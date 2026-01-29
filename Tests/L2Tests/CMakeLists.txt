@@ -16,7 +16,7 @@
 # limitations under the License.
 
 
-set(PLUGIN_NAME L2TestDD)
+set(PLUGIN_NAME L2TestsDD)
 set(MODULE_NAME ${NAMESPACE}${PLUGIN_NAME})
 set(THUNDER_PORT 9998)
 
