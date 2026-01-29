@@ -100,14 +100,14 @@ jobs:
         with:
           repository: rdkcentral/entservices-systemservices
           path: entservices-systemservices
-          ref: develop
+          ref: topic/RDKEMW-13071
 
       - name: Checkout entservices-testframework
         uses: actions/checkout@v3
         with:
           repository: rdkcentral/entservices-testframework
           path: entservices-testframework
-          ref: develop
+          ref: topic/RDKEMW-13071
           token: ${{ secrets.RDKCM_RDKE }}
 
       - name: Checkout googletest
@@ -378,13 +378,8 @@ jobs:
           -DCMAKE_DISABLE_FIND_PACKAGE_Udev=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_RFC=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_RBus=ON
-          -DPLUGIN_SYSTEMMODE=ON
           -DPLUGIN_SYSTEMSERVICES=ON
           -DPLUGIN_POWERMANAGER=ON
-          -DPLUGIN_DEVICEDIAGNOSTICS=ON
-          -DPLUGIN_DISPLAYSETTINGS=ON
-          -DPLUGIN_WAREHOUSE=ON
-          -DPLUGIN_FRAMERATE=ON
           -DUSE_THUNDER_R4=ON
           -DPLUGIN_L2Tests=ON
           -DRDK_SERVICE_L2_TEST=ON
@@ -463,13 +458,6 @@ jobs:
           -DCMAKE_DISABLE_FIND_PACKAGE_RBus=ON
           -DPLUGIN_SYSTEMSERVICES=ON
           -DPLUGIN_POWERMANAGER=ON
-          -DPLUGIN_DISPLAYSETTINGS=ON
-          -DPLUGIN_DEVICEDIAGNOSTICS=ON
-          -DPLUGIN_WAREHOUSE=ON
-          -DPLUGIN_AVINPUT=OFF
-          -DPLUGIN_AVOUTPUT=OFF
-          -DPLUGIN_FRAMERATE=ON
-          -DAVOUTPUT_TV=OFF
           -DUSE_THUNDER_R4=ON
           -DPLUGIN_L2Tests=ON
           -DRDK_SERVICE_L2_TEST=ON
