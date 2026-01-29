@@ -100,18 +100,29 @@ namespace Plugin {
     {
         WPEFramework::PluginHost::IShell* controller = builder.controller();
         const std::string& callsign = builder.callSign();
+        const int retryCount = builder.retryCount();
+        const uint32_t retryInterval = builder.retryInterval();
+        int count = 0;
+
         if (!controller) {
             LOGERR("Invalid controller");
             return nullptr;
         }
 
-        auto pluginInterface = controller->QueryInterfaceByCallsign<INTERFACE>(callsign.c_str());
+        do {
+            auto pluginInterface = controller->QueryInterfaceByCallsign<INTERFACE>(callsign.c_str());
 
-        if (pluginInterface) {
-            pluginInterface->AddRef();
-        }
+            if (pluginInterface) {
+                LOGINFO("plugin interface succeed and retry count: %d", count);
+                return pluginInterface;
+            } else {
+                count++;
+                LOGERR("plugin interface failed and retry: %d", count);
+                usleep(retryInterval * 1000);
+            }
+        } while (count < retryCount);
 
-        return pluginInterface;
+        return nullptr;
     }
 
     template <typename T, typename... Args>
@@ -127,6 +138,8 @@ namespace Plugin {
         PluginHost::IShell* _service;
         uint32_t _version;
         uint32_t _timeout;
+        int _retryCount;
+        uint32_t _retryInterval;
 
     public:
         PluginInterfaceBuilder(const char* callsign)
@@ -134,6 +147,8 @@ namespace Plugin {
             , _service(nullptr)
             , _version(static_cast<uint32_t>(~0))
             , _timeout(3000)
+            , _retryCount(0)
+            , _retryInterval(0)
         {
         }
 
@@ -152,9 +167,21 @@ namespace Plugin {
             return *this;
         }
 
-        inline PluginInterfaceBuilder& withIShell(PluginHost::IShell * service)
+        inline PluginInterfaceBuilder& withIShell(PluginHost::IShell* service)
         {
             _service = service;
+            return *this;
+        }
+
+        inline PluginInterfaceBuilder& withRetryIntervalMS(int retryInterval)
+        {
+            _retryInterval = retryInterval;
+            return *this;
+        }
+
+        inline PluginInterfaceBuilder& withRetryCount(int retryCount)
+        {
+            _retryCount = retryCount;
             return *this;
         }
 
@@ -168,6 +195,16 @@ namespace Plugin {
 
             // pass on the ownership of controller to interfaceRef
             return std::move(PluginInterfaceRef<INTERFACE>(interface, _service));
+        }
+
+        const uint32_t retryInterval() const
+        {
+            return _retryInterval;
+        }
+
+        const int retryCount() const
+        {
+            return _retryCount;
         }
 
         const std::string& callSign() const
