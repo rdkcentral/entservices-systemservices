@@ -16,42 +16,14 @@
 # limitations under the License.
 
 
-set(PLUGIN_NAME L2TestsDD)
+set(PLUGIN_NAME L2TestDD)
 set(MODULE_NAME ${NAMESPACE}${PLUGIN_NAME})
 set(THUNDER_PORT 9998)
 
 find_package(${NAMESPACE}Plugins REQUIRED)
 
-if(PLUGIN_SYSTEMMODE)
-    set(SRC_FILES ${SRC_FILES} tests/SystemMode_L2Test.cpp)
-endif()
-
-if(PLUGIN_WAREHOUSE)
-    set(SRC_FILES ${SRC_FILES} tests/Warehouse_L2Test.cpp)
-endif()
-
-if(PLUGIN_DEVICEDIAGNOSTICS)
-    set(SRC_FILES ${SRC_FILES} tests/DeviceDiagnostics_L2Test.cpp)
-endif()
-
-if(PLUGIN_DISPLAYSETTINGS)
-    set(SRC_FILES ${SRC_FILES} tests/DisplaySettings_L2Test.cpp)
-endif()
-
 if(PLUGIN_SYSTEMSERVICES)
     set(SRC_FILES ${SRC_FILES} tests/SystemService_L2Test.cpp)
-endif()
-
-if(PLUGIN_USERPREFERENCES)
-    set(SRC_FILES ${SRC_FILES} tests/UserPreferences_L2Test.cpp) 
-endif()
-
-if(PLUGIN_POWERMANAGER)
-    set(SRC_FILES ${SRC_FILES} tests/PowerManager_L2Test.cpp)
-endif()
-
-if(PLUGIN_FRAMERATE)
-    set(SRC_FILES ${SRC_FILES} tests/FrameRate_L2Test.cpp)
 endif()
 
 add_library(${MODULE_NAME} SHARED ${SRC_FILES})
