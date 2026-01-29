@@ -54,44 +54,8 @@ if(RDK_SERVICES_L1_TEST)
     add_subdirectory(Tests/L1Tests)
 endif()
 
-if(PLUGIN_DISPLAYSETTINGS)
-    add_subdirectory(DisplaySettings)
-endif()
-
 if(PLUGIN_SYSTEMSERVICES)
-    add_subdirectory(SystemServices)
-endif()
-
-if(PLUGIN_POWERMANAGER)
-    add_subdirectory(PowerManager)
-endif()
-
-if(PLUGIN_USERPREFERENCES)
-    add_subdirectory(UserPreferences)
-endif()
-
-if(PLUGIN_FRAMERATE)
-    add_subdirectory(FrameRate)
-endif()
-
-if(PLUGIN_WAREHOUSE)
-    add_subdirectory(Warehouse)
-endif()
-
-if(PLUGIN_DEVICEINFO)
-    add_subdirectory(DeviceInfo)
-endif()
-
-if(PLUGIN_DISPLAYINFO)
-    add_subdirectory(DisplayInfo)
-endif()
-
-if(PLUGIN_DEVICEDIAGNOSTICS)
-    add_subdirectory(DeviceDiagnostics)
-endif()
-
-if(PLUGIN_SYSTEMMODE)
-    add_subdirectory(SystemMode)
+    add_subdirectory(plugin)
 endif()
 
 if(WPEFRAMEWORK_CREATE_IPKG_TARGETS)
