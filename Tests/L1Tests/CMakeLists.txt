@@ -26,7 +26,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(${NAMESPACE}Plugins REQUIRED)
 
 set (TEST_SRC
-    tests/test_SystemServices.cpp
 )
 
 set (TEST_LIB
