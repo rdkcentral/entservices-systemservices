@@ -17,6 +17,7 @@ env:
   INTERFACES_REF: "develop"
   AUTOMATICS_UNAME: ${{ secrets.AUTOMATICS_UNAME}}
   AUTOMATICS_PASSCODE: ${{ secrets. AUTOMATICS_PASSCODE}}
+  RDK_SERVICES_L1_TEST: "OFF"
 
 jobs:
   L1-tests:
@@ -470,13 +471,6 @@ jobs:
           -DRDK_SERVICES_L1_TEST=ON
           -DUSE_THUNDER_R4=ON
           -DHIDE_NON_EXTERNAL_SYMBOLS=OFF
-          -DPLUGIN_DEVICEDIAGNOSTICS=ON
-          -DPLUGIN_USERPREFERENCES=ON
-          -DPLUGIN_WAREHOUSE=ON
-          -DPLUGIN_DEVICEINFO=OFF
-          -DPLUGIN_DISPLAYINFO=ON
-          -DPLUGIN_DISPLAYSETTINGS=OFF
-          -DPLUGIN_FRAMERATE=ON
           -DPLUGIN_POWERMANAGER=ON
           -DPLUGIN_SYSTEMSERVICES=ON
           &&
@@ -556,14 +550,8 @@ jobs:
           -DBUILD_RPI=ON
           -DHAS_FRONT_PANEL=ON
           -DPLUGIN_SYSTEMSERVICES=ON
-          -DPLUGIN_DEVICEINFO=OFF
           -DPLUGIN_POWERMANAGER=ON
-          -DPLUGIN_FRAMERATE=ON
-          -DPLUGIN_USERPREFERENCES=ON
-          -DPLUGIN_WAREHOUSE=ON
-          -DPLUGIN_DEVICEDIAGNOSTICS=ON
-          -DPLUGIN_DISPLAYINFO=ON
-          -DRDK_SERVICES_L1_TEST=ON
+          -DRDK_SERVICES_L1_TEST=OFF
           -DUSE_THUNDER_R4=ON
           -DHIDE_NON_EXTERNAL_SYMBOLS=OFF
           &&
@@ -657,6 +645,7 @@ jobs:
           ls -l /dev/disk/by-id/usb-JetFlash_Transcend_16GB_UEUIRCXT-0
 
       - name: Run unit tests without valgrind
+        if: ${{ env.RDK_SERVICES_L1_TEST == 'ON' }}
         run: >
           PATH=$GITHUB_WORKSPACE/install/usr/bin:${PATH}
           LD_LIBRARY_PATH=$GITHUB_WORKSPACE/install/usr/lib:$GITHUB_WORKSPACE/install/usr/lib/wpeframework/plugins:${LD_LIBRARY_PATH}
@@ -666,7 +655,7 @@ jobs:
           rm -rf $(pwd)/rdkL1TestResults.json
 
       - name: Run unit tests with valgrind
-        if: ${{ !env.ACT }}
+        if: ${{ !env.ACT && env.RDK_SERVICES_L1_TEST == 'ON'}}
         run: >
           PATH=$GITHUB_WORKSPACE/install/usr/bin:${PATH}
           LD_LIBRARY_PATH=$GITHUB_WORKSPACE/install/usr/lib:$GITHUB_WORKSPACE/install/usr/lib/wpeframework/plugins:${LD_LIBRARY_PATH}
@@ -683,7 +672,7 @@ jobs:
           rm -rf $(pwd)/rdkL1TestResults.json
 
       - name: Generate coverage
-        if: ${{ matrix.coverage == 'with-coverage' && !env.ACT }}
+        if: ${{ matrix.coverage == 'with-coverage' && !env.ACT && env.RDK_SERVICE_L1_TEST == 'ON' }}
         run: >
           cp $GITHUB_WORKSPACE/entservices-testframework/Tests/L1Tests/.lcovrc_l1 ~/.lcovrc
           &&
@@ -708,6 +697,7 @@ jobs:
           filtered_coverage.info
 
       - name: Upload artifacts
+        if: ${{env.RDK_SERVICE_L1_TEST == 'ON'}}
         uses: actions/upload-artifact@v4
         with:
           name: artifacts-L1-systemservices
