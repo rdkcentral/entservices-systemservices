@@ -369,12 +369,9 @@ jobs:
           -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvTypes.h
           -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/essos-resmgr.h
           -Wall -Wno-unused-result -Wno-deprecated-declarations -Wno-error=format=
-          -Wl,-wrap,system -Wl,-wrap,popen -Wl,-wrap,syslog -Wl,-wrap,v_secure_system -Wl,-wrap,v_secure_popen -Wl,-wrap,v_secure_pclose -Wl,-wrap,unlink
+          -Wl,-wrap,popen -Wl,-wrap,syslog -Wl,-wrap,v_secure_system -Wl,-wrap,v_secure_popen -Wl,-wrap,v_secure_pclose -Wl,-wrap,unlink
           -DUSE_IARMBUS
-          -DENABLE_ERM
-          -DRDK_LOG_MILESTONE
           -DRDK_SERVICE_L2_TEST
-          -DDISABLE_SECURITY_TOKEN
           -DHAS_API_POWERSTATE
           -DENABLE_THERMAL_PROTECTION"
           -DPLUGIN_PERSISTENTSTORE_PATH="/tmp/secure/persistent/rdkservicestore"
@@ -449,8 +446,6 @@ jobs:
           -Wall -Wno-unused-result -Wno-deprecated-declarations -Wno-error=format=
           -Wl,-wrap,system -Wl,-wrap,popen -Wl,-wrap,syslog -Wl,-wrap,v_secure_system -Wl,-wrap,v_secure_popen -Wl,-wrap,v_secure_pclose -Wl,-wrap,unlink
           -DUSE_IARMBUS
-          -DENABLE_ERM
-          -DRDK_LOG_MILESTONE
           -DRDK_SERVICE_L2_TEST
           -DDISABLE_SECURITY_TOKEN
           -DHAS_API_POWERSTATE
@@ -526,8 +521,6 @@ jobs:
           -Werror -Wall -Wno-unused-result -Wno-deprecated-declarations -Wno-error=format=
           -Wl,--no-as-needed
           -DUSE_IARMBUS
-          -DENABLE_ERM
-          -DRDK_LOG_MILESTONE
           -DRDK_SERVICE_L2_TEST
           -DDISABLE_SECURITY_TOKEN
           -DHAS_API_POWERSTATE
