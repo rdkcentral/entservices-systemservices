@@ -124,7 +124,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-testframework
           path: entservices-testframework
-          ref: topic/RDKEMW-13071
+          ref: develop
           token: ${{ secrets.RDKCM_RDKE }}
 
       - name: Checkout entservices-systemservices
@@ -139,7 +139,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-systemservices
           path: entservices-systemservices
-          ref: topic/RDKEMW-13071
+          ref: develop
 
       - name: Checkout googletest
         if: steps.cache.outputs.cache-hit != 'true'
