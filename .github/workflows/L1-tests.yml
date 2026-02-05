@@ -469,7 +469,6 @@ jobs:
           -DRDK_SERVICES_L1_TEST=ON
           -DUSE_THUNDER_R4=ON
           -DHIDE_NON_EXTERNAL_SYMBOLS=OFF
-          -DPLUGIN_POWERMANAGER=ON
           -DPLUGIN_SYSTEMSERVICES=ON
           &&
           cmake --build build/entservices-systemservices
@@ -547,7 +546,6 @@ jobs:
           -DBUILD_RPI=ON
           -DHAS_FRONT_PANEL=ON
           -DPLUGIN_SYSTEMSERVICES=ON
-          -DPLUGIN_POWERMANAGER=ON
           -DRDK_SERVICES_L1_TEST=${{env.RDK_SERVICES_L1_TEST}}
           -DUSE_THUNDER_R4=ON
           -DHIDE_NON_EXTERNAL_SYMBOLS=OFF
