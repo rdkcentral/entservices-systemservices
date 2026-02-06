@@ -399,7 +399,44 @@ namespace WPEFramework {
                     LOGWARN("Failed to get %s from %s", key, filename);
 
                 return result;                    
-            }            
+            }
+
+            uint32_t GetFileRegex(const char* filename, const std::regex& regex, string& response)
+            {
+                uint32_t result = Core::ERROR_GENERAL;
+
+                if (!Utils::fileExists(filename)) {
+                    LOGWARN("GetFileRegex: file %s does not exist", filename);
+                    return result;
+                }
+                std::ifstream file(filename);
+                if (file) {
+                    string line;
+                    while (std::getline(file, line)) {
+                        std::smatch sm;
+                        if (std::regex_match(line, sm, regex)) {
+                            if (sm.size() == 2) {
+                                response = sm[1];
+                                result = Core::ERROR_NONE;
+                            } else {
+                                LOGERR("GetFileRegex: Unexpected capture group count %zu (expected 2) in file %s",
+                                    sm.size(), filename);
+                                result = Core::ERROR_GENERAL;
+                            }
+                            break;
+                        }
+                    }
+
+                    if (result != Core::ERROR_NONE) {
+                        LOGWARN("Regex pattern did not match any line in %s", filename);
+                    }
+                }
+                else {
+                    LOGWARN("failed to open %s:%s", filename, strerror(errno));
+                }
+
+                return result;
+            }
         }
 
         //Prototypes
@@ -1295,19 +1332,42 @@ namespace WPEFramework {
 	bool SystemServices::getModelName(const string& parameter, JsonObject& response)
 	{
 		LOGWARN("SystemService getDeviceInfo query %s", parameter.c_str());
+
+		bool status = false;
+		std::string device_name{};
+		std::string friendly_id;
+		GetValueFromPropertiesFile(DEVICE_PROPERTIES_FILE, "DEVICE_NAME", device_name);
+
+		if ((device_name == "PLATCO") || (device_name == "LLAMA")) {
 		IARM_Bus_MFRLib_GetSerializedData_Param_t param;
 		param.bufLen = 0;
 		param.type = mfrSERIALIZED_TYPE_PROVISIONED_MODELNAME;
 		IARM_Result_t result = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME, IARM_BUS_MFRLIB_API_GetSerializedData, &param, sizeof(param));
 		param.buffer[param.bufLen] = '\0';
 		LOGWARN("SystemService getDeviceInfo param type %d result %s", param.type, param.buffer);
-		bool status = false;
-		if (result == IARM_RESULT_SUCCESS) {
+		if (result == IARM_RESULT_SUCCESS && param.bufLen) {
 			response[parameter.c_str()] = string(param.buffer);
 			status = true;
 		}
 		else{
 			LOGWARN("SystemService getDeviceInfo - Manufacturer Data Read Failed");
+			GetFileRegex(DEVICE_PROPERTIES_FILE, std::regex("^FRIENDLY_ID(?:\\s*)=(?:\\s*)(?:\"{0,1})([^\"\\n]+)(?:\"{0,1})(?:\\s*)$"), friendly_id);
+                        if (friendly_id.size() > 0) {
+                                response[parameter.c_str()] = friendly_id;
+                                status = true;
+                        } else {
+                                populateResponseWithError(SysSrv_MissingKeyValues, response);
+                        }
+		}
+		}
+		else {
+			GetFileRegex(DEVICE_PROPERTIES_FILE, std::regex("^FRIENDLY_ID(?:\\s*)=(?:\\s*)(?:\"{0,1})([^\"\\n]+)(?:\"{0,1})(?:\\s*)$"), friendly_id);
+			if (friendly_id.size() > 0) {
+				response[parameter.c_str()] = friendly_id;
+				status = true;
+			} else {
+				populateResponseWithError(SysSrv_MissingKeyValues, response);
+			}
 		}
 		return status;
 	}
