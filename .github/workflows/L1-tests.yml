@@ -17,6 +17,7 @@ env:
   INTERFACES_REF: "develop"
   AUTOMATICS_UNAME: ${{ secrets.AUTOMATICS_UNAME}}
   AUTOMATICS_PASSCODE: ${{ secrets. AUTOMATICS_PASSCODE}}
+  RDK_SERVICES_L1_TEST: "OFF"
 
 jobs:
   L1-tests:
@@ -126,18 +127,18 @@ jobs:
           ref: develop
           token: ${{ secrets.RDKCM_RDKE }}
 
-      - name: Checkout entservices-deviceanddisplay
+      - name: Checkout entservices-systemservices
         if: ${{ inputs.caller_source == 'local' }}
         uses: actions/checkout@v3
         with:
-          path: entservices-deviceanddisplay
+          path: entservices-systemservices
 
-      - name: Checkout entservices-deviceanddisplay-testframework
+      - name: Checkout entservices-systemservices-testframework
         if: ${{ inputs.caller_source == 'testframework' }}
         uses: actions/checkout@v3
         with:
-          repository: rdkcentral/entservices-deviceanddisplay
-          path: entservices-deviceanddisplay
+          repository: rdkcentral/entservices-systemservices
+          path: entservices-systemservices
           ref: develop
 
       - name: Checkout googletest
@@ -334,7 +335,7 @@ jobs:
           -S "$GITHUB_WORKSPACE/entservices-testframework/Tests/mocks"
           -B build/mocks
           -DBUILD_SHARED_LIBS=ON
-          -DRDK_SERVICES_L1_TEST=ON
+          -DRDK_SERVICES_L1_TEST=${{env.RDK_SERVICES_L1_TEST == 'ON'}}
           -DUSE_THUNDER_R4=ON
           -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
           -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/install/usr"
@@ -357,7 +358,7 @@ jobs:
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/ccec/drivers
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/network
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests
-          -I$GITHUB_WORKSPACE/entservices-deviceanddisplay/helpers
+          -I$GITHUB_WORKSPACE/entservices-systemservices/helpers
           -I$GITHUB_WORKSPACE/Thunder/Source
           -I$GITHUB_WORKSPACE/Thunder/Source/core
           -I$GITHUB_WORKSPACE/install/usr/include
@@ -379,7 +380,6 @@ jobs:
           -Wl,-wrap,syslog -Wl,-wrap,v_secure_system -Wl,-wrap,v_secure_popen -Wl,-wrap,v_secure_pclose -Wl,-wrap,unlink -Wl,-wrap,v_secure_system -Wl,-wrap,setmntent -Wl,-wrap,getmntent
           -DENABLE_TELEMETRY_LOGGING
           -DUSE_IARMBUS
-          -DENABLE_SYSTEM_GET_STORE_DEMO_LINK
           -DENABLE_DEEP_SLEEP
           -DENABLE_SET_WAKEUP_SRC_CONFIG
           -DENABLE_THERMAL_PROTECTION
@@ -395,11 +395,11 @@ jobs:
           &&
           cmake --install build/mocks
 
-      - name: Build entservices-deviceanddisplay
+      - name: Build entservices-systemservices
         run: >
           cmake -G Ninja
-          -S "$GITHUB_WORKSPACE/entservices-deviceanddisplay"
-          -B build/entservices-deviceanddisplay
+          -S "$GITHUB_WORKSPACE/entservices-systemservices"
+          -B build/entservices-systemservices
           -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/install/usr"
           -DCMAKE_MODULE_PATH="$GITHUB_WORKSPACE/install/tools/cmake"
           -DCMAKE_CXX_FLAGS="
@@ -419,7 +419,7 @@ jobs:
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/ccec/drivers
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/network
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests
-          -I$GITHUB_WORKSPACE/entservices-deviceanddisplay/helpers
+          -I$GITHUB_WORKSPACE/entservices-systemservices/helpers
           -I$GITHUB_WORKSPACE/Thunder/Source
           -I$GITHUB_WORKSPACE/Thunder/Source/core
           -I$GITHUB_WORKSPACE/install/usr/include
@@ -446,7 +446,6 @@ jobs:
           -DUSE_IARMBUS
           -DUSE_DEVICESETTINGS
           -DBUILD_RPI
-          -DENABLE_SYSTEM_GET_STORE_DEMO_LINK
           -DENABLE_DEEP_SLEEP
           -DENABLE_SET_WAKEUP_SRC_CONFIG
           -DENABLE_THERMAL_PROTECTION
@@ -467,22 +466,14 @@ jobs:
           -DUSE_DEVICESETTINGS=ON
           -DBUILD_RPI=ON
           -DHAS_FRONT_PANEL=ON
-          -DRDK_SERVICES_L1_TEST=ON
+          -DRDK_SERVICES_L1_TEST=${{env.RDK_SERVICES_L1_TEST == 'ON'}}
           -DUSE_THUNDER_R4=ON
           -DHIDE_NON_EXTERNAL_SYMBOLS=OFF
-          -DPLUGIN_DEVICEDIAGNOSTICS=ON
-          -DPLUGIN_USERPREFERENCES=ON
-          -DPLUGIN_WAREHOUSE=ON
-          -DPLUGIN_DEVICEINFO=OFF
-          -DPLUGIN_DISPLAYINFO=ON
-          -DPLUGIN_DISPLAYSETTINGS=OFF
-          -DPLUGIN_FRAMERATE=ON
-          -DPLUGIN_POWERMANAGER=ON
           -DPLUGIN_SYSTEMSERVICES=ON
           &&
-          cmake --build build/entservices-deviceanddisplay
+          cmake --build build/entservices-systemservices
           &&
-          cmake --install build/entservices-deviceanddisplay
+          cmake --install build/entservices-systemservices
 
       - name: Build entservices-testframework
         run: >
@@ -507,7 +498,7 @@ jobs:
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmmgrs-hal
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/ccec/drivers
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/network
-          -I$GITHUB_WORKSPACE/entservices-deviceanddisplay/helpers
+          -I$GITHUB_WORKSPACE/entservices-systemservices/helpers
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests
           -I$GITHUB_WORKSPACE/Thunder/Source
           -I$GITHUB_WORKSPACE/Thunder/Source/core
@@ -534,7 +525,6 @@ jobs:
           -DUSE_IARMBUS
           -DUSE_DEVICESETTINGS
           -DBUILD_RPI
-          -DENABLE_SYSTEM_GET_STORE_DEMO_LINK
           -DENABLE_DEEP_SLEEP
           -DENABLE_SET_WAKEUP_SRC_CONFIG
           -DENABLE_THERMAL_PROTECTION
@@ -556,14 +546,7 @@ jobs:
           -DBUILD_RPI=ON
           -DHAS_FRONT_PANEL=ON
           -DPLUGIN_SYSTEMSERVICES=ON
-          -DPLUGIN_DEVICEINFO=OFF
-          -DPLUGIN_POWERMANAGER=ON
-          -DPLUGIN_FRAMERATE=ON
-          -DPLUGIN_USERPREFERENCES=ON
-          -DPLUGIN_WAREHOUSE=ON
-          -DPLUGIN_DEVICEDIAGNOSTICS=ON
-          -DPLUGIN_DISPLAYINFO=ON
-          -DRDK_SERVICES_L1_TEST=ON
+          -DRDK_SERVICES_L1_TEST=${{env.RDK_SERVICES_L1_TEST}}
           -DUSE_THUNDER_R4=ON
           -DHIDE_NON_EXTERNAL_SYMBOLS=OFF
           &&
@@ -657,6 +640,7 @@ jobs:
           ls -l /dev/disk/by-id/usb-JetFlash_Transcend_16GB_UEUIRCXT-0
 
       - name: Run unit tests without valgrind
+        if: ${{ env.RDK_SERVICES_L1_TEST == 'ON' }}
         run: >
           PATH=$GITHUB_WORKSPACE/install/usr/bin:${PATH}
           LD_LIBRARY_PATH=$GITHUB_WORKSPACE/install/usr/lib:$GITHUB_WORKSPACE/install/usr/lib/wpeframework/plugins:${LD_LIBRARY_PATH}
@@ -666,7 +650,7 @@ jobs:
           rm -rf $(pwd)/rdkL1TestResults.json
 
       - name: Run unit tests with valgrind
-        if: ${{ !env.ACT }}
+        if: ${{ !env.ACT && env.RDK_SERVICES_L1_TEST == 'ON'}}
         run: >
           PATH=$GITHUB_WORKSPACE/install/usr/bin:${PATH}
           LD_LIBRARY_PATH=$GITHUB_WORKSPACE/install/usr/lib:$GITHUB_WORKSPACE/install/usr/lib/wpeframework/plugins:${LD_LIBRARY_PATH}
@@ -683,18 +667,18 @@ jobs:
           rm -rf $(pwd)/rdkL1TestResults.json
 
       - name: Generate coverage
-        if: ${{ matrix.coverage == 'with-coverage' && !env.ACT }}
+        if: ${{ matrix.coverage == 'with-coverage' && !env.ACT && env.RDK_SERVICES_L1_TEST == 'ON' }}
         run: >
           cp $GITHUB_WORKSPACE/entservices-testframework/Tests/L1Tests/.lcovrc_l1 ~/.lcovrc
           &&
           lcov -c
           -o coverage.info
-          -d build/entservices-deviceanddisplay
+          -d build/entservices-systemservices
           &&
           lcov
           -r coverage.info
           '/usr/include/*'
-          '*/build/entservices-deviceanddisplay/_deps/*'
+          '*/build/entservices-systemservices/_deps/*'
           '*/install/usr/include/*'
           '*/Tests/headers/*'
           '*/Tests/mocks/*'
@@ -704,13 +688,14 @@ jobs:
           &&
           genhtml
           -o coverage
-          -t "entservices-deviceanddisplay coverage"
+          -t "entservices-systemservices coverage"
           filtered_coverage.info
 
       - name: Upload artifacts
+        if: ${{env.RDK_SERVICES_L1_TEST == 'ON'}}
         uses: actions/upload-artifact@v4
         with:
-          name: artifacts-L1-deviceanddisplay
+          name: artifacts-L1-systemservices
           path: |
             coverage/
             valgrind_log

@@ -88,26 +88,33 @@ jobs:
           path: ThunderTools
           ref: R4.4.3
 
-      - name: Checkout entservices-deviceanddisplay
+      - name: Checkout entservices-powermanager
+        uses: actions/checkout@v3
+        with:
+          repository: rdkcentral/entservices-powermanager
+          path: entservices-powermanager
+          ref: develop
+
+      - name: Checkout entservices-systemservices
         if: ${{ inputs.caller_source == 'local' }}
         uses: actions/checkout@v3
         with:
-          path: entservices-deviceanddisplay
+          path: entservices-systemservices
 
-      - name: Checkout entservices-deviceanddisplay-testframework
+      - name: Checkout entservices-systemservices-testframework
         if: ${{ inputs.caller_source == 'testframework' }}
         uses: actions/checkout@v3
         with:
-          repository: rdkcentral/entservices-deviceanddisplay
-          path: entservices-deviceanddisplay
-          ref: develop
+          repository: rdkcentral/entservices-systemservices
+          path: entservices-systemservices
+          ref: topic/RDKEMW-13071
 
       - name: Checkout entservices-testframework
         uses: actions/checkout@v3
         with:
           repository: rdkcentral/entservices-testframework
           path: entservices-testframework
-          ref: develop
+          ref: feature/RDKEMW-12935
           token: ${{ secrets.RDKCM_RDKE }}
 
       - name: Checkout googletest
@@ -312,11 +319,11 @@ jobs:
           &&
           cmake --install build/mocks
 
-      - name: Build entservices-deviceanddisplay
+      - name: Build entservices-powermanager
         run: >
           cmake
-          -S "$GITHUB_WORKSPACE/entservices-deviceanddisplay"
-          -B build/entservices-deviceanddisplay
+          -S "$GITHUB_WORKSPACE/entservices-powermanager"
+          -B build/entservices-powermanager
           -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
           -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/install/usr"
           -DCMAKE_MODULE_PATH="$GITHUB_WORKSPACE/install/tools/cmake"
@@ -339,7 +346,7 @@ jobs:
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systemservices
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systemservices/proc
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks
-          -I $GITHUB_WORKSPACE/entservices-deviceanddisplay/helpers
+          -I $GITHUB_WORKSPACE/entservices-powermanager/helpers
           -I $GITHUB_WORKSPACE/install/usr/include
           -I ./usr/include/libdrm
           -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/devicesettings.h
@@ -364,8 +371,6 @@ jobs:
           -Wall -Wno-unused-result -Wno-deprecated-declarations -Wno-error=format=
           -Wl,-wrap,system -Wl,-wrap,popen -Wl,-wrap,syslog -Wl,-wrap,v_secure_system -Wl,-wrap,v_secure_popen -Wl,-wrap,v_secure_pclose -Wl,-wrap,unlink
           -DUSE_IARMBUS
-          -DENABLE_ERM
-          -DRDK_LOG_MILESTONE
           -DRDK_SERVICE_L2_TEST
           -DDISABLE_SECURITY_TOKEN
           -DHAS_API_POWERSTATE
@@ -378,22 +383,92 @@ jobs:
           -DCMAKE_DISABLE_FIND_PACKAGE_Udev=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_RFC=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_RBus=ON
-          -DPLUGIN_SYSTEMMODE=ON
-          -DPLUGIN_SYSTEMSERVICES=ON
           -DPLUGIN_POWERMANAGER=ON
-          -DPLUGIN_DEVICEDIAGNOSTICS=ON
-          -DPLUGIN_DISPLAYSETTINGS=ON
-          -DPLUGIN_WAREHOUSE=ON
-          -DPLUGIN_FRAMERATE=ON
+          -DPLUGIN_SYSTEMSERVICES=ON
           -DUSE_THUNDER_R4=ON
           -DPLUGIN_L2Tests=ON
           -DRDK_SERVICE_L2_TEST=ON
           -DDS_FOUND=ON
           -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
           &&
-          cmake --build build/entservices-deviceanddisplay
+          cmake --build build/entservices-powermanager -j8
           &&
-          cmake --install build/entservices-deviceanddisplay
+          cmake --install build/entservices-powermanager
+
+      - name: Build entservices-systemservices
+        run: >
+          cmake
+          -S "$GITHUB_WORKSPACE/entservices-systemservices"
+          -B build/entservices-systemservices
+          -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
+          -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/install/usr"
+          -DCMAKE_MODULE_PATH="$GITHUB_WORKSPACE/install/tools/cmake"
+          -DHIDE_NON_EXTERNAL_SYMBOLS=OFF
+          -DCMAKE_CXX_FLAGS="
+          -DEXCEPTIONS_ENABLE=ON
+          -fprofile-arcs
+          -ftest-coverage
+          -DUSE_THUNDER_R4=ON
+          -DTHUNDER_VERSION=4
+          -DTHUNDER_VERSION_MAJOR=4
+          -DTHUNDER_VERSION_MINOR=4
+          -DDEVICE_TYPE=AVOutputTV
+          -DPLUGIN_PERSISTENTSTORE_PATH="/tmp/secure/persistent/rdkservicestore"
+          -DPLUGIN_PERSISTENTSTORE_LEGACYPATH="/tmp/persistent/rdkservicestore"
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/ds
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmbus
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmmgrs-hal
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systemservices
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systemservices/proc
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks
+          -I $GITHUB_WORKSPACE/entservices-systemservices/helpers
+          -I $GITHUB_WORKSPACE/install/usr/include
+          -I ./usr/include/libdrm
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/devicesettings.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Iarm.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Rfc.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/RBus.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Udev.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Wraps.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/maintenanceMGR.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/pkg.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/secure_wrappermock.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/wpa_ctrl_mock.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/readprocMockInterface.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/btmgr.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tr181api.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvSettings.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvError.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvSettingsExtODM.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvSettingsODM.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvTypes.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/essos-resmgr.h
+          -Wall -Wno-unused-result -Wno-deprecated-declarations -Wno-error=format=
+          -Wl,-wrap,popen -Wl,-wrap,syslog -Wl,-wrap,v_secure_system -Wl,-wrap,v_secure_popen -Wl,-wrap,v_secure_pclose -Wl,-wrap,unlink
+          -DUSE_IARMBUS
+          -DRDK_SERVICE_L2_TEST
+          -DHAS_API_POWERSTATE
+          -DENABLE_THERMAL_PROTECTION"
+          -DPLUGIN_PERSISTENTSTORE_PATH="/tmp/secure/persistent/rdkservicestore"
+          -DPLUGIN_PERSISTENTSTORE_LEGACYPATH="/tmp/persistent/rdkservicestore"
+          -DCOMCAST_CONFIG=OFF
+          -DCMAKE_DISABLE_FIND_PACKAGE_DS=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_IARMBus=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_Udev=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_RFC=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_RBus=ON
+          -DPLUGIN_SYSTEMSERVICES=ON
+          -DPLUGIN_POWERMANAGER=ON
+          -DUSE_THUNDER_R4=ON
+          -DPLUGIN_L2Tests=ON
+          -DRDK_SERVICE_L2_TEST=ON
+          -DDS_FOUND=ON
+          -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+          &&
+          cmake --build build/entservices-systemservices
+          &&
+          cmake --install build/entservices-systemservices
 
       - name: Build entservices-testframework
         run: >
@@ -421,7 +496,7 @@ jobs:
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmmgrs-hal
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systemservices
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systemservices/proc
-          -I $GITHUB_WORKSPACE/entservices-deviceanddisplay/helpers
+          -I $GITHUB_WORKSPACE/entservices-systemservices/helpers
           -I $GITHUB_WORKSPACE/install/usr/include
           -I ./usr/include/libdrm
           -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/devicesettings.h
@@ -447,8 +522,6 @@ jobs:
           -Werror -Wall -Wno-unused-result -Wno-deprecated-declarations -Wno-error=format=
           -Wl,--no-as-needed
           -DUSE_IARMBUS
-          -DENABLE_ERM
-          -DRDK_LOG_MILESTONE
           -DRDK_SERVICE_L2_TEST
           -DDISABLE_SECURITY_TOKEN
           -DHAS_API_POWERSTATE
@@ -463,13 +536,6 @@ jobs:
           -DCMAKE_DISABLE_FIND_PACKAGE_RBus=ON
           -DPLUGIN_SYSTEMSERVICES=ON
           -DPLUGIN_POWERMANAGER=ON
-          -DPLUGIN_DISPLAYSETTINGS=ON
-          -DPLUGIN_DEVICEDIAGNOSTICS=ON
-          -DPLUGIN_WAREHOUSE=ON
-          -DPLUGIN_AVINPUT=OFF
-          -DPLUGIN_AVOUTPUT=OFF
-          -DPLUGIN_FRAMERATE=ON
-          -DAVOUTPUT_TV=OFF
           -DUSE_THUNDER_R4=ON
           -DPLUGIN_L2Tests=ON
           -DRDK_SERVICE_L2_TEST=ON
@@ -615,12 +681,12 @@ jobs:
           &&
           lcov -c
           -o coverage.info
-          -d build/entservices-deviceanddisplay
+          -d build/entservices-systemservices
           &&
           lcov
           -r coverage.info
           '/usr/include/*'
-          '*/build/entservices-deviceanddisplay/_deps/*'
+          '*/build/entservices-systemservices/_deps/*'
           '*/build/entservices-entservices-testframework/_deps/*'
           '*/install/usr/include/*'
           '*/Tests/headers/*'
@@ -633,14 +699,14 @@ jobs:
           &&
           genhtml
           -o coverage
-          -t "entservices-deviceanddisplay coverage"
+          -t "entservices-systemservices coverage"
           filtered_coverage.info
 
       - name: Upload artifacts
         if: ${{ !env.ACT }}
         uses: actions/upload-artifact@v4
         with:
-          name: artifacts-L2-deviceanddisplay
+          name: artifacts-L2-systemservices
           path: |
             coverage/
             valgrind_log

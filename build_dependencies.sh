@@ -10,20 +10,9 @@ cd ${GITHUB_WORKSPACE}
 #1. Install Dependencies and packages
 
 apt update
-apt install -y libsqlite3-dev libcurl4-openssl-dev valgrind lcov clang libsystemd-dev libboost-all-dev libwebsocketpp-dev meson libcunit1 libcunit1-dev curl protobuf-compiler-grpc libgrpc-dev libgrpc++-dev libunwind-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+apt install -y libcurl4-openssl-dev valgrind lcov clang libsystemd-dev libboost-all-dev meson curl libunwind-dev libdrm-dev
 pip install jsonref
 
-############################
-# Build trevor-base64
-if [ ! -d "trower-base64" ]; then
-git clone https://github.com/xmidt-org/trower-base64.git
-fi
-cd trower-base64
-meson setup --warnlevel 3 --werror build
-ninja -C build
-ninja -C build install
-cd ..
-###########################################
 # Clone the required repositories
 
 
@@ -104,14 +93,10 @@ cd entservices-testframework/Tests
 echo " Empty mocks creation to avoid compilation errors"
 echo "======================================================================================"
 mkdir -p headers
-mkdir -p headers/audiocapturemgr
 mkdir -p headers/rdk/ds
 mkdir -p headers/rdk/iarmbus
 mkdir -p headers/rdk/iarmmgrs-hal
-mkdir -p headers/rdk/halif/
 mkdir -p headers/rdk/halif/deepsleep-manager
-mkdir -p headers/ccec/drivers
-mkdir -p headers/network
 mkdir -p headers/proc
 echo "dir created successfully"
 echo "======================================================================================"
@@ -120,53 +105,23 @@ echo "==========================================================================
 echo "empty headers creation"
 cd headers
 echo "current working dir: "${PWD}
-touch audiocapturemgr/audiocapturemgr_iarm.h
-touch ccec/drivers/CecIARMBusMgr.h
 touch rdk/ds/audioOutputPort.hpp
-touch rdk/ds/compositeIn.hpp
-touch rdk/ds/dsDisplay.h
-touch rdk/ds/dsError.h
-touch rdk/ds/dsMgr.h
-touch rdk/ds/dsTypes.h
-touch rdk/ds/dsUtl.h
 touch rdk/ds/exception.hpp
-touch rdk/ds/hdmiIn.hpp
 touch rdk/ds/host.hpp
-touch rdk/ds/list.hpp
-touch rdk/ds/manager.hpp
 touch rdk/ds/sleepMode.hpp
-touch rdk/ds/videoDevice.hpp
 touch rdk/ds/videoOutputPort.hpp
-touch rdk/ds/videoOutputPortConfig.hpp
-touch rdk/ds/videoOutputPortType.hpp
-touch rdk/ds/videoResolution.hpp
-touch rdk/ds/audioOutputPortType.hpp
-touch rdk/ds/audioOutputPortConfig.hpp
-touch rdk/ds/pixelResolution.hpp
 touch rdk/iarmbus/libIARM.h
 touch rdk/iarmbus/libIBus.h
 touch rdk/iarmbus/libIBusDaemon.h
 touch rdk/halif/deepsleep-manager/deepSleepMgr.h
 touch rdk/iarmmgrs-hal/mfrMgr.h
 touch rdk/iarmmgrs-hal/sysMgr.h
-touch network/wifiSrvMgrIarmIf.h
-touch network/netsrvmgrIarm.h
-touch libudev.h
 touch rfcapi.h
-touch rbus.h
-touch telemetry_busmessage_sender.h
-touch maintenanceMGR.h
-touch pkg.h
-touch edid-parser.hpp
 touch secure_wrapper.h
-touch wpa_ctrl.h
 touch proc/readproc.h
-touch btmgr.h
-touch rdk_logger_milestone.h
 echo "files created successfully"
 echo "======================================================================================"
 
 cd ../../
-cp -r /usr/include/gstreamer-1.0/gst /usr/include/glib-2.0/* /usr/lib/x86_64-linux-gnu/glib-2.0/include/* /usr/local/include/trower-base64/base64.h .
 
 ls -la ${GITHUB_WORKSPACE}

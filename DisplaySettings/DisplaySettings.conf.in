@@ -1,4 +1,0 @@
-precondition = ["Platform"]
-callsign = "org.rdk.DisplaySettings"
-autostart = "@PLUGIN_DISPLAYSETTINGS_AUTOSTART@"
-startuporder = "@PLUGIN_DISPLAYSETTINGS_STARTUPORDER@"
