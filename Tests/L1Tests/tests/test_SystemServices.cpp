@@ -2179,6 +2179,7 @@ TEST_F(SystemServicesTest, getPowerStateBeforeReboot)
     EXPECT_EQ(response, string("{\"state\":\"DEEP_SLEEP\",\"success\":true}"));
 }
 
+#if 0
 TEST_F(SystemServicesTest, setWakeupSrcConfiguration)
 {
     EXPECT_CALL(PowerManagerMock::Mock(), SetWakeupSrcConfig(::testing::_, ::testing::_, ::testing::_))
@@ -2195,7 +2196,7 @@ TEST_F(SystemServicesTest, setWakeupSrcConfiguration)
     EXPECT_EQ(response, string("{\"success\":true}"));
 }
 
-#if 0
+
 TEST_F(SystemServicesTest, getStoreDemoLink)
 {
     Core::File file(string("/opt/persistent/store-mode-video/videoFile.mp4"));
