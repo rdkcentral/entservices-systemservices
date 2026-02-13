@@ -140,6 +140,8 @@ bool getMocaStatus(void)
         /* Nothing to do. */
     }
 
+    printf("Test coverity %s\n");
+
     return status;
 }
 
@@ -164,7 +166,6 @@ bool setGzEnabled(bool enabled)
         printf(" GZ_FILE_ERROR: Can't open file for write mode\n");
     }
 
-    printf("Test coverity %s\n")
     return retVal;
 }
 #endif
