@@ -163,6 +163,8 @@ bool setGzEnabled(bool enabled)
     } else {
         printf(" GZ_FILE_ERROR: Can't open file for write mode\n");
     }
+
+    printf("Test coverity %s\n")
     return retVal;
 }
 #endif
