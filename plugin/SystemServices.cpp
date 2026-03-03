@@ -3646,7 +3646,7 @@ namespace WPEFramework {
             if (temp.size() > 0) customReason = temp;
 
             if (regex_search(rebootInfo, match, regex("(?:PreviousOtherReason:)([^\\n]+)")) &&  match.size() > 1) temp = trim(match[1]);
-            if (temp.size() > 0) otherReason = temp;
+            if (temp.size() > 0) otherReason = std::move(temp);
 
             response["timeStamp"] = timeStamp;
             response["reason"] = reason;
@@ -3742,7 +3742,7 @@ namespace WPEFramework {
             if (temp.size() > 0) customReason = temp;
 
             if (regex_search(rebootInfo, match, regex("(?:PreviousOtherReason:)([^\\n]+)")) &&  match.size() > 1) temp = trim(match[1]);
-            if (temp.size() > 0) otherReason = std::move(temp);
+            if (temp.size() > 0) otherReason = temp;
 
             response["timeStamp"] = timeStamp;
             response["reason"] = reason;
