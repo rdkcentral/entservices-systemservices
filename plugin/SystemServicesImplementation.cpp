@@ -419,5 +419,34 @@ namespace WPEFramework
             return (result ? Core::ERROR_NONE : Core::ERROR_GENERAL);
         }
 
+	/**
+         * @brief : API to query BuildType details
+         *
+         * @param1[in]  : {"params":{}}}
+         * @param2[out] : "result":{<key>:<BuildType Info Details>,"success":<bool>}
+         * @return      : Core::<StatusCode>
+         */
+        Core::hresult SystemServicesImplementation::GetBuildType(string& buildType, bool& success)
+        {
+            LOGINFOMETHOD();
+            bool result = false;
+            const char* filename = "/etc/device.properties";
+            string propertyName = "BUILD_TYPE";
+
+            if (Utils::readPropertyFromFile(filename, propertyName, buildType))
+            {
+                LOGINFO("BUILD_TYPE '%s' ", buildType.c_str());
+                result = true;
+            }
+            else
+            {
+                LOGERR("buildType is empty");
+                result = false;
+            }
+
+            success = result;
+            return (result ? Core::ERROR_NONE : Core::ERROR_GENERAL);
+        }
+
     } // namespace Plugin
 } // namespace WPEFramework
