@@ -149,6 +149,7 @@ namespace WPEFramework
                     , SYSTEMSERVICES_EVT_ONMACADDRESSRETRIEVED
                     , SYSTEMSERVICES_EVT_ONSYSTEMMODECHANGED
                     , SYSTEMSERVICES_EVT_ONLOGUPLOAD
+                    , SYSTEMSERVICES_EVT_ONBLOCKLISTCHANGED
 #ifdef ENABLE_SYSTIMEMGR_SUPPORT
                     , SYSTEMSERVICES_EVT_ONTIMESTATUSCHANGED
 #endif// ENABLE_SYSTIMEMGR_SUPPORT
@@ -260,6 +261,7 @@ namespace WPEFramework
             void onTimeStatusChanged(string timequality,string timesource, string utctime);
             Core::hresult GetTimeStatus(string& TimeQuality, string& TimeSrc, string& Time, bool& success) override;
 #endif// ENABLE_SYSTIMEMGR_SUPPORT
+            void onBlocklistChanged(bool newBlocklistFlag, bool oldBlocklistFlag);
 
         private:
             mutable Core::CriticalSection _adminLock;
