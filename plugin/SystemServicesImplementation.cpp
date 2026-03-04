@@ -224,6 +224,10 @@ namespace WPEFramework
         {
             LOGINFO("Create SystemServicesImplementation Instance");
 
+#ifdef ENABLE_DEVICE_MANUFACTURER_INFO
+            m_MfgSerialNumberValid = false;
+#endif
+
             SystemServicesImplementation::_instance = this;
         }
 
@@ -232,6 +236,39 @@ namespace WPEFramework
             SystemServicesImplementation::_instance = nullptr;
             _service = nullptr;
         }
+
+	void SystemServicesImplementation::Initialize()
+        {
+#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
+            InitializeIARM();
+#endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
+
+        }
+
+	void SystemServicesImplementation::Deinitialize()
+        {
+#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
+            DeinitializeIARM();
+#endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
+        }
+
+#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
+        void SystemServicesImplementation::InitializeIARM()
+        {
+            if (Utils::IARM::init())
+            {
+                // TODO
+            }
+        }
+
+	void SystemServices::DeinitializeIARM()
+        {
+            if (Utils::IARM::isConnected())
+            {
+	        // TODO
+            }
+        }
+#endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
 
         Core::hresult SystemServicesImplementation::Register(Exchange::ISystemServices::INotification *notification)
         {
@@ -309,5 +346,47 @@ namespace WPEFramework
             _adminLock.Unlock();
         }
     
+#ifdef ENABLE_DEVICE_MANUFACTURER_INFO
+	// @text getMfgSerialNumber
+        // @brief Gets the Manufacturing Serial Number.
+        // @param mfgSerialNumber: Manufacturing Serial Number
+        // @param success: Whether the request succeeded
+        // @retval ErrorCode::ERROR_NONE: Indicates success
+        // @retval ErrorCode::ERROR_GENERAL: Indicates failure
+        Core::hresult SystemServicesImplementation::GetMfgSerialNumber(string& mfgSerialNumber, bool& success)
+        {
+            LOGWARN("SystemService getMfgSerialNumber query");
+
+            if (m_MfgSerialNumberValid) {
+                mfgSerialNumber = m_MfgSerialNumber;
+                LOGWARN("Got cached MfgSerialNumber %s", m_MfgSerialNumber.c_str());
+                success = true;
+                return Core::ERROR_NONE;
+            }
+
+            IARM_Bus_MFRLib_GetSerializedData_Param_t param;
+            param.bufLen = 0;
+            param.type = mfrSERIALIZED_TYPE_MANUFACTURING_SERIALNUMBER;
+            IARM_Result_t result = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME, IARM_BUS_MFRLIB_API_GetSerializedData, &param, sizeof(param));
+            param.buffer[param.bufLen] = '\0';
+
+            bool status = false;
+            if (result == IARM_RESULT_SUCCESS) {
+                mfgSerialNumber = string(param.buffer);
+                status = true;
+
+                m_MfgSerialNumber = string(param.buffer);
+                m_MfgSerialNumberValid = true;
+
+                LOGWARN("SystemService getMfgSerialNumber Manufacturing Serial Number: %s", param.buffer);
+            } else {
+                LOGERR("SystemService getMfgSerialNumber Manufacturing Serial Number: NULL");
+            }
+
+            success = status;
+            return (status ? Core::ERROR_NONE : Core::ERROR_GENERAL);
+        }
+#endif /* ENABLE_DEVICE_MANUFACTURER_INFO */
+
     } // namespace Plugin
 } // namespace WPEFramework

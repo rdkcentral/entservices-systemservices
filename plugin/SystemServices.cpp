@@ -76,6 +76,7 @@ namespace WPEFramework
 
         if(nullptr != _systemServices)
         {
+            _systemServices->Initialize();
             // Register for notifications
             _systemServices->Register(&_systemServicesNotification);
             // Invoking Plugin API register to wpeframework
@@ -101,7 +102,7 @@ namespace WPEFramework
 
         if (nullptr != _systemServices)
         {
-
+            _systemServices->Deinitialize();
             _systemServices->Unregister(&_systemServicesNotification);
             Exchange::JSystemServices::Unregister(*this);
 

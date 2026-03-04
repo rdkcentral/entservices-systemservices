@@ -265,6 +265,11 @@ namespace WPEFramework
             PluginHost::IShell* _service;
             std::list<Exchange::ISystemServices::INotification*> _SystemServicesNotification;
 
+#ifdef ENABLE_DEVICE_MANUFACTURER_INFO
+            std::string m_MfgSerialNumber;
+            bool m_MfgSerialNumberValid;
+#endif
+
             void dispatchEvent(Event, const JsonValue &params);
             void Dispatch(Event event, const JsonValue params);
         public:
