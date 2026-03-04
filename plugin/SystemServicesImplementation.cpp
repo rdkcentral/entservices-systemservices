@@ -661,5 +661,101 @@ namespace WPEFramework
             return (result.success ? Core::ERROR_NONE : Core::ERROR_GENERAL);
         }
 
+        /***
+         * @brief : To set the fsr flag into the emmc raw area.
+         * @param1[in] : fsrFlag (bool)
+         * @param2[out] : success (bool)
+         * @return     : Core::hresult
+         */
+        Core::hresult SystemServicesImplementation::SetFSRFlag(const bool fsrFlag, bool& success)
+        {
+            LOGINFOMETHOD();
+            success = false;
+
+            IARM_Bus_MFRLib_FsrFlag_Param_t param;
+            param = fsrFlag;
+            LOGINFO("Param %d \n", param);
+            IARM_Result_t res = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME,
+                                   IARM_BUS_MFRLIB_API_SetFsrFlag, (void *)&param,
+                                   sizeof(param));
+            if (IARM_RESULT_SUCCESS == res) {
+                success = true;
+            } else {
+                success = false;
+            }
+
+            return (success ? Core::ERROR_NONE : Core::ERROR_GENERAL);
+        }
+
+        /***
+         * @brief : To get the fsr flag from emmc
+         * @param1[out] : fsrFlag (bool)
+         * @param2[out] : success (bool)
+         * @return     : Core::hresult
+         */
+        Core::hresult SystemServicesImplementation::GetFSRFlag(bool &fsrFlag, bool& success)
+        {
+            LOGINFOMETHOD();
+            success = false;
+            fsrFlag = false;
+            IARM_Bus_MFRLib_FsrFlag_Param_t param;
+            IARM_Result_t res = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME,
+                                  IARM_BUS_MFRLIB_API_GetFsrFlag, (void *)&param,
+                                  sizeof(param));
+            if (IARM_RESULT_SUCCESS == res) {
+                fsrFlag = param;
+                success = true;
+            } else {
+                success = false;
+            }
+
+            return (success ? Core::ERROR_NONE : Core::ERROR_GENERAL);
+        }
+
+        /***
+         * @brief : To retrieve blocklist flag from persistent memory
+         * @param1[out] : result (BlocklistResult)
+         * @return     : Core::hresult
+         */
+        Core::hresult SystemServicesImplementation::GetBlocklistFlag(BlocklistResult& result)
+        {
+            LOGINFOMETHOD();
+            bool status = false, ret = false;
+            bool blocklistFlag = false;
+
+            result.success = false;
+            result.error.message = "";
+            result.error.code = "";
+
+            /*check /opt/secure/persistent/opflashstore/ dir*/
+            ret = checkOpFlashStoreDir();
+            if(ret == true){
+                LOGINFO("checked opflashstore directory and it is exists. ret = %d",ret);
+            }
+            else {
+                LOGWARN("Blocklist flag retrieved failed from persistent memory.");
+                result.error.message = "Blocklist flag retrieved failed from persistent memory.";
+                result.error.code = "-32099";
+                result.success = false;
+                return Core::ERROR_GENERAL;
+            }
+
+            status = read_parameters(DEVICESTATE_FILE, BLOCKLIST, blocklistFlag);
+            if (status == true) {
+                LOGWARN("blocklistFlag=%d", blocklistFlag);
+                result.blocklist = blocklistFlag;
+                result.success = true;
+                LOGINFO("Blocklist flag retrieved successfully from persistent memory.");
+            }
+            else{
+                LOGWARN("Blocklist flag retrieved failed from persistent memory.");
+                result.error.message = "Blocklist flag retrieved failed from persistent memory.";
+                result.error.code = "-32099";
+                result.success = false;
+            }
+
+            return (result.success ? Core::ERROR_NONE : Core::ERROR_GENERAL);
+        }
+
     } // namespace Plugin
 } // namespace WPEFramework
