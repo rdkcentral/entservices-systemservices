@@ -224,6 +224,7 @@ namespace WPEFramework
 #endif /* ENABLE_DEEP_SLEEP */
             Core::hresult IsOptOutTelemetry(bool& OptOut, bool& success) override;
             Core::hresult Reboot(const string& rebootReason, int& IARM_Bus_Call_STATUS, bool& success) override;
+            Core::hresult RequestSystemUptime(string& systemUptime, bool& success) override;
             Core::hresult SetDeepSleepTimer(const int seconds, SystemServicesSuccess& success) override;
             Core::hresult SetFirmwareAutoReboot(const bool enable, SystemServicesSuccess& success) override;
             Core::hresult SetNetworkStandbyMode(const bool nwStandby, SystemServicesSuccess& success) override;

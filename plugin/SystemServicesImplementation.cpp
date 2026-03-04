@@ -388,5 +388,36 @@ namespace WPEFramework
         }
 #endif /* ENABLE_DEVICE_MANUFACTURER_INFO */
 
+	// @text requestSystemUptime
+        // @brief Returns the device uptime.
+        // @param systemUptime: The uptime, in seconds, of the device
+        // @param success: Whether the request succeeded
+        // @retval ErrorCode::ERROR_NONE: Indicates success
+        // @retval ErrorCode::ERROR_GENERAL: Indicates failure
+        Core::hresult SystemServicesImplementation::RequestSystemUptime(string& systemUptime, bool& success)
+        {
+            struct timespec time;
+            bool result = false;
+
+            if (clock_gettime(CLOCK_MONOTONIC_RAW, &time) == 0)
+            {
+                float uptime = (float)time.tv_sec + (float)time.tv_nsec / 1e9;
+                std::string value = std::to_string(uptime);
+                value = value.erase(value.find_last_not_of("0") + 1);
+
+                if (value.back() == '.')
+                    value += '0';
+
+                systemUptime = value;
+                LOGINFO("uptime is %s seconds", value.c_str());
+                result = true;
+            } else {
+                LOGERR("unable to evaluate uptime by clock_gettime");
+	    }
+
+            success = result;
+            return (result ? Core::ERROR_NONE : Core::ERROR_GENERAL);
+        }
+
     } // namespace Plugin
 } // namespace WPEFramework
