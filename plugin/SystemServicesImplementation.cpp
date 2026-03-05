@@ -463,20 +463,32 @@ namespace WPEFramework
         {
             _adminLock.Lock();
         
+            JsonObject obj;
+            obj.FromString(params.String());
             std::list<Exchange::ISystemServices::INotification*>::const_iterator index(_systemServicesNotification.begin());
         
             switch(event)
             {
                 case SYSTEMSERVICES_EVT_ONBLOCKLISTCHANGED:
                 {
-                    JsonObject obj;
-                    obj.FromString(params.String());
                     bool oldFlag = obj["oldBlocklistFlag"].Boolean();
                     bool newFlag = obj["newBlocklistFlag"].Boolean();
                     
                     while (index != _systemServicesNotification.end()) 
                     {
                         (*index)->OnBlocklistChanged(oldFlag, newFlag);
+                        ++index;
+                    }
+                    break;
+                }
+
+		case SYSTEMSERVICES_EVT_ONLOGUPLOAD:
+                {
+                    string logUploadStatus = obj["logUploadStatus"].String();
+                   
+		    while (index != _systemServicesNotification.end())
+                    {
+                        (*index)->OnLogUpload(logUploadStatus);
                         ++index;
                     }
                     break;
@@ -488,7 +500,91 @@ namespace WPEFramework
             }
             _adminLock.Unlock();
         }
-    
+
+         /***
+         * @brief : Starts background process to upload logs
+         * @param1[out] : success (SystemServicesSuccess structure)
+         * @return     : Core::hresult
+         */
+        Core::hresult SystemServicesImplementation::UploadLogsAsync(SystemServicesSuccess& success)
+        {
+            LOGWARN("");
+            success.success = false;
+
+            pid_t uploadLogsPid = -1;
+
+            {
+                std::lock_guard<std::mutex> lck(m_uploadLogsMutex);
+                uploadLogsPid = m_uploadLogsPid;
+            }
+
+            if (-1 != uploadLogsPid) {
+                LOGWARN("Another instance of log upload script is running");
+                AbortLogUpload(success);
+            }
+
+            std::lock_guard<std::mutex> lck(m_uploadLogsMutex);
+            m_uploadLogsPid = UploadLogs::logUploadAsync();
+            success.success = true;
+
+            return Core::ERROR_NONE;
+        }
+
+       /***
+         * @brief : Stops background process to upload logs
+         * @param1[out] : success (SystemServicesSuccess structure)
+         * @return     : Core::hresult
+         */
+        Core::hresult SystemServicesImplementation::AbortLogUpload(SystemServicesSuccess& success)
+        {
+            success.success = false;
+
+            std::lock_guard<std::mutex> lck(m_uploadLogsMutex);
+
+            if (-1 != m_uploadLogsPid) {
+                std::vector<int> processIds;
+                bool result = Utils::getChildProcessIDs(m_uploadLogsPid, processIds);
+
+                if (true == result) {
+                    std::vector<int>::iterator pid_iterator = processIds.begin();
+                    while (pid_iterator != processIds.end()) {
+                        std::string line = std::to_string(*pid_iterator);
+                        line = trim(line);
+                        char *end;
+                        int pid = strtol(line.c_str(), &end, 10);
+                        if (line.c_str() != end && 0 != pid && 1 != pid) {
+                            kill(pid, SIGKILL);
+                        } else {
+                            LOGERR("Bad pid: %d", pid);
+                        }
+                        pid_iterator++;
+                    }
+
+                } else {
+                    LOGERR("Cannot get the child process Ids\n");
+                }
+
+                kill(m_uploadLogsPid, SIGKILL);
+
+                int status;
+                waitpid(m_uploadLogsPid, &status, 0);
+
+                m_uploadLogsPid = -1;
+
+                if (SystemServicesImplementation::_instance) {
+                    JsonObject params;
+                    params["logUploadStatus"] = LOG_UPLOAD_STATUS_ABORTED;
+                    SystemServicesImplementation::_instance->dispatchEvent(SYSTEMSERVICES_EVT_ONLOGUPLOAD, params);
+                }
+
+                success.success = true;
+                return Core::ERROR_NONE;
+            }
+
+            LOGERR("Upload logs script is not running");
+            return Core::ERROR_GENERAL;
+        }
+
 #ifdef ENABLE_DEVICE_MANUFACTURER_INFO
 	// @text getMfgSerialNumber
         // @brief Gets the Manufacturing Serial Number.

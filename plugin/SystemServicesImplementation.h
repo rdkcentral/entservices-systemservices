@@ -56,6 +56,7 @@ using std::ofstream;
 #include "cSettings.h"
 #include "cTimer.h"
 #include "rfcapi.h"
+#include "uploadlogs.h"
 #include <interfaces/IPowerManager.h>
 #include <core/core.h>
 #include <core/JSON.h>
@@ -272,6 +273,8 @@ namespace WPEFramework
             std::string m_MfgSerialNumber;
             bool m_MfgSerialNumberValid;
 #endif
+            pid_t m_uploadLogsPid;
+            std::mutex m_uploadLogsMutex;
 
             void dispatchEvent(Event, const JsonValue &params);
             void Dispatch(Event event, const JsonValue params);
