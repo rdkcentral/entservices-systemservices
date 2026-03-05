@@ -150,6 +150,7 @@ namespace WPEFramework
                     , SYSTEMSERVICES_EVT_ONMACADDRESSRETRIEVED
                     , SYSTEMSERVICES_EVT_ONSYSTEMMODECHANGED
                     , SYSTEMSERVICES_EVT_ONLOGUPLOAD
+		    , SYSTEMSERVICES_EVT_ONFRIENDLYNAME_CHANGED
                     , SYSTEMSERVICES_EVT_ONBLOCKLISTCHANGED
 #ifdef ENABLE_SYSTIMEMGR_SUPPORT
                     , SYSTEMSERVICES_EVT_ONTIMESTATUSCHANGED
@@ -275,9 +276,14 @@ namespace WPEFramework
 #endif
             pid_t m_uploadLogsPid;
             std::mutex m_uploadLogsMutex;
+            std::string m_friendlyName;
 
             void dispatchEvent(Event, const JsonValue &params);
             void Dispatch(Event event, const JsonValue params);
+
+            bool getSerialNumberTR069(string& serialNumber);
+            bool getSerialNumberSnmp(string& serialNumber);
+            bool processTimeZones(std::string entry, JsonObject& out);
         public:
             static SystemServicesImplementation* _instance;
 

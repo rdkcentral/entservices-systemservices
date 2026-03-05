@@ -363,6 +363,7 @@ namespace WPEFramework
 #ifdef ENABLE_DEVICE_MANUFACTURER_INFO
             m_MfgSerialNumberValid = false;
 #endif
+            m_friendlyName = "Living Room";
 
             SystemServicesImplementation::_instance = this;
         }
@@ -378,6 +379,23 @@ namespace WPEFramework
 #if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
             InitializeIARM();
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
+
+#ifdef DISABLE_GEOGRAPHY_TIMEZONE
+            std::string timeZone = getTimeZoneDSTHelper();
+
+            if (!timeZone.empty()) {
+                std::string tzenv = ":";
+                tzenv += timeZone;
+                Core::SystemInfo::SetEnvironment(_T("TZ"), tzenv.c_str());
+            }
+#endif
+            RFC_ParamData_t param = {0};
+            WDMP_STATUS status = getRFCParameter((char*)"thunderapi", TR181_SYSTEM_FRIENDLY_NAME, &param);
+            if(WDMP_SUCCESS == status && param.type == WDMP_STRING)
+            {
+                m_friendlyName = param.value;
+                LOGINFO("Success Getting the friendly name value :%s \n",m_friendlyName.c_str());
+            }
 
         }
 
@@ -492,6 +510,19 @@ namespace WPEFramework
                         ++index;
                     }
                     break;
+                }
+
+		case SYSTEMSERVICES_EVT_ONFRIENDLYNAME_CHANGED:
+                {
+                    string friendlyName = obj["friendlyName"].String();
+
+                    while (index != _systemServicesNotification.end())
+                    {
+                        (*index)->onFriendlyNameChanged(friendlyName);
+                        ++index;
+                    }
+                    break;
+
                 }
  
                 default:
@@ -627,36 +658,104 @@ namespace WPEFramework
         }
 #endif /* ENABLE_DEVICE_MANUFACTURER_INFO */
 
-	// @text requestSystemUptime
-        // @brief Returns the device uptime.
-        // @param systemUptime: The uptime, in seconds, of the device
-        // @param success: Whether the request succeeded
-        // @retval ErrorCode::ERROR_NONE: Indicates success
-        // @retval ErrorCode::ERROR_GENERAL: Indicates failure
-        Core::hresult SystemServicesImplementation::RequestSystemUptime(string& systemUptime, bool& success)
+        /***
+         * @brief : Populates device serial number from TR069 Support/Query.
+         */
+        bool SystemServicesImplementation::getSerialNumberTR069(string& serialNumber)
         {
-            struct timespec time;
-            bool result = false;
+            bool ret =  false;
+            std::string paramValue;
 
-            if (clock_gettime(CLOCK_MONOTONIC_RAW, &time) == 0)
+            RFC_ParamData_t param = {0};
+            param.type = WDMP_NONE;
+            WDMP_STATUS status = getRFCParameter(NULL, "Device.DeviceInfo.SerialNumber", &param);
+            if(WDMP_SUCCESS == status)
             {
-                float uptime = (float)time.tv_sec + (float)time.tv_nsec / 1e9;
-                std::string value = std::to_string(uptime);
-                value = value.erase(value.find_last_not_of("0") + 1);
+                paramValue = param.value;
+                serialNumber = paramValue;
+                ret = true;
+            }
 
-                if (value.back() == '.')
-                    value += '0';
+            return ret;
+        }
 
-                systemUptime = value;
-                LOGINFO("uptime is %s seconds", value.c_str());
-                result = true;
-            } else {
-                LOGERR("unable to evaluate uptime by clock_gettime");
-	    }
+        /***
+         * @brief : Populates Device Serial Number Info using SNMP Request.
+         */
+        bool SystemServicesImplementation::getSerialNumberSnmp(string& serialNumber)
+        {
+            bool retAPIStatus = false;
+            IARM_Bus_MFRLib_GetSerializedData_Param_t param = {};
 
-            success = result;
+            param.bufLen = 0;
+            param.type = mfrSERIALIZED_TYPE_SERIALNUMBER;
+            IARM_Result_t result = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME, IARM_BUS_MFRLIB_API_GetSerializedData, &param, sizeof(param));
+            param.buffer[param.bufLen] = '\0';
+            if (result == IARM_RESULT_SUCCESS) {
+                serialNumber = string(param.buffer);
+                retAPIStatus = true;
+            }
+
+            return retAPIStatus;
+        }
+
+	/***
+         * @brief : To retrieve Device Serial Number
+         * @param1[in] : {"params":{}}
+         * @param2[out] : {"result":{"serialNumber":"<string>","success":true}}
+         * @return      : Core::<StatusCode>
+         */
+        Core::hresult SystemServicesImplementation::GetSerialNumber(string& serialNumber, bool& success)
+        {
+            bool retAPIStatus = false;
+#ifdef USE_TR_69
+            retAPIStatus = getSerialNumberTR069(serialNumber);
+#else
+            retAPIStatus = getSerialNumberSnmp(serialNumber);
+#endif
+            success = retAPIStatus;
+            return (retAPIStatus ? Core::ERROR_NONE : Core::ERROR_GENERAL);
+        }
+
+        Core::hresult SystemServicesImplementation::GetFriendlyName(string& friendlyName, bool& success)
+        {
+            bool resp = true;
+            friendlyName = m_friendlyName;
+            success = resp;
+            return (resp ? Core::ERROR_NONE : Core::ERROR_GENERAL);
+        }
+
+        Core::hresult SystemServicesImplementation::SetFriendlyName(const string& friendlyName, SystemServicesSuccess& success)
+        {
+            LOGINFOMETHOD();
+            bool result = true;
+
+            LOGWARN("SystemServices::setFriendlyName  :%s \n", friendlyName.c_str());
+            if(m_friendlyName != friendlyName)
+            {
+                m_friendlyName = friendlyName;
+                JsonObject params;
+                params["friendlyName"] = m_friendlyName;
+                if (SystemServicesImplementation::_instance) {
+                    JsonObject params;
+                    params["friendlyName"] = m_friendlyName;
+                    SystemServicesImplementation::_instance->dispatchEvent(SYSTEMSERVICES_EVT_ONFRIENDLYNAME_CHANGED, params);
+                }
+
+                //write to persistence storage
+                WDMP_STATUS status = setRFCParameter((char*)"thunderapi",
+                       TR181_SYSTEM_FRIENDLY_NAME,m_friendlyName.c_str(),WDMP_STRING);
+                if ( WDMP_SUCCESS == status ){
+                    LOGINFO("Success Setting the friendly name value\n");
+                }
+                else {
+                    LOGINFO("Failed Setting the friendly name value %s\n",getRFCErrorString(status));
+                }
+            }
+            success.success = result;
             return (result ? Core::ERROR_NONE : Core::ERROR_GENERAL);
         }
+
 
 	/**
          * @brief : API to query BuildType details
