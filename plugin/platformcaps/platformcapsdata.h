@@ -118,8 +118,9 @@ private:
       }
 
      public:
+      // Coverity Fix: ID 64 - COPY_INSTEAD_OF_MOVE: Use std::move for constructor parameter
       JSONRPCDirectLink(PluginHost::IShell* service, std::string callsign)
-          : mCallSign(callsign)
+          : mCallSign(std::move(callsign))
       {
         if (service)
 #if ((THUNDER_VERSION >= 4) && (THUNDER_VERSION_MINOR == 4))
