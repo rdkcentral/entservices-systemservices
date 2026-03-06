@@ -952,5 +952,166 @@ namespace WPEFramework
             return (result.success ? Core::ERROR_NONE : Core::ERROR_GENERAL);
         }
 
+        Core::hresult SystemServicesImplementation::IsOptOutTelemetry(bool& OptOut, bool& success)
+        {
+            uint32_t result = WPEFramework::Core::ERROR_GENERAL;
+            if (m_TelemetryObject)
+            {
+                result = m_TelemetryObject->IsOptOutTelemetry(OptOut, success);
+            }
+            else
+            {
+                LOGERR("Telemetry plugin is not activated\n");
+            }
+
+            return result;
+        }
+
+        Core::hresult SystemServicesImplementation::SetOptOutTelemetry(const bool OptOut, SystemServicesSuccess& success)
+        {
+            uint32_t result = WPEFramework::Core::ERROR_GENERAL;
+            WPEFramework::Exchange::ISystemServices::TelemetrySuccess successResult;
+            if (m_TelemetryObject)
+            {
+                result = m_TelemetryObject->SetOptOutTelemetry(OptOut, successResult);
+                if ( Core::ERROR_NONE == result)
+                    SystemServicesSuccess.success = successResult.success;
+            }
+            else
+            {
+                LOGERR("Telemetry plugin is not activated\n");
+            }
+
+            return result;
+        }
+
+        Core::hresult SystemServicesImplementation::SetMigrationStatus(const std::string& status, bool& success)
+        {
+            uint32_t result = WPEFramework::Core::ERROR_GENERAL;
+
+            WPEFramework::Exchange::IMigration::MigrationStatus migrationStatus;
+
+            static const std::unordered_map<std::string,
+            WPEFramework::Exchange::IMigration::MigrationStatus> stringToStatus = {
+                {"NOT_STARTED",                WPEFramework::Exchange::IMigration::MIGRATION_STATUS_NOT_STARTED},
+                {"NOT_NEEDED",                 WPEFramework::Exchange::IMigration::MIGRATION_STATUS_NOT_NEEDED},
+                {"STARTED",                    WPEFramework::Exchange::IMigration::MIGRATION_STATUS_STARTED},
+                {"PRIORITY_SETTINGS_MIGRATED", WPEFramework::Exchange::IMigration::MIGRATION_STATUS_PRIORITY_SETTINGS_MIGRATED},
+                {"DEVICE_SETTINGS_MIGRATED",   WPEFramework::Exchange::IMigration::MIGRATION_STATUS_DEVICE_SETTINGS_MIGRATED},
+                {"CLOUD_SETTINGS_MIGRATED",    WPEFramework::Exchange::IMigration::MIGRATION_STATUS_CLOUD_SETTINGS_MIGRATED},
+                {"APP_DATA_MIGRATED",          WPEFramework::Exchange::IMigration::MIGRATION_STATUS_APP_DATA_MIGRATED},
+                {"MIGRATION_COMPLETED",        WPEFramework::Exchange::IMigration::MIGRATION_STATUS_MIGRATION_COMPLETED}
+            };
+
+            auto it = stringToStatus.find(status);
+            if (it != stringToStatus.end()) {
+                migrationStatus = it->second;
+            }
+
+            if (m_MigrationObject)
+            {
+                result = m_MigrationObject->SetMigrationStatus(migrationStatus, success);
+            }
+            else
+            {
+                LOGERR("Migration plugin is not activated\n");
+            }
+
+            return result;
+        }
+
+        Core::hresult SystemServicesImplementation::GetMigrationStatus(string &migrationStatus)
+        {
+            uint32_t result = WPEFramework::Core::ERROR_GENERAL;
+
+            if (m_MigrationObject)
+            {
+                MigrationStatusInfo migrationStatusInfo;
+
+                result = m_MigrationObject->GetMigrationStatus(migrationStatusInfo);
+
+                if (result == WPEFramework::Core::ERROR_NONE)
+                {
+                    static const std::unordered_map<migrationStatus, std::string> statusToString = {
+                        {MIGRATION_STATUS_NOT_STARTED,                "NOT_STARTED"},
+                        {MIGRATION_STATUS_NOT_NEEDED,                 "NOT_NEEDED"},
+                        {MIGRATION_STATUS_STARTED,                    "STARTED"},
+                        {MIGRATION_STATUS_PRIORITY_SETTINGS_MIGRATED, "PRIORITY_SETTINGS_MIGRATED"},
+                        {MIGRATION_STATUS_DEVICE_SETTINGS_MIGRATED,   "DEVICE_SETTINGS_MIGRATED"},
+                        {MIGRATION_STATUS_CLOUD_SETTINGS_MIGRATED,    "CLOUD_SETTINGS_MIGRATED"},
+                        {MIGRATION_STATUS_APP_DATA_MIGRATED,          "APP_DATA_MIGRATED"},
+                        {MIGRATION_STATUS_MIGRATION_COMPLETED,        "MIGRATION_COMPLETED"}
+                    };
+
+                    auto it = statusToString.find(migrationStatusInfo.migrationStatus);
+                    if (it != statusToString.end())
+                    {
+                        migrationStatus = it->second;
+                    }
+                }
+            }
+            else
+            {
+                LOGERR("Migration plugin is not activated\n");
+            }
+
+            return result;
+        }
+
+        Core::hresult SystemServicesImplementation::GetBootTypeInfo(string &bootType)
+        {
+            uint32_t result = WPEFramework::Core::ERROR_GENERAL;
+            success = false;
+
+            if (m_MigrationObject)
+            {
+                BootTypeInfo bootTypeInfo;
+
+                result = m_MigrationObject->GetBootTypeInfo(bootTypeInfo);
+
+                if (result == WPEFramework::Core::ERROR_NONE)
+                {
+                    static const std::unordered_map<BootType, std::string> bootTypeToString = {
+                        {BOOT_TYPE_INIT,      "BOOT_INIT"},
+                        {BOOT_TYPE_NORMAL,    "BOOT_NORMAL"},
+                        {BOOT_TYPE_MIGRATION, "BOOT_MIGRATION"},
+                        {BOOT_TYPE_UPDATE,    "BOOT_UPDATE"}
+                    };
+
+                    auto it = bootTypeToString.find(bootTypeInfo.bootType);
+                    if (it != bootTypeToString.end())
+                    {
+                        bootType = it->second;
+                    }
+                 }
+             }
+             else
+             {
+                 LOGERR("Migration plugin is not activated\n");
+             }
+
+             return result;
+         }
+
+         Core::hresult SystemServicesImplementation::GetSerialNumber(string& serialNumber, bool& success)
+         {
+             uint32_t result = WPEFramework::Core::ERROR_GENERAL;
+             WPEFramework::Exchange::IDeviceInfo::DeviceSerialNo deviceSerialNo;
+
+             if (m_deviceInfoObject)
+             {
+                 result = m_deviceInfoObject->SerialNumber(deviceSerialNo);
+                 if (WPEFramework::Core::ERROR_NONE == result)
+                 {
+                     serialNumber = deviceSerialNo.serialnumber;
+                     success = true;
+                 }
+             }
+             else
+             {
+                 LOGERR("DeviceInfo plugin is not activated\n");
+             }
+         }
+
     } // namespace Plugin
 } // namespace WPEFramework

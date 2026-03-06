@@ -237,14 +237,13 @@ namespace WPEFramework
             Core::hresult SetTerritory(const string& territory, const string& region, SystemError& error, bool& success) override;
             Core::hresult SetTimeZoneDST(const string& timeZone, const string& accuracy, SystemServicesSuccess& success) override;
             Core::hresult UpdateFirmware(SystemServicesSuccess& success) override;
-            Core::hresult GetBootTypeInfo(string &bootType, bool& success) override;
-            Core::hresult SetMigrationStatus(const bool status, bool& success) override;
-            Core::hresult GetMigrationStatus(string &MigrationStatus, bool& success) override;
+            Core::hresult GetBootTypeInfo(string &bootType) override;
+            Core::hresult SetMigrationStatus(const string& status, bool& success) override;
+            Core::hresult GetMigrationStatus(string &migrationStatus) override;
             Core::hresult GetMacAddresses(const string& GUID, bool &asyncResponse, bool& success) override;
             Core::hresult GetPlatformConfiguration (PlatformConfig& platformConfig) override;
             Core::hresult SetWakeupSrcConfiguration(const string& powerState, ISystemServicesWakeupSourcesIterator* const& wakeupSources, SystemServicesSuccess& success) override;
             Core::hresult GetSystemVersions(SystemVersionsInfo& systemVersionsInfo) override;
-            Core::hresult RequestSystemUptime(string& systemUptime, bool& success) override;
             Core::hresult SetMode(const ModeInfo& modeinfo, SystemServicesSuccess& success) override;
             Core::hresult UploadLogsAsync(SystemServicesSuccess& success) override;
             Core::hresult AbortLogUpload(SystemServicesSuccess& success) override;
