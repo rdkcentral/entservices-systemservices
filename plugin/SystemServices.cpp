@@ -794,8 +794,9 @@ namespace WPEFramework {
             LOGWARN("IARM Event triggered for PowerStateChange.\
                     Old State %s, New State: %s\n",
                     curPowerState.c_str() , newPowerState.c_str());
+            // Coverity Fix: ID 35, 36 - COPY_INSTEAD_OF_MOVE: onSystemPowerStateChanged will copy if needed
             if (SystemServices::_instance) {
-                SystemServices::_instance->onSystemPowerStateChanged(curPowerState, newPowerState);
+                SystemServices::_instance->onSystemPowerStateChanged(std::move(curPowerState), std::move(newPowerState));
             } else {
                 LOGERR("SystemServices::_instance is NULL.\n");
             }
@@ -1307,10 +1308,11 @@ namespace WPEFramework {
                                 response["cable_card_firmware_version"] = value;
                             }
                             else if (key == "model_number") {
-                                model_number = value;
+                                // Coverity Fix: IDs 37-38 - COPY_INSTEAD_OF_MOVE: Use std::move for assignments
+                                model_number = std::move(value);
                             }
 			    else if(key == "device_type") {
-				device_type = value;
+				device_type = std::move(value);
 			    }
                         }
                     }
@@ -1659,7 +1661,8 @@ namespace WPEFramework {
 
                     if (changeMode) {
                         IARM_Bus_CommonAPI_SysModeChange_Param_t modeParam;
-                        stringToIarmMode(oldMode, modeParam.oldMode);
+                        // Coverity Fix: ID 21 - COPY_INSTEAD_OF_MOVE
+                        stringToIarmMode(std::move(oldMode), modeParam.oldMode);
                         stringToIarmMode(m_currentMode, modeParam.newMode);
 
                         if (IARM_RESULT_SUCCESS == IARM_Bus_Call(IARM_BUS_DAEMON_NAME,
@@ -1759,19 +1762,25 @@ namespace WPEFramework {
 
         bool checkOpFlashStoreDir()
         {
-            int ret = 0;
-            if (access(OPFLASH_STORE, F_OK) == -1) {
-                ret = mkdir(OPFLASH_STORE, 0774);
-                LOGINFO(" --- SubDirectories created from mkdir %d ", ret);
+            // Coverity Fix: ID 578 - TOCTOU: Use mkdir directly and check for EEXIST to handle race condition
+            int ret = mkdir(OPFLASH_STORE, 0774);
+            if (ret == 0) {
+                LOGINFO(" --- Directory %s created", OPFLASH_STORE);
+                return true;
+            } else if (errno == EEXIST) {
+                // Directory already exists, which is fine
+                return true;
+            } else {
+                LOGERR(" --- Failed to create directory %s: %d", OPFLASH_STORE, ret);
+                return false;
             }
-            return 0 == ret;
         }
 
         // Function to write (update or append) parameters in the file
         bool write_parameters(const string &filename, const string &param, bool value, bool &update, bool &oldBlocklistFlag) {
             ifstream file_in(filename);
             vector<string> lines;
-            bool param_found = false, status = false;
+            bool param_found = false;
         
             // If file exists, read its content line by line
             if (file_in.is_open()) {
@@ -1821,19 +1830,17 @@ namespace WPEFramework {
         
             // Rewrite the entire file with updated values
             ofstream file_out(filename);
-            if (!file_out.is_open()) {
-                LOGERR("Error opening file for writing:%s ", filename.c_str());
-                status = false;
+            if (!file_out) {
+                LOGERR("Error opening file for writing: %s", filename.c_str());
+                return false;
             }
         
-            for (const string &line : lines) {
-                file_out << line << endl;
+            for (const auto &line : lines) {
+                file_out << line << '\n';
             }
-            status = true;
         
-            file_out.close();
-            LOGINFO("%s flag stored successfully in persistent memory. status= %d, update=%d, oldBlocklistFlag=%d", param.c_str(), status, update, oldBlocklistFlag);
-            return status;
+            LOGINFO("%s flag stored successfully in persistent memory. update=%d, oldBlocklistFlag=%d", param.c_str(), update, oldBlocklistFlag);
+            return true;
         }
         
         // Function to read a parameter from a file and update its value
@@ -2130,8 +2137,9 @@ namespace WPEFramework {
                     // empty /opt/swupdate.conf. Don't initiate FW download
                     LOGWARN("Empty /opt/swupdate.conf. Skipping FW upgrade check with xconf");
                     if (_instance) {
+                        // Coverity Fix: ID 22 - COPY_INSTEAD_OF_MOVE
                         _instance->reportFirmwareUpdateInfoReceived("",
-                        STATUS_CODE_NO_SWUPDATE_CONF, true, "", response);
+                        STATUS_CODE_NO_SWUPDATE_CONF, true, "", std::move(response));
                     }
                     return;
                 }
@@ -2192,8 +2200,9 @@ namespace WPEFramework {
             
 
             if (_instance) {
-                _instance->reportFirmwareUpdateInfoReceived(_fwUpdate.firmwareUpdateVersion,
-                        _fwUpdate.httpStatus, _fwUpdate.success, firmwareVersion, response);
+                // Coverity Fix: IDs 23-24 - COPY_INSTEAD_OF_MOVE
+                _instance->reportFirmwareUpdateInfoReceived(std::move(_fwUpdate.firmwareUpdateVersion),
+                        _fwUpdate.httpStatus, _fwUpdate.success, std::move(firmwareVersion), std::move(response));
             } else {
                 LOGERR("_instance is NULL.\n");
             }
@@ -3023,7 +3032,10 @@ namespace WPEFramework {
 #ifdef ENABLE_LINK_LOCALTIME
                                     // Now create the linux link back to the zone info file to our writeable localtime
                                     if (Utils::fileExists(LOCALTIME_FILE)) {
-                                        remove (LOCALTIME_FILE);
+                                        // Coverity Fix: ID 4 - CHECKED_RETURN: Check return value of remove()
+                                        if (remove(LOCALTIME_FILE) != 0) {
+                                            LOGERR("Failed to remove %s: %s\n", LOCALTIME_FILE, strerror(errno));
+                                        }
                                     }
 
                                     LOGWARN("Linux localtime linked to %s\n", city.c_str());
@@ -3063,7 +3075,8 @@ namespace WPEFramework {
                             }
 
                             if (SystemServices::_instance && (oldTimeZoneDST != timeZone || oldAccuracy != accuracy))
-                                SystemServices::_instance->onTimeZoneDSTChanged(oldTimeZoneDST,timeZone,oldAccuracy, accuracy);
+                                // Coverity Fix: IDs 25-27 - COPY_INSTEAD_OF_MOVE
+                                SystemServices::_instance->onTimeZoneDSTChanged(std::move(oldTimeZoneDST),timeZone,std::move(oldAccuracy), std::move(accuracy));
 
                         }
                         else{
@@ -3098,12 +3111,14 @@ namespace WPEFramework {
         {
             LOGINFOMETHOD();
             returnIfParamNotFound(parameters, "friendlyName");
-            string friendlyName = parameters["friendlyName"].String();
+            // Coverity Fix: ID 46 - COPY_INSTEAD_OF_MOVE: Use std::move for parameter string
+            string friendlyName = std::move(parameters["friendlyName"].String());
             bool success = true;
             LOGWARN("SystemServices::setFriendlyName  :%s \n", friendlyName.c_str());
             if(m_friendlyName != friendlyName)
             {
-                m_friendlyName = friendlyName;
+                // Coverity Fix: ID 28 - COPY_INSTEAD_OF_MOVE
+                m_friendlyName = std::move(friendlyName);
                 JsonObject params;
                 params["friendlyName"] = m_friendlyName;
                 sendNotify("onFriendlyNameChanged", params);
@@ -3162,7 +3177,8 @@ namespace WPEFramework {
 				if(resp == true){
 					//call event on Territory changed
 					if (SystemServices::_instance)
-						SystemServices::_instance->onTerritoryChanged(m_strTerritory,territoryStr,m_strRegion,regionStr);
+						// Coverity Fix: IDs 29-30 - COPY_INSTEAD_OF_MOVE
+						SystemServices::_instance->onTerritoryChanged(m_strTerritory,std::move(territoryStr),m_strRegion,std::move(regionStr));
 				}
 			}
 			catch(...){
@@ -3297,10 +3313,11 @@ namespace WPEFramework {
 		if(regionStr.length() < 7){
 			string strRegion = regionStr.substr(0,regionStr.find("-"));
 			if( strRegion.length() == 2){
+				// Coverity Fix: ID 16, 31 - COPY_INSTEAD_OF_MOVE
 				if (isStrAlphaUpper(strRegion)){
 					strRegion = regionStr.substr(regionStr.find("-")+1,regionStr.length());
 					if(strRegion.length() >= 2){
-						retVal = isStrAlphaUpper(strRegion);
+						retVal = isStrAlphaUpper(std::move(strRegion));
 					}
 				}
 			}
@@ -3502,7 +3519,8 @@ namespace WPEFramework {
 
                 if (S_ISDIR(deStat.st_mode))
                 {
-                    dirs.push_back(fullName);
+                    // Coverity Fix: ID 50 - COPY_INSTEAD_OF_MOVE: Use std::move when adding to vector
+                    dirs.push_back(std::move(fullName));
                 }
                 else
                 {
@@ -4324,8 +4342,9 @@ namespace WPEFramework {
                     sleepMode = mode.toString();
                     LOGWARN("Output of getPreferredSleepMode: '%s'", sleepMode.c_str());
 
+                    // Coverity Fix: IDs 32-33, 51 - COPY_INSTEAD_OF_MOVE
                     if (convert("DEEP_SLEEP", sleepMode)) {
-                        retVal = setPowerState(sleepMode);
+                        retVal = setPowerState(std::move(sleepMode));
                     } else {
                         retVal = setPowerState(state);
                     }
@@ -4342,7 +4361,8 @@ namespace WPEFramework {
                 } else {
                     retVal = setPowerState(state);
                 }
-                m_current_state = state; /* save the old state */
+                // Coverity Fix: ID 52. 17 - COPY_INSTEAD_OF_MOVE: Move to m_current_state
+                m_current_state = std::move(state);
             } else {
                 populateResponseWithError(SysSrv_MissingKeyValues, response);
             }
@@ -4447,7 +4467,8 @@ namespace WPEFramework {
 
             if (getFileContent(VERSION_FILE_NAME, lines)) {
                 for (int i = 0; i < (int)lines.size(); ++i) {
-                    string line = lines.at(i);
+                    // Coverity Fix: ID 53 - COPY_INSTEAD_OF_MOVE: Use std::move from vector
+                    string line = std::move(lines.at(i));
 
                     if (strstr(line.c_str(), "imagename:")) {
                         std::string gp = line.c_str();
@@ -4455,10 +4476,12 @@ namespace WPEFramework {
                         std::string token = gp.substr((gp.find(delimiter)+1), string::npos);
                         if (token.length()){
                             versionFound = true;
-                            m_stbVersionString = token;
+                            // Coverity Fix: ID 53 - COPY_INSTEAD_OF_MOVE: Use std::move for token
+                            m_stbVersionString = std::move(token);
                             LOGWARN("m_stbVersion: %s\n", m_stbVersionString.c_str());
                         }
                         if (versionFound) {
+                            // Coverity Fix: ID 34 - COPY_INSTEAD_OF_MOVE
                             return m_stbVersionString;
                         } else {
                             LOGWARN("stb version not found in file %s\n",
@@ -4606,13 +4629,18 @@ namespace WPEFramework {
 
         bool SystemServices::makePersistentDir()
         {
-            struct stat st = {0};
-            int ret = 0;
-            if (stat("/opt/secure/persistent/System", &st) == -1) {
-                ret = mkdir("/opt/secure/persistent/System", 0700);
-                LOGWARN(" --- SubDirectories created from mkdir %d ", ret);
+            // Coverity Fix: ID 579 - TOCTOU: Use mkdir directly and check for EEXIST to handle race condition
+            int ret = mkdir("/opt/secure/persistent/System", 0700);
+            if (ret == 0) {
+                LOGWARN(" --- Directory /opt/secure/persistent/System created");
+                return true;
+            } else if (errno == EEXIST) {
+                // Directory already exists, which is fine
+                return true;
+            } else {
+                LOGERR(" --- Failed to create directory: %d", ret);
+                return false;
             }
-            return 0 == ret;
         }
 
         /***
@@ -4855,7 +4883,8 @@ namespace WPEFramework {
 
 #ifdef HAS_API_POWERSTATE
             if (SystemServices::_instance) {
-                SystemServices::_instance->onSystemModeChanged(mode);
+                // Coverity Fix: ID 35 - COPY_INSTEAD_OF_MOVE
+                SystemServices::_instance->onSystemModeChanged(std::move(mode));
             } else {
                 LOGERR("SystemServices::_instance is NULL.\n");
             }
@@ -4966,7 +4995,8 @@ namespace WPEFramework {
                     string timerStr = std::string(pMsg->currentTime,cTIMER_STATUS_MESSAGE_LENGTH);
 
                 if (SystemServices::_instance) {
-                    SystemServices::_instance->onTimeStatusChanged(timequality,timersrc,timerStr);
+                    // Coverity Fix: IDs 36-38 - COPY_INSTEAD_OF_MOVE
+                    SystemServices::_instance->onTimeStatusChanged(std::move(timequality),std::move(timersrc),std::move(timerStr));
                 } else {
                     LOGERR("SystemServices::_instance is NULL.\n");
                 }
@@ -5046,7 +5076,8 @@ namespace WPEFramework {
             if (validparams) {
                 LOGWARN("Invalid temperature levels \n");
                 if (SystemServices::_instance) {
-                    SystemServices::_instance->onTemperatureThresholdChanged(thermLevel,
+                    // Coverity Fix: ID 39 - COPY_INSTEAD_OF_MOVE
+                    SystemServices::_instance->onTemperatureThresholdChanged(std::move(thermLevel),
                             crossOver, currentTemperature);
                 } else {
                     LOGERR("SystemServices::_instance is NULL.\n");

@@ -32,11 +32,12 @@ bool PlatformCaps::Load(PluginHost::IShell* service, const string &query) {
   Reset();
 
   std::smatch m;
-  std::regex_search(query, m,
+  bool matched = std::regex_search(query, m,
       std::regex("^(AccountInfo|DeviceInfo)(\\.(\\w*)){0,1}"));
 
-  if (query.empty() || !m.empty()) {
+  if (query.empty() || matched) {
     if (query.empty() || (m[1] == _T("AccountInfo"))) {
+      // Coverity Fix: ID 2 - CHECKED_RETURN: Check return value of Load()
       if (!accountInfo.Load(service, m.size() > 3 ? m[3] : string())) {
         result = false;
       }
