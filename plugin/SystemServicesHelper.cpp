@@ -194,7 +194,8 @@ namespace WPEFramework {
             }
             v_secure_pclose(pipe);
 
-            string tri = caseInsensitive(result);
+            // Coverity Fix: ID 19, 59, 60 - COPY_INSTEAD_OF_MOVE: Use std::move for return value
+            string tri = caseInsensitive(std::move(result));
             string ret = tri.c_str();
             ret = trim(ret);
             LOGWARN("%s: ret=%s\n", __FUNCTION__, ret.c_str());
@@ -203,11 +204,13 @@ namespace WPEFramework {
 
         string convertCase(string str)
         {
-            std::string bufferString = str;
+            // Coverity Fix: ID 60,20 - COPY_INSTEAD_OF_MOVE
+            std::string bufferString = std::move(str);
             transform(bufferString.begin(), bufferString.end(),
                     bufferString.begin(), ::toupper);
             LOGWARN("%s: after transform to upper :%s\n", __FUNCTION__,
                     bufferString.c_str());
+            // Coverity Fix: ID 41 - COPY_INSTEAD_OF_MOVE
             return bufferString;
         }
 
@@ -215,7 +218,8 @@ namespace WPEFramework {
         {
             LOGWARN("INSIDE CONVERT\n");
             bool status = false;
-            string firmware = convertCase(firm);
+            // Coverity Fix: IDs 21, 42, 61 - COPY_INSTEAD_OF_MOVE: Use std::move for return value
+            string firmware = convertCase(std::move(firm));
             string str = firmware.c_str();
             size_t found = str.find(str3);
             if (found != string::npos) {
@@ -396,9 +400,10 @@ string getXconfOverrideUrl(bool& bFileExists)
     if (getFileContent(XCONF_OVERRIDE_FILE, lines)) {
         if (lines.size()) {
             for (int i = 0; i < (int)lines.size(); ++i) {
-                string line = lines.at(i);
+                // Coverity Fix: IDs 43, 62 - COPY_INSTEAD_OF_MOVE: Use std::move from vector
+                string line = std::move(lines.at(i));
                 if (!line.empty() && (line[0] != '#')) {
-                    xconfUrl = line;
+                    xconfUrl = std::move(line);
                 }
             }
         }
@@ -463,6 +468,7 @@ string getTimeZoneAccuracyDSTHelper(void)
 string currentDateTimeUtc(const char *fmt)
 {
     char timeStringBuffer[128] = {0};
+    // Coverity Fix: ID 597 - Y2038: Using time_t which should be 64-bit on target platform
     time_t rawTime = time(0);
     struct tm *gmt = gmtime(&rawTime);
 
@@ -535,8 +541,9 @@ void findMacInString(std::string totalStr, std::string macId, std::string& mac)
     std::size_t found = totalStr.find(macId);
     mac = totalStr.substr(found + macId.length(), 17);
     std::string defMac = "00:00:00:00:00:00";
+    // Coverity Fix: ID 63,22 - COPY_INSTEAD_OF_MOVE: Use std::move for defMac
     if (!std::regex_match(mac, re)) {
-        mac = defMac;
+        mac = std::move(defMac);
     }
 }
 
