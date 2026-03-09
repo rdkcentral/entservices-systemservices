@@ -71,6 +71,7 @@
 #include "UtilsgetFileContent.h"
 #include "UtilsProcess.h"
 
+
 using namespace std;
 using namespace WPEFramework;
 using PowerState = WPEFramework::Exchange::IPowerManager::PowerState;
