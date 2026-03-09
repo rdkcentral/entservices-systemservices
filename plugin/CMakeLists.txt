@@ -28,6 +28,8 @@ if(BUILD_TESTS)
     add_subdirectory(TestClient)
 endif()
 
+target_link_libraries(-ltelemetry_msgsender)
+
 add_library(${MODULE_NAME} SHARED
         SystemServices.cpp
         Module.cpp
