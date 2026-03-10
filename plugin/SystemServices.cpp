@@ -1086,32 +1086,24 @@ namespace WPEFramework {
             LOGWARN("power state changed from '%s' to '%s'", currentPowerState.c_str(), powerState.c_str());
 
 			char value[256] = {0};
-			snprintf(value, sizeof(value), "power state changed from '%s' to '%s'", currentPowerState.c_str(), powerState.c_str());
+			snprintf(value, sizeof(value), "power state changed from");
 			t2_event_s((char*)"PwrStateChng_split", value);
 
 			if (currentPowerState == "ON" && powerState == "LIGHT_SLEEP")
 			{
-				static int thunder_sleep1_count = 0;
-				thunder_sleep1_count++;
-				t2_event_d((char*)"SYST_INFO_ThunderSleep1", thunder_sleep1_count);
+				t2_event_d((char*)"SYST_INFO_ThunderSleep1", 1);
 			}
 			else if (currentPowerState == "LIGHT_SLEEP" && powerState == "DEEP_SLEEP")
 			{
-				static int thunder_sleep2_count = 0;
-				thunder_sleep2_count++;
-				t2_event_d((char*)"SYST_INFO_ThunderSleep2", thunder_sleep2_count);
+				t2_event_d((char*)"SYST_INFO_ThunderSleep2", 1);
 			}
 			else if (currentPowerState == "DEEP_SLEEP" && powerState == "LIGHT_SLEEP")
 			{
-				static int thunder_wake1_count = 0;
-				thunder_wake1_count++;
-				t2_event_d((char*)"SYST_INFO_ThunderWake1", thunder_wake1_count);
+				t2_event_d((char*)"SYST_INFO_ThunderWake1", 1);
 			}
 			else if (currentPowerState == "LIGHT_SLEEP" && powerState == "ON")
 			{
-				static int thunder_wake2_count = 0;
-				thunder_wake2_count++;
-				t2_event_d((char*)"SYST_INFO_ThunderWake2", thunder_wake2_count);
+				t2_event_d((char*)"SYST_INFO_ThunderWake2", 1);
 			}
             sendNotify(EVT_ONSYSTEMPOWERSTATECHANGED, params);
         }
@@ -2324,10 +2316,12 @@ namespace WPEFramework {
                  bStandbyMode = parameters["nwStandby"].Boolean();
                  LOGWARN("setNetworkStandbyMode called, with NwStandbyMode : %s\n",
                           (bStandbyMode)?("Enabled"):("Disabled"));
-
-				 static int nw_disable_count = 0;
-				 nw_disable_count++;
-				 t2_event_d((char*)"SYST_INFO_NwDisable", nw_disable_count);
+				 
+				 if (bStandbyMode) {
+					 t2_event_d((char*)"SYST_INFO_NWenable", 1);
+				 } else {
+					 t2_event_d((char*)"SYST_INFO_NwDisable", 1);
+				 }
 
                  ASSERT (_powerManagerPlugin);
                  if (_powerManagerPlugin){
