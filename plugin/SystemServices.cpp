@@ -3309,9 +3309,7 @@ namespace WPEFramework {
 		    }else{
 		    	LOGERR("Territory is not set");
 
-				static int territory_notset_count = 0;
-				territory_notset_count++;
-				t2_event_d((char*)"SYST_ERR_TerritoryNotSet", territory_notset_count);
+				t2_event_d((char*)"SYST_ERR_TerritoryNotSet", 1);
 		    }
         }
         catch(...){
