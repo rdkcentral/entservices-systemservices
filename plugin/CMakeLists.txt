@@ -28,8 +28,6 @@ if(BUILD_TESTS)
     add_subdirectory(TestClient)
 endif()
 
-target_link_libraries(-ltelemetry_msgsender)
-
 add_library(${MODULE_NAME} SHARED
         SystemServices.cpp
         Module.cpp
@@ -107,6 +105,7 @@ if (RDK_SERVICE_L2_TEST)
     endif (TESTMOCKLIB_LIBRARIES)
 endif()
 
+target_link_libraries(${MODULE_NAME} PRIVATE -ltelemetry_msgsender)
 
 target_include_directories(${MODULE_NAME} PRIVATE ../helpers)
 target_include_directories(${MODULE_NAME} PRIVATE ./)
