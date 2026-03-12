@@ -581,6 +581,8 @@ namespace WPEFramework {
                 &SystemServices::getPlatformConfiguration, this);
             GetHandler(2)->Register<JsonObject, PlatformCaps>("getPlatformConfiguration",
                 &SystemServices::getPlatformConfiguration, this);
+            registerMethod("getPreviousRebootInfo",
+                    &SystemServices::getPreviousRebootInfo, this);
 #if 0
             registerMethod("getXconfParams", &SystemServices::getXconfParams, this);
             registerMethod("getPreferredStandbyMode",
@@ -3648,6 +3650,65 @@ namespace WPEFramework {
             response["zoneinfo"] = dirObject;
 
             returnResponse(resp);
+        }
+
+        /***
+         * @brief : To get previous boot info.
+         * @param1[in]	: {"params":{}}
+         * @param2[out]	: {"result":{"timeStamp":"<string>","reason":"<string>",
+         *				   "success":<bool>}}
+         * @return		: Core::<StatusCode>
+         */
+        uint32_t SystemServices::getPreviousRebootInfo(const JsonObject& parameters,
+                JsonObject& response)
+        {
+            if (!Utils::fileExists(REBOOT_INFO_LOG_FILE)) {
+                LOGERR("Cant't determine previous reboot info, %s not found or can't be opened for reading", REBOOT_INFO_LOG_FILE);
+                returnResponse(false);
+            }
+
+            string rebootInfo;
+            if (!getFileContent(REBOOT_INFO_LOG_FILE, rebootInfo)) {
+                LOGERR("Cant't determine previous reboot info, %s not found or can't be opened for reading", REBOOT_INFO_LOG_FILE);
+                returnResponse(false);
+            }
+
+            if (rebootInfo.length() < 1) {
+                LOGERR("No reboot info, file %s is empty", REBOOT_INFO_LOG_FILE);
+                returnResponse(false);
+            }
+
+            smatch match;
+
+            string timeStamp = "Unknown";
+            string reason = "Unknown";
+            string source = "Unknown";
+            string customReason = "Unknown";
+            string otherReason = "Unknown";
+
+            string temp;
+            if (regex_search(rebootInfo, match, regex("(?:PreviousRebootTime:)([^\\n]+)")) &&  match.size() > 1) temp = trim(match[1]);
+            if (temp.size() > 0) timeStamp = temp;
+
+            if (regex_search(rebootInfo, match, regex("(?:PreviousRebootReason: RebootReason:)([^\\n]+)")) &&  match.size() > 1) temp = trim(match[1]);
+            if (temp.size() > 0) reason = temp;
+
+            if (regex_search(rebootInfo, match, regex("(?:PreviousRebootInitiatedBy:)([^\\n]+)")) &&  match.size() > 1) temp = trim(match[1]);
+            if (temp.size() > 0) source = temp;
+
+            if (regex_search(rebootInfo, match, regex("(?:PreviousCustomReason:)([^\\n]+)")) &&  match.size() > 1) temp = trim(match[1]);
+            if (temp.size() > 0) customReason = temp;
+
+            if (regex_search(rebootInfo, match, regex("(?:PreviousOtherReason:)([^\\n]+)")) &&  match.size() > 1) temp = trim(match[1]);
+            if (temp.size() > 0) otherReason = std::move(temp);
+
+            response["timeStamp"] = timeStamp;
+            response["reason"] = reason;
+            response["source"] = source;
+            response["customReason"] = customReason;
+            response["otherReason"] = otherReason;
+
+            returnResponse(true);
         }
 
 #if 0

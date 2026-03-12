@@ -362,6 +362,7 @@ namespace WPEFramework {
                 uint32_t setWakeupSrcConfiguration(const JsonObject& parameters, JsonObject& response);
                 uint32_t getMacAddresses(const JsonObject& parameters, JsonObject& response);
                 uint32_t getPlatformConfiguration(const JsonObject& parameters, PlatformCaps& response);
+                uint32_t getPreviousRebootInfo(const JsonObject& parameters, JsonObject& response);
 #if 0
                 uint32_t getStoreDemoLink(const JsonObject& parameters, JsonObject& response);
                 uint32_t getPreferredStandbyMode(const JsonObject& parameters, JsonObject& response);
