@@ -117,6 +117,7 @@ touch rdk/halif/deepsleep-manager/deepSleepMgr.h
 touch rdk/iarmmgrs-hal/mfrMgr.h
 touch rdk/iarmmgrs-hal/sysMgr.h
 touch rfcapi.h
+touch telemetry_busmessage_sender.h
 touch secure_wrapper.h
 touch proc/readproc.h
 echo "files created successfully"
