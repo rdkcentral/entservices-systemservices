@@ -71,6 +71,7 @@
 #include "UtilsgetFileContent.h"
 #include "UtilsProcess.h"
 
+#include <telemetry_busmessage_sender.h>
 
 using namespace std;
 using namespace WPEFramework;
@@ -1083,6 +1084,27 @@ namespace WPEFramework {
             params["powerState"] = powerState;
             params["currentPowerState"] = currentPowerState;
             LOGWARN("power state changed from '%s' to '%s'", currentPowerState.c_str(), powerState.c_str());
+
+			char value[256] = {0};
+			snprintf(value, sizeof(value), "power state changed from");
+			t2_event_s((char*)"PwrStateChng_split", value);
+
+			if (currentPowerState == "ON" && powerState == "LIGHT_SLEEP")
+			{
+				t2_event_d((char*)"SYST_INFO_ThunderSleep1", 1);
+			}
+			else if (currentPowerState == "LIGHT_SLEEP" && powerState == "DEEP_SLEEP")
+			{
+				t2_event_d((char*)"SYST_INFO_ThunderSleep2", 1);
+			}
+			else if (currentPowerState == "DEEP_SLEEP" && powerState == "LIGHT_SLEEP")
+			{
+				t2_event_d((char*)"SYST_INFO_ThunderWake1", 1);
+			}
+			else if (currentPowerState == "LIGHT_SLEEP" && powerState == "ON")
+			{
+				t2_event_d((char*)"SYST_INFO_ThunderWake2", 1);
+			}
             sendNotify(EVT_ONSYSTEMPOWERSTATECHANGED, params);
         }
 
@@ -2294,6 +2316,12 @@ namespace WPEFramework {
                  bStandbyMode = parameters["nwStandby"].Boolean();
                  LOGWARN("setNetworkStandbyMode called, with NwStandbyMode : %s\n",
                           (bStandbyMode)?("Enabled"):("Disabled"));
+				 
+				 if (bStandbyMode) {
+					 t2_event_d((char*)"SYST_INFO_NWenable", 1);
+				 } else {
+					 t2_event_d((char*)"SYST_INFO_NwDisable", 1);
+				 }
 
                  ASSERT (_powerManagerPlugin);
                  if (_powerManagerPlugin){
@@ -2446,7 +2474,12 @@ namespace WPEFramework {
                 status = false;
             }
             LOGWARN("WakeupReason : %s\n", wakeupReason.c_str());
-                response["wakeupReason"] = wakeupReason;
+			
+			char value[256] = {0};
+			snprintf(value, sizeof(value), "WakeupReason : %s", wakeupReason.c_str());
+			t2_event_s((char*)"WakeUPRsn_split", value);
+			
+			response["wakeupReason"] = wakeupReason;
 
             returnResponse(status);
         }
@@ -3275,6 +3308,8 @@ namespace WPEFramework {
             
 		    }else{
 		    	LOGERR("Territory is not set");
+
+				t2_event_d((char*)"SYST_ERR_TerritoryNotSet", 1);
 		    }
         }
         catch(...){
@@ -5147,6 +5182,12 @@ namespace WPEFramework {
             }
 
             response["failReason"] = FwFailReasonToText.at(failReason);
+			
+			std::string failReasonStr = FwFailReasonToText.at(failReason);
+			char value[256] = {0};
+			snprintf(value, sizeof(value), "getLastFirmwareFailureReason: response=%s", failReasonStr.c_str());
+			t2_event_s((char*)"FWFail_split", value);
+			
             returnResponse(retStatus);
         }
         /***
@@ -5435,6 +5476,11 @@ namespace WPEFramework {
             {
                 LOGINFO("Boot type changed to: %s, current OS Class: rdke\n", bootType.c_str());
                 response["bootType"] = bootType;
+
+				char value[256] = {0};
+				snprintf(value, sizeof(value), "\"bootType\":\"%s\"", bootType.c_str());
+				t2_event_s((char*)"WPE_INFO_MigBoottype_split", value);
+				
                 status = true;
             }
             else

@@ -24,6 +24,8 @@ set(PLUGIN_SYSTEMSERVICE_STARTUPORDER "" CACHE STRING "To configure startup orde
 find_package(${NAMESPACE}Plugins REQUIRED)
 find_library(PROCPS_LIBRARIES NAMES procps)
 
+find_package(Telemetry)
+
 if(BUILD_TESTS)
     add_subdirectory(TestClient)
 endif()
@@ -105,6 +107,10 @@ if (RDK_SERVICE_L2_TEST)
     endif (TESTMOCKLIB_LIBRARIES)
 endif()
 
+if(TELEMETRY_FOUND)
+    target_link_libraries(${MODULE_NAME} PRIVATE ${TELEMETRY_LIBRARIES})
+    target_include_directories(${MODULE_NAME} PRIVATE ${TELEMETRY_INCLUDE_DIRS})
+endif()
 
 target_include_directories(${MODULE_NAME} PRIVATE ../helpers)
 target_include_directories(${MODULE_NAME} PRIVATE ./)
