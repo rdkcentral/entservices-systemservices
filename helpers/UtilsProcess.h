@@ -58,7 +58,7 @@ bool killProcess(const string& input_pname)
                 (strstr(proc_info.cmd, input_pname.c_str()) != nullptr))
             {
                 match = true;
-                LOGINF(O, "Matched process [%d] command name [%s]", proc_info.tid, proc_info.cmd);
+                LOGINFO("Matched process [%d] command name [%s]", proc_info.tid, proc_info.cmd);
             }
 
             // If not matched yet, match substring against each command-line argument.
@@ -66,7 +66,7 @@ bool killProcess(const string& input_pname)
                 for (char** arg = proc_info.cmdline; *arg != nullptr; ++arg) {
                     if (strstr(*arg, input_pname.c_str()) != nullptr) {
                         match = true;
-                        LOGINF(O, "Matched process [%d] command-line argument [%s]", proc_info.tid, *arg);
+                        LOGINFO("Matched process [%d] command-line argument [%s]", proc_info.tid, *arg);
                         break;
                     }
                 }
