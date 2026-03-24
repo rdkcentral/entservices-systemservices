@@ -31,23 +31,49 @@ using namespace std;
 
 namespace Utils
 {
+
 /**
-* @brief Kill all the processes with the given process name
-* @param[in] input_pname - The given process name
-* @return true if any process with the given name was killed, otherwise false is returned
+* @brief Kill processes whose executable name or command-line contains input_pname.
+* @param[in] input_pname Substring to match in process command name/arguments.
+* @return true if at least one matching process was signaled, false otherwise.
 */
-bool killProcess(string& input_pname)
+bool killProcess(const string& input_pname)
 {
-    PROCTAB* proc = openproc(PROC_FILLMEM | PROC_FILLSTAT | PROC_FILLSTATUS);
+    // Request enough process metadata to inspect command name and command-line args.
+    PROCTAB* proc = openproc(PROC_FILLMEM | PROC_FILLSTAT | PROC_FILLSTATUS | PROC_FILLCOM);
     proc_t proc_info = {0};
     bool ret_value = false;
 
     if (proc != NULL)
     {
         memset(&proc_info, 0, sizeof(proc_info));
+
+        // Walk all processes in the process table.
         while (readproc(proc, &proc_info) != NULL)
         {
-            if (proc_info.cmd == input_pname)
+            bool match = false;
+
+            // Match substring against the executable/command name.
+            if ((proc_info.cmd != nullptr) &&
+                (strstr(proc_info.cmd, input_pname.c_str()) != nullptr))
+            {
+                match = true;
+                LOGINF(O, "Matched process [%d] command name [%s]", proc_info.tid, proc_info.cmd);
+            }
+
+            // If not matched yet, match substring against each command-line argument.
+            if (!match && (proc_info.cmdline != nullptr)) {
+                for (char** arg = proc_info.cmdline; *arg != nullptr; ++arg) {
+                    if (strstr(*arg, input_pname.c_str()) != nullptr) {
+                        match = true;
+                        LOGINF(O, "Matched process [%d] command-line argument [%s]", proc_info.tid, *arg);
+                        break;
+                    }
+                }
+            }
+
+            // Gracefully terminate all matched processes.
+            if (match)
             {
                 if (0 == kill(proc_info.tid, SIGTERM))
                 {
@@ -56,8 +82,11 @@ bool killProcess(string& input_pname)
                 }
             }
         }
+
+        // Release resources held by libproc.
         closeproc(proc);
     }
+
     return ret_value;
 }
 
