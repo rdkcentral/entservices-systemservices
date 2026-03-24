@@ -852,7 +852,7 @@ namespace WPEFramework {
             string otherReason = "No other reason supplied";
             string requestor = "SystemServices";
             bool result = false;
-            string fname = "nrdPluginApp";
+            string fname = "sky-nrdplugin";
 
             nfxResult = Utils::killProcess(fname);
             if (true == nfxResult) {
