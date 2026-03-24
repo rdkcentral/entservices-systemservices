@@ -44,6 +44,7 @@ bool killProcess(const string& input_pname)
     proc_t proc_info = {0};
     bool ret_value = false;
 
+    LOGINFO("Attempting to kill processes with name or command-line containing [%s]", input_pname.c_str());
     if (proc != NULL)
     {
         memset(&proc_info, 0, sizeof(proc_info));
@@ -53,6 +54,8 @@ bool killProcess(const string& input_pname)
         {
             bool match = false;
 
+            //print process info for debugging
+            LOGINFO("Inspecting process [%d] with command name [%s]", proc_info.tid, proc_info.cmd ? proc_info.cmd : "null");
             // Match substring against the executable/command name.
             if ((proc_info.cmd != nullptr) &&
                 (strstr(proc_info.cmd, input_pname.c_str()) != nullptr))

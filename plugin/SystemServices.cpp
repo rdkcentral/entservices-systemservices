@@ -872,17 +872,17 @@ namespace WPEFramework {
             LOGINFO("requestSystemReboot: custom reason: %s, other reason: %s\n", customReason.c_str(),
                 otherReason.c_str());
 
-            ASSERT (_powerManagerPlugin);
-            if (_powerManagerPlugin){
-                status = _powerManagerPlugin->Reboot(requestor, customReason, otherReason);
-                result = true;
-            } else {
-                status = Core::ERROR_ILLEGAL_STATE;
-            }
+            // ASSERT (_powerManagerPlugin);
+            // if (_powerManagerPlugin){
+            //     status = _powerManagerPlugin->Reboot(requestor, customReason, otherReason);
+            //     result = true;
+            // } else {
+            //     status = Core::ERROR_ILLEGAL_STATE;
+            // }
 
-            if (status != Core::ERROR_NONE){
-                 LOGWARN("requestSystemReboot: powerManagerPlugin->rebooot failed\n");
-            }
+            // if (status != Core::ERROR_NONE){
+            //      LOGWARN("requestSystemReboot: powerManagerPlugin->rebooot failed\n");
+            // }
 
             response["IARM_Bus_Call_STATUS"] = static_cast <int32_t> (status);
 
