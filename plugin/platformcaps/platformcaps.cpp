@@ -26,22 +26,27 @@
 namespace WPEFramework {
 namespace Plugin {
 
-bool PlatformCaps::Load(PluginHost::IShell* service, const string &query) {
+bool PlatformCaps::Load(PluginHost::IShell* service, const string &query, Exchange::ISystemServices::PlatformConfig& platformConfig) {
   bool result = true;
 
   Reset();
 
   std::smatch m;
-  bool matched = std::regex_search(query, m,
+  std::regex_search(query, m,
       std::regex("^(AccountInfo|DeviceInfo)(\\.(\\w*)){0,1}"));
 
-  if (query.empty() || matched) {
+  if (query.empty() || !m.empty()) {
     if (query.empty() || (m[1] == _T("AccountInfo"))) {
-      // Coverity Fix: ID 2 - CHECKED_RETURN: Check return value of Load()
       if (!accountInfo.Load(service, m.size() > 3 ? m[3] : string())) {
         result = false;
       }
       Add(_T("AccountInfo"), &accountInfo);
+      platformConfig.accountInfo.accountId = accountInfo.accountId.Value();
+      platformConfig.accountInfo.x1DeviceId = accountInfo.x1DeviceId.Value();
+      platformConfig.accountInfo.xCALSessionTokenAvailable = accountInfo.XCALSessionTokenAvailable.Value();
+      platformConfig.accountInfo.experience = accountInfo.experience.Value();
+      platformConfig.accountInfo.deviceMACAddress = accountInfo.deviceMACAddress.Value();
+      platformConfig.accountInfo.firmwareUpdateDisabled = accountInfo.firmwareUpdateDisabled.Value();
     }
 
     if (query.empty() || (m[1] == _T("DeviceInfo"))) {
@@ -49,6 +54,139 @@ bool PlatformCaps::Load(PluginHost::IShell* service, const string &query) {
         result = false;
       }
       Add(_T("DeviceInfo"), &deviceInfo);
+
+      // Convert quirks array to comma-separated string
+      auto& quirksArray = deviceInfo.quirks;
+      string quirksStr;
+      for (uint32_t i = 0; i < quirksArray.Length(); i++) {
+        if (i > 0) quirksStr += ",";
+        quirksStr += quirksArray[i].Value();
+      }
+      platformConfig.deviceInfo.quirks = quirksStr;
+
+      // Extract mimeTypeExclusions from JsonObject and assign to struct fields
+      auto& mimeExclusions = deviceInfo.mimeTypeExclusions;
+      if (mimeExclusions.HasLabel("CDVR")) {
+        auto cdvrArray = mimeExclusions["CDVR"].Array();
+        string cdvrStr;
+        for (uint32_t i = 0; i < cdvrArray.Length(); i++) {
+          if (i > 0) cdvrStr += ",";
+          cdvrStr += cdvrArray[i].String();
+        }
+        platformConfig.deviceInfo.mimeTypeExclusions.cdvr = cdvrStr;
+      }
+      if (mimeExclusions.HasLabel("DVR")) {
+        auto dvrArray = mimeExclusions["DVR"].Array();
+        string dvrStr;
+        for (uint32_t i = 0; i < dvrArray.Length(); i++) {
+          if (i > 0) dvrStr += ",";
+          dvrStr += dvrArray[i].String();
+        }
+        platformConfig.deviceInfo.mimeTypeExclusions.dvr = dvrStr;
+      }
+      if (mimeExclusions.HasLabel("EAS")) {
+        auto easArray = mimeExclusions["EAS"].Array();
+        string easStr;
+        for (uint32_t i = 0; i < easArray.Length(); i++) {
+          if (i > 0) easStr += ",";
+          easStr += easArray[i].String();
+        }
+        platformConfig.deviceInfo.mimeTypeExclusions.eas = easStr;
+      }
+      if (mimeExclusions.HasLabel("IPDVR")) {
+        auto ipdvrArray = mimeExclusions["IPDVR"].Array();
+        string ipdvrStr;
+        for (uint32_t i = 0; i < ipdvrArray.Length(); i++) {
+          if (i > 0) ipdvrStr += ",";
+          ipdvrStr += ipdvrArray[i].String();
+        }
+        platformConfig.deviceInfo.mimeTypeExclusions.ipdvr = ipdvrStr;
+      }
+      if (mimeExclusions.HasLabel("IVOD")) {
+        auto ivodArray = mimeExclusions["IVOD"].Array();
+        string ivodStr;
+        for (uint32_t i = 0; i < ivodArray.Length(); i++) {
+          if (i > 0) ivodStr += ",";
+          ivodStr += ivodArray[i].String();
+        }
+        platformConfig.deviceInfo.mimeTypeExclusions.ivod = ivodStr;
+      }
+      if (mimeExclusions.HasLabel("LINEAR_TV")) {
+        auto linearTVArray = mimeExclusions["LINEAR_TV"].Array();
+        string linearTVStr;
+        for (uint32_t i = 0; i < linearTVArray.Length(); i++) {
+          if (i > 0) linearTVStr += ",";
+          linearTVStr += linearTVArray[i].String();
+        }
+        platformConfig.deviceInfo.mimeTypeExclusions.linearTV = linearTVStr;
+      }
+      if (mimeExclusions.HasLabel("VOD")) {
+        auto vodArray = mimeExclusions["VOD"].Array();
+        string vodStr;
+        for (uint32_t i = 0; i < vodArray.Length(); i++) {
+          if (i > 0) vodStr += ",";
+          vodStr += vodArray[i].String();
+        }
+        platformConfig.deviceInfo.mimeTypeExclusions.vod = vodStr;
+      }
+
+      // Extract features from JsonObject and assign to struct fields
+      auto& featuresObj = deviceInfo.features;
+      if (featuresObj.HasLabel("allowSelfSignedWithIPAddress")) {
+        platformConfig.deviceInfo.features.allowSelfSignedWithIPAddress = featuresObj["allowSelfSignedWithIPAddress"].Number();
+      }
+      if (featuresObj.HasLabel("connection.supportsSecure")) {
+        platformConfig.deviceInfo.features.supportsSecure = featuresObj["connection.supportsSecure"].Number();
+      }
+      if (featuresObj.HasLabel("htmlview.callJavaScriptWithResult")) {
+        platformConfig.deviceInfo.features.callJavaScriptWithResult = featuresObj["htmlview.callJavaScriptWithResult"].Number();
+      }
+      if (featuresObj.HasLabel("htmlview.cookies")) {
+        platformConfig.deviceInfo.features.cookies = featuresObj["htmlview.cookies"].Number();
+      }
+      if (featuresObj.HasLabel("htmlview.disableCSSAnimations")) {
+        platformConfig.deviceInfo.features.disableCSSAnimations = featuresObj["htmlview.disableCSSAnimations"].Number();
+      }
+      if (featuresObj.HasLabel("htmlview.evaluateJavaScript")) {
+        platformConfig.deviceInfo.features.evaluateJavaScript = featuresObj["htmlview.evaluateJavaScript"].Number();
+      }
+      if (featuresObj.HasLabel("htmlview.headers")) {
+        platformConfig.deviceInfo.features.headers = featuresObj["htmlview.headers"].Number();
+      }
+      if (featuresObj.HasLabel("htmlview.httpCookies")) {
+        platformConfig.deviceInfo.features.httpCookies = featuresObj["htmlview.httpCookies"].Number();
+      }
+      if (featuresObj.HasLabel("htmlview.postMessage")) {
+        platformConfig.deviceInfo.features.postMessage = featuresObj["htmlview.postMessage"].Number();
+      }
+      if (featuresObj.HasLabel("htmlview.urlpatterns")) {
+        platformConfig.deviceInfo.features.urlpatterns = featuresObj["htmlview.urlpatterns"].Number();
+      }
+      if (featuresObj.HasLabel("keySource")) {
+        platformConfig.deviceInfo.features.keySource = featuresObj["keySource"].Number();
+      }
+      if (featuresObj.HasLabel("uhd_4k_decode")) {
+        platformConfig.deviceInfo.features.uhd4kDecode = featuresObj["uhd_4k_decode"].Number();
+      }
+
+      // Convert mimeTypes array to comma-separated string
+      auto& mimeTypesArray = deviceInfo.mimeTypes;
+      string mimeTypesStr;
+      for (uint32_t i = 0; i < mimeTypesArray.Length(); i++) {
+        if (i > 0) mimeTypesStr += ",";
+        mimeTypesStr += mimeTypesArray[i].Value();
+      }
+      platformConfig.deviceInfo.mimeTypes = mimeTypesStr;
+
+      platformConfig.deviceInfo.model = deviceInfo.model.Value();
+      platformConfig.deviceInfo.deviceType = deviceInfo.deviceType.Value();
+      platformConfig.deviceInfo.supportsTrueSD = deviceInfo.supportsTrueSD.Value();
+      platformConfig.deviceInfo.webBrowser.browserType = deviceInfo.webBrowser.browserType.Value();
+      platformConfig.deviceInfo.webBrowser.version = deviceInfo.webBrowser.version.Value();
+      platformConfig.deviceInfo.webBrowser.userAgent = deviceInfo.webBrowser.userAgent.Value();
+      platformConfig.deviceInfo.hdrCapability = deviceInfo.HdrCapability.Value();
+      platformConfig.deviceInfo.canMixPCMWithSurround = deviceInfo.canMixPCMWithSurround.Value();
+      platformConfig.deviceInfo.publicIP = deviceInfo.publicIP.Value();
     }
   } else {
     TRACE(Trace::Error, (_T("%s Bad query '%s'\n"),
@@ -58,6 +196,7 @@ bool PlatformCaps::Load(PluginHost::IShell* service, const string &query) {
 
   success = result;
   Add(_T("success"), &success);
+  platformConfig.success = result;
 
   return result;
 }
