@@ -445,10 +445,7 @@ TEST_F(SystemService_L2Test,SystemServiceUploadLogsAndSystemPowerStateChange)
     std::string message;
     JsonObject expected_status;
 
-    const string uploadStbLogFile = _T("/lib/rdk/uploadSTBLogs.sh");
-    Core::File file(uploadStbLogFile);
-    file.Create();
-    EXPECT_TRUE(Core::File(string(_T("/lib/rdk/uploadSTBLogs.sh"))).Exists());
+    EXPECT_TRUE(Core::File(string(_T("/usr/bin/logupload"))).Exists());
 
     ON_CALL(*p_rfcApiImplMock, getRFCParameter(::testing::_, ::testing::_, ::testing::_))
         .WillByDefault(::testing::Invoke(
