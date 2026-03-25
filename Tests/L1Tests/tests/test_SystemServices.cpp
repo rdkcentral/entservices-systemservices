@@ -2996,7 +2996,7 @@ TEST_F(SystemServicesTest, requestSystemRebootSuccess_NrdPluginNotRunning)
     // Simulate "nrdplugin" is  not running
     EXPECT_CALL(*p_readprocImplMock, readproc(dummyProcTab, ::testing::_))
         .WillOnce([&proc_info](PROCTAB* pt, proc_t* p) -> proc_t* {
-            std::string input_pname = "No_nrdplugin";
+            std::string input_pname = "UnrelatedProcess";
             strncpy(p->cmd, input_pname.c_str(), sizeof(p->cmd) - 1);
             p->cmd[sizeof(p->cmd) - 1] = '\0';
             p->tid = 123;
