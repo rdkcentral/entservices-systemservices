@@ -128,7 +128,7 @@ std::int32_t getUploadLogParameters(string &tftp_server, string &upload_protocol
 
 pid_t logUploadAsync(void)
 {
-    if ( !Utils::fileExists("/lib/rdk/uploadSTBLogs.sh") ){
+    if ( !Utils::fileExists("/usr/bin/logupload") ){
         return -1;
     }
 
