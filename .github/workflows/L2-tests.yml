@@ -591,6 +591,7 @@ jobs:
           if [ ! -f mknod /dev/sdb2 c 240 0 ]; then mknod /dev/sdb2 c 240 0; fi
           &&
           sudo touch
+          /usr/bin/logupload
           /opt/standbyReason.txt
           /opt/tmtryoptout
           /opt/fwdnldstatus.txt
