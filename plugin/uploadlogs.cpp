@@ -128,7 +128,7 @@ std::int32_t getUploadLogParameters(string &tftp_server, string &upload_protocol
 
 pid_t logUploadAsync(void)
 {
-    if ( !Utils::fileExists("/lib/rdk/uploadSTBLogs.sh") ){
+    if ( !Utils::fileExists("/usr/bin/logupload") ){
         return -1;
     }
 
@@ -138,18 +138,16 @@ pid_t logUploadAsync(void)
 
     if (E_NOK == getUploadLogParameters(tftp_server, upload_protocol, upload_httplink))
         return -1;
-
     const char *argArray[] = {
-        "/bin/sh",
-        "/lib/rdk/uploadSTBLogs.sh",
+        "/usr/bin/logupload",
         tftp_server.c_str(),
         "0", //FLAG,
         "1", //DCM_FLAG,
-        "0", //UploadOnReboot,
+        "false", //UploadOnReboot,
         upload_protocol.c_str(),
         upload_httplink.c_str(), 
         "1",
-        0
+        "false"
     };
 
     pid_t pid  = fork();

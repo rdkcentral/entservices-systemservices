@@ -217,7 +217,7 @@ namespace WPEFramework
 
             Core::hresult GetDeviceInfo(IStringIterator* const& params, DeviceInfo& deviceInfo) override;
             Core::hresult GetDownloadedFirmwareInfo(DownloadedFirmwareInfo& downloadedFirmwareInfo) override;
-            Core::hresult GetFirmwareDownloadPercent(uint32_t & downloadPercent, bool& success) override;
+            Core::hresult GetFirmwareDownloadPercent(int32_t & downloadPercent, bool& success) override;
             Core::hresult GetFirmwareUpdateInfo(const string& GUID, bool &asyncResponse, bool& success) override;
             Core::hresult GetFirmwareUpdateState(int& firmwareUpdateState, bool& success) override;
             Core::hresult GetLastFirmwareFailureReason(string& failReason, bool& success) override;
@@ -260,7 +260,7 @@ namespace WPEFramework
             Core::hresult GetPlatformConfiguration (const string &query, PlatformConfig& platformConfig) override;
             Core::hresult SetWakeupSrcConfiguration(const string& powerState, ISystemServicesWakeupSourcesIterator* const& wakeupSources, SystemResult& result) override;
             Core::hresult GetSystemVersions(SystemVersionsInfo& systemVersionsInfo) override;
-            Core::hresult SetMode(const ModeInfo& modeinfo, uint32_t& SysSrv_Status, string& errorMessage, bool& success) override;
+            Core::hresult SetMode(const ModeInfo& modeInfo, uint32_t& SysSrv_Status, string& errorMessage, bool& success) override;
             Core::hresult UploadLogsAsync(SystemResult& result) override;
             Core::hresult AbortLogUpload(SystemResult& result) override;
             Core::hresult SetFSRFlag(const bool fsrFlag, SystemResult& result) override;

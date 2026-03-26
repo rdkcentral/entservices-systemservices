@@ -993,7 +993,7 @@ namespace WPEFramework
             }
 
             LOGERR("Upload logs script is not running");
-            return Core::ERROR_GENERAL;
+            return Core::ERROR_NONE;
         }
 
 #ifdef ENABLE_DEVICE_MANUFACTURER_INFO
@@ -1157,7 +1157,7 @@ namespace WPEFramework
                 result.success = false;
             }
 
-            return (result.success ? Core::ERROR_NONE : Core::ERROR_GENERAL);
+            return Core::ERROR_NONE;
         }
 
         Core::hresult SystemServicesImplementation::GetFSRFlag(bool &fsrFlag, bool& success)
@@ -1543,7 +1543,7 @@ namespace WPEFramework
                 }
             }
 
-            return retStatus;
+            return Core::ERROR_NONE;
         }
         
         Core::hresult SystemServicesImplementation::GetLastFirmwareFailureReason(string& failReason, bool& success)
@@ -1766,7 +1766,7 @@ namespace WPEFramework
             }
         }
         
-        Core::hresult SystemServicesImplementation::GetFirmwareDownloadPercent(uint32_t & downloadPercent, bool& success)
+        Core::hresult SystemServicesImplementation::GetFirmwareDownloadPercent(int32_t& downloadPercent, bool& success)
         {
             int m_downloadPercent = -1;
 
@@ -2119,12 +2119,11 @@ namespace WPEFramework
 
 	    Core::hresult SystemServicesImplementation::GetTimeZoneDST(string& timeZone, string& accuracy, bool& success)
         {
-            std::string timezone;
             bool resp = false;
 
             if (Utils::fileExists(TZ_FILE)) {
-                if(readFromFile(TZ_FILE, timezone)) {
-                    LOGWARN("Fetch TimeZone: %s\n", timezone.c_str());
+                if(readFromFile(TZ_FILE, timeZone)) {
+                    LOGWARN("Fetch TimeZone: %s\n", timeZone.c_str());
                     resp = true;
                 } else {
                     LOGERR("Unable to open %s file.\n", TZ_FILE);
@@ -2645,7 +2644,7 @@ namespace WPEFramework
         
         Core::hresult SystemServicesImplementation::SetWakeupSrcConfiguration(const string& powerState, ISystemServicesWakeupSourcesIterator* const& wakeupSources, SystemResult& result)
         {
-            Core::hresult retStatus = Core::ERROR_GENERAL;
+            Core::hresult retStatus = Core::ERROR_NONE;
 
             if(wakeupSources != nullptr)
             {
@@ -2700,16 +2699,16 @@ namespace WPEFramework
             return retStatus;
         }
         
-        Core::hresult SystemServicesImplementation::SetMode(const ModeInfo& modeinfo, uint32_t& SysSrv_Status, string& errorMessage, bool& success)
+        Core::hresult SystemServicesImplementation::SetMode(const ModeInfo& modeInfo, uint32_t& SysSrv_Status, string& errorMessage, bool& success)
         {
             bool changeMode = true;
             std::string oldMode = m_currentMode;
-            std::string newMode = modeinfo.mode;
-            int duration = modeinfo.duration;
+            std::string newMode = modeInfo.mode;
+            int duration = modeInfo.duration;
 
             LOGWARN("Request to switch mode from %s to %s duration %d", oldMode.c_str(), newMode.c_str(), duration);
 
-            if(newMode.empty() || newMode == "")
+            if(newMode.empty())
             {
                 populateResponseWithError(SysSrv_MissingKeyValues, SysSrv_Status, errorMessage);
                 return Core::ERROR_NONE;
@@ -3340,7 +3339,7 @@ namespace WPEFramework
 
             std::vector<string> rfcResults;
 
-            if (rfcList == nullptr)
+            if (rfcList == nullptr || rfcList->Count() == 0)
             {
                 populateResponseWithError(SysSrv_MissingKeyValues, SysSrv_Status, errorMessage);
 
@@ -3471,7 +3470,7 @@ namespace WPEFramework
                     result = deviceInfoObject->Sku(modelNo);
                     if (Core::ERROR_NONE == result)
                     {
-                        deviceInfo.make = modelNo.sku;
+                        deviceInfo.modelNumber = modelNo.sku;
                         deviceInfo.success = true;
                     }
 	            }
@@ -3520,7 +3519,17 @@ namespace WPEFramework
                     result = deviceInfoObject->DeviceType(deviceTypeInfos);
                     if (Core::ERROR_NONE == result)
                     {
-                        deviceInfo.deviceType = deviceTypeInfos.devicetype;
+                        static const std::unordered_map<Exchange::IDeviceInfo::DeviceTypeInfo, std::string> statusToString = {
+                            {Exchange::IDeviceInfo::DEVICE_TYPE_IPTV,     "IpTv"},
+                            {Exchange::IDeviceInfo::DEVICE_TYPE_IPSTB,    "IpStb"},
+                            {Exchange::IDeviceInfo::DEVICE_TYPE_QAMIPSTB, "QamIpStb"},
+                        };
+
+                        auto it = statusToString.find(deviceTypeInfos.devicetype);
+                        if (it != statusToString.end())
+                        {
+                           deviceInfo.deviceType = it->second;
+                        }
                         deviceInfo.success = true;
                     }
 	            }
