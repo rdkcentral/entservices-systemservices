@@ -2517,18 +2517,19 @@ namespace WPEFramework
                             }
 
                             std::string oldAccuracy = getTimeZoneAccuracyDSTHelper();
+                            std::string currentAccuracy = accuracy;
 
-                            if (!accuracy.empty()) {
-                                if (accuracy != TZ_ACCURACY_INITIAL && accuracy != TZ_ACCURACY_INTERIM && accuracy != TZ_ACCURACY_FINAL) {
-                                    LOGERR("Wrong TimeZone Accuracy: %s", accuracy.c_str());
-                                    accuracy = oldAccuracy;
+                            if (!currentAccuracy.empty()) {
+                                if (currentAccuracy != TZ_ACCURACY_INITIAL && currentAccuracy != TZ_ACCURACY_INTERIM && currentAccuracy != TZ_ACCURACY_FINAL) {
+                                    LOGERR("Wrong TimeZone Accuracy: %s", currentAccuracy.c_str());
+                                    currentAccuracy = oldAccuracy;
                                 }
                             }
 
-                            if (accuracy != oldAccuracy) {
+                            if (currentAccuracy != oldAccuracy) {
                                 FILE *f = fopen(TZ_ACCURACY_FILE, "w");
                                 if (f) {
-                                    if (accuracy.size() != fwrite(accuracy.c_str(), 1, accuracy.size(), f))
+                                    if (currentAccuracy.size() != fwrite(currentAccuracy.c_str(), 1, currentAccuracy.size(), f))
                                     {
                                         LOGERR("Failed to write %s", TZ_ACCURACY_FILE);
                                         resp = false;
@@ -2540,8 +2541,8 @@ namespace WPEFramework
                                 }
                             }
 
-                            if (SystemServicesImplementation::_instance && (oldTimeZoneDST != timeZone || oldAccuracy != accuracy))
-                                SystemServicesImplementation::_instance->OnTimeZoneDSTChanged(std::move(oldTimeZoneDST),timeZone,std::move(oldAccuracy), std::move(accuracy));
+                            if (SystemServicesImplementation::_instance && (oldTimeZoneDST != timeZone || oldAccuracy != currentAccuracy))
+                                SystemServicesImplementation::_instance->OnTimeZoneDSTChanged(std::move(oldTimeZoneDST),timeZone,std::move(oldAccuracy), std::move(currentAccuracy));
 
                         }
                         else{
