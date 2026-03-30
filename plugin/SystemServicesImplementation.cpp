@@ -259,6 +259,7 @@ namespace WPEFramework
             SystemServicesImplementation::m_FwUpdateState_LatestEvent=FirmwareUpdateStateUninitialized;
 
             m_networkStandbyModeValid = false;
+            m_networkStandbyMode = false;
             m_powerStateBeforeRebootValid = false;
             m_friendlyName = "Living Room";
 
@@ -795,12 +796,17 @@ namespace WPEFramework
 
         bool checkOpFlashStoreDir()
         {
-            int ret = 0;
-            if (access(OPFLASH_STORE, F_OK) == -1) {
-                ret = mkdir(OPFLASH_STORE, 0774);
-                LOGINFO(" --- SubDirectories created from mkdir %d ", ret);
+            int ret = mkdir(OPFLASH_STORE, 0774);
+            if (ret == 0) {
+                LOGINFO(" --- Directory %s created", OPFLASH_STORE);
+                return true;
+            } else if (errno == EEXIST) {
+                // Directory already exists, which is fine
+                return true;
+            } else {
+                LOGERR(" --- Failed to create directory %s: %d", OPFLASH_STORE, ret);
+                return false;
             }
-            return 0 == ret;
         }
 
         // Function to write (update or append) parameters in the file
@@ -808,7 +814,7 @@ namespace WPEFramework
         {
             ifstream file_in(filename);
             vector<string> lines;
-            bool param_found = false, status = false;
+            bool param_found = false;
 
             // If file exists, read its content line by line
             if (file_in.is_open()) {
@@ -858,19 +864,17 @@ namespace WPEFramework
 
             // Rewrite the entire file with updated values
             ofstream file_out(filename);
-            if (!file_out.is_open()) {
-                LOGERR("Error opening file for writing:%s ", filename.c_str());
-                status = false;
+            if (!file_out) {
+                LOGERR("Error opening file for writing: %s", filename.c_str());
+                return false;
             }
 
-            for (const string &line : lines) {
-                file_out << line << endl;
+            for (const auto &line : lines) {
+                file_out << line << '\n';
             }
-            status = true;
 
-            file_out.close();
-            LOGINFO("%s flag stored successfully in persistent memory. status= %d, update=%d, oldBlocklistFlag=%d", param.c_str(), status, update, oldBlocklistFlag);
-            return status;
+            LOGINFO("%s flag stored successfully in persistent memory. update=%d, oldBlocklistFlag=%d", param.c_str(), update, oldBlocklistFlag);
+            return true;
         }
         
         // Function to read a parameter from a file and update its value
@@ -1034,10 +1038,9 @@ namespace WPEFramework
 
         Core::hresult SystemServicesImplementation::GetFriendlyName(string& friendlyName, bool& success)
         {
-            bool resp = true;
             friendlyName = m_friendlyName;
-            success = resp;
-            return (resp ? Core::ERROR_NONE : Core::ERROR_GENERAL);
+            success = true;
+            return Core::ERROR_NONE;
         }
 
         Core::hresult SystemServicesImplementation::SetFriendlyName(const string& friendlyName, SystemResult& result)
@@ -1266,7 +1269,7 @@ namespace WPEFramework
         {
             uint32_t result = Core::ERROR_GENERAL;
 
-            Exchange::IMigration::MigrationStatus migrationStatus;
+            Exchange::IMigration::MigrationStatus migrationStatus = Exchange::IMigration::MIGRATION_STATUS_NOT_STARTED;
             Exchange::IMigration::MigrationResult migrationResult;
 
 
@@ -1478,7 +1481,7 @@ namespace WPEFramework
                 } else {
                     retVal = setPowerStateConversion(powerState);
                 }
-                m_current_state = std::move(powerState);
+                m_current_state = powerState;
             } else {
                 populateResponseWithError(SysSrv_MissingKeyValues, SysSrv_Status, errorMessage);
             }
@@ -1524,6 +1527,7 @@ namespace WPEFramework
             
             if (m_networkStandbyModeValid) {
                 success = true;
+                nwStandby = m_networkStandbyMode;
                 LOGINFO("Got cached NetworkStandbyMode: '%s'", m_networkStandbyMode ? "true" : "false");
             }
             else {
@@ -1799,8 +1803,8 @@ namespace WPEFramework
 
             if (!Utils::fileExists(FWDNLDSTATUS_FILE_NAME)) {
                 //If firmware download file doesn't exist we can still return the current version
-                downloadedFirmwareInfo.downloadedFWVersion = downloadedFWVersion;
-                downloadedFirmwareInfo.downloadedFWLocation = downloadedFWLocation;
+                downloadedFirmwareInfo.downloadedFWVersion = std::move(downloadedFWVersion);
+                downloadedFirmwareInfo.downloadedFWLocation = std::move(downloadedFWLocation);
                 downloadedFirmwareInfo.isRebootDeferred = isRebootDeferred;
                 downloadedFirmwareInfo.success = true;
                 string ver =  getStbVersionString();
@@ -1811,7 +1815,7 @@ namespace WPEFramework
                 }
                 else
                 {
-                    downloadedFirmwareInfo.currentFWVersion = ver;
+                    downloadedFirmwareInfo.currentFWVersion = std::move(ver);
                     downloadedFirmwareInfo.success = true;
                 }
             }
@@ -1868,8 +1872,8 @@ namespace WPEFramework
                     }
                 }
                 downloadedFirmwareInfo.currentFWVersion = getStbVersionString();
-                downloadedFirmwareInfo.downloadedFWVersion = downloadedFWVersion;
-                downloadedFirmwareInfo.downloadedFWLocation = downloadedFWLocation;
+                downloadedFirmwareInfo.downloadedFWVersion = std::move(downloadedFWVersion);
+                downloadedFirmwareInfo.downloadedFWLocation = std::move(downloadedFWLocation);
                 downloadedFirmwareInfo.isRebootDeferred = isRebootDeferred;
                 downloadedFirmwareInfo.success = true;
             } else {
@@ -2224,7 +2228,7 @@ namespace WPEFramework
             std::regex stbBranchString_regex("^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}$");
             if (std::regex_match (stbBranchString, stbBranchString_regex))
             {             
-                systemVersionsInfo.receiverVersion = stbBranchString;
+                systemVersionsInfo.receiverVersion = std::move(stbBranchString);
             }
             else
             {                    
@@ -2497,7 +2501,6 @@ namespace WPEFramework
 #ifdef ENABLE_LINK_LOCALTIME
                                     // Now create the linux link back to the zone info file to our writeable localtime
                                     if (Utils::fileExists(LOCALTIME_FILE)) {
-                                        // Coverity Fix: ID 4 - CHECKED_RETURN: Check return value of remove()
                                         if (remove(LOCALTIME_FILE) != 0) {
                                             LOGERR("Failed to remove %s: %s\n", LOCALTIME_FILE, strerror(errno));
                                         }
@@ -2514,7 +2517,6 @@ namespace WPEFramework
                             }
 
                             std::string oldAccuracy = getTimeZoneAccuracyDSTHelper();
-                            std::string accuracy = oldAccuracy;
 
                             if (!accuracy.empty()) {
                                 if (accuracy != TZ_ACCURACY_INITIAL && accuracy != TZ_ACCURACY_INTERIM && accuracy != TZ_ACCURACY_FINAL) {
@@ -3295,7 +3297,7 @@ namespace WPEFramework
         {
             LOGINFO("called");
 
-            if (timeZones == nullptr)
+            if (timeZones == nullptr || timeZones->Count() == 0)
             {
                 LOGINFO("No timezone list provided, processing all");
             }
@@ -3312,7 +3314,7 @@ namespace WPEFramework
                         continue;
 
                     std::string path = std::string(ZONEINFO_DIR) + "/" + tz;
-                    bool status = processTimeZones(path, dirObject);
+                    bool status = processTimeZones(std::move(path), dirObject);
                     success = status;
 
                     if (!status)
@@ -3357,7 +3359,7 @@ namespace WPEFramework
                 {
                     LOGERR("Invalid charset in %s", rfcName.c_str());
                     result = rfcName + "=Invalid charset found";
-                    rfcResults.push_back(result);
+                    rfcResults.push_back(std::move(result));
                     continue;
                 }
 
@@ -3390,7 +3392,7 @@ namespace WPEFramework
                     result = rfcName + "=Failed to read RFC";
                 }
 
-                rfcResults.push_back(result);
+                rfcResults.push_back(std::move(result));
             }
 
             RFCConfig = Core::Service<RPC::StringIterator>::Create<IStringIterator>(rfcResults);
@@ -3504,7 +3506,8 @@ namespace WPEFramework
 
                 if (Core::ERROR_NONE == result)
                 {
-                    deviceInfo.buildType = buildType;
+                    Utils::String::toUpper(buildType);
+                    deviceInfo.buildType = std::move(buildType);
                 }
                     deviceInfo.success = success;
             }

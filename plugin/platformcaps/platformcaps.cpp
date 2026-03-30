@@ -32,10 +32,10 @@ bool PlatformCaps::Load(PluginHost::IShell* service, const string &query, Exchan
   Reset();
 
   std::smatch m;
-  std::regex_search(query, m,
+  bool matched = std::regex_search(query, m,
       std::regex("^(AccountInfo|DeviceInfo)(\\.(\\w*)){0,1}"));
 
-  if (query.empty() || !m.empty()) {
+  if (query.empty() || matched) {
     if (query.empty() || (m[1] == _T("AccountInfo"))) {
       if (!accountInfo.Load(service, m.size() > 3 ? m[3] : string())) {
         result = false;
@@ -62,7 +62,7 @@ bool PlatformCaps::Load(PluginHost::IShell* service, const string &query, Exchan
         if (i > 0) quirksStr += ",";
         quirksStr += quirksArray[i].Value();
       }
-      platformConfig.deviceInfo.quirks = quirksStr;
+      platformConfig.deviceInfo.quirks = std::move(quirksStr);
 
       // Extract mimeTypeExclusions from JsonObject and assign to struct fields
       auto& mimeExclusions = deviceInfo.mimeTypeExclusions;
@@ -73,7 +73,7 @@ bool PlatformCaps::Load(PluginHost::IShell* service, const string &query, Exchan
           if (i > 0) cdvrStr += ",";
           cdvrStr += cdvrArray[i].String();
         }
-        platformConfig.deviceInfo.mimeTypeExclusions.cdvr = cdvrStr;
+        platformConfig.deviceInfo.mimeTypeExclusions.cdvr = std::move(cdvrStr);
       }
       if (mimeExclusions.HasLabel("DVR")) {
         auto dvrArray = mimeExclusions["DVR"].Array();
@@ -82,7 +82,7 @@ bool PlatformCaps::Load(PluginHost::IShell* service, const string &query, Exchan
           if (i > 0) dvrStr += ",";
           dvrStr += dvrArray[i].String();
         }
-        platformConfig.deviceInfo.mimeTypeExclusions.dvr = dvrStr;
+        platformConfig.deviceInfo.mimeTypeExclusions.dvr = std::move(dvrStr);
       }
       if (mimeExclusions.HasLabel("EAS")) {
         auto easArray = mimeExclusions["EAS"].Array();
@@ -91,7 +91,7 @@ bool PlatformCaps::Load(PluginHost::IShell* service, const string &query, Exchan
           if (i > 0) easStr += ",";
           easStr += easArray[i].String();
         }
-        platformConfig.deviceInfo.mimeTypeExclusions.eas = easStr;
+        platformConfig.deviceInfo.mimeTypeExclusions.eas = std::move(easStr);
       }
       if (mimeExclusions.HasLabel("IPDVR")) {
         auto ipdvrArray = mimeExclusions["IPDVR"].Array();
@@ -100,7 +100,7 @@ bool PlatformCaps::Load(PluginHost::IShell* service, const string &query, Exchan
           if (i > 0) ipdvrStr += ",";
           ipdvrStr += ipdvrArray[i].String();
         }
-        platformConfig.deviceInfo.mimeTypeExclusions.ipdvr = ipdvrStr;
+        platformConfig.deviceInfo.mimeTypeExclusions.ipdvr = std::move(ipdvrStr);
       }
       if (mimeExclusions.HasLabel("IVOD")) {
         auto ivodArray = mimeExclusions["IVOD"].Array();
@@ -109,7 +109,7 @@ bool PlatformCaps::Load(PluginHost::IShell* service, const string &query, Exchan
           if (i > 0) ivodStr += ",";
           ivodStr += ivodArray[i].String();
         }
-        platformConfig.deviceInfo.mimeTypeExclusions.ivod = ivodStr;
+        platformConfig.deviceInfo.mimeTypeExclusions.ivod = std::move(ivodStr);
       }
       if (mimeExclusions.HasLabel("LINEAR_TV")) {
         auto linearTVArray = mimeExclusions["LINEAR_TV"].Array();
@@ -118,7 +118,7 @@ bool PlatformCaps::Load(PluginHost::IShell* service, const string &query, Exchan
           if (i > 0) linearTVStr += ",";
           linearTVStr += linearTVArray[i].String();
         }
-        platformConfig.deviceInfo.mimeTypeExclusions.linearTV = linearTVStr;
+        platformConfig.deviceInfo.mimeTypeExclusions.linearTV = std::move(linearTVStr);
       }
       if (mimeExclusions.HasLabel("VOD")) {
         auto vodArray = mimeExclusions["VOD"].Array();
@@ -127,7 +127,7 @@ bool PlatformCaps::Load(PluginHost::IShell* service, const string &query, Exchan
           if (i > 0) vodStr += ",";
           vodStr += vodArray[i].String();
         }
-        platformConfig.deviceInfo.mimeTypeExclusions.vod = vodStr;
+        platformConfig.deviceInfo.mimeTypeExclusions.vod = std::move(vodStr);
       }
 
       // Extract features from JsonObject and assign to struct fields
@@ -176,7 +176,7 @@ bool PlatformCaps::Load(PluginHost::IShell* service, const string &query, Exchan
         if (i > 0) mimeTypesStr += ",";
         mimeTypesStr += mimeTypesArray[i].Value();
       }
-      platformConfig.deviceInfo.mimeTypes = mimeTypesStr;
+      platformConfig.deviceInfo.mimeTypes = std::move(mimeTypesStr);
 
       platformConfig.deviceInfo.model = deviceInfo.model.Value();
       platformConfig.deviceInfo.deviceType = deviceInfo.deviceType.Value();
