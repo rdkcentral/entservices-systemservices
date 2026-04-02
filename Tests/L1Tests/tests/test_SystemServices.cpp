@@ -2978,14 +2978,14 @@ TEST_F(SystemServicesTest, getDeviceInfoSuccess_OnSpecificKeyValueParsing)
  ********************************************************************************************************************/
 
 /**
- * @brief :requestSystemReboot when "nrdPluginApp" process is NOT running.
- *        Check if "nrdPluginApp" process is not running ensure that the system reboot is initiated
+ * @brief :requestSystemReboot when "nrdplugin" process is NOT running.
+ *        Check if "nrdplugin" process is not running ensure that the system reboot is initiated
  *        without any issues and returns the BUS call status in the response.
  *
  * @param[in]   :  "params": {}
  * @return      :  {"IARM_Bus_Call_STATUS":0,"success":true}
  */
-TEST_F(SystemServicesTest, requestSystemRebootSuccess_NrdPluginAppNotRunning)
+TEST_F(SystemServicesTest, requestSystemRebootSuccess_NrdPluginNotRunning)
 {
     PROCTAB* dummyProcTab = reinterpret_cast<PROCTAB*>(1);
     proc_t proc_info = {};
@@ -2993,10 +2993,10 @@ TEST_F(SystemServicesTest, requestSystemRebootSuccess_NrdPluginAppNotRunning)
     EXPECT_CALL(*p_readprocImplMock, openproc(::testing::_))
         .WillOnce(::testing::Return(dummyProcTab));
 
-    // Simulate "nrdPluginApp" is  not running
+    // Simulate "nrdplugin" is  not running
     EXPECT_CALL(*p_readprocImplMock, readproc(dummyProcTab, ::testing::_))
         .WillOnce([&proc_info](PROCTAB* pt, proc_t* p) -> proc_t* {
-            std::string input_pname = "No_nrdPluginApp";
+            std::string input_pname = "No_nrdplugin_process";
             strncpy(p->cmd, input_pname.c_str(), sizeof(p->cmd) - 1);
             p->cmd[sizeof(p->cmd) - 1] = '\0';
             p->tid = 123;
@@ -3017,15 +3017,15 @@ TEST_F(SystemServicesTest, requestSystemRebootSuccess_NrdPluginAppNotRunning)
     EXPECT_EQ(response, string("{\"IARM_Bus_Call_STATUS\":0,\"success\":true}"));
 }
 /**
- * @brief :requestSystemReboot when "nrdPluginApp" process is running.
- *        Check if "nrdPluginApp" process is running ensure that the system reboot is initiated
+ * @brief :requestSystemReboot when "nrdplugin" process is running.
+ *        Check if "nrdplugin" process is running ensure that the system reboot is initiated
  *        without any issues and returns the BUS call status in the response.
  *
  * @param[in]   :  "params": {}
  * @return      :  {"IARM_Bus_Call_STATUS":0,"success":true}
  */
 
-TEST_F(SystemServicesTest, requestSystemRebootSuccess_NrdPluginAppRunning)
+TEST_F(SystemServicesTest, requestSystemRebootSuccess_NrdPluginRunning)
 {
     PROCTAB* dummyProcTab = reinterpret_cast<PROCTAB*>(1);
     proc_t proc_info = {};
@@ -3035,7 +3035,7 @@ TEST_F(SystemServicesTest, requestSystemRebootSuccess_NrdPluginAppRunning)
 
     EXPECT_CALL(*p_readprocImplMock, readproc(dummyProcTab, ::testing::_))
         .WillOnce([&proc_info](PROCTAB* pt, proc_t* p) -> proc_t* {
-            std::string input_pname = "nrdPluginApp";
+            std::string input_pname = "nrdplugin";
             strncpy(p->cmd, input_pname.c_str(), sizeof(p->cmd) - 1);
             p->cmd[sizeof(p->cmd) - 1] = '\0';
             p->tid = 123;
@@ -3057,7 +3057,7 @@ TEST_F(SystemServicesTest, requestSystemRebootSuccess_NrdPluginAppRunning)
 }
 
 /**
- * @brief :requestSystemReboot when "nrdPluginApp" process is running & It can't be terminated successfully
+ * @brief :requestSystemReboot when "nrdplugin" process is running & It can't be terminated successfully
  *        Check if NrdPlugin App is Running & if unable to shutdown the app due to openproc Failed,
  *        then ensure that the system reboot is initiated
  *        without any issues and returns the BUS call status in the response.
@@ -3065,7 +3065,7 @@ TEST_F(SystemServicesTest, requestSystemRebootSuccess_NrdPluginAppRunning)
  * @param[in]   :  "params": {}
  * @return      :  {"IARM_Bus_Call_STATUS":0,"success":true}
  */
-TEST_F(SystemServicesTest, requestSystemRebootSuccess_NrdPluginAppShutdownFailedWhen_openprocFailed)
+TEST_F(SystemServicesTest, requestSystemRebootSuccess_NrdPluginShutdownFailedWhen_openprocFailed)
 {
     // Simulate openproc failure
     EXPECT_CALL(*p_readprocImplMock, openproc(::testing::_))
@@ -3083,7 +3083,7 @@ TEST_F(SystemServicesTest, requestSystemRebootSuccess_NrdPluginAppShutdownFailed
     EXPECT_EQ(response, string("{\"IARM_Bus_Call_STATUS\":0,\"success\":true}"));
 }
 /**
- * @brief :requestSystemReboot when "nrdPluginApp" process is running & It can't be terminated successfully
+ * @brief :requestSystemReboot when "nrdplugin" process is running & It can't be terminated successfully
  *        Check if NrdPlugin App is Running & if unable to shutdown the app due to readproc Failed,
  *        then ensure that the system reboot is initiated
  *        without any issues and returns the BUS call status in the response.
@@ -3091,7 +3091,7 @@ TEST_F(SystemServicesTest, requestSystemRebootSuccess_NrdPluginAppShutdownFailed
  * @param[in]   :  "params": {}
  * @return      :  {"IARM_Bus_Call_STATUS":0,"success":true}
  */
-TEST_F(SystemServicesTest, requestSystemRebootSuccess_NrdPluginAppShutdownFailedWhen_readprocFailed)
+TEST_F(SystemServicesTest, requestSystemRebootSuccess_NrdPluginShutdownFailedWhen_readprocFailed)
 {
     PROCTAB* dummyProcTab = reinterpret_cast<PROCTAB*>(1);
 
@@ -3132,7 +3132,7 @@ TEST_F(SystemServicesTest, requestSystemRebootSuccess_withoutReason)
 
     EXPECT_CALL(*p_readprocImplMock, readproc(dummyProcTab, ::testing::_))
         .WillOnce([&proc_info](PROCTAB* pt, proc_t* p) -> proc_t* {
-            std::string input_pname = "nrdPluginApp";
+            std::string input_pname = "nrdplugin";
             strncpy(p->cmd, input_pname.c_str(), sizeof(p->cmd) - 1);
             p->cmd[sizeof(p->cmd) - 1] = '\0';
             p->tid = 123;
@@ -3171,7 +3171,7 @@ TEST_F(SystemServicesTest, requestSystemRebootSuccess_withReason)
 
     EXPECT_CALL(*p_readprocImplMock, readproc(dummyProcTab, ::testing::_))
         .WillOnce([&proc_info](PROCTAB* pt, proc_t* p) -> proc_t* {
-            std::string input_pname = "nrdPluginApp";
+            std::string input_pname = "nrdplugin";
             strncpy(p->cmd, input_pname.c_str(), sizeof(p->cmd) - 1);
             p->cmd[sizeof(p->cmd) - 1] = '\0';
             p->tid = 123;
@@ -3218,7 +3218,7 @@ TEST_F(SystemServicesTest, requestSystemRebootSuccess_onRebootBusAPIFailed)
 
     EXPECT_CALL(*p_readprocImplMock, readproc(dummyProcTab, ::testing::_))
         .WillOnce([&proc_info](PROCTAB* pt, proc_t* p) -> proc_t* {
-            std::string input_pname = "nrdPluginApp";
+            std::string input_pname = "nrdplugin";
             strncpy(p->cmd, input_pname.c_str(), sizeof(p->cmd) - 1);
             p->cmd[sizeof(p->cmd) - 1] = '\0';
             p->tid = 123;
