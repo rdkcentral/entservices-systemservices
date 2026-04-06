@@ -230,11 +230,11 @@ namespace WPEFramework
             Core::hresult SetPowerState(const string &powerState, const string &standbyReason, uint32_t& SysSrv_Status, string& errorMessage, bool& success) override;
 #endif /* HAS_API_SYSTEM && HAS_API_POWERSTATE */
             Core::hresult GetPowerStateBeforeReboot(string& state, bool& success) override;
-            Core::hresult GetRFCConfig(IStringIterator* const& rfcList, IStringIterator*& RFCConfig, uint32_t& SysSrv_Status, string& errorMessage, bool& success) override;
+            Core::hresult GetRFCConfig(IStringIterator* const& rfcList, string& RFCConfig, uint32_t& SysSrv_Status, string& errorMessage, bool& success) override;
             Core::hresult GetSerialNumber(string& serialNumber, bool& success) override;
             Core::hresult GetFriendlyName(string& friendlyName, bool& success) override;
             Core::hresult GetTerritory(string& territory , string& region, bool& success) override;
-            Core::hresult GetTimeZones(IStringIterator* const& timeZones, string& zoneinfo) override;
+            Core::hresult GetTimeZones(IStringIterator* const& timeZones, string& zoneinfo, bool& success) override;
             Core::hresult GetTimeZoneDST(string& timeZone, string& accuracy, bool& success) override;
 #ifdef ENABLE_DEEP_SLEEP
             Core::hresult GetWakeupReason(string& wakeupReason, bool& success) override;
@@ -297,6 +297,8 @@ namespace WPEFramework
             std::string m_MfgSerialNumber;
             bool m_MfgSerialNumberValid;
             std::string m_ManufacturerDataHardwareID;
+            std::string m_ManufacturerDataModelName;
+            bool m_ManufacturerDataModelNameValid;
             bool m_ManufacturerDataHardwareIdValid;
 #endif
             pid_t m_uploadLogsPid;

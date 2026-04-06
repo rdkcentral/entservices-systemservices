@@ -265,6 +265,7 @@ namespace WPEFramework
 
 #ifdef ENABLE_DEVICE_MANUFACTURER_INFO
             m_ManufacturerDataHardwareIdValid = false;
+            m_ManufacturerDataModelNameValid = false;
             m_MfgSerialNumberValid = false;
 #endif
             m_uploadLogsPid = -1;
@@ -700,9 +701,9 @@ namespace WPEFramework
                 
                 case SYSTEMSERVICES_EVT_ONTIMESTATUSCHANGED:
                 {
-                    string timeQuality = params["timeQuality"].String();
-                    string timeSrc = params["timeSrc"].String();
-                    string time = params["time"].String();
+                    string timeQuality = params["TimeQuality"].String();
+                    string timeSrc = params["TimeSrc"].String();
+                    string time = params["Time"].String();
 
                     while (index != _systemServicesNotification.end()) 
                     {
@@ -792,6 +793,46 @@ namespace WPEFramework
 
             //set values in temp file so they can be restored in receiver restarts / crashes
             m_temp_settings.setValue("mode_duration", m_remainingDuration);
+        }
+
+        uint32_t GetValueFromPropertiesFile(const char* filename, const char* key, string& response, const char *delimiter = "=")
+        {
+            uint32_t result = Core::ERROR_GENERAL;
+
+            if (!Utils::fileExists(filename)) {
+                return result;
+            }
+
+            char buf[1024];
+
+            FILE *f = fopen(filename, "r");
+
+            if(!f) {
+                LOGWARN("failed to open %s:%s", filename, strerror(errno));
+                return result;
+            }
+
+            std::string line;
+
+            while(fgets(buf, sizeof(buf), f) != NULL) {
+                line = buf;
+                size_t eq = line.find_first_of(delimiter);
+
+                if (std::string::npos != eq) {
+                    std::string k = line.substr(0, eq);
+
+                    if (k == key) {
+                        response = line.substr(eq + strlen(delimiter));
+                        Utils::String::trim(response);
+                        result = Core::ERROR_NONE;
+                        break;
+                    }
+                }
+            }
+
+            fclose(f);
+
+            return result;
         }
 
         bool checkOpFlashStoreDir()
@@ -951,6 +992,7 @@ namespace WPEFramework
             m_uploadLogsPid = UploadLogs::logUploadAsync();
             result.success = true;
 
+
             return Core::ERROR_NONE;
         }
 
@@ -1009,6 +1051,7 @@ namespace WPEFramework
                 mfgSerialNumber = m_MfgSerialNumber;
                 LOGWARN("Got cached MfgSerialNumber %s", m_MfgSerialNumber.c_str());
                 success = true;
+                LOGINFO("response: mfgSerialNumber=%s, success=%d", mfgSerialNumber.c_str(), success);
                 return Core::ERROR_NONE;
             }
 
@@ -1032,6 +1075,7 @@ namespace WPEFramework
             }
 
             success = status;
+            LOGINFO("response: mfgSerialNumber=%s, success=%s", mfgSerialNumber.c_str(), success ? "true" : "false");
             return (status ? Core::ERROR_NONE : Core::ERROR_GENERAL);
         }
 #endif /* ENABLE_DEVICE_MANUFACTURER_INFO */
@@ -1040,6 +1084,7 @@ namespace WPEFramework
         {
             friendlyName = m_friendlyName;
             success = true;
+            LOGINFO("response: friendlyName=%s, success=%s", friendlyName.c_str(), success ? "true" : "false");
             return Core::ERROR_NONE;
         }
 
@@ -1085,6 +1130,7 @@ namespace WPEFramework
             }
 
             success = result;
+            LOGINFO("response: buildType=%s, success=%s", buildType.c_str(), success ? "true" : "false");
             return Core::ERROR_NONE;
         }
 
@@ -1101,7 +1147,8 @@ namespace WPEFramework
         }
 
         Core::hresult SystemServicesImplementation::SetBlocklistFlag(const bool blocklist, SetBlocklistResult& result)
-        {                
+        {
+            LOGINFO("blocklist=%d", blocklist);
             bool status = false, update = false, ret;
             bool blocklistFlag, oldBlocklistFlag;
 
@@ -1143,7 +1190,7 @@ namespace WPEFramework
                 }
             }
 
-            return (result.success ? Core::ERROR_NONE : Core::ERROR_GENERAL);
+            return Core::ERROR_NONE;
         }
 
         Core::hresult SystemServicesImplementation::SetFSRFlag(const bool fsrFlag, SystemResult& result)
@@ -1179,7 +1226,8 @@ namespace WPEFramework
                 success = false;
             }
 
-            return (success ? Core::ERROR_NONE : Core::ERROR_GENERAL);
+            LOGINFO("response: fsrFlag=%s, success=%s", fsrFlag ? "true" : "false", success ? "true" : "false");
+            return success ? Core::ERROR_NONE : Core::ERROR_GENERAL;
         }
 
         Core::hresult SystemServicesImplementation::GetBlocklistFlag(BlocklistResult& result)
@@ -1202,6 +1250,7 @@ namespace WPEFramework
                 result.error.message = "Blocklist flag retrieved failed from persistent memory.";
                 result.error.code = "-32099";
                 result.success = false;
+                LOGINFO("response: success=%d, error.code=%s", result.success, result.error.code.c_str());
                 return Core::ERROR_GENERAL;
             }
 
@@ -1219,7 +1268,8 @@ namespace WPEFramework
                 result.success = false;
             }
 
-            return (result.success ? Core::ERROR_NONE : Core::ERROR_GENERAL);
+            LOGINFO("response: blocklist=%s, success=%s", result.blocklist ? "true" : "false", result.success ? "true" : "false");
+            return Core::ERROR_NONE;
         }
 
         Core::hresult SystemServicesImplementation::IsOptOutTelemetry(bool& OptOut, bool& success)
@@ -1240,11 +1290,13 @@ namespace WPEFramework
                 LOGERR("Telemetry plugin is not activated\n");
             }
 
+            LOGINFO("response: OptOut=%s, success=%s", OptOut ? "true" : "false", success ? "true" : "false");
             return result;
         }
 
         Core::hresult SystemServicesImplementation::SetOptOutTelemetry(const bool OptOut, SystemResult& result)
         {
+            LOGINFO("OptOut=%d", OptOut);
             uint32_t errCode = Core::ERROR_GENERAL;
             Exchange::ITelemetry::TelemetrySuccess teleResult;
 
@@ -1267,6 +1319,7 @@ namespace WPEFramework
 
         Core::hresult SystemServicesImplementation::SetMigrationStatus(const string& status, bool& success)
         {
+            LOGINFO("status=%s", status.c_str());
             uint32_t result = Core::ERROR_GENERAL;
 
             Exchange::IMigration::MigrationStatus migrationStatus = Exchange::IMigration::MIGRATION_STATUS_NOT_STARTED;
@@ -1348,6 +1401,7 @@ namespace WPEFramework
                 LOGERR("Migration plugin is not activated\n");
             }
 
+            LOGINFO("response: migrationStatus=%s", migrationInfo.migrationStatus.c_str());
             return result;
         }
 
@@ -1389,6 +1443,7 @@ namespace WPEFramework
                 LOGERR("Migration plugin is not activated\n");
             }
 
+            LOGINFO("response: bootType=%s", bootInfo.bootType.c_str());
             return result;
         }
 
@@ -1414,6 +1469,7 @@ namespace WPEFramework
                 LOGERR("DeviceInfo plugin is not activated\n");
             }
 
+            LOGINFO("response: serialNumber=%s, success=%s", serialNumber.c_str(), success ? "true" : "false");
             return result;
         }
 
@@ -1449,6 +1505,7 @@ namespace WPEFramework
 
         Core::hresult SystemServicesImplementation::SetPowerState(const string &powerState, const string &standbyReason, uint32_t& SysSrv_Status, string& errorMessage, bool& success)
         {
+            LOGINFO("powerState=%s, standbyReason=%s", powerState.c_str(), standbyReason.c_str());
             bool retVal = false;
             string sleepMode;
             ofstream outfile;
@@ -1486,6 +1543,7 @@ namespace WPEFramework
                 populateResponseWithError(SysSrv_MissingKeyValues, SysSrv_Status, errorMessage);
             }
             success = retVal;
+
             return Core::ERROR_NONE;
         }
 
@@ -1547,6 +1605,7 @@ namespace WPEFramework
                 }
             }
 
+            LOGINFO("response: nwStandby=%s, success=%s", nwStandby ? "true" : "false", success ? "true" : "false");
             return Core::ERROR_NONE;
         }
         
@@ -1584,6 +1643,7 @@ namespace WPEFramework
             snprintf(value, sizeof(value), "getLastFirmwareFailureReason: response=%s", failReasonStr.c_str());
             t2_event_s((char*)"FWFail_split", value);
             success = true;
+            LOGINFO("response: failReason=%s, success=%s", failReason.c_str(), success ? "true" : "false");
             return Core::ERROR_NONE;
         }
         
@@ -1750,7 +1810,7 @@ namespace WPEFramework
         
         Core::hresult SystemServicesImplementation::GetFirmwareUpdateInfo(const string& GUID, bool &asyncResponse, bool& success)
         {
-            LOGINFO("GUID = %s\n", GUID.c_str());
+            LOGINFO("GUID=%s", GUID.c_str());
             try
             {
                 if (m_getFirmwareInfoThread.get().joinable()) {
@@ -1759,6 +1819,7 @@ namespace WPEFramework
                 m_getFirmwareInfoThread = Utils::ThreadRAII(std::thread(firmwareUpdateInfoReceived));
                 asyncResponse = true;
                 success = true;
+                LOGINFO("response: asyncResponse=%s, success=%s", asyncResponse ? "true" : "false", success ? "true" : "false");
                 return Core::ERROR_NONE;
             }
             catch(const std::system_error& e)
@@ -1766,6 +1827,7 @@ namespace WPEFramework
                 LOGERR("exception in GetFirmwareUpdateInfo %s", e.what());
                 asyncResponse = false;
                 success = false;
+                LOGINFO("response: asyncResponse=%s, success=%s", asyncResponse ? "true" : "false", success ? "true" : "false");
                 return Core::ERROR_GENERAL;
             }
         }
@@ -1791,6 +1853,7 @@ namespace WPEFramework
                 downloadPercent = -1;
                 success = true;
             }
+            LOGINFO("response: downloadPercent=%d, success=%s", downloadPercent, success ? "true" : "false");
             return Core::ERROR_NONE;
         }
         
@@ -1879,6 +1942,8 @@ namespace WPEFramework
             } else {
                 populateResponseWithError(SysSrv_FileContentUnsupported, downloadedFirmwareInfo.sysSrvStatus, downloadedFirmwareInfo.errorMessage);
             }
+            LOGINFO("response: currentFWVersion=%s, downloadedFWVersion=%s, downloadedFWLocation=%s, isRebootDeferred=%s, success=%s",
+                downloadedFirmwareInfo.currentFWVersion.c_str(), downloadedFirmwareInfo.downloadedFWVersion.c_str(), downloadedFirmwareInfo.downloadedFWLocation.c_str(), downloadedFirmwareInfo.isRebootDeferred ? "true" : "false", downloadedFirmwareInfo.success ? "true" : "false");
             return Core::ERROR_NONE;
         }
         
@@ -1887,6 +1952,7 @@ namespace WPEFramework
             FirmwareUpdateState fwUpdateState =(FirmwareUpdateState)m_FwUpdateState_LatestEvent;
             firmwareUpdateState = (int)fwUpdateState;
             success = true;
+            LOGINFO("response: firmwareUpdateState=%d, success=%s", firmwareUpdateState, success ? "true" : "false");
             return Core::ERROR_NONE;
         }
         
@@ -1917,6 +1983,7 @@ namespace WPEFramework
                 }
             }
 
+            LOGINFO("response: state=%s, success=%s", state.c_str(), success ? "true" : "false");
             return Core::ERROR_NONE;
         }
 
@@ -1948,6 +2015,7 @@ namespace WPEFramework
             snprintf(value, sizeof(value), "WakeupReason : %s", wakeupReason.c_str());
             t2_event_s((char*)"WakeUPRsn_split", value);
 
+            LOGINFO("response: wakeupReason=%s, success=%s", wakeupReason.c_str(), success ? "true" : "false");
             return Core::ERROR_NONE;
         }
 
@@ -1976,6 +2044,7 @@ namespace WPEFramework
 
             success = status;
 
+            LOGINFO("response: wakeupKeyCode=%d, success=%s", wakeupKeyCode, success ? "true" : "false");
             return Core::ERROR_NONE;
         }
 
@@ -2118,6 +2187,7 @@ namespace WPEFramework
             territory = m_strTerritory;
             region = m_strRegion;
             success = resp;
+            LOGINFO("response: territory=%s, region=%s, success=%s", territory.c_str(), region.c_str(), success ? "true" : "false");
             return Core::ERROR_NONE;
 	    }
 
@@ -2145,11 +2215,13 @@ namespace WPEFramework
             }
 
             success = resp;
+            LOGINFO("response: timeZone=%s, accuracy=%s, success=%s", timeZone.c_str(), accuracy.c_str(), success ? "true" : "false");
             return Core::ERROR_NONE;
         }
         
         Core::hresult SystemServicesImplementation::Reboot(const string& rebootReason, int& IARM_Bus_Call_STATUS, bool& success)
         {
+            LOGINFO("rebootReason=%s", rebootReason.c_str());
             Core::hresult status = Core::ERROR_GENERAL;
             bool nfxResult = false;
             string customReason = "No custom reason provided";
@@ -2192,6 +2264,7 @@ namespace WPEFramework
             
             success = result;
 
+            LOGINFO("response: IARM_Bus_Call_STATUS=%d, success=%s", IARM_Bus_Call_STATUS, success ? "true" : "false");
             return status;
         }
         
@@ -2218,6 +2291,7 @@ namespace WPEFramework
 
             success = result;
             
+            LOGINFO("response: systemUptime=%s, success=%s", systemUptime.c_str(), success ? "true" : "false");
             return Core::ERROR_NONE;
         }
         
@@ -2238,6 +2312,8 @@ namespace WPEFramework
             systemVersionsInfo.stbTimestamp = getStbTimestampString();
 
             systemVersionsInfo.success = true;
+            LOGINFO("response: stbVersion=%s, receiverVersion=%s, stbTimestamp=%s, success=%s",
+                systemVersionsInfo.stbVersion.c_str(), systemVersionsInfo.receiverVersion.c_str(), systemVersionsInfo.stbTimestamp.c_str(), systemVersionsInfo.success ? "true" : "false");
             return Core::ERROR_NONE;
         }
         
@@ -2256,12 +2332,14 @@ namespace WPEFramework
             TimeSrc = std::string(param.timerSrc,cTIMER_STATUS_MESSAGE_LENGTH);
             Time = std::string(param.currentTime,cTIMER_STATUS_MESSAGE_LENGTH);
             success = true;
+            LOGINFO("response: TimeQuality=%s, TimeSrc=%s, Time=%s, success=%s", TimeQuality.c_str(), TimeSrc.c_str(), Time.c_str(), success ? "true" : "false");
             return Core::ERROR_NONE;
         }
 #endif// ENABLE_SYSTIMEMGR_SUPPORT
 
         Core::hresult SystemServicesImplementation::SetDeepSleepTimer(const int seconds, uint32_t& SysSrv_Status, string& errorMessage, bool& success)
         {
+            LOGINFO("seconds=%d", seconds);
             Core::hresult retStatus = Core::ERROR_GENERAL;
 
             if (seconds) {
@@ -2285,11 +2363,13 @@ namespace WPEFramework
             } else {
                 populateResponseWithError(SysSrv_MissingKeyValues, SysSrv_Status, errorMessage);
             }
+            LOGINFO("response: SysSrv_Status=%u, errorMessage=%s, success=%s", SysSrv_Status, errorMessage.c_str(), success ? "true" : "false");
             return retStatus;
         }
         
         Core::hresult SystemServicesImplementation::SetFirmwareAutoReboot(const bool enable, SystemResult& result)
         {
+            LOGINFO("enable=%d", enable);
             Core::hresult retStatus = Core::ERROR_GENERAL;
             Exchange::IFirmwareUpdate::Result res;
 
@@ -2308,11 +2388,13 @@ namespace WPEFramework
             {
                  LOGERR("FirmwareUpdate plugin is not activated\n");
             }
+            LOGINFO("response: success=%s", result.success ? "true" : "false");
             return retStatus;
         }
         
         Core::hresult SystemServicesImplementation::SetNetworkStandbyMode (const bool nwStandby, SystemResult& result)
         {
+            LOGINFO("nwStandby=%d", nwStandby);
             bool status = false;
             Core::hresult retStatus = Core::ERROR_GENERAL;
 
@@ -2336,11 +2418,13 @@ namespace WPEFramework
                 status = false;
             }
             result.success = status;
+            LOGINFO("response: success=%s", result.success ? "true" : "false");
             return retStatus;
         }
         
         Core::hresult SystemServicesImplementation::SetBootLoaderSplashScreen(const string& path, ErrorInfo& error, bool& success)
         {
+            LOGINFO("path=%s", path.c_str());
             string strBLSplashScreenPath = path;
             bool fileExists = Utils::fileExists(strBLSplashScreenPath.c_str());
             if((strBLSplashScreenPath != "") && fileExists)
@@ -2368,11 +2452,13 @@ namespace WPEFramework
                 error.code = "-32001";
                 success = false;
             }
+            LOGINFO("response: error.code=%s, error.message=%s, success=%s", error.code.c_str(), error.message.c_str(), success ? "true" : "false");
             return Core::ERROR_NONE;
         }
         
         Core::hresult SystemServicesImplementation::SetTerritory(const string& territory, const string& region, SystemError& error, bool& success)
 	    {
+            LOGINFO("territory=%s, region=%s", territory.c_str(), region.c_str());
             bool resp = false;
             const std::lock_guard<std::mutex> lock(m_territoryMutex);
             if(!territory.empty()){
@@ -2421,6 +2507,7 @@ namespace WPEFramework
                 resp = false;
             }
             success = resp;
+            LOGINFO("response: error.message=%s, success=%s", error.message.c_str(), success ? "true" : "false");
             return Core::ERROR_NONE;
 	    }
 
@@ -2446,6 +2533,7 @@ namespace WPEFramework
 	
 	    Core::hresult SystemServicesImplementation::SetTimeZoneDST(const string& timeZone, const string& accuracy, uint32_t& SysSrv_Status, string& errorMessage, bool& success)
         {
+            LOGINFO("timeZone=%s, accuracy=%s", timeZone.c_str(), accuracy.c_str());
             bool resp = true;
             bool isUniversal = false, isOlson = true;
 
@@ -2564,6 +2652,7 @@ namespace WPEFramework
                 populateResponseWithError(SysSrv_MissingKeyValues, SysSrv_Status, errorMessage);
             }
             success = resp;
+            LOGINFO("response: SysSrv_Status=%u, errorMessage=%s, success=%s", SysSrv_Status, errorMessage.c_str(), success ? "true" : "false");
             return Core::ERROR_NONE;
         }
         
@@ -2575,12 +2664,13 @@ namespace WPEFramework
                v_secure_pclose(pipe);
             }
             result.success = true;
+            LOGINFO("response: success=%s", result.success ? "true" : "false");
             return Core::ERROR_NONE;
         }
         
         Core::hresult SystemServicesImplementation::GetMacAddresses(const string& GUID, bool &asyncResponse, uint32_t& SysSrv_Status, string& errorMessage, bool& success)
         {
-            LOGINFO("GUID = %s\n", GUID.c_str());
+            LOGINFO("GUID=%s", GUID.c_str());
             if (!Utils::fileExists("/lib/rdk/getDeviceDetails.sh")) {
                 populateResponseWithError(SysSrv_FileNotPresent, SysSrv_Status, errorMessage);
             } else {
@@ -2600,6 +2690,7 @@ namespace WPEFramework
                     success = false;
                 }
             }
+            LOGINFO("response: asyncResponse=%s, SysSrv_Status=%u, errorMessage=%s, success=%s", asyncResponse ? "true" : "false", SysSrv_Status, errorMessage.c_str(), success ? "true" : "false");
             return Core::ERROR_NONE;
         }
         
@@ -2647,6 +2738,7 @@ namespace WPEFramework
         
         Core::hresult SystemServicesImplementation::SetWakeupSrcConfiguration(const string& powerState, ISystemServicesWakeupSourcesIterator* const& wakeupSources, SystemResult& result)
         {
+            LOGINFO("powerState=%s", powerState.c_str());
             Core::hresult retStatus = Core::ERROR_NONE;
 
             if(wakeupSources != nullptr)
@@ -2699,6 +2791,7 @@ namespace WPEFramework
                     result.success = (retStatus == Core::ERROR_NONE);
                 }
             }
+            LOGINFO("response: success=%s", result.success ? "true" : "false");
             return retStatus;
         }
         
@@ -2709,7 +2802,7 @@ namespace WPEFramework
             std::string newMode = modeInfo.mode;
             int duration = modeInfo.duration;
 
-            LOGWARN("Request to switch mode from %s to %s duration %d", oldMode.c_str(), newMode.c_str(), duration);
+            LOGWARN("Request to switch mode from %s to %s with duration %d", oldMode.c_str(), newMode.c_str(), duration);
 
             if(newMode.empty())
             {
@@ -2785,12 +2878,14 @@ namespace WPEFramework
 
                 m_temp_settings.setValue("mode", m_currentMode);
                 m_temp_settings.setValue("mode_duration", m_remainingDuration);
+                success = true;
             }
             else
             {
                 LOGWARN("Current mode '%s' not changed", m_currentMode.c_str());
                 success = true;
             }
+            LOGINFO("response={success: %s}", success ? "true" : "false");
             return Core::ERROR_NONE;
         }
 
@@ -3294,19 +3389,16 @@ namespace WPEFramework
             return ret;
         }
 
-        Core::hresult SystemServicesImplementation::GetTimeZones(IStringIterator* const& timeZones, string& zoneinfo)
+        Core::hresult SystemServicesImplementation::GetTimeZones(IStringIterator* const& timeZones, string& zoneinfo, bool& success)
         {
-            LOGINFO("called");
-
             if (timeZones == nullptr || timeZones->Count() == 0)
             {
                 LOGINFO("No timezone list provided, processing all");
             }
 
             JsonObject dirObject;
-            bool success = false;
 
-            if (timeZones)
+            if (timeZones && (timeZones->Count() != 0))
             {
                 string tz;
                 while (timeZones->Next(tz))
@@ -3330,17 +3422,15 @@ namespace WPEFramework
             }
 
             if (!dirObject.IsNull()) {
-                dirObject.ToString(zoneinfo);
+		dirObject.ToString(zoneinfo);
             }
 
             return success ? Core::ERROR_NONE : Core::ERROR_GENERAL;
         }
         
-        Core::hresult SystemServicesImplementation::GetRFCConfig( IStringIterator* const& rfcList, IStringIterator*& RFCConfig, uint32_t& SysSrv_Status, string& errorMessage, bool& success)
+        Core::hresult SystemServicesImplementation::GetRFCConfig( IStringIterator* const& rfcList, string& RFCConfig, uint32_t& SysSrv_Status, string& errorMessage, bool& success)
         {
             LOGINFO("called");
-
-            std::vector<string> rfcResults;
 
             if (rfcList == nullptr || rfcList->Count() == 0)
             {
@@ -3350,20 +3440,22 @@ namespace WPEFramework
             }
 
             const std::regex re("(\\w|-|\\.)+");
+            JsonObject hash;
             string rfcName;
+            string cmdResponse;
 
             while (rfcList->Next(rfcName))
             {
-                string result;
+                LOGINFO("RFC Name = %s", rfcName.c_str());
 
                 if (!std::regex_match(rfcName, re))
                 {
                     LOGERR("Invalid charset in %s", rfcName.c_str());
-                    result = rfcName + "=Invalid charset found";
-                    rfcResults.push_back(std::move(result));
+                    hash[rfcName.c_str()] = "Invalid charset found";
                     continue;
                 }
 
+                cmdResponse ="";
                 WDMP_STATUS wdmpStatus;
                 RFC_ParamData_t rfcParam;
                 char sysServices[] = "SystemServices";
@@ -3373,43 +3465,42 @@ namespace WPEFramework
 
                 if ((wdmpStatus == WDMP_SUCCESS) || (wdmpStatus == WDMP_ERR_DEFAULT_VALUE))
                 {
-                    string value = rfcParam.value;
-                    removeCharsFromString(value, "\n\r");
+                    cmdResponse = rfcParam.value;
+                    removeCharsFromString(cmdResponse, "\n\r");
 
-                    if (!value.empty())
+                    if (!cmdResponse.empty())
                     {
-                        result = rfcName + "=" + value;
+                        hash[rfcName.c_str()] = cmdResponse;
                         success = true;
                     }
                     else
                     {
-                        result = rfcName + "=Empty response received";
+                        hash[rfcName.c_str()] = "Empty response received";
                     }
                 }
                 else
                 {
                     LOGERR("Failed to get %s status %d", rfcName.c_str(), wdmpStatus);
 
-                    result = rfcName + "=Failed to read RFC";
+                    hash[rfcName.c_str()] = "Failed to read RFC";
                 }
-
-                rfcResults.push_back(std::move(result));
             }
 
-            RFCConfig = Core::Service<RPC::StringIterator>::Create<IStringIterator>(rfcResults);
+            if (!hash.IsNull()) {
+                hash.ToString(RFCConfig);
+            }
 
             if (!success)
             {
                 populateResponseWithError(SysSrv_UnSupportedFormat, SysSrv_Status, errorMessage);
             }
 
+            LOGINFO("response: SysSrv_Status=%u, errorMessage=%s, success=%s", SysSrv_Status, errorMessage.c_str(), success ? "true" : "false");
             return Core::ERROR_NONE;
         }
-        
+
         Core::hresult SystemServicesImplementation::GetDeviceInfo( IStringIterator* const& params, DeviceInfo& deviceInfo)
         {
-            LOGINFO("called");
-
             string queryParam;
 
             if (params != nullptr)
@@ -3430,6 +3521,8 @@ namespace WPEFramework
                 return Core::ERROR_NONE;
             }
 
+            LOGWARN("SystemService getDeviceInfo query %s", queryParam.c_str());
+
             auto deviceInfoObject = m_shellService->QueryInterfaceByCallsign<Exchange::IDeviceInfo>("DeviceInfo");
 
             if (deviceInfoObject == nullptr)
@@ -3441,20 +3534,39 @@ namespace WPEFramework
 
             if (queryParam.empty() || queryParam == "make")
             {
-                std::string deviceName;
-
-                uint32_t result = Core::ERROR_GENERAL;
-                Exchange::IDeviceInfo::DeviceMake deviceMake;
-        
-                if (deviceInfoObject)
+                std::string deviceName{};
+                GetValueFromPropertiesFile(DEVICE_PROPERTIES_FILE, "DEVICE_NAME", deviceName);
+                if (deviceName == "PLATCO")
                 {
-                    result = deviceInfoObject->Make(deviceMake);
-                    if (Core::ERROR_NONE == result)
+                    uint32_t result = Core::ERROR_GENERAL;
+                    Exchange::IDeviceInfo::DeviceMake deviceMake;
+
+                    if (deviceInfoObject)
                     {
-                        deviceInfo.make = deviceMake.make;
+                        result = deviceInfoObject->Make(deviceMake);
+                        if (Core::ERROR_NONE == result)
+                        {
+                            deviceInfo.make = deviceMake.make;
+                            deviceInfo.success = true;
+                            LOGINFO("Device Make: %s", deviceInfo.make.c_str());
+                        }
+                    }
+                }
+                else
+                {
+                    std::string make;
+                    GetValueFromPropertiesFile(DEVICE_PROPERTIES_FILE, "MFG_NAME", make);
+
+                    if (make.size() > 0)
+                    {
+                        deviceInfo.make = std::move(make);
                         deviceInfo.success = true;
                     }
-	            }
+                    else
+                    {
+                        LOGERR("Failed to read make from properties file");
+                    }
+                }
 
                 if (!queryParam.empty())
                 {
@@ -3542,18 +3654,27 @@ namespace WPEFramework
 #ifdef ENABLE_DEVICE_MANUFACTURER_INFO
             if (queryParam.empty() || queryParam == MODEL_NAME)
             {
-                uint32_t result = Core::ERROR_GENERAL;
-                Exchange::IDeviceInfo::DeviceModel deviceModel;
-
-                if (deviceInfoObject)
+                if (m_ManufacturerDataModelNameValid)
                 {
-                    result = deviceInfoObject->Model(deviceModel);
-                    if (Core::ERROR_NONE == result)
-                    {
-                        deviceInfo.modelName = deviceModel.model;
+                    deviceInfo.modelName = m_ManufacturerDataModelName;
+                    deviceInfo.success = true;
+                }
+                else
+                {
+                    IARM_Bus_MFRLib_GetSerializedData_Param_t param;
+                    param.bufLen = 0;
+                    param.type = mfrSERIALIZED_TYPE_PROVISIONED_MODELNAME;
+
+                    IARM_Result_t result = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME, IARM_BUS_MFRLIB_API_GetSerializedData, &param, sizeof(param));
+                    param.buffer[param.bufLen] = '\0';
+
+                    if (result == IARM_RESULT_SUCCESS) {
+                        deviceInfo.modelName = string(param.buffer);
+                        m_ManufacturerDataModelName = param.buffer;
+                        m_ManufacturerDataModelNameValid = true;
                         deviceInfo.success = true;
                     }
-	            }
+                }
             }
 
             if (queryParam.empty() || queryParam == HARDWARE_ID)
@@ -3683,11 +3804,16 @@ namespace WPEFramework
                 }
             }
             deviceInfoObject->Release();
+            LOGINFO("response={make:'%s', bluetooth_mac:'%s', boxIP:'%s', build_type:'%s', device_type:'%s', estb_mac:'%s', eth_mac:'%s', friendlyId:'%s', wifi_mac:'%s', model_number:'%s', imageVersion:'%s', modelName:'%s', hardwareID:'%s'}\n",
+                     deviceInfo.make.c_str(), deviceInfo.bluetoothMac.c_str(), deviceInfo.boxIP.c_str(), deviceInfo.buildType.c_str(), deviceInfo.deviceType.c_str(), deviceInfo.estbMac.c_str(), deviceInfo.ethMac.c_str(), deviceInfo.friendlyId.c_str(), deviceInfo.wifiMac.c_str(),
+                    deviceInfo.modelNumber.c_str(), deviceInfo.imageVersion.c_str(), deviceInfo.modelName.c_str(), deviceInfo.hardwareID.c_str());
+
             return Core::ERROR_NONE;
         }
         
         Core::hresult SystemServicesImplementation::GetPlatformConfiguration (const string &query, PlatformConfig& platformConfig)
         {
+            LOGINFO("query %s", query.c_str());
             PlatformCaps response;
             response.Load(m_shellService, query, platformConfig);
             return Core::ERROR_NONE;
