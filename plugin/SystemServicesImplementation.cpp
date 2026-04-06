@@ -292,8 +292,10 @@ namespace WPEFramework
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
 
             SystemServicesImplementation::_instance = nullptr;
-            m_shellService->Release();
-            m_shellService = nullptr;
+            if (m_shellService) {
+                m_shellService->Release();
+                m_shellService = nullptr;
+            }
             _service = nullptr;
         }
 
@@ -721,7 +723,7 @@ namespace WPEFramework
                     macAddressesInfo.mocaMac = params["moca_mac"].String();
                     macAddressesInfo.ethMac = params["eth_mac"].String();
                     macAddressesInfo.wifiMac = params["wifi_mac"].String();
-                    macAddressesInfo.bluetoothMac = params["bluetoothMac"].String();
+                    macAddressesInfo.bluetoothMac = params["bluetooth_mac"].String();
                     macAddressesInfo.rf4ceMac = params["rf4ce_mac"].String();
                     macAddressesInfo.info = params["info"].String();
                     macAddressesInfo.success = params["success"].Boolean();
@@ -3422,7 +3424,7 @@ namespace WPEFramework
             }
 
             if (!dirObject.IsNull()) {
-		dirObject.ToString(zoneinfo);
+                dirObject.ToString(zoneinfo);
             }
 
             return success ? Core::ERROR_NONE : Core::ERROR_GENERAL;
@@ -3534,7 +3536,7 @@ namespace WPEFramework
 
             if (queryParam.empty() || queryParam == "make")
             {
-                std::string deviceName{};
+                std::string deviceName;
                 GetValueFromPropertiesFile(DEVICE_PROPERTIES_FILE, "DEVICE_NAME", deviceName);
                 if (deviceName == "PLATCO")
                 {
