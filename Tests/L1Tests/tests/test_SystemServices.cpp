@@ -2673,6 +2673,39 @@ TEST_F(SystemServicesTest, getDeviceInfoSuccess_onValidInput)
 }
 
 /**
+ * @brief : getDeviceInfo strips trailing escape/extra bytes for bluetooth_mac
+ *          Check if bluetooth_mac output from script has valid MAC followed by
+ *          escape sequence / extra bytes, then only canonical MAC is returned.
+ * @param[in]   : "params":{"params": "bluetooth_mac"}
+ * @return      : {"bluetooth_mac":"12:34:56:78:90:AB","success":true}
+ */
+TEST_F(SystemServicesTest, getDeviceInfoSuccess_onBluetoothMacWithTrailingEscapeCharacters)
+{
+    EXPECT_CALL(*p_wrapsImplMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_))
+        .Times(1)
+        .WillOnce(::testing::Invoke(
+            [&](const char* direction, const char* command, va_list args) {
+                va_list args2;
+                va_copy(args2, args);
+                char strFmt[256];
+                vsnprintf(strFmt, sizeof(strFmt), command, args2);
+                va_end(args2);
+                EXPECT_EQ(string(strFmt), string(_T("/lib/rdk/getDeviceDetails.sh read bluetooth_mac")));
+
+                // MAC followed by ESC sequence and trailing junk to emulate the field issue.
+                const char key_bluetooth_mac[] = "12:34:56:78:90:AB\x1b[0mTRAILING";
+                char buffer[1024];
+                memset(buffer, 0, sizeof(buffer));
+                strncpy(buffer, key_bluetooth_mac, sizeof(buffer) - 1);
+                FILE* pipe = fmemopen(buffer, strlen(buffer), "r");
+                return pipe;
+            }));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDeviceInfo"), _T("{\"params\":bluetooth_mac}"), response));
+    EXPECT_EQ(response, string("{\"bluetooth_mac\":\"12:34:56:78:90:AB\",\"success\":true}"));
+}
+
+/**
  * @brief : getDeviceInfo  When QueryParam is HardwareId
  *          Check if device's HardwareId as input query param,
  *          then getDeviceInfo shall succeed and retrieves the information from  the external Bus device API
