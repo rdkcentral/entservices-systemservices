@@ -1331,6 +1331,7 @@ namespace WPEFramework {
                             std::string value;
                             if (key == "bluetooth_mac") {
                                 value = extractMacAddress(rawValue);
+                                LOGINFO("getDeviceInfo bluetooth_mac = %s", value.c_str());
                             } else {
                                 value = rawValue;
                                 Utils::String::trim(value);
