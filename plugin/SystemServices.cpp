@@ -1364,7 +1364,7 @@ namespace WPEFramework {
                     if (queryParams == "bluetooth_mac") {
                         response[queryParams.c_str()] = extractMacAddress(res);
                     } else {
-                        std::string trimmedRes = res;
+                        std::string trimmedRes = std::move(res);
                         Utils::String::trim(trimmedRes);
                         response[queryParams.c_str()] = trimmedRes;
                     }
