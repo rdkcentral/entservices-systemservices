@@ -322,6 +322,16 @@ void stringToIarmMode(std::string mode, IARM_Bus_Daemon_SysMode_t& iarmMode)
 
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
 
+static std::string extractMacAddress(const std::string& raw)
+{
+    static const std::regex kMacPattern("([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5})");
+    std::smatch macMatch;
+    if (std::regex_search(raw, macMatch, kMacPattern)) {
+        return macMatch[1].str();
+    }
+    return "00:00:00:00:00:00";
+}
+
 // TODO: remove this
 #define registerMethod(...) for (uint8_t i = 1; GetHandler(i); i++) GetHandler(i)->Register<JsonObject, JsonObject>(__VA_ARGS__)
 
@@ -346,7 +356,6 @@ namespace WPEFramework {
 
     namespace Plugin {
         namespace {
-            
             uint32_t GetValueFromPropertiesFile(const char* filename, const char* key, string& response, const char *delimiter = "=")
             {
                 uint32_t result = Core::ERROR_GENERAL;
@@ -1318,7 +1327,14 @@ namespace WPEFramework {
                         if (std::string::npos != eq)
                         {
                             std::string key = line.substr(0, eq);
-                            std::string value = line.substr(eq + 1);
+                            std::string rawValue = line.substr(eq + 1);
+                            std::string value;
+                            if (key == "bluetooth_mac") {
+                                value = extractMacAddress(rawValue);
+                            } else {
+                                value = rawValue;
+                                Utils::String::trim(value);
+                            }
 
                             response[key.c_str()] = value;
 
@@ -1345,8 +1361,13 @@ namespace WPEFramework {
 #endif
                 } else {
                     retAPIStatus = true;
-                    Utils::String::trim(res);
-                        response[queryParams.c_str()] = res;
+                    if (queryParams == "bluetooth_mac") {
+                        response[queryParams.c_str()] = extractMacAddress(res);
+                    } else {
+                        std::string trimmedRes = res;
+                        Utils::String::trim(trimmedRes);
+                        response[queryParams.c_str()] = trimmedRes;
+                    }
                     }
                 }
             returnResponse(retAPIStatus);
@@ -2925,9 +2946,13 @@ namespace WPEFramework {
 
                }
 
-                removeCharsFromString(tempBuffer, "\n\r");
+                if (macTypeList[i] == "bluetooth_mac") {
+                    tempBuffer = extractMacAddress(tempBuffer);
+                } else {
+                    Utils::String::trim(tempBuffer);
+                }
                 LOGWARN("resp = %s\n", tempBuffer.c_str());
-                params[macTypeList[i].c_str()] = (tempBuffer.empty()? "00:00:00:00:00:00" : tempBuffer.c_str());
+                params[macTypeList[i].c_str()] = tempBuffer.c_str();
                 listLength++;
             }
             if (listLength != i) {
