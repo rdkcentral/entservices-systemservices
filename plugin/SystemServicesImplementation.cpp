@@ -1319,10 +1319,10 @@ namespace WPEFramework
             return errCode;
         }
 
-        Core::hresult SystemServicesImplementation::SetMigrationStatus(const string& status, bool& success)
+        Core::hresult SystemServicesImplementation::SetMigrationStatus(const string& status, SystemResult& result)
         {
             LOGINFO("status=%s", status.c_str());
-            uint32_t result = Core::ERROR_GENERAL;
+            uint32_t errCode = Core::ERROR_GENERAL;
 
             Exchange::IMigration::MigrationStatus migrationStatus = Exchange::IMigration::MIGRATION_STATUS_NOT_STARTED;
             Exchange::IMigration::MigrationResult migrationResult;
@@ -1349,12 +1349,9 @@ namespace WPEFramework
 
             if (migrationObject)
             {
-                result = migrationObject->SetMigrationStatus(migrationStatus, migrationResult);
-                if (Core::ERROR_NONE != result)
-                {
-                    LOGERR("Failed to set migration status\n");
-                }
-                success = migrationResult.success;
+                errCode = migrationObject->SetMigrationStatus(migrationStatus, migrationResult);
+                if ( Core::ERROR_NONE == errCode)
+                    result.success = migrationResult.success;
                 migrationObject->Release();
             }
             else
@@ -1362,7 +1359,7 @@ namespace WPEFramework
                 LOGERR("Migration plugin is not activated\n");
             }
 
-            return result;
+            return errCode;
         }
 
         Core::hresult SystemServicesImplementation::GetMigrationStatus(MigrationStatus &migrationInfo)

@@ -254,7 +254,7 @@ namespace WPEFramework
             Core::hresult SetTimeZoneDST(const string& timeZone, const string& accuracy, uint32_t& SysSrv_Status, string& errorMessage, bool& success) override;
             Core::hresult UpdateFirmware(SystemResult& result) override;
             Core::hresult GetBootTypeInfo(BootType &bootInfo) override;
-            Core::hresult SetMigrationStatus(const string& status, bool& success) override;
+            Core::hresult SetMigrationStatus(const string& status, SystemResult& result) override;
             Core::hresult GetMigrationStatus(MigrationStatus &migrationInfo) override;
             Core::hresult GetMacAddresses(const string& GUID, bool &asyncResponse, uint32_t& SysSrv_Status, string& errorMessage, bool& success) override;
             Core::hresult GetPlatformConfiguration (const string &query, PlatformConfig& platformConfig) override;
