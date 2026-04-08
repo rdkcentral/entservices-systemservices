@@ -819,7 +819,6 @@ namespace WPEFramework {
             return powerState;
         }
 
-
         void SystemServices::onNetworkStandbyModeChanged(const bool enabled)
         {
             if (SystemServices::_instance) {
