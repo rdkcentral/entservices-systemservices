@@ -24,6 +24,12 @@ git clone --branch develop https://github.com/rdkcentral/entservices-apis.git
 
 git clone https://$GITHUB_TOKEN@github.com/rdkcentral/entservices-testframework.git
 
+# Patch readprocMockInterface.h to add PROC_FILLCOM flag and cmdline member required by UtilsProcess.h
+sed -i 's/^#define PROC_FILLSTAT\(.*\)/#define PROC_FILLSTAT\1\n#define PROC_FILLCOM         0x0200 \/\/ fill cmdline/' \
+    entservices-testframework/Tests/mocks/readprocMockInterface.h
+sed -i 's/^} proc_t;/    char **cmdline;\n} proc_t;/' \
+    entservices-testframework/Tests/mocks/readprocMockInterface.h
+
 ############################
 # Build Thunder-Tools
 echo "======================================================================================"
@@ -119,36 +125,9 @@ touch rdk/iarmmgrs-hal/sysMgr.h
 touch rfcapi.h
 touch telemetry_busmessage_sender.h
 touch secure_wrapper.h
-cat > proc/readproc.h << 'EOF'
-#pragma once
-#include <unistd.h>
-#include <sys/types.h>
-
-/* openproc() flag bits */
-#define PROC_FILLMEM    0x0040
-#define PROC_FILLSTAT   0x0002
-#define PROC_FILLSTATUS 0x0008
-#define PROC_FILLCOM    0x0200  /* fill cmdline (argv) */
-
-typedef struct proc_t {
-    int       tid;      /* task/process ID */
-    int       ppid;     /* parent PID */
-    char      cmd[16];  /* short executable name */
-    char    **cmdline;  /* full command-line argv, NULL-terminated */
-} proc_t;
-
-typedef struct PROCTAB PROCTAB;
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-PROCTAB* openproc(int flags, ...);
-proc_t*  readproc(PROCTAB* PT, proc_t* p);
-void     closeproc(PROCTAB* PT);
-#ifdef __cplusplus
-}
-#endif
-EOF
+# readprocMockInterface.h (pre-included via -include) owns all proc_t/PROCTAB definitions.
+# This stub just satisfies the #include <proc/readproc.h> directive without redefining anything.
+echo '#pragma once' > proc/readproc.h
 echo "files created successfully"
 echo "======================================================================================"
 
