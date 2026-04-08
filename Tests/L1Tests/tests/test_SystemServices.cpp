@@ -2661,10 +2661,11 @@ TEST_F(SystemServicesTest, getDeviceInfoSuccess_onValidInput)
                 EXPECT_EQ(string(strFmt), string(_T("/lib/rdk/getDeviceDetails.sh read estb_mac")));
                 // Simulated the behavior of "getDeviceDetails.sh" script inorder to obtain the value of estb_mac key
                 const char key_estb_mac[] = "12:34:56:78:90:AB";
-                char buffer[1024];
-                memset(buffer, 0, sizeof(buffer));
-                strncpy(buffer, key_estb_mac, sizeof(buffer) - 1);
-                FILE* pipe = fmemopen(buffer, strlen(buffer), "r");
+                FILE* pipe = tmpfile();
+                if (pipe != nullptr) {
+                    fwrite(key_estb_mac, 1, strlen(key_estb_mac), pipe);
+                    rewind(pipe);
+                }
                 return pipe;
             }));
 
@@ -2694,15 +2695,51 @@ TEST_F(SystemServicesTest, getDeviceInfoSuccess_onBluetoothMacWithTrailingEscape
 
                 // MAC followed by ESC sequence and trailing junk to emulate the field issue.
                 const char key_bluetooth_mac[] = "12:34:56:78:90:AB\x1b[0mTRAILING";
-                char buffer[1024];
-                memset(buffer, 0, sizeof(buffer));
-                strncpy(buffer, key_bluetooth_mac, sizeof(buffer) - 1);
-                FILE* pipe = fmemopen(buffer, strlen(buffer), "r");
+                FILE* pipe = tmpfile();
+                if (pipe != nullptr) {
+                    fwrite(key_bluetooth_mac, 1, strlen(key_bluetooth_mac), pipe);
+                    rewind(pipe);
+                }
                 return pipe;
             }));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDeviceInfo"), _T("{\"params\":bluetooth_mac}"), response));
     EXPECT_EQ(response, string("{\"bluetooth_mac\":\"12:34:56:78:90:AB\",\"success\":true}"));
+}
+
+/**
+ * @brief : getDeviceInfo returns trimmed raw output for bluetooth_mac when script output
+ *          does not contain a valid MAC pattern (no regex match).
+ *          The fallback must return the trimmed raw string instead of a fabricated zero MAC.
+ * @param[in]   : "params":{"params": "bluetooth_mac"}
+ * @return      : {"bluetooth_mac":"NOT_A_MAC","success":true}
+ */
+TEST_F(SystemServicesTest, getDeviceInfoSuccess_onBluetoothMacWithNoMacPattern)
+{
+    EXPECT_CALL(*p_wrapsImplMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_))
+        .Times(1)
+        .WillOnce(::testing::Invoke(
+            [&](const char* direction, const char* command, va_list args) {
+                va_list args2;
+                va_copy(args2, args);
+                char strFmt[256];
+                vsnprintf(strFmt, sizeof(strFmt), command, args2);
+                va_end(args2);
+                EXPECT_EQ(string(strFmt), string(_T("/lib/rdk/getDeviceDetails.sh read bluetooth_mac")));
+
+                // Script returns a string that contains no valid MAC pattern.
+                // The fallback should return this trimmed string as-is.
+                const char key_bluetooth_mac[] = "NOT_A_MAC\n";
+                FILE* pipe = tmpfile();
+                if (pipe != nullptr) {
+                    fwrite(key_bluetooth_mac, 1, strlen(key_bluetooth_mac), pipe);
+                    rewind(pipe);
+                }
+                return pipe;
+            }));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDeviceInfo"), _T("{\"params\":bluetooth_mac}"), response));
+    EXPECT_EQ(response, string("{\"bluetooth_mac\":\"NOT_A_MAC\",\"success\":true}"));
 }
 
 /**
@@ -3982,10 +4019,11 @@ TEST_F(SystemServicesEventTest, onMacAddressesRetrieved)
                     valueToReturn = "00:00:00:00:00:00";
                 }
                 if (valueToReturn != NULL) {
-                    char buffer[1024];
-                    memset(buffer, 0, sizeof(buffer));
-                    strncpy(buffer, valueToReturn, sizeof(buffer) - 1);
-                    FILE* pipe = fmemopen(buffer, strlen(buffer), "r");
+                    FILE* pipe = tmpfile();
+                    if (pipe != nullptr) {
+                        fwrite(valueToReturn, 1, strlen(valueToReturn), pipe);
+                        rewind(pipe);
+                    }
                     return pipe;
                 } else {
                     const char* str = static_cast<const char*>(strFmt);

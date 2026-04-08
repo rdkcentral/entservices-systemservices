@@ -329,7 +329,7 @@ static std::string extractMacAddress(const std::string& raw)
     if (std::regex_search(raw, macMatch, kMacPattern)) {
         return macMatch[1].str();
     }
-    return "00:00:00:00:00:00";
+    return "";
 }
 
 // TODO: remove this
@@ -1331,8 +1331,12 @@ namespace WPEFramework {
                             std::string value;
                             if (key == "bluetooth_mac") {
                                 value = extractMacAddress(rawValue);
+                                if (value.empty()) {
+                                    value = rawValue;
+                                    Utils::String::trim(value);
+                                }
                             } else {
-                                value = rawValue;
+                                value = std::move(rawValue);
                                 Utils::String::trim(value);
                             }
 
@@ -1362,7 +1366,13 @@ namespace WPEFramework {
                 } else {
                     retAPIStatus = true;
                     if (queryParams == "bluetooth_mac") {
-                        response[queryParams.c_str()] = extractMacAddress(res);
+                        std::string mac = extractMacAddress(res);
+                        if (!mac.empty()) {
+                            response[queryParams.c_str()] = mac;
+                        } else {
+                            Utils::String::trim(res);
+                            response[queryParams.c_str()] = res;
+                        }
                     } else {
                         std::string trimmedRes = std::move(res);
                         Utils::String::trim(trimmedRes);
@@ -2947,7 +2957,15 @@ namespace WPEFramework {
                }
 
                 if (macTypeList[i] == "bluetooth_mac") {
-                    tempBuffer = extractMacAddress(tempBuffer);
+                    std::string mac = extractMacAddress(tempBuffer);
+                    if (!mac.empty()) {
+                        tempBuffer = mac;
+                    } else {
+                        Utils::String::trim(tempBuffer);
+                        if (tempBuffer.empty()) {
+                            tempBuffer = "00:00:00:00:00:00";
+                        }
+                    }
                 } else {
                     Utils::String::trim(tempBuffer);
                     if (tempBuffer.empty()) {
