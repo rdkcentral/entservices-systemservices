@@ -119,7 +119,36 @@ touch rdk/iarmmgrs-hal/sysMgr.h
 touch rfcapi.h
 touch telemetry_busmessage_sender.h
 touch secure_wrapper.h
-touch proc/readproc.h
+cat > proc/readproc.h << 'EOF'
+#pragma once
+#include <unistd.h>
+#include <sys/types.h>
+
+/* openproc() flag bits */
+#define PROC_FILLMEM    0x0040
+#define PROC_FILLSTAT   0x0002
+#define PROC_FILLSTATUS 0x0008
+#define PROC_FILLCOM    0x0200  /* fill cmdline (argv) */
+
+typedef struct proc_t {
+    int       tid;      /* task/process ID */
+    int       ppid;     /* parent PID */
+    char      cmd[16];  /* short executable name */
+    char    **cmdline;  /* full command-line argv, NULL-terminated */
+} proc_t;
+
+typedef struct PROCTAB PROCTAB;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+PROCTAB* openproc(int flags, ...);
+proc_t*  readproc(PROCTAB* PT, proc_t* p);
+void     closeproc(PROCTAB* PT);
+#ifdef __cplusplus
+}
+#endif
+EOF
 echo "files created successfully"
 echo "======================================================================================"
 
