@@ -2648,7 +2648,6 @@ TEST_F(SystemServicesTest, getDeviceInfoSuccess_onMakeParameter)
  */
 TEST_F(SystemServicesTest, getDeviceInfoSuccess_onValidInput)
 {
-
     EXPECT_CALL(*p_wrapsImplMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_))
         .Times(::testing::AnyNumber())
         .WillRepeatedly(::testing::Invoke(
@@ -2661,7 +2660,10 @@ TEST_F(SystemServicesTest, getDeviceInfoSuccess_onValidInput)
                 EXPECT_EQ(string(strFmt), string(_T("/lib/rdk/getDeviceDetails.sh read estb_mac")));
                 // Simulated the behavior of "getDeviceDetails.sh" script inorder to obtain the value of estb_mac key
                 const char key_estb_mac[] = "12:34:56:78:90:AB";
-                FILE* pipe = tmpfile();
+                char tmpPath1[] = "/tmp/ss_test_XXXXXX";
+                int tmpFd1 = mkstemp(tmpPath1);
+                unlink(tmpPath1);
+                FILE* pipe = (tmpFd1 >= 0) ? fdopen(tmpFd1, "w+b") : nullptr;
                 if (pipe != nullptr) {
                     fwrite(key_estb_mac, 1, strlen(key_estb_mac), pipe);
                     rewind(pipe);
@@ -2695,7 +2697,10 @@ TEST_F(SystemServicesTest, getDeviceInfoSuccess_onBluetoothMacWithTrailingEscape
 
                 // MAC followed by ESC sequence and trailing junk to emulate the field issue.
                 const char key_bluetooth_mac[] = "12:34:56:78:90:AB\x1b[0mTRAILING";
-                FILE* pipe = tmpfile();
+                char tmpPath2[] = "/tmp/ss_test_XXXXXX";
+                int tmpFd2 = mkstemp(tmpPath2);
+                unlink(tmpPath2);
+                FILE* pipe = (tmpFd2 >= 0) ? fdopen(tmpFd2, "w+b") : nullptr;
                 if (pipe != nullptr) {
                     fwrite(key_bluetooth_mac, 1, strlen(key_bluetooth_mac), pipe);
                     rewind(pipe);
@@ -2730,7 +2735,10 @@ TEST_F(SystemServicesTest, getDeviceInfoSuccess_onBluetoothMacWithNoMacPattern)
                 // Script returns a string that contains no valid MAC pattern.
                 // The fallback should return this trimmed string as-is.
                 const char key_bluetooth_mac[] = "NOT_A_MAC\n";
-                FILE* pipe = tmpfile();
+                char tmpPath3[] = "/tmp/ss_test_XXXXXX";
+                int tmpFd3 = mkstemp(tmpPath3);
+                unlink(tmpPath3);
+                FILE* pipe = (tmpFd3 >= 0) ? fdopen(tmpFd3, "w+b") : nullptr;
                 if (pipe != nullptr) {
                     fwrite(key_bluetooth_mac, 1, strlen(key_bluetooth_mac), pipe);
                     rewind(pipe);
@@ -4019,7 +4027,10 @@ TEST_F(SystemServicesEventTest, onMacAddressesRetrieved)
                     valueToReturn = "00:00:00:00:00:00";
                 }
                 if (valueToReturn != NULL) {
-                    FILE* pipe = tmpfile();
+                    char tmpPath4[] = "/tmp/ss_test_XXXXXX";
+                    int tmpFd4 = mkstemp(tmpPath4);
+                    unlink(tmpPath4);
+                    FILE* pipe = (tmpFd4 >= 0) ? fdopen(tmpFd4, "w+b") : nullptr;
                     if (pipe != nullptr) {
                         fwrite(valueToReturn, 1, strlen(valueToReturn), pipe);
                         rewind(pipe);

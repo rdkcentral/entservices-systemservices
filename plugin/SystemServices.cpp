@@ -1332,7 +1332,7 @@ namespace WPEFramework {
                             if (key == "bluetooth_mac") {
                                 value = extractMacAddress(rawValue);
                                 if (value.empty()) {
-                                    value = rawValue;
+                                    value = std::move(rawValue);
                                     Utils::String::trim(value);
                                 }
                             } else {
@@ -1368,7 +1368,7 @@ namespace WPEFramework {
                     if (queryParams == "bluetooth_mac") {
                         std::string mac = extractMacAddress(res);
                         if (!mac.empty()) {
-                            response[queryParams.c_str()] = mac;
+                            response[queryParams.c_str()] = std::move(mac);
                         } else {
                             Utils::String::trim(res);
                             response[queryParams.c_str()] = res;
@@ -2959,7 +2959,7 @@ namespace WPEFramework {
                 if (macTypeList[i] == "bluetooth_mac") {
                     std::string mac = extractMacAddress(tempBuffer);
                     if (!mac.empty()) {
-                        tempBuffer = mac;
+                        tempBuffer = std::move(mac);
                     } else {
                         Utils::String::trim(tempBuffer);
                         if (tempBuffer.empty()) {
