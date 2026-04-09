@@ -149,6 +149,13 @@ jobs:
           path: googletest
           ref: v1.15.0
 
+      - name: Patch readprocMockInterface.h for UtilsProcess.h compatibility
+        run: |
+          sed -i '/^#define PROC_FILLSTAT/a #define PROC_FILLCOM         0x0200 // fill cmdline' \
+            $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/readprocMockInterface.h
+          sed -i 's/^} proc_t;/    char **cmdline;\n} proc_t;/' \
+            $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/readprocMockInterface.h
+
       - name: Apply patches ThunderTools
         if: steps.cache.outputs.cache-hit != 'true'
         run: |  

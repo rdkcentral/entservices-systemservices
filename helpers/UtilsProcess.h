@@ -65,7 +65,7 @@ bool killProcess(const string& input_pname)
             bool match = false;
 
             // Match substring against the executable/command name.
-            if ((proc_info.cmd != nullptr) &&
+            if ((proc_info.cmd[0] != '\0') &&
                 (strstr(proc_info.cmd, input_pname.c_str()) != nullptr))
             {
                 match = true;
@@ -89,11 +89,11 @@ bool killProcess(const string& input_pname)
                 if (0 == kill(proc_info.tid, SIGTERM))
                 {
                     ret_value = true;
-                    LOGINFO("Killed the process [%d] process name [%s]", proc_info.tid, proc_info.cmd ? proc_info.cmd : "null");
+                    LOGINFO("Killed the process [%d] process name [%s]", proc_info.tid, proc_info.cmd[0] != '\0' ? proc_info.cmd : "null");
                 }
                 else
                 {
-                    LOGERR("Failed to Kill the process [%d] process name [%s]", proc_info.tid, proc_info.cmd ? proc_info.cmd : "null");
+                    LOGERR("Failed to Kill the process [%d] process name [%s]", proc_info.tid, proc_info.cmd[0] != '\0' ? proc_info.cmd : "null");
                 }
             }
         }
