@@ -22,6 +22,7 @@
 #include "../Module.h"
 
 #include <interfaces/IAuthService.h>
+#include <interfaces/IDeviceInfo.h>
 
 namespace WPEFramework {
 namespace Plugin {
@@ -238,6 +239,7 @@ private:
 
 private:
   JsonRpc jsonRpc;
+  PluginHost::IShell* _service;
   Exchange::IAuthService *authservicePlugin;
 };
 

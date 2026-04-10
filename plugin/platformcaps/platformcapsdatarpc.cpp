@@ -43,9 +43,26 @@ namespace Plugin {
  */
  
 string PlatformCapsData::GetModel() {
-  return jsonRpc.invoke(_T("org.rdk.System"),
-                        _T("getDeviceInfo"), 5000)
-      .Get(_T("model_number")).String();
+  string model;
+
+  Exchange::IDeviceInfo* deviceInfoPlugin = _service->QueryInterfaceByCallsign<Exchange::IDeviceInfo>("DeviceInfo");
+
+  if (deviceInfoPlugin != nullptr) {
+    Exchange::IDeviceInfo::DeviceModelNo modelNo;
+    uint32_t result = deviceInfoPlugin->Sku(modelNo);
+
+    if (result == Core::ERROR_NONE) {
+      model = modelNo.sku;
+    } else {
+      TRACE(Trace::Error, (_T("DeviceInfo Sku() failed with error code: %u\n"), result));
+    }
+
+    deviceInfoPlugin->Release();
+  } else {
+    TRACE(Trace::Error, (_T("Failed to get IDeviceInfo interface for DeviceInfo plugin\n")));
+  }
+
+  return model;
 }
 
 string PlatformCapsData::GetDeviceType() {
@@ -171,9 +188,26 @@ string PlatformCapsData::GetExperience() {
 }
 
 string PlatformCapsData::GetDdeviceMACAddress() {
-  return jsonRpc.invoke(_T("org.rdk.System"),
-                        _T("getDeviceInfo"), 5000)
-      .Get(_T("estb_mac")).String();
+  string macAddress;
+
+  Exchange::IDeviceInfo* deviceInfoPlugin = _service->QueryInterfaceByCallsign<Exchange::IDeviceInfo>("DeviceInfo");
+
+  if (deviceInfoPlugin != nullptr) {
+    Exchange::IDeviceInfo::StbMac stbMac;
+    uint32_t result = deviceInfoPlugin->EstbMac(stbMac);
+
+    if (result == Core::ERROR_NONE) {
+      macAddress = stbMac.estbMac;
+    } else {
+      TRACE(Trace::Error, (_T("DeviceInfo EstbMac() failed with error code: %u\n"), result));
+    }
+
+    deviceInfoPlugin->Release();
+  } else {
+    TRACE(Trace::Error, (_T("Failed to get IDeviceInfo interface for DeviceInfo plugin\n")));
+  }
+
+  return macAddress;
 }
 
 string PlatformCapsData::GetPublicIP() {
