@@ -30,7 +30,7 @@
 
 #define JSON_TIMEOUT   (1000)
 #define TEST_LOG(x, ...) fprintf(stderr, "\033[1;32m[%s:%d](%s)<PID:%d><TID:%d>" x "\n\033[0m", __FILE__, __LINE__, __FUNCTION__, getpid(), gettid(), ##__VA_ARGS__); fflush(stderr);
-#define SYSTEMSERVICES_CALLSIGN  _T("org.rdk.SystemServices.1")
+#define SYSTEM_CALLSIGN  _T("org.rdk.System.1")
 #define L2TEST_CALLSIGN _T("L2tests.1")
 
 using ::testing::NiceMock;
@@ -195,7 +195,7 @@ SystemService_L2Test::SystemService_L2Test()
                  return IARM_RESULT_SUCCESS;
          }));
 
-         status = ActivateService("org.rdk.SystemServices");
+         status = ActivateService("org.rdk.System");
          EXPECT_EQ(Core::ERROR_NONE, status);
 
 }
@@ -208,7 +208,7 @@ SystemService_L2Test::~SystemService_L2Test()
     uint32_t status = Core::ERROR_GENERAL;
     m_event_signalled = SYSTEMSERVICEL2TEST_STATE_INVALID;
 
-    status = DeactivateService("org.rdk.SystemServices");
+    status = DeactivateService("org.rdk.System");
     EXPECT_EQ(Core::ERROR_NONE, status);
 
     EXPECT_CALL(*p_powerManagerHalMock, PLAT_TERM())
@@ -436,7 +436,7 @@ TEST_F(SystemService_L2Test,SystemServiceGetSetTemperature)
 *******************************************************/
 TEST_F(SystemService_L2Test,SystemServiceUploadLogsAndSystemPowerStateChange)
 {
-    JSONRPC::LinkType<Core::JSON::IElement> jsonrpc(SYSTEMSERVICES_CALLSIGN,L2TEST_CALLSIGN);
+    JSONRPC::LinkType<Core::JSON::IElement> jsonrpc(SYSTEM_CALLSIGN,L2TEST_CALLSIGN);
     StrictMock<AsyncHandlerMock> async_handler;
     uint32_t status = Core::ERROR_GENERAL;
     JsonObject params;
@@ -479,7 +479,7 @@ TEST_F(SystemService_L2Test,SystemServiceUploadLogsAndSystemPowerStateChange)
     tmpDcmSettings.close();
     EXPECT_TRUE(Core::File(string(_T("/tmp/DCMSettings.conf"))).Exists());
 
-    status = InvokeServiceMethod("org.rdk.SystemServices.1", "uploadLogsAsync", params, result);
+    status = InvokeServiceMethod("org.rdk.System.1", "uploadLogsAsync", params, result);
     EXPECT_EQ(Core::ERROR_NONE, status);
 
     EXPECT_TRUE(result["success"].Boolean());
@@ -538,7 +538,7 @@ TEST_F(SystemService_L2Test,SystemServiceUploadLogsAndSystemPowerStateChange)
 
 TEST_F(SystemService_L2Test,setBootLoaderSplashScreen)
 {
-    JSONRPC::LinkType<Core::JSON::IElement> jsonrpc(SYSTEMSERVICES_CALLSIGN,L2TEST_CALLSIGN);
+    JSONRPC::LinkType<Core::JSON::IElement> jsonrpc(SYSTEM_CALLSIGN,L2TEST_CALLSIGN);
     StrictMock<AsyncHandlerMock> async_handler;
     uint32_t status = Core::ERROR_GENERAL;
     JsonObject params;
@@ -553,12 +553,12 @@ TEST_F(SystemService_L2Test,setBootLoaderSplashScreen)
     file << "testing setBootLoaderSplashScreen";
     file.close();
 
-    status = InvokeServiceMethod("org.rdk.SystemServices.1", "setBootLoaderSplashScreen", params, result);
+    status = InvokeServiceMethod("org.rdk.System.1", "setBootLoaderSplashScreen", params, result);
     EXPECT_EQ(Core::ERROR_NONE, status);
     EXPECT_TRUE(result["success"].Boolean());
 
 #if 0
-    status = InvokeServiceMethod("org.rdk.SystemServices.1", "setBootLoaderSplashScreen", params, result);
+    status = InvokeServiceMethod("org.rdk.System.1", "setBootLoaderSplashScreen", params, result);
     EXPECT_EQ(Core::ERROR_GENERAL, status);
     EXPECT_FALSE(result["success"].Boolean());
     if (result.HasLabel("error")) {
@@ -566,7 +566,7 @@ TEST_F(SystemService_L2Test,setBootLoaderSplashScreen)
     }
     params["path"] = "/tmp/osd2";
 
-    status = InvokeServiceMethod("org.rdk.SystemServices.1", "setBootLoaderSplashScreen", params, result);
+    status = InvokeServiceMethod("org.rdk.System.1", "setBootLoaderSplashScreen", params, result);
     EXPECT_EQ(Core::ERROR_GENERAL, status);
     EXPECT_FALSE(result["success"].Boolean());
     if (result.HasLabel("error")) {
@@ -575,7 +575,7 @@ TEST_F(SystemService_L2Test,setBootLoaderSplashScreen)
 
 
     params["path"] = "";
-    status = InvokeServiceMethod("org.rdk.SystemServices.1", "setBootLoaderSplashScreen", params, result);
+    status = InvokeServiceMethod("org.rdk.System.1", "setBootLoaderSplashScreen", params, result);
     EXPECT_EQ(Core::ERROR_GENERAL, status);
     EXPECT_FALSE(result["success"].Boolean());
     if (result.HasLabel("error")) {
@@ -595,7 +595,7 @@ TEST_F(SystemService_L2Test,setBootLoaderSplashScreen)
 
 TEST_F(SystemService_L2Test,SystemServiceGetSetBlocklistFlag)
 {
-    JSONRPC::LinkType<Core::JSON::IElement> jsonrpc(SYSTEMSERVICES_CALLSIGN, L2TEST_CALLSIGN);
+    JSONRPC::LinkType<Core::JSON::IElement> jsonrpc(SYSTEM_CALLSIGN, L2TEST_CALLSIGN);
     StrictMock<AsyncHandlerMock> async_handler;
     uint32_t status = Core::ERROR_GENERAL;
     JsonObject params;
@@ -615,12 +615,12 @@ TEST_F(SystemService_L2Test,SystemServiceGetSetBlocklistFlag)
 
     params["blocklist"] = true;
 
-    status = InvokeServiceMethod("org.rdk.SystemServices.1", "setBlocklistFlag", params, result);
+    status = InvokeServiceMethod("org.rdk.System.1", "setBlocklistFlag", params, result);
     EXPECT_EQ(Core::ERROR_NONE, status);
 
     EXPECT_TRUE(result["success"].Boolean());
 
-    status = InvokeServiceMethod("org.rdk.SystemServices.1", "getBlocklistFlag", params, result);
+    status = InvokeServiceMethod("org.rdk.System.1", "getBlocklistFlag", params, result);
     EXPECT_EQ(Core::ERROR_NONE, status);
 
     EXPECT_TRUE(result["success"].Boolean());
@@ -634,7 +634,7 @@ TEST_F(SystemService_L2Test,SystemServiceGetSetBlocklistFlag)
 
     params["blocklist"] = false;
 
-    status = InvokeServiceMethod("org.rdk.SystemServices.1", "setBlocklistFlag", params, result);
+    status = InvokeServiceMethod("org.rdk.System.1", "setBlocklistFlag", params, result);
     EXPECT_EQ(Core::ERROR_NONE, status);
 
     signalled = WaitForRequestStatus(JSON_TIMEOUT,SYSTEMSERVICEL2TEST_BLOCKLIST_CHANGED);
@@ -642,7 +642,7 @@ TEST_F(SystemService_L2Test,SystemServiceGetSetBlocklistFlag)
     EXPECT_TRUE(result["success"].Boolean());
 
 
-    status = InvokeServiceMethod("org.rdk.SystemServices.1", "getBlocklistFlag", params, result);
+    status = InvokeServiceMethod("org.rdk.System.1", "getBlocklistFlag", params, result);
     EXPECT_EQ(Core::ERROR_NONE, status);
 
     EXPECT_TRUE(result["success"].Boolean());
