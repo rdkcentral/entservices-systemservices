@@ -2400,7 +2400,7 @@ TEST_F(SystemServicesEventIarmTest, onSystemPowerStateChanged_PowerState_STANDBY
 TEST_F(SystemServicesEventIarmTest, onSystemPowerStateChanged_PowerState_ON_To_DEEPSLEEP)
 {
     Core::Event onSystemPowerStateChanged(false, true);
-    const string uploadStbLogFile = _T("/lib/rdk/uploadSTBLogs.sh");
+    const string uploadStbLogFile = _T("/usr/bin/logupload");
     Core::File file(uploadStbLogFile);
     file.Create();
 
@@ -5670,8 +5670,8 @@ TEST_F(SystemServicesTest, getPlatformConfigurationSuccess_withDispatcherInvokeE
  ********************************************************************************************************/
 
 /**
- * @brief : uploadLogsAsync  when uploadSTBLogs.sh not present.
- *          Checks if uploadSTBLogs.sh is not present in /lib/rdk, then uploadLogsAsync
+ * @brief : uploadLogsAsync  when /usr/bin/logupload not present.
+ *          Checks logupload is not present in /usr/bin, then uploadLogsAsync
  *          should return a response status as true but fail to start the log upload process.
  *
  * @param[in]   :  no parameter
@@ -5693,7 +5693,7 @@ TEST_F(SystemServicesTest, uploadLogsAsyncFailed_WhenUploadLogFileNotExist)
  */
 TEST_F(SystemServicesTest, uploadLogsAsyncFailed_withoutBuildType)
 {
-    const string uploadStbLogFile = _T("/lib/rdk/uploadSTBLogs.sh");
+    const string uploadStbLogFile = _T("/usr/bin/logupload");
     Core::File file(uploadStbLogFile);
     file.Create();
 
@@ -5715,10 +5715,10 @@ TEST_F(SystemServicesTest, uploadLogsAsyncFailed_withoutBuildType)
  */
 TEST_F(SystemServicesTest, uploadLogsAsyncFailed_WhenDcmFileNotExist)
 {
-    const string uploadStbLogFile = _T("/lib/rdk/uploadSTBLogs.sh");
+    const string uploadStbLogFile = _T("/usr/bin/logupload");
     Core::File file(uploadStbLogFile);
     file.Create();
-    EXPECT_TRUE(Core::File(string(_T("/lib/rdk/uploadSTBLogs.sh"))).Exists());
+    EXPECT_TRUE(Core::File(string(_T("/usr/bin/logupload"))).Exists());
 
     ON_CALL(*p_rfcApiImplMock, getRFCParameter(::testing::_, ::testing::_, ::testing::_))
         .WillByDefault(::testing::Invoke(
@@ -5756,10 +5756,10 @@ TEST_F(SystemServicesTest, uploadLogsAsyncFailed_WhenDcmFileNotExist)
  */
 TEST_F(SystemServicesTest, uploadLogsAsyncSuccess_WithBuildTypeProd)
 {
-    const string uploadStbLogFile = _T("/lib/rdk/uploadSTBLogs.sh");
+    const string uploadStbLogFile = _T("/usr/bin/logupload");
     Core::File file(uploadStbLogFile);
     file.Create();
-    EXPECT_TRUE(Core::File(string(_T("/lib/rdk/uploadSTBLogs.sh"))).Exists());
+    EXPECT_TRUE(Core::File(string(_T("/usr/bin/logupload"))).Exists());
 
     ON_CALL(*p_rfcApiImplMock, getRFCParameter(::testing::_, ::testing::_, ::testing::_))
         .WillByDefault(::testing::Invoke(
@@ -5807,10 +5807,10 @@ TEST_F(SystemServicesTest, uploadLogsAsyncSuccess_WithBuildTypeProd)
  */
 TEST_F(SystemServicesTest, uploadLogsAsyncSuccess_WhenDcmFileExist)
 {
-    const string uploadStbLogFile = _T("/lib/rdk/uploadSTBLogs.sh");
+    const string uploadStbLogFile = _T("/usr/bin/logupload");
     Core::File file(uploadStbLogFile);
     file.Create();
-    EXPECT_TRUE(Core::File(string(_T("/lib/rdk/uploadSTBLogs.sh"))).Exists());
+    EXPECT_TRUE(Core::File(string(_T("/usr/bin/logupload"))).Exists());
 
     ON_CALL(*p_rfcApiImplMock, getRFCParameter(::testing::_, ::testing::_, ::testing::_))
         .WillByDefault(::testing::Invoke(
@@ -5890,10 +5890,10 @@ TEST_F(SystemServicesTest, abortLogUploadFailure_whenNoActiveUploadLog)
  */
 TEST_F(SystemServicesTest, abortLogUploadSuccess_OpenprocFailedOnGettingChildProcessId)
 {
-    const string uploadStbLogFile = _T("/lib/rdk/uploadSTBLogs.sh");
+    const string uploadStbLogFile = _T("/usr/bin/logupload");
     Core::File file(uploadStbLogFile);
     file.Create();
-    EXPECT_TRUE(Core::File(string(_T("/lib/rdk/uploadSTBLogs.sh"))).Exists());
+    EXPECT_TRUE(Core::File(string(_T("/usr/bin/logupload"))).Exists());
 
     EXPECT_CALL(*p_readprocImplMock, openproc(::testing::_))
         .WillOnce(::testing::Return(nullptr));
@@ -5937,10 +5937,10 @@ TEST_F(SystemServicesTest, abortLogUploadSuccess_OpenprocFailedOnGettingChildPro
 TEST_F(SystemServicesTest, abortLogUploadSuccess_ReadprocFailedOnGettingChildProcessId)
 {
     PROCTAB* dummyProcTab = reinterpret_cast<PROCTAB*>(1);
-    const string uploadStbLogFile = _T("/lib/rdk/uploadSTBLogs.sh");
+    const string uploadStbLogFile = _T("/lib/rdk//usr/bin/logupload");
     Core::File file(uploadStbLogFile);
     file.Create();
-    EXPECT_TRUE(Core::File(string(_T("/lib/rdk/uploadSTBLogs.sh"))).Exists());
+    EXPECT_TRUE(Core::File(string(_T("/usr/bin/logupload"))).Exists());
 
     ON_CALL(*p_rfcApiImplMock, getRFCParameter(::testing::_, ::testing::_, ::testing::_))
         .WillByDefault(::testing::Invoke(
@@ -5999,7 +5999,7 @@ TEST_F(SystemServicesTest, abortLogUploadSuccess_ReadprocFailedOnGettingChildPro
 TEST_F(SystemServicesEventIarmTest, onLogUploadSuccess_withUploadStatusSuccess)
 {
     Core::Event onLogUpload(false, true);
-    const string uploadStbLogFile = _T("/lib/rdk/uploadSTBLogs.sh");
+    const string uploadStbLogFile = _T("/usr/bin/logupload");
     Core::File file(uploadStbLogFile);
     file.Create();
 
@@ -6076,7 +6076,7 @@ TEST_F(SystemServicesEventIarmTest, onLogUploadSuccess_withUploadStatusSuccess)
 TEST_F(SystemServicesEventIarmTest, onLogUploadSuccess_withAbortStatusSuccess)
 {
     Core::Event onLogUpload(false, true);
-    const string uploadStbLogFile = _T("/lib/rdk/uploadSTBLogs.sh");
+    const string uploadStbLogFile = _T("/usr/bin/logupload");
     Core::File file(uploadStbLogFile);
     file.Create();
 
