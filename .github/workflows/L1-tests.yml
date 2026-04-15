@@ -244,6 +244,7 @@ jobs:
           headers/rdk/halif/deepsleep-manager
           headers/ccec/drivers
           headers/network
+          headers/systimerifc
           headers/proc
           &&
           cd headers
