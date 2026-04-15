@@ -6,7 +6,7 @@ on:
       caller_source:
         description: "Specifies the source type (e.g., local or test framework) for the workflow."
         required: true
-        type: string  
+        type: string
     secrets:
       RDKCM_RDKE:
         required: true
@@ -394,8 +394,7 @@ jobs:
           -DIARM_BUS_SYSTIME_MGR_NAME=\"SYSMgr\"
           -DTIMER_STATUS_MSG=\"GetTimeStatus\"
           -DcTIMER_STATUS_UPDATE=0
-          -DcTIMER_STATUS_MESSAGE_LENGTH=256
-          -DTimerMsg='struct{char message[256];char timerSrc[256];char currentTime[256];}'"
+          -DcTIMER_STATUS_MESSAGE_LENGTH=256"
           -D_DRM_MODE_H=ON
           &&
           cmake --build build/mocks -j8
@@ -464,8 +463,7 @@ jobs:
           -DIARM_BUS_SYSTIME_MGR_NAME=\\\"SYSMgr\\\"
           -DTIMER_STATUS_MSG=\\\"GetTimeStatus\\\"
           -DcTIMER_STATUS_UPDATE=0
-          -DcTIMER_STATUS_MESSAGE_LENGTH=256
-          -DTimerMsg='struct{char message[256];char timerSrc[256];char currentTime[256];}'"
+          -DcTIMER_STATUS_MESSAGE_LENGTH=256"
           -DCOMCAST_CONFIG=OFF
           -DBUILD_ENABLE_SYSTIMEMGR_SUPPORT=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_DS=ON
