@@ -40,6 +40,19 @@
 using namespace WPEFramework;
 using ::testing::Matcher;
 
+static FILE* CreateInputStreamWithData(const char* value)
+{
+    if (value == nullptr) {
+        return nullptr;
+    }
+
+#if defined(__GLIBC__) || defined(__APPLE__)
+    return fmemopen(const_cast<char*>(value), strlen(value), "r");
+#else
+    return nullptr;
+#endif
+}
+
 class SystemServicesTest : public ::testing::Test {
 protected:
     Core::ProxyType<Plugin::SystemServices> plugin;
@@ -2660,11 +2673,7 @@ TEST_F(SystemServicesTest, getDeviceInfoSuccess_onValidInput)
                 EXPECT_EQ(string(strFmt), string(_T("/lib/rdk/getDeviceDetails.sh read estb_mac")));
                 // Simulated the behavior of "getDeviceDetails.sh" script inorder to obtain the value of estb_mac key
                 const char key_estb_mac[] = "12:34:56:78:90:AB";
-                FILE* pipe = tmpfile();
-                if (pipe != nullptr) {
-                    fwrite(key_estb_mac, 1, strlen(key_estb_mac), pipe);
-                    rewind(pipe);
-                }
+                FILE* pipe = CreateInputStreamWithData(key_estb_mac);
                 return pipe;
             }));
 
@@ -2694,11 +2703,7 @@ TEST_F(SystemServicesTest, getDeviceInfoSuccess_onBluetoothMacWithTrailingEscape
 
                 // MAC followed by ESC sequence and trailing junk to emulate the field issue.
                 const char key_bluetooth_mac[] = "12:34:56:78:90:AB\x1b[0mTRAILING";
-                FILE* pipe = tmpfile();
-                if (pipe != nullptr) {
-                    fwrite(key_bluetooth_mac, 1, strlen(key_bluetooth_mac), pipe);
-                    rewind(pipe);
-                }
+                FILE* pipe = CreateInputStreamWithData(key_bluetooth_mac);
                 return pipe;
             }));
 
@@ -2729,11 +2734,7 @@ TEST_F(SystemServicesTest, getDeviceInfoSuccess_onBluetoothMacWithNoMacPattern)
                 // Script returns a string that contains no valid MAC pattern.
                 // The fallback should return this trimmed string as-is.
                 const char key_bluetooth_mac[] = "NOT_A_MAC\n";
-                FILE* pipe = tmpfile();
-                if (pipe != nullptr) {
-                    fwrite(key_bluetooth_mac, 1, strlen(key_bluetooth_mac), pipe);
-                    rewind(pipe);
-                }
+                FILE* pipe = CreateInputStreamWithData(key_bluetooth_mac);
                 return pipe;
             }));
 
@@ -4018,12 +4019,7 @@ TEST_F(SystemServicesEventTest, onMacAddressesRetrieved)
                     valueToReturn = "00:00:00:00:00:00";
                 }
                 if (valueToReturn != NULL) {
-                    FILE* pipe = tmpfile();
-                    if (pipe != nullptr) {
-                        fwrite(valueToReturn, 1, strlen(valueToReturn), pipe);
-                        rewind(pipe);
-                    }
-                    return pipe;
+                    return CreateInputStreamWithData(valueToReturn);
                 } else {
                     const char* str = static_cast<const char*>(strFmt);
                     return __real_popen(str, type);
