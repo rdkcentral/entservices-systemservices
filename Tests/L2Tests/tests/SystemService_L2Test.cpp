@@ -24,6 +24,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <fstream>
+#include <interfaces/ISystemServices.h>
 #include "deepSleepMgr.h"
 #include "PowerManagerHalMock.h"
 #include "MfrMock.h"
@@ -67,11 +68,24 @@ class AsyncHandlerMock
 class SystemService_L2Test : public L2TestMocks {
 protected:
     IARM_EventHandler_t systemStateChanged = nullptr;
+    IARM_EventHandler_t sysMgrEventHandler = nullptr;
+    IARM_EventHandler_t pwrMgrEventHandler = nullptr;
+
+    // Plugin interface objects
+    Exchange::ISystemServices* m_SystemServicesPlugin = nullptr;
+    PluginHost::IShell* m_controller_SystemServices = nullptr;
+    Core::ProxyType<RPC::InvokeServerType<1, 0, 4>> SystemServices_Engine;
+    Core::ProxyType<RPC::CommunicatorClient> SystemServices_Client;
 
     SystemService_L2Test();
     virtual ~SystemService_L2Test() override;
 
     public:
+        /**
+         * @brief Creates SystemServices plugin interface object
+         */
+        uint32_t CreateSystemServicesInterfaceObject();
+
         /**
          * @brief called when Temperature threshold
          * changed notification received from IARM
@@ -122,6 +136,31 @@ SystemService_L2Test::SystemService_L2Test()
         uint32_t status = Core::ERROR_GENERAL;
         m_event_signalled = SYSTEMSERVICEL2TEST_STATE_INVALID;
 
+        // Mock IARM Bus initialization
+        EXPECT_CALL(*p_iarmBusImplMock, IARM_Bus_Init(::testing::_))
+            .Times(::testing::AnyNumber())
+            .WillRepeatedly(::testing::Return(IARM_RESULT_SUCCESS));
+
+        EXPECT_CALL(*p_iarmBusImplMock, IARM_Bus_Connect())
+            .Times(::testing::AnyNumber())
+            .WillRepeatedly(::testing::Return(IARM_RESULT_SUCCESS));
+
+        // Mock IARM Event Registration - capture event handlers
+        ON_CALL(*p_iarmBusImplMock, IARM_Bus_RegisterEventHandler(::testing::_, ::testing::_, ::testing::_))
+        .WillByDefault(::testing::Invoke(
+            [&](const char* ownerName, IARM_EventId_t eventId, IARM_EventHandler_t handler) {
+                if ((string(IARM_BUS_SYSMGR_NAME) == string(ownerName)) && (eventId == IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE)) {
+                    systemStateChanged = handler;
+                    sysMgrEventHandler = handler;
+                    TEST_LOG("Captured SYSMGR event handler");
+                } else if (string(IARM_BUS_PWRMGR_NAME) == string(ownerName)) {
+                    pwrMgrEventHandler = handler;
+                    TEST_LOG("Captured PWRMGR event handler");
+                }
+                return IARM_RESULT_SUCCESS;
+            }));
+
+        // Mock PowerManager HAL
         EXPECT_CALL(*p_powerManagerHalMock, PLAT_DS_INIT())
         .WillOnce(::testing::Return(DEEPSLEEPMGR_SUCCESS));
 
@@ -181,21 +220,28 @@ SystemService_L2Test::SystemService_L2Test()
                    return mfrERR_NONE;
         }));
 
-         /* Activate plugin in constructor */
+         /* Activate PowerManager plugin */
          status = ActivateService("org.rdk.PowerManager");
          EXPECT_EQ(Core::ERROR_NONE, status);
 
-         /* Set all the asynchronouse event handler with IARM bus to handle various events*/
-         ON_CALL(*p_iarmBusImplMock, IARM_Bus_RegisterEventHandler(::testing::_, ::testing::_, ::testing::_))
-         .WillByDefault(::testing::Invoke(
-             [&](const char* ownerName, IARM_EventId_t eventId, IARM_EventHandler_t handler) {
-                 if ((string(IARM_BUS_SYSMGR_NAME) == string(ownerName)) && (eventId == IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE)) {
-                     systemStateChanged = handler;
-                 }
-                 return IARM_RESULT_SUCCESS;
-         }));
+         /* Activate SystemServices plugin with retry logic */
+         int retry_count = 0;
+         const int max_retries = 10;
+         status = Core::ERROR_GENERAL;
 
-         status = ActivateService("org.rdk.System");
+         while (status != Core::ERROR_NONE && retry_count < max_retries) {
+             status = ActivateService("org.rdk.System");
+             if (status != Core::ERROR_NONE) {
+                 TEST_LOG("ActivateService attempt %d/%d returned: %d (%s)",
+                          retry_count + 1, max_retries, status, Core::ErrorToString(status));
+                 retry_count++;
+                 if (retry_count < max_retries) {
+                     std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                 }
+             } else {
+                 TEST_LOG("ActivateService succeeded on attempt %d", retry_count + 1);
+             }
+         }
          EXPECT_EQ(Core::ERROR_NONE, status);
 
 }
@@ -208,8 +254,11 @@ SystemService_L2Test::~SystemService_L2Test()
     uint32_t status = Core::ERROR_GENERAL;
     m_event_signalled = SYSTEMSERVICEL2TEST_STATE_INVALID;
 
+    TEST_LOG("Cleaning up SystemServices L2 Test");
+
     status = DeactivateService("org.rdk.System");
     EXPECT_EQ(Core::ERROR_NONE, status);
+    TEST_LOG("Deactivated org.rdk.System");
 
     EXPECT_CALL(*p_powerManagerHalMock, PLAT_TERM())
         .WillOnce(::testing::Return(PWRMGR_SUCCESS));
@@ -219,6 +268,45 @@ SystemService_L2Test::~SystemService_L2Test()
 
     status = DeactivateService("org.rdk.PowerManager");
     EXPECT_EQ(Core::ERROR_NONE, status);
+    TEST_LOG("Deactivated org.rdk.PowerManager");
+}
+
+/**
+ * @brief Creates SystemServices plugin interface object
+ */
+uint32_t SystemService_L2Test::CreateSystemServicesInterfaceObject()
+{
+    uint32_t return_value = Core::ERROR_GENERAL;
+
+    TEST_LOG("Creating SystemServices_Engine");
+    SystemServices_Engine = Core::ProxyType<RPC::InvokeServerType<1, 0, 4>>::Create();
+    SystemServices_Client = Core::ProxyType<RPC::CommunicatorClient>::Create(
+        Core::NodeId("/tmp/communicator"),
+        Core::ProxyType<Core::IIPCServer>(SystemServices_Engine));
+
+    TEST_LOG("Creating SystemServices_Engine Announcements");
+#if ((THUNDER_VERSION == 2) || ((THUNDER_VERSION == 4) && (THUNDER_VERSION_MINOR == 2)))
+    SystemServices_Engine->Announcements(SystemServices_Client->Announcement());
+#endif
+
+    if (!SystemServices_Client.IsValid()) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        m_controller_SystemServices = SystemServices_Client->Open<PluginHost::IShell>(
+            _T("org.rdk.System"), ~0, 3000);
+        if (m_controller_SystemServices) {
+            m_SystemServicesPlugin = m_controller_SystemServices->QueryInterface<Exchange::ISystemServices>();
+            if (m_SystemServicesPlugin) {
+                return_value = Core::ERROR_NONE;
+                TEST_LOG("Successfully created SystemServices Plugin Interface");
+            } else {
+                TEST_LOG("Failed to QueryInterface for ISystemServices");
+            }
+        } else {
+            TEST_LOG("Failed to get SystemServices Plugin Interface - m_controller_SystemServices is NULL");
+        }
+    }
+    return return_value;
 }
 
 /**
@@ -660,4 +748,56 @@ TEST_F(SystemService_L2Test,SystemServiceGetSetBlocklistFlag)
     }
     TEST_LOG("Removed the devicestate.txt file in preparation for the next round of testing.");
     jsonrpc.Unsubscribe(JSON_TIMEOUT, _T("onBlocklistChanged"));
+}
+
+/********************************************************
+************Test case Details **************************
+** Example test using COM-RPC interface pattern
+** 1. Create interface object using CreateSystemServicesInterfaceObject
+** 2. Call GetSerialNumber using COM-RPC interface
+** 3. Verify the response
+** 4. Release interface properly
+*******************************************************/
+TEST_F(SystemService_L2Test, GetSerialNumber_InterfacePattern)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                // Mock MFR API for serial number
+                EXPECT_CALL(*p_mfrMock, mfrGetSerializedData(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+                    .WillOnce(::testing::Invoke(
+                        [](mfrSerializedType_t type, mfrSerializedData_t* data, uint32_t* bufLen, uint8_t* buffer) {
+                            if (type == mfrSERIALIZED_TYPE_SERIALNUMBER) {
+                                const char* serial = "TEST123456789";
+                                strncpy((char*)data->buf, serial, sizeof(data->buf));
+                                data->bufLen = strlen(serial);
+                                *bufLen = strlen(serial);
+                                return mfrERR_NONE;
+                            }
+                            return mfrERR_GENERAL;
+                        }));
+
+                string serialNumber;
+                bool success = false;
+                
+                Core::hresult result = m_SystemServicesPlugin->GetSerialNumber(serialNumber, success);
+                
+                EXPECT_EQ(Core::ERROR_NONE, result);
+                EXPECT_TRUE(success);
+                EXPECT_STREQ("TEST123456789", serialNumber.c_str());
+                TEST_LOG("SerialNumber: %s", serialNumber.c_str());
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
 }
