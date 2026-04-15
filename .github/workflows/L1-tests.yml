@@ -6,7 +6,7 @@ on:
       caller_source:
         description: "Specifies the source type (e.g., local or test framework) for the workflow."
         required: true
-        type: string
+        type: string  
     secrets:
       RDKCM_RDKE:
         required: true
@@ -359,7 +359,6 @@ jobs:
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmmgrs-hal
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/ccec/drivers
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/network
-          -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systimerifc
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests
           -I$GITHUB_WORKSPACE/entservices-systemservices/helpers
           -I$GITHUB_WORKSPACE/install/usr/include
@@ -420,7 +419,6 @@ jobs:
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmmgrs-hal
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/ccec/drivers
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/network
-          -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systimerifc
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests
           -I$GITHUB_WORKSPACE/entservices-systemservices/helpers
           -I$GITHUB_WORKSPACE/install/usr/include
@@ -501,7 +499,6 @@ jobs:
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmmgrs-hal
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/ccec/drivers
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/network
-          -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systimerifc
           -I$GITHUB_WORKSPACE/entservices-systemservices/helpers
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests
           -I$GITHUB_WORKSPACE/Thunder/Source
