@@ -687,6 +687,7 @@ TEST_F(SystemService_L2Test,SystemServiceGetSetBlocklistFlag)
     JsonObject params;
     JsonObject result;
     std::string message;
+    uint32_t signalled = SYSTEMSERVICEL2TEST_STATE_INVALID;
     JsonObject expected_status;
     uint32_t file_status = -1;
 
