@@ -301,6 +301,7 @@ jobs:
           systemaudioplatform.h
           gdialservice.h
           gdialservicecommon.h
+          systimerifc/itimermsg.h
           &&
           cp -r /usr/include/gstreamer-1.0/gst /usr/include/glib-2.0/* /usr/lib/x86_64-linux-gnu/glib-2.0/include/* /usr/local/include/trower-base64/base64.h /usr/include/libdrm/drm.h /usr/include/libdrm/drm_mode.h /usr/include/xf86drm.h .
 
@@ -357,6 +358,7 @@ jobs:
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmmgrs-hal
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/ccec/drivers
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/network
+          -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systimerifc
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests
           -I$GITHUB_WORKSPACE/entservices-systemservices/helpers
           -I$GITHUB_WORKSPACE/install/usr/include
@@ -417,6 +419,7 @@ jobs:
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmmgrs-hal
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/ccec/drivers
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/network
+          -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systimerifc
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests
           -I$GITHUB_WORKSPACE/entservices-systemservices/helpers
           -I$GITHUB_WORKSPACE/install/usr/include
@@ -497,6 +500,7 @@ jobs:
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmmgrs-hal
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/ccec/drivers
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/network
+          -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systimerifc
           -I$GITHUB_WORKSPACE/entservices-systemservices/helpers
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests
           -I$GITHUB_WORKSPACE/Thunder/Source
