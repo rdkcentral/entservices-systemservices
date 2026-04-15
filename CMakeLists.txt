@@ -25,15 +25,13 @@ find_package(WPEFramework)
 # are located in the cmake directory. Include it in the search.
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/")
 
+set(BUILD_ENABLE_SYSTIMEMGR_SUPPORT ON)
+
 # This configuration enables generation of Test binaries which can be used to test respective plugins.
 option(TESTBINARIES "Generate plugin specific test binaries" OFF)
 if(TESTBINARIES)
     message(INFO "Enabling test binaries")
     add_subdirectory(Tests)
-endif()
-
-if(RDK_SERVICES_L1_TEST)
-    set(BUILD_ENABLE_SYSTIMEMGR_SUPPORT ON CACHE BOOL "Enable System Time Manager Support for L1 tests" FORCE)
 endif()
 
 option(COMCAST_CONFIG "Comcast services configuration" ON)
