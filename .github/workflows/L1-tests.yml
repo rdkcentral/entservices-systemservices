@@ -302,7 +302,8 @@ jobs:
           systemaudioplatform.h
           gdialservice.h
           gdialservicecommon.h
-          systimerifc/itimermsg.h
+          &&
+          echo "typedef struct { char message[256]; char timerSrc[256]; char currentTime[256]; } TimerMsg;" > systimerifc/itimermsg.h
           &&
           cp -r /usr/include/gstreamer-1.0/gst /usr/include/glib-2.0/* /usr/lib/x86_64-linux-gnu/glib-2.0/include/* /usr/local/include/trower-base64/base64.h /usr/include/libdrm/drm.h /usr/include/libdrm/drm_mode.h /usr/include/xf86drm.h .
 
@@ -391,9 +392,10 @@ jobs:
           -DENABLE_DEVICE_MANUFACTURER_INFO
           -DENABLE_SYSTIMEMGR_SUPPORT
           -DIARM_BUS_SYSTIME_MGR_NAME=\"SYSMgr\"
-          -DTIMER_STATUS_MSG=1
+          -DTIMER_STATUS_MSG=\"GetTimeStatus\"
           -DcTIMER_STATUS_UPDATE=0
-          -DcTIMER_STATUS_MESSAGE_LENGTH=256"
+          -DcTIMER_STATUS_MESSAGE_LENGTH=256
+          -DTimerMsg='struct{char message[256];char timerSrc[256];char currentTime[256];}'"
           -D_DRM_MODE_H=ON
           &&
           cmake --build build/mocks -j8
@@ -460,9 +462,10 @@ jobs:
           -DENABLE_DEVICE_MANUFACTURER_INFO
           -DENABLE_SYSTIMEMGR_SUPPORT
           -DIARM_BUS_SYSTIME_MGR_NAME=\\\"SYSMgr\\\"
-          -DTIMER_STATUS_MSG=1
+          -DTIMER_STATUS_MSG=\\\"GetTimeStatus\\\"
           -DcTIMER_STATUS_UPDATE=0
-          -DcTIMER_STATUS_MESSAGE_LENGTH=256"
+          -DcTIMER_STATUS_MESSAGE_LENGTH=256
+          -DTimerMsg='struct{char message[256];char timerSrc[256];char currentTime[256];}'"
           -DCOMCAST_CONFIG=OFF
           -DBUILD_ENABLE_SYSTIMEMGR_SUPPORT=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_DS=ON
