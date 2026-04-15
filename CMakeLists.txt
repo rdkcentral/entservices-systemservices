@@ -32,6 +32,10 @@ if(TESTBINARIES)
     add_subdirectory(Tests)
 endif()
 
+if(RDK_SERVICES_L1_TEST)
+    set(BUILD_ENABLE_SYSTIMEMGR_SUPPORT ON CACHE BOOL "Enable System Time Manager Support for L1 tests" FORCE)
+endif()
+
 option(COMCAST_CONFIG "Comcast services configuration" ON)
 if(COMCAST_CONFIG)
     include(services.cmake)
