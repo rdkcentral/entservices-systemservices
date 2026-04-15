@@ -25,8 +25,6 @@ find_package(WPEFramework)
 # are located in the cmake directory. Include it in the search.
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/")
 
-set(BUILD_ENABLE_SYSTIMEMGR_SUPPORT ON)
-
 # This configuration enables generation of Test binaries which can be used to test respective plugins.
 option(TESTBINARIES "Generate plugin specific test binaries" OFF)
 if(TESTBINARIES)
