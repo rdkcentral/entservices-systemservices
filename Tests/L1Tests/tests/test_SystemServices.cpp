@@ -18,6 +18,10 @@
  */
 
 #include <gtest/gtest.h>
+#include <cstdio>
+#include <cstring>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "SystemServices.h"
 
@@ -46,11 +50,45 @@ static FILE* CreateInputStreamWithData(const char* value)
         return nullptr;
     }
 
-#if defined(__GLIBC__) || defined(__APPLE__)
-    return fmemopen(const_cast<char*>(value), strlen(value), "r");
-#else
-    return nullptr;
-#endif
+    char tmpPath[] = "/tmp/ss_test_XXXXXX";
+
+    const mode_t oldMask = umask(0077);
+    int tmpFd = mkstemp(tmpPath);
+    umask(oldMask);
+
+    if (tmpFd < 0) {
+        return nullptr;
+    }
+
+    if (unlink(tmpPath) != 0) {
+        close(tmpFd);
+        return nullptr;
+    }
+
+    FILE* stream = fdopen(tmpFd, "w+b");
+    if (stream == nullptr) {
+        close(tmpFd);
+        return nullptr;
+    }
+
+    const size_t length = strlen(value);
+    if ((length > 0) && (fwrite(value, 1, length, stream) != length)) {
+        fclose(stream);
+        return nullptr;
+    }
+
+    if (fflush(stream) != 0) {
+        fclose(stream);
+        return nullptr;
+    }
+
+    rewind(stream);
+    if (ferror(stream) != 0) {
+        fclose(stream);
+        return nullptr;
+    }
+
+    return stream;
 }
 
 class SystemServicesTest : public ::testing::Test {
