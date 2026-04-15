@@ -2750,16 +2750,17 @@ TEST_F(SystemServicesTest, getDeviceInfoSuccess_onBluetoothMacWithTrailingEscape
 }
 
 /**
- * @brief : getDeviceInfo returns trimmed raw output for bluetooth_mac when script output
- *          does not contain a valid MAC pattern (no regex match).
- *          The fallback must return the trimmed raw string instead of a fabricated zero MAC.
+ * @brief : getDeviceInfo validates bluetooth_mac across valid and invalid MAC patterns.
+ *          - "12:34:56:78:90:AB" : valid MAC  -> returned as-is.
+ *          - "12:34:56:78:90:A"  : invalid (last octet only 1 hex digit) -> fallback returns trimmed raw string.
+ *          - "12:34:56:78:9G:AB" : invalid (non-hex character 'G') -> fallback returns trimmed raw string.
  * @param[in]   : "params":{"params": "bluetooth_mac"}
- * @return      : {"bluetooth_mac":"NOT_A_MAC","success":true}
+ * @return      : varies per invocation (see EXPECT_EQ assertions below)
  */
-TEST_F(SystemServicesTest, getDeviceInfoSuccess_onBluetoothMacWithNoMacPattern)
+TEST_F(SystemServicesTest, getDeviceInfoSuccess_onBluetoothMacWithInvalidMacPattern)
 {
     EXPECT_CALL(*p_wrapsImplMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_))
-        .Times(1)
+        .Times(3)
         .WillOnce(::testing::Invoke(
             [&](const char* direction, const char* command, va_list args) {
                 va_list args2;
@@ -2769,15 +2770,53 @@ TEST_F(SystemServicesTest, getDeviceInfoSuccess_onBluetoothMacWithNoMacPattern)
                 va_end(args2);
                 EXPECT_EQ(string(strFmt), string(_T("/lib/rdk/getDeviceDetails.sh read bluetooth_mac")));
 
-                // Script returns a string that contains no valid MAC pattern.
-                // The fallback should return this trimmed string as-is.
-                const char key_bluetooth_mac[] = "NOT_A_MAC\n";
+                // Valid MAC address – regex must match and return it as-is.
+                const char key_bluetooth_mac[] = "12:34:56:78:90:AB";
+                FILE* pipe = CreateInputStreamWithData(key_bluetooth_mac);
+                return pipe;
+            }))
+        .WillOnce(::testing::Invoke(
+            [&](const char* direction, const char* command, va_list args) {
+                va_list args2;
+                va_copy(args2, args);
+                char strFmt[256];
+                vsnprintf(strFmt, sizeof(strFmt), command, args2);
+                va_end(args2);
+                EXPECT_EQ(string(strFmt), string(_T("/lib/rdk/getDeviceDetails.sh read bluetooth_mac")));
+
+                // Invalid MAC: last octet has only one hex digit.
+                // No regex match – fallback returns the trimmed raw string.
+                const char key_bluetooth_mac[] = "12:34:56:78:90:A";
+                FILE* pipe = CreateInputStreamWithData(key_bluetooth_mac);
+                return pipe;
+            }))
+        .WillOnce(::testing::Invoke(
+            [&](const char* direction, const char* command, va_list args) {
+                va_list args2;
+                va_copy(args2, args);
+                char strFmt[256];
+                vsnprintf(strFmt, sizeof(strFmt), command, args2);
+                va_end(args2);
+                EXPECT_EQ(string(strFmt), string(_T("/lib/rdk/getDeviceDetails.sh read bluetooth_mac")));
+
+                // Invalid MAC: non-hex character 'G' in fifth octet.
+                // No regex match – fallback returns the trimmed raw string.
+                const char key_bluetooth_mac[] = "12:34:56:78:9G:AB";
                 FILE* pipe = CreateInputStreamWithData(key_bluetooth_mac);
                 return pipe;
             }));
 
+    // Invocation 1 – valid MAC returned unchanged.
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDeviceInfo"), _T("{\"params\":bluetooth_mac}"), response));
-    EXPECT_EQ(response, string("{\"bluetooth_mac\":\"NOT_A_MAC\",\"success\":true}"));
+    EXPECT_EQ(response, string("{\"bluetooth_mac\":\"12:34:56:78:90:AB\",\"success\":true}"));
+
+    // Invocation 2 – invalid MAC (short last octet), fallback raw string.
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDeviceInfo"), _T("{\"params\":bluetooth_mac}"), response));
+    EXPECT_EQ(response, string("{\"bluetooth_mac\":\"12:34:56:78:90:A\",\"success\":true}"));
+
+    // Invocation 3 – invalid MAC (non-hex 'G'), fallback raw string.
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDeviceInfo"), _T("{\"params\":bluetooth_mac}"), response));
+    EXPECT_EQ(response, string("{\"bluetooth_mac\":\"12:34:56:78:9G:AB\",\"success\":true}"));
 }
 
 /**

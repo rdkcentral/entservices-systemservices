@@ -1327,17 +1327,13 @@ namespace WPEFramework {
                         if (std::string::npos != eq)
                         {
                             std::string key = line.substr(0, eq);
-                            std::string rawValue = line.substr(eq + 1);
-                            std::string value;
+                            std::string value = line.substr(eq + 1);
+                            Utils::String::trim(value);
                             if (key == "bluetooth_mac") {
-                                value = extractMacAddress(rawValue);
-                                if (value.empty()) {
-                                    value = std::move(rawValue);
-                                    Utils::String::trim(value);
+                                std::string mac = extractMacAddress(value);
+                                if (!mac.empty()) {
+                                    value = std::move(mac);
                                 }
-                            } else {
-                                value = std::move(rawValue);
-                                Utils::String::trim(value);
                             }
 
                             response[key.c_str()] = value;
@@ -1365,18 +1361,16 @@ namespace WPEFramework {
 #endif
                 } else {
                     retAPIStatus = true;
+                    Utils::String::trim(res);
                     if (queryParams == "bluetooth_mac") {
                         std::string mac = extractMacAddress(res);
                         if (!mac.empty()) {
                             response[queryParams.c_str()] = std::move(mac);
                         } else {
-                            Utils::String::trim(res);
                             response[queryParams.c_str()] = res;
                         }
                     } else {
-                        std::string trimmedRes = std::move(res);
-                        Utils::String::trim(trimmedRes);
-                        response[queryParams.c_str()] = trimmedRes;
+                        response[queryParams.c_str()] = std::move(res);
                     }
                     }
                 }
@@ -2956,20 +2950,13 @@ namespace WPEFramework {
 
                }
 
-                if (macTypeList[i] == "bluetooth_mac") {
+                Utils::String::trim(tempBuffer);
+                if (tempBuffer.empty()) {
+                    tempBuffer = "00:00:00:00:00:00";
+                } else if (macTypeList[i] == "bluetooth_mac") {
                     std::string mac = extractMacAddress(tempBuffer);
                     if (!mac.empty()) {
                         tempBuffer = std::move(mac);
-                    } else {
-                        Utils::String::trim(tempBuffer);
-                        if (tempBuffer.empty()) {
-                            tempBuffer = "00:00:00:00:00:00";
-                        }
-                    }
-                } else {
-                    Utils::String::trim(tempBuffer);
-                    if (tempBuffer.empty()) {
-                        tempBuffer = "00:00:00:00:00:00";
                     }
                 }
                 LOGWARN("resp = %s\n", tempBuffer.c_str());
