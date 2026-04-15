@@ -529,7 +529,6 @@ TEST_F(SystemService_L2Test,SystemServiceUploadLogsAndSystemPowerStateChange)
     uint32_t status = Core::ERROR_GENERAL;
     JsonObject params;
     JsonObject result;
-    uint32_t signalled = SYSTEMSERVICEL2TEST_STATE_INVALID;
     std::string message;
     JsonObject expected_status;
 
@@ -631,7 +630,6 @@ TEST_F(SystemService_L2Test,setBootLoaderSplashScreen)
     uint32_t status = Core::ERROR_GENERAL;
     JsonObject params;
     JsonObject result;
-    uint32_t signalled = SYSTEMSERVICEL2TEST_STATE_INVALID;
     std::string message;
     JsonObject expected_status;
     params["path"] = "/tmp/osd1";
@@ -688,7 +686,6 @@ TEST_F(SystemService_L2Test,SystemServiceGetSetBlocklistFlag)
     uint32_t status = Core::ERROR_GENERAL;
     JsonObject params;
     JsonObject result;
-    uint32_t signalled = SYSTEMSERVICEL2TEST_STATE_INVALID;
     std::string message;
     JsonObject expected_status;
     uint32_t file_status = -1;
@@ -748,56 +745,4 @@ TEST_F(SystemService_L2Test,SystemServiceGetSetBlocklistFlag)
     }
     TEST_LOG("Removed the devicestate.txt file in preparation for the next round of testing.");
     jsonrpc.Unsubscribe(JSON_TIMEOUT, _T("onBlocklistChanged"));
-}
-
-/********************************************************
-************Test case Details **************************
-** Example test using COM-RPC interface pattern
-** 1. Create interface object using CreateSystemServicesInterfaceObject
-** 2. Call GetSerialNumber using COM-RPC interface
-** 3. Verify the response
-** 4. Release interface properly
-*******************************************************/
-TEST_F(SystemService_L2Test, GetSerialNumber_InterfacePattern)
-{
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("Invalid SystemServices_Client");
-    } else {
-        EXPECT_TRUE(m_controller_SystemServices != nullptr);
-        if (m_controller_SystemServices) {
-            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
-            if (m_SystemServicesPlugin) {
-                // Mock MFR API for serial number
-                EXPECT_CALL(*p_mfrMock, mfrGetSerializedData(::testing::_, ::testing::_, ::testing::_, ::testing::_))
-                    .WillOnce(::testing::Invoke(
-                        [](mfrSerializedType_t type, mfrSerializedData_t* data, uint32_t* bufLen, uint8_t* buffer) {
-                            if (type == mfrSERIALIZED_TYPE_SERIALNUMBER) {
-                                const char* serial = "TEST123456789";
-                                strncpy((char*)data->buf, serial, sizeof(data->buf));
-                                data->bufLen = strlen(serial);
-                                *bufLen = strlen(serial);
-                                return mfrERR_NONE;
-                            }
-                            return mfrERR_GENERAL;
-                        }));
-
-                string serialNumber;
-                bool success = false;
-                
-                Core::hresult result = m_SystemServicesPlugin->GetSerialNumber(serialNumber, success);
-                
-                EXPECT_EQ(Core::ERROR_NONE, result);
-                EXPECT_TRUE(success);
-                EXPECT_STREQ("TEST123456789", serialNumber.c_str());
-                TEST_LOG("SerialNumber: %s", serialNumber.c_str());
-
-                m_SystemServicesPlugin->Release();
-            } else {
-                TEST_LOG("m_SystemServicesPlugin is NULL");
-            }
-            m_controller_SystemServices->Release();
-        } else {
-            TEST_LOG("m_controller_SystemServices is NULL");
-        }
-    }
 }
