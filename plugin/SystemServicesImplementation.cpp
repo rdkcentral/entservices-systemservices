@@ -701,6 +701,7 @@ namespace WPEFramework
                     break;
                 }
                 
+#ifdef ENABLE_SYSTIMEMGR_SUPPORT
                 case SYSTEMSERVICES_EVT_ONTIMESTATUSCHANGED:
                 {
                     string timeQuality = params["TimeQuality"].String();
@@ -714,6 +715,7 @@ namespace WPEFramework
                     }
                     break;
                 }
+#endif// ENABLE_SYSTIMEMGR_SUPPORT
                 
                 case SYSTEMSERVICES_EVT_ONMACADDRESSRETRIEVED:
                 {

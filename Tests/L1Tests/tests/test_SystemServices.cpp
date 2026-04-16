@@ -80,6 +80,7 @@ private:
     std::mutex m_mutex;
     std::condition_variable m_condition_variable;
     uint32_t m_event_signalled;
+    mutable uint32_t m_refCount;
 
     // Event-specific data storage
     struct {
@@ -116,12 +117,28 @@ private:
 
 public:
     SystemServicesNotificationHandler() 
-        : m_event_signalled(0) 
+        : m_event_signalled(0)
+        , m_refCount(1)
     {
         memset(&m_eventData, 0, sizeof(m_eventData));
     }
 
     virtual ~SystemServicesNotificationHandler() = default;
+
+    // Reference counting implementation
+    void AddRef() const override
+    {
+        Core::InterlockedIncrement(m_refCount);
+    }
+
+    uint32_t Release() const override
+    {
+        uint32_t result = Core::InterlockedDecrement(m_refCount);
+        if (result == 0) {
+            delete const_cast<SystemServicesNotificationHandler*>(this);
+        }
+        return result;
+    }
 
     // Notification interface methods
     void OnFirmwareUpdateInfoReceived(const Exchange::ISystemServices::FirmwareUpdateInfo& firmwareUpdateInfo) override
