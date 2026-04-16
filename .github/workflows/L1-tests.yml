@@ -684,6 +684,7 @@ jobs:
           lcov -c
           -o coverage.info
           -d build/entservices-systemservices
+          -d $GITHUB_WORKSPACE/entservices-systemservices/plugin
           &&
           lcov
           -r coverage.info
