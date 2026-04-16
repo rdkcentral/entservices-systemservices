@@ -734,16 +734,15 @@ INSTANTIATE_TEST_SUITE_P(
     )
 );
 #endif
-TEST_F(SystemServicesTest, GetTimeStatus_NotSupported)
+TEST_F(SystemServicesTest, GetTimeStatus_Success)
 {
-    // Remove the duplicate GetTimeStatus_Success test - getTimeStatus is not supported
-    // getTimeStatus is not supported according to implementation
+    // getTimeStatus is now supported with ENABLE_SYSTIMEMGR_SUPPORT enabled
     uint32_t result = handler.Invoke(connection, _T("getTimeStatus"), _T("{}"), response);
     
-    // The implementation logs "SystemService GetTimeStatus not supported" and returns ERROR_GENERAL
-    EXPECT_EQ(Core::ERROR_GENERAL, result) << "GetTimeStatus should return ERROR_GENERAL as it's not supported";
+    // The IARM mock returns SUCCESS, so GetTimeStatus should return ERROR_NONE
+    EXPECT_EQ(Core::ERROR_NONE, result) << "GetTimeStatus should return ERROR_NONE when SYSTIMEMGR is enabled";
     
-    TEST_LOG("GetTimeStatus correctly returns not supported - Response: %s", response.c_str());
+    TEST_LOG("GetTimeStatus returned successfully - Response: %s", response.c_str());
 }
 
 TEST_F(SystemServicesTest, GetTimeZoneDST_Success)
@@ -1109,17 +1108,18 @@ TEST_F(SystemServicesTest, UploadLogsAsync_EmptyUrl)
 
 TEST_F(SystemServicesTest, SetBlocklistFlag_InvalidFileWrite)
 {
-    // Test with read-only directory to cause write failure
+    // Test with read-only file to cause write failure
     system("mkdir -p /opt/secure/persistent/opflashstore");
     createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "BLOCKLIST=false");
     system("chmod 444 /opt/secure/persistent/opflashstore/devicestate.txt");
 
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"), _T("{\"blocklist\":true}"), response));
+    // Should return ERROR_GENERAL when file is read-only
+    EXPECT_EQ(Core::ERROR_GENERAL, handler.Invoke(connection, _T("setBlocklistFlag"), _T("{\"blocklist\":true}"), response));
     
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    // Response should be empty on error
+    EXPECT_TRUE(response.empty()) << "Response should be empty when write fails: " << response;
     
-    TEST_LOG("SetBlocklistFlag file write failure test - Response: %s", response.c_str());
+    TEST_LOG("SetBlocklistFlag file write failure test - correctly returned ERROR_GENERAL");
     
     // Cleanup - restore permissions before removing
     system("chmod 644 /opt/secure/persistent/opflashstore/devicestate.txt");
