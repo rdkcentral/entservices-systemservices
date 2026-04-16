@@ -733,7 +733,7 @@ INSTANTIATE_TEST_SUITE_P(
         "CAN"
     )
 );
-#endif
+
 TEST_F(SystemServicesTest, GetTimeStatus_Success)
 {
     // getTimeStatus is now supported with ENABLE_SYSTIMEMGR_SUPPORT enabled
@@ -744,6 +744,7 @@ TEST_F(SystemServicesTest, GetTimeStatus_Success)
     
     TEST_LOG("GetTimeStatus returned successfully - Response: %s", response.c_str());
 }
+#endif
 
 TEST_F(SystemServicesTest, GetTimeZoneDST_Success)
 {
