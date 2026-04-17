@@ -921,6 +921,7 @@ TEST_F(SystemService_L2Test,SystemServiceGetSetBlocklistFlag)
     std::string message;
     JsonObject expected_status;
     uint32_t file_status = -1;
+	uint32_t signalled = SYSTEMSERVICEL2TEST_STATE_INVALID;
 
     /* Register for temperature threshold change event. */
     status = jsonrpc.Subscribe<JsonObject>(JSON_TIMEOUT,
