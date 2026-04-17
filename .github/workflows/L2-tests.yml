@@ -453,7 +453,8 @@ jobs:
           -DUSE_IARMBUS
           -DRDK_SERVICE_L2_TEST
           -DHAS_API_POWERSTATE
-          -DENABLE_THERMAL_PROTECTION"
+          -DENABLE_THERMAL_PROTECTION
+          -DENABLE_SYSTIMEMGR_SUPPORT"
           -DPLUGIN_PERSISTENTSTORE_PATH="/tmp/secure/persistent/rdkservicestore"
           -DPLUGIN_PERSISTENTSTORE_LEGACYPATH="/tmp/persistent/rdkservicestore"
           -DCOMCAST_CONFIG=OFF
