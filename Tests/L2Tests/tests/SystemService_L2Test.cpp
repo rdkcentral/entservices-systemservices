@@ -43,8 +43,237 @@ typedef enum : uint32_t {
     SYSTEMSERVICEL2TEST_THERMALSTATE_CHANGED=0x00000002,
     SYSTEMSERVICEL2TEST_LOGUPLOADSTATE_CHANGED=0x00000004,
     SYSTEMSERVICEL2TEST_BLOCKLIST_CHANGED=0x00000008,
+    SYSTEMSERVICEL2TEST_FIRMWARE_UPDATE_INFO = 0x00000010,
+    SYSTEMSERVICEL2TEST_REBOOT_REQUEST = 0x00000020,
+    SYSTEMSERVICEL2TEST_TERRITORY_CHANGED = 0x00000040,
+    SYSTEMSERVICEL2TEST_FRIENDLY_NAME_CHANGED = 0x00000080,
+    SYSTEMSERVICEL2TEST_SYSTEM_MODE_CHANGED = 0x00000100,
+    SYSTEMSERVICEL2TEST_NETWORK_STANDBY_CHANGED = 0x00000200,
     SYSTEMSERVICEL2TEST_STATE_INVALID = 0x00000000
 }SystemServiceL2test_async_events_t;
+
+/**
+ * @brief Notification handler class for SystemServices COM-RPC notifications
+ */
+class SystemServicesNotificationHandler : public Exchange::ISystemServices::INotification {
+private:
+    std::mutex m_mutex;
+    std::condition_variable m_condition_variable;
+    uint32_t m_event_signalled;
+    string m_lastPowerState;
+    string m_lastCurrentPowerState;
+    string m_lastFriendlyName;
+    string m_lastMode;
+    string m_lastOldBlocklist;
+    string m_lastNewBlocklist;
+    bool m_lastNwStandby;
+
+public:
+    SystemServicesNotificationHandler()
+        : m_event_signalled(SYSTEMSERVICEL2TEST_STATE_INVALID)
+        , m_lastNwStandby(false)
+    {
+    }
+
+    virtual ~SystemServicesNotificationHandler() = default;
+
+    BEGIN_INTERFACE_MAP(SystemServicesNotificationHandler)
+    INTERFACE_ENTRY(Exchange::ISystemServices::INotification)
+    END_INTERFACE_MAP
+
+    void OnFirmwareUpdateInfoReceived(const Exchange::ISystemServices::FirmwareUpdateInfo& firmwareUpdateInfo) override
+    {
+        TEST_LOG("OnFirmwareUpdateInfoReceived notification received");
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_event_signalled |= SYSTEMSERVICEL2TEST_FIRMWARE_UPDATE_INFO;
+        m_condition_variable.notify_one();
+    }
+
+    void OnRebootRequest(const string& requestedApp, const string& rebootReason) override
+    {
+        TEST_LOG("OnRebootRequest notification received");
+        TEST_LOG("  requestedApp: %s", requestedApp.c_str());
+        TEST_LOG("  rebootReason: %s", rebootReason.c_str());
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_event_signalled |= SYSTEMSERVICEL2TEST_REBOOT_REQUEST;
+        m_condition_variable.notify_one();
+    }
+
+    void OnSystemPowerStateChanged(const string& powerState, const string& currentPowerState) override
+    {
+        TEST_LOG("OnSystemPowerStateChanged notification received");
+        TEST_LOG("  powerState: %s", powerState.c_str());
+        TEST_LOG("  currentPowerState: %s", currentPowerState.c_str());
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_lastPowerState = powerState;
+        m_lastCurrentPowerState = currentPowerState;
+        m_event_signalled |= SYSTEMSERVICEL2TEST_SYSTEMSTATE_CHANGED;
+        m_condition_variable.notify_one();
+    }
+
+    void OnTerritoryChanged(const Exchange::ISystemServices::TerritoryChangedInfo& territoryChangedInfo) override
+    {
+        TEST_LOG("OnTerritoryChanged notification received");
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_event_signalled |= SYSTEMSERVICEL2TEST_TERRITORY_CHANGED;
+        m_condition_variable.notify_one();
+    }
+
+    void OnTimeZoneDSTChanged(const Exchange::ISystemServices::TimeZoneDSTChangedInfo& timeZoneDSTChangedInfo) override
+    {
+        TEST_LOG("OnTimeZoneDSTChanged notification received");
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_condition_variable.notify_one();
+    }
+
+    void OnMacAddressesRetreived(const Exchange::ISystemServices::MacAddressesInfo& macAddressesInfo) override
+    {
+        TEST_LOG("OnMacAddressesRetreived notification received");
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_condition_variable.notify_one();
+    }
+
+    void OnSystemModeChanged(const string& mode) override
+    {
+        TEST_LOG("OnSystemModeChanged notification received");
+        TEST_LOG("  mode: %s", mode.c_str());
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_lastMode = mode;
+        m_event_signalled |= SYSTEMSERVICEL2TEST_SYSTEM_MODE_CHANGED;
+        m_condition_variable.notify_one();
+    }
+
+    void OnLogUpload(const string& logUploadStatus) override
+    {
+        TEST_LOG("OnLogUpload notification received");
+        TEST_LOG("  logUploadStatus: %s", logUploadStatus.c_str());
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_event_signalled |= SYSTEMSERVICEL2TEST_LOGUPLOADSTATE_CHANGED;
+        m_condition_variable.notify_one();
+    }
+
+    void OnFirmwareUpdateStateChanged(const int firmwareUpdateStateChange) override
+    {
+        TEST_LOG("OnFirmwareUpdateStateChanged notification received");
+        TEST_LOG("  state: %d", firmwareUpdateStateChange);
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_condition_variable.notify_one();
+    }
+
+    void OnTemperatureThresholdChanged(const string& thresholdType, const bool exceeded, const string& temperature) override
+    {
+        TEST_LOG("OnTemperatureThresholdChanged notification received");
+        TEST_LOG("  thresholdType: %s, exceeded: %d, temperature: %s", 
+                 thresholdType.c_str(), exceeded, temperature.c_str());
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_event_signalled |= SYSTEMSERVICEL2TEST_THERMALSTATE_CHANGED;
+        m_condition_variable.notify_one();
+    }
+
+    void OnSystemClockSet() override
+    {
+        TEST_LOG("OnSystemClockSet notification received");
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_condition_variable.notify_one();
+    }
+
+    void OnFirmwarePendingReboot(const int fireFirmwarePendingReboot) override
+    {
+        TEST_LOG("OnFirmwarePendingReboot notification received");
+        TEST_LOG("  seconds: %d", fireFirmwarePendingReboot);
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_condition_variable.notify_one();
+    }
+
+    void OnFriendlyNameChanged(const string& friendlyName) override
+    {
+        TEST_LOG("OnFriendlyNameChanged notification received");
+        TEST_LOG("  friendlyName: %s", friendlyName.c_str());
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_lastFriendlyName = friendlyName;
+        m_event_signalled |= SYSTEMSERVICEL2TEST_FRIENDLY_NAME_CHANGED;
+        m_condition_variable.notify_one();
+    }
+
+    void OnDeviceMgtUpdateReceived(const string& source, const string& type, const bool success) override
+    {
+        TEST_LOG("OnDeviceMgtUpdateReceived notification received");
+        TEST_LOG("  source: %s, type: %s, success: %d", source.c_str(), type.c_str(), success);
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_condition_variable.notify_one();
+    }
+
+    void OnBlocklistChanged(const string& oldBlocklistFlag, const string& newBlocklistFlag) override
+    {
+        TEST_LOG("OnBlocklistChanged notification received");
+        TEST_LOG("  oldBlocklistFlag: %s, newBlocklistFlag: %s", 
+                 oldBlocklistFlag.c_str(), newBlocklistFlag.c_str());
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_lastOldBlocklist = oldBlocklistFlag;
+        m_lastNewBlocklist = newBlocklistFlag;
+        m_event_signalled |= SYSTEMSERVICEL2TEST_BLOCKLIST_CHANGED;
+        m_condition_variable.notify_one();
+    }
+
+    void OnTimeStatusChanged(const string& TimeQuality, const string& TimeSrc, const string& Time) override
+    {
+        TEST_LOG("OnTimeStatusChanged notification received");
+        TEST_LOG("  TimeQuality: %s, TimeSrc: %s, Time: %s", 
+                 TimeQuality.c_str(), TimeSrc.c_str(), Time.c_str());
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_condition_variable.notify_one();
+    }
+
+    void OnNetworkStandbyModeChanged(const bool nwStandby) override
+    {
+        TEST_LOG("OnNetworkStandbyModeChanged notification received");
+        TEST_LOG("  nwStandby: %s", nwStandby ? "true" : "false");
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_lastNwStandby = nwStandby;
+        m_event_signalled |= SYSTEMSERVICEL2TEST_NETWORK_STANDBY_CHANGED;
+        m_condition_variable.notify_one();
+    }
+
+    uint32_t WaitForEvent(uint32_t timeout_ms, SystemServiceL2test_async_events_t expected_status)
+    {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        auto now = std::chrono::system_clock::now();
+        
+        if (m_condition_variable.wait_until(lock, now + std::chrono::milliseconds(timeout_ms),
+            [this, expected_status]() { return (m_event_signalled & expected_status) != 0; })) {
+            return m_event_signalled;
+        }
+        
+        TEST_LOG("Timeout waiting for event 0x%08X, got 0x%08X", expected_status, m_event_signalled);
+        return SYSTEMSERVICEL2TEST_STATE_INVALID;
+    }
+
+    void ResetEvent()
+    {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_event_signalled = SYSTEMSERVICEL2TEST_STATE_INVALID;
+    }
+
+    string GetLastPowerState() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_lastPowerState;
+    }
+
+    string GetLastFriendlyName() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_lastFriendlyName;
+    }
+
+    string GetLastMode() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_lastMode;
+    }
+
+    bool GetLastNwStandby() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_lastNwStandby;
+    }
+};
 /**
  * @brief Internal test mock class
  *
@@ -76,6 +305,7 @@ protected:
     PluginHost::IShell* m_controller_SystemServices = nullptr;
     Core::ProxyType<RPC::InvokeServerType<1, 0, 4>> SystemServices_Engine;
     Core::ProxyType<RPC::CommunicatorClient> SystemServices_Client;
+    Core::Sink<SystemServicesNotificationHandler> m_notificationHandler;
 
     SystemService_L2Test();
     virtual ~SystemService_L2Test() override;
@@ -529,6 +759,7 @@ TEST_F(SystemService_L2Test,SystemServiceUploadLogsAndSystemPowerStateChange)
     uint32_t status = Core::ERROR_GENERAL;
     JsonObject params;
     JsonObject result;
+    // uint32_t signalled = SYSTEMSERVICEL2TEST_STATE_INVALID;
     std::string message;
     JsonObject expected_status;
 
@@ -630,6 +861,7 @@ TEST_F(SystemService_L2Test,setBootLoaderSplashScreen)
     uint32_t status = Core::ERROR_GENERAL;
     JsonObject params;
     JsonObject result;
+    // uint32_t signalled = SYSTEMSERVICEL2TEST_STATE_INVALID;
     std::string message;
     JsonObject expected_status;
     params["path"] = "/tmp/osd1";
@@ -687,7 +919,6 @@ TEST_F(SystemService_L2Test,SystemServiceGetSetBlocklistFlag)
     JsonObject params;
     JsonObject result;
     std::string message;
-    uint32_t signalled = SYSTEMSERVICEL2TEST_STATE_INVALID;
     JsonObject expected_status;
     uint32_t file_status = -1;
 
@@ -747,3 +978,685 @@ TEST_F(SystemService_L2Test,SystemServiceGetSetBlocklistFlag)
     TEST_LOG("Removed the devicestate.txt file in preparation for the next round of testing.");
     jsonrpc.Unsubscribe(JSON_TIMEOUT, _T("onBlocklistChanged"));
 }
+
+/********************************************************
+************Test case Details **************************
+** COM-RPC Interface Tests
+** Testing SystemServices APIs via COM-RPC interface
+*******************************************************/
+
+TEST_F(SystemService_L2Test, GetSerialNumber_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetSerialNumber via COM-RPC");
+
+                string serialNumber;
+                bool success = false;
+
+                uint32_t result = m_SystemServicesPlugin->GetSerialNumber(serialNumber, success);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+                EXPECT_TRUE(success);
+
+                TEST_LOG("SerialNumber: %s", serialNumber.c_str());
+                EXPECT_FALSE(serialNumber.empty());
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, GetFriendlyName_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetFriendlyName via COM-RPC");
+
+                string friendlyName;
+                bool success = false;
+
+                uint32_t result = m_SystemServicesPlugin->GetFriendlyName(friendlyName, success);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+                EXPECT_TRUE(success);
+
+                TEST_LOG("FriendlyName: %s", friendlyName.c_str());
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, GetNetworkStandbyMode_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetNetworkStandbyMode via COM-RPC");
+
+                bool nwStandby = false;
+                bool success = false;
+
+                uint32_t result = m_SystemServicesPlugin->GetNetworkStandbyMode(nwStandby, success);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+                EXPECT_TRUE(success);
+
+                TEST_LOG("NetworkStandbyMode: %s", nwStandby ? "Enabled" : "Disabled");
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, GetBuildType_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetBuildType via COM-RPC");
+
+                string buildType;
+                bool success = false;
+
+                uint32_t result = m_SystemServicesPlugin->GetBuildType(buildType, success);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+                EXPECT_TRUE(success);
+
+                TEST_LOG("BuildType: %s", buildType.c_str());
+                EXPECT_FALSE(buildType.empty());
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, RequestSystemUptime_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing RequestSystemUptime via COM-RPC");
+
+                string systemUptime;
+                bool success = false;
+
+                uint32_t result = m_SystemServicesPlugin->RequestSystemUptime(systemUptime, success);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+                EXPECT_TRUE(success);
+
+                TEST_LOG("SystemUptime: %s", systemUptime.c_str());
+                EXPECT_FALSE(systemUptime.empty());
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+/********************************************************
+************Test case Details **************************
+** JSON-RPC Interface Tests
+** Testing SystemServices APIs via JSON-RPC interface
+*******************************************************/
+
+TEST_F(SystemService_L2Test, GetSerialNumber_JSONRPC)
+{
+    TEST_LOG("Testing getSerialNumber via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getSerialNumber", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+
+    EXPECT_TRUE(result.HasLabel("serialNumber"));
+    if (result.HasLabel("serialNumber")) {
+        string serialNumber = result["serialNumber"].String();
+        TEST_LOG("  serialNumber: %s", serialNumber.c_str());
+        EXPECT_FALSE(serialNumber.empty());
+    }
+}
+
+TEST_F(SystemService_L2Test, GetFriendlyName_JSONRPC)
+{
+    TEST_LOG("Testing getFriendlyName via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getFriendlyName", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+
+    EXPECT_TRUE(result.HasLabel("friendlyName"));
+    if (result.HasLabel("friendlyName")) {
+        string friendlyName = result["friendlyName"].String();
+        TEST_LOG("  friendlyName: %s", friendlyName.c_str());
+    }
+}
+
+TEST_F(SystemService_L2Test, SetFriendlyName_JSONRPC)
+{
+    TEST_LOG("Testing setFriendlyName via JSON-RPC");
+
+    JsonObject params;
+    params["friendlyName"] = "TestDevice_L2";
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setFriendlyName", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+        TEST_LOG("  setFriendlyName succeeded");
+    }
+}
+
+TEST_F(SystemService_L2Test, GetNetworkStandbyMode_JSONRPC)
+{
+    TEST_LOG("Testing getNetworkStandbyMode via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getNetworkStandbyMode", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+
+    EXPECT_TRUE(result.HasLabel("nwStandby"));
+    if (result.HasLabel("nwStandby")) {
+        bool nwStandby = result["nwStandby"].Boolean();
+        TEST_LOG("  nwStandby: %s", nwStandby ? "true" : "false");
+    }
+}
+
+TEST_F(SystemService_L2Test, RequestSystemUptime_JSONRPC)
+{
+    TEST_LOG("Testing requestSystemUptime via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "requestSystemUptime", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+
+    EXPECT_TRUE(result.HasLabel("systemUptime"));
+    if (result.HasLabel("systemUptime")) {
+        string uptime = result["systemUptime"].String();
+        TEST_LOG("  systemUptime: %s", uptime.c_str());
+        EXPECT_FALSE(uptime.empty());
+    }
+}
+
+TEST_F(SystemService_L2Test, GetBuildType_JSONRPC)
+{
+    TEST_LOG("Testing getBuildType via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getBuildType", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+
+    EXPECT_TRUE(result.HasLabel("buildType"));
+    if (result.HasLabel("buildType")) {
+        string buildType = result["buildType"].String();
+        TEST_LOG("  buildType: %s", buildType.c_str());
+        EXPECT_FALSE(buildType.empty());
+    }
+}
+
+TEST_F(SystemService_L2Test, GetSystemVersions_JSONRPC)
+{
+    TEST_LOG("Testing getSystemVersions via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getSystemVersions", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    EXPECT_TRUE(result.HasLabel("stbVersion"));
+    if (result.HasLabel("stbVersion")) {
+        string stbVersion = result["stbVersion"].String();
+        TEST_LOG("  stbVersion: %s", stbVersion.c_str());
+    }
+
+    EXPECT_TRUE(result.HasLabel("receiverVersion"));
+    if (result.HasLabel("receiverVersion")) {
+        string receiverVersion = result["receiverVersion"].String();
+        TEST_LOG("  receiverVersion: %s", receiverVersion.c_str());
+    }
+
+    EXPECT_TRUE(result.HasLabel("stbTimestamp"));
+    if (result.HasLabel("stbTimestamp")) {
+        string stbTimestamp = result["stbTimestamp"].String();
+        TEST_LOG("  stbTimestamp: %s", stbTimestamp.c_str());
+    }
+}
+
+TEST_F(SystemService_L2Test, GetTerritory_JSONRPC)
+{
+    TEST_LOG("Testing getTerritory via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getTerritory", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+
+    EXPECT_TRUE(result.HasLabel("territory"));
+    if (result.HasLabel("territory")) {
+        string territory = result["territory"].String();
+        TEST_LOG("  territory: %s", territory.c_str());
+    }
+
+    if (result.HasLabel("region")) {
+        string region = result["region"].String();
+        TEST_LOG("  region: %s", region.c_str());
+    }
+}
+
+TEST_F(SystemService_L2Test, IsOptOutTelemetry_JSONRPC)
+{
+    TEST_LOG("Testing isOptOutTelemetry via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "isOptOutTelemetry", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+
+    EXPECT_TRUE(result.HasLabel("Opt-Out"));
+    if (result.HasLabel("Opt-Out")) {
+        bool optOut = result["Opt-Out"].Boolean();
+        TEST_LOG("  Opt-Out: %s", optOut ? "true" : "false");
+    }
+}
+
+TEST_F(SystemService_L2Test, GetFSRFlag_JSONRPC)
+{
+    TEST_LOG("Testing getFSRFlag via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getFSRFlag", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+
+    EXPECT_TRUE(result.HasLabel("fsrFlag"));
+    if (result.HasLabel("fsrFlag")) {
+        bool fsrFlag = result["fsrFlag"].Boolean();
+        TEST_LOG("  fsrFlag: %s", fsrFlag ? "true" : "false");
+    }
+}
+
+/********************************************************
+************Test case Details **************************
+** COM-RPC Notification Tests
+** Testing SystemServices notification interface
+*******************************************************/
+
+#define EVNT_TIMEOUT (5000)
+
+TEST_F(SystemService_L2Test, RegisterUnregister_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing Register and Unregister via COM-RPC");
+
+                // Register for notifications
+                uint32_t result = m_SystemServicesPlugin->Register(&m_notificationHandler);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "Register returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                } else {
+                    TEST_LOG("Successfully registered for notifications");
+                }
+
+                // Unregister from notifications
+                result = m_SystemServicesPlugin->Unregister(&m_notificationHandler);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "Unregister returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                } else {
+                    TEST_LOG("Successfully unregistered from notifications");
+                }
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, OnSystemPowerStateChanged_Notification_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing OnSystemPowerStateChanged notification via COM-RPC");
+
+                // Register for event notifications
+                uint32_t result = m_SystemServicesPlugin->Register(&m_notificationHandler);
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "Register returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                } else {
+                    TEST_LOG("Successfully registered for notifications");
+                }
+
+                // Reset event flag before triggering the event
+                m_notificationHandler.ResetEvent();
+
+                // Trigger the event
+                if (pwrMgrEventHandler != nullptr) {
+                    TEST_LOG("Triggering power state change event");
+
+                    IARM_Bus_PWRMgr_EventData_t eventData;
+                    eventData.data.state.curState = IARM_BUS_PWRMGR_POWERSTATE_STANDBY;
+                    eventData.data.state.newState = IARM_BUS_PWRMGR_POWERSTATE_ON;
+
+                    pwrMgrEventHandler(IARM_BUS_PWRMGR_NAME, IARM_BUS_PWRMGR_EVENT_MODECHANGED, &eventData, 0);
+
+                    // Wait for the event notification with timeout
+                    uint32_t eventStatus = m_notificationHandler.WaitForEvent(EVNT_TIMEOUT, SYSTEMSERVICEL2TEST_SYSTEMSTATE_CHANGED);
+
+                    EXPECT_NE(eventStatus, SYSTEMSERVICEL2TEST_STATE_INVALID);
+                    if (eventStatus != SYSTEMSERVICEL2TEST_STATE_INVALID) {
+                        TEST_LOG("OnSystemPowerStateChanged notification received successfully");
+
+                        string powerState = m_notificationHandler.GetLastPowerState();
+                        TEST_LOG("Received powerState: %s", powerState.c_str());
+                        EXPECT_FALSE(powerState.empty());
+                    } else {
+                        TEST_LOG("Timeout waiting for OnSystemPowerStateChanged notification");
+                    }
+                } else {
+                    TEST_LOG("pwrMgrEventHandler is NULL, cannot trigger event");
+                }
+
+                // Unregister from notifications
+                result = m_SystemServicesPlugin->Unregister(&m_notificationHandler);
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result == Core::ERROR_NONE) {
+                    TEST_LOG("Successfully unregistered from notifications");
+                }
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, OnSystemModeChanged_Notification_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing OnSystemModeChanged notification via COM-RPC");
+
+                // Register for event notifications
+                uint32_t result = m_SystemServicesPlugin->Register(&m_notificationHandler);
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result == Core::ERROR_NONE) {
+                    TEST_LOG("Successfully registered for notifications");
+                }
+
+                // Reset event flag before triggering the event
+                m_notificationHandler.ResetEvent();
+
+                // Trigger the event
+                if (sysMgrEventHandler != nullptr) {
+                    TEST_LOG("Triggering system mode change event");
+
+                    IARM_Bus_CommonAPI_SysModeChange_Param_t eventData;
+                    eventData.oldMode = IARM_BUS_SYS_MODE_NORMAL;
+                    eventData.newMode = IARM_BUS_SYS_MODE_WAREHOUSE;
+
+                    sysMgrEventHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, &eventData, sizeof(eventData));
+
+                    // Wait for the event notification with timeout
+                    uint32_t eventStatus = m_notificationHandler.WaitForEvent(EVNT_TIMEOUT, SYSTEMSERVICEL2TEST_SYSTEM_MODE_CHANGED);
+
+                    EXPECT_NE(eventStatus, SYSTEMSERVICEL2TEST_STATE_INVALID);
+                    if (eventStatus != SYSTEMSERVICEL2TEST_STATE_INVALID) {
+                        TEST_LOG("OnSystemModeChanged notification received successfully");
+
+                        string mode = m_notificationHandler.GetLastMode();
+                        TEST_LOG("Received mode: %s", mode.c_str());
+                        EXPECT_FALSE(mode.empty());
+                    } else {
+                        TEST_LOG("Timeout waiting for OnSystemModeChanged notification");
+                    }
+                } else {
+                    TEST_LOG("sysMgrEventHandler is NULL, cannot trigger event");
+                }
+
+                // Unregister from notifications
+                result = m_SystemServicesPlugin->Unregister(&m_notificationHandler);
+                EXPECT_EQ(result, Core::ERROR_NONE);
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, OnBlocklistChanged_Notification_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing OnBlocklistChanged notification via COM-RPC");
+
+                // Register for event notifications
+                uint32_t result = m_SystemServicesPlugin->Register(&m_notificationHandler);
+                EXPECT_EQ(result, Core::ERROR_NONE);
+
+                if (result == Core::ERROR_NONE) {
+                    TEST_LOG("Successfully registered for notifications");
+
+                    // Reset event flag
+                    m_notificationHandler.ResetEvent();
+
+                    // Perform action that triggers blocklist change
+                    // Using JSON-RPC to set blocklist flag
+                    JsonObject params;
+                    params["blocklist"] = true;
+                    JsonObject setResult;
+
+                    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setBlocklistFlag", params, setResult);
+                    if (status == Core::ERROR_NONE) {
+                        TEST_LOG("Set blocklist flag successfully");
+
+                        // Wait for the notification
+                        uint32_t eventStatus = m_notificationHandler.WaitForEvent(EVNT_TIMEOUT, SYSTEMSERVICEL2TEST_BLOCKLIST_CHANGED);
+
+                        EXPECT_NE(eventStatus, SYSTEMSERVICEL2TEST_STATE_INVALID);
+                        if (eventStatus != SYSTEMSERVICEL2TEST_STATE_INVALID) {
+                            TEST_LOG("OnBlocklistChanged notification received successfully");
+                        } else {
+                            TEST_LOG("Timeout waiting for OnBlocklistChanged notification");
+                        }
+                    }
+
+                    // Cleanup
+                    remove("/opt/secure/persistent/opflashstore/devicestate.txt");
+                }
+
+                // Unregister from notifications
+                result = m_SystemServicesPlugin->Unregister(&m_notificationHandler);
+                EXPECT_EQ(result, Core::ERROR_NONE);
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
