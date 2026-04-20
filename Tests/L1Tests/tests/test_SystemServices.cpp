@@ -166,6 +166,14 @@ protected:
     }
     virtual void TearDown() override
     {
+        EXPECT_CALL(PowerManagerMock::Mock(), Unregister(::testing::Matcher<const Exchange::IPowerManager::INetworkStandbyModeChangedNotification*>(::testing::_)))
+            .WillOnce(::testing::Return(Core::ERROR_NONE));
+        EXPECT_CALL(PowerManagerMock::Mock(), Unregister(::testing::Matcher<const Exchange::IPowerManager::IRebootNotification*>(::testing::_)))
+            .WillOnce(::testing::Return(Core::ERROR_NONE));
+        EXPECT_CALL(PowerManagerMock::Mock(), Unregister(::testing::Matcher<const Exchange::IPowerManager::IThermalModeChangedNotification*>(::testing::_)))
+            .WillOnce(::testing::Return(Core::ERROR_NONE));
+        EXPECT_CALL(PowerManagerMock::Mock(), Unregister(::testing::Matcher<const Exchange::IPowerManager::IModeChangedNotification*>(::testing::_)))
+            .WillOnce(::testing::Return(Core::ERROR_NONE));
         plugin->Deinitialize(&service);
     }
 };
