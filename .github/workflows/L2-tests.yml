@@ -213,6 +213,7 @@ jobs:
           headers/rdk/iarmmgrs-hal
           headers/systemservices
           headers/systemservices/proc
+          headers/systimerifc
           &&
           cd headers
           &&
@@ -256,6 +257,7 @@ jobs:
           systemservices/proc/readproc.h
           systemservices/secure_wrapper.h
           systemaudioplatform.h
+          systimerifc/itimermsg.h
           maintenanceMGR.h
           pkg.h
           edid-parser.hpp
