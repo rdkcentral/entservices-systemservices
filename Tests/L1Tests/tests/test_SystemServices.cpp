@@ -454,6 +454,23 @@ protected:
                 return &pluginImpl;
             }));
 
+        ON_CALL(PowerManagerMock::Mock(), Register(::testing::Matcher<Exchange::IPowerManager::INetworkStandbyModeChangedNotification*>(::testing::_)))
+            .WillByDefault(::testing::Return(Core::ERROR_NONE));
+        ON_CALL(PowerManagerMock::Mock(), Register(::testing::Matcher<Exchange::IPowerManager::IRebootNotification*>(::testing::_)))
+            .WillByDefault(::testing::Return(Core::ERROR_NONE));
+        ON_CALL(PowerManagerMock::Mock(), Register(::testing::Matcher<Exchange::IPowerManager::IThermalModeChangedNotification*>(::testing::_)))
+            .WillByDefault(::testing::Return(Core::ERROR_NONE));
+        ON_CALL(PowerManagerMock::Mock(), Register(::testing::Matcher<Exchange::IPowerManager::IModeChangedNotification*>(::testing::_)))
+            .WillByDefault(::testing::Return(Core::ERROR_NONE));
+        ON_CALL(PowerManagerMock::Mock(), Unregister(::testing::Matcher<const Exchange::IPowerManager::INetworkStandbyModeChangedNotification*>(::testing::_)))
+            .WillByDefault(::testing::Return(Core::ERROR_NONE));
+        ON_CALL(PowerManagerMock::Mock(), Unregister(::testing::Matcher<const Exchange::IPowerManager::IRebootNotification*>(::testing::_)))
+            .WillByDefault(::testing::Return(Core::ERROR_NONE));
+        ON_CALL(PowerManagerMock::Mock(), Unregister(::testing::Matcher<const Exchange::IPowerManager::IThermalModeChangedNotification*>(::testing::_)))
+            .WillByDefault(::testing::Return(Core::ERROR_NONE));
+        ON_CALL(PowerManagerMock::Mock(), Unregister(::testing::Matcher<const Exchange::IPowerManager::IModeChangedNotification*>(::testing::_)))
+            .WillByDefault(::testing::Return(Core::ERROR_NONE));
+
 	Core::IWorkerPool::Assign(&(*workerPool));
         workerPool->Run();
 
