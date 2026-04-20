@@ -40,13 +40,7 @@ git clone --branch R4.4.1 https://github.com/rdkcentral/Thunder.git
 
 git clone --branch develop https://github.com/rdkcentral/entservices-apis.git
 
-git clone --branch 1.0.1 https://github.com/rdkcentral/entservices-testframework.git
-
-# Patch readprocMockInterface.h to add PROC_FILLCOM flag and cmdline member required by UtilsProcess.h
-sed -i 's/^#define PROC_FILLSTAT\(.*\)/#define PROC_FILLSTAT\1\n#define PROC_FILLCOM         0x0200 \/\/ fill cmdline/' \
-    entservices-testframework/Tests/mocks/readprocMockInterface.h
-sed -i 's/^} proc_t;/    char **cmdline;\n} proc_t;/' \
-    entservices-testframework/Tests/mocks/readprocMockInterface.h
+git clone --branch topic/RDKEMW-16428 https://github.com/rdkcentral/entservices-testframework.git
 
 ############################
 # Build Thunder-Tools
@@ -143,9 +137,7 @@ touch rdk/iarmmgrs-hal/sysMgr.h
 touch rfcapi.h
 touch telemetry_busmessage_sender.h
 touch secure_wrapper.h
-# readprocMockInterface.h (pre-included via -include) owns all proc_t/PROCTAB definitions.
-# This stub just satisfies the #include <proc/readproc.h> directive without redefining anything.
-echo '#pragma once' > proc/readproc.h
+touch proc/readproc.h
 echo "files created successfully"
 echo "======================================================================================"
 
