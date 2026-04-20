@@ -277,6 +277,18 @@ jobs:
           dsRpc.h
           telemetry_busmessage_sender.h
           &&
+          echo '#ifndef __ITIMERMSG_H__
+          #define __ITIMERMSG_H__
+          #define IARM_BUS_SYSTIME_MGR_NAME "SYSTEMTIME"
+          #define cTIMER_STATUS_UPDATE 0
+          #define TIMER_STATUS_MSG "TimerStatus"
+          #define cTIMER_STATUS_MESSAGE_LENGTH 256
+          typedef struct _TimerMsg {
+              char message[256];
+              int status;
+          } TimerMsg;
+          #endif' > systimerifc/itimermsg.h
+          &&
           cp -r /usr/include/gstreamer-1.0/gst /usr/include/glib-2.0/* /usr/lib/x86_64-linux-gnu/glib-2.0/include/* /usr/local/include/trower-base64/base64.h /usr/include/libdrm/drm.h /usr/include/libdrm/drm_mode.h /usr/include/xf86drm.h .
 
       - name: Set clang toolchain
@@ -426,6 +438,7 @@ jobs:
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmmgrs-hal
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systemservices
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systemservices/proc
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systimerifc
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks
           -I $GITHUB_WORKSPACE/entservices-systemservices/helpers
           -I $GITHUB_WORKSPACE/install/usr/include
