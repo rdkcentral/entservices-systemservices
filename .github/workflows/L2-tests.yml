@@ -290,8 +290,6 @@ jobs:
           #endif' > systimerifc/itimermsg.h
           &&
           cp -r /usr/include/gstreamer-1.0/gst /usr/include/glib-2.0/* /usr/lib/x86_64-linux-gnu/glib-2.0/include/* /usr/local/include/trower-base64/base64.h /usr/include/libdrm/drm.h /usr/include/libdrm/drm_mode.h /usr/include/xf86drm.h .
-          &&
-          printf '#ifndef __ITIMERMSG_H__\n#define __ITIMERMSG_H__\n#define IARM_BUS_SYSTIME_MGR_NAME "SYSTEMTIME"\n#define cTIMER_STATUS_UPDATE 0\n#define TIMER_STATUS_MSG "TimerStatus"\n#define cTIMER_STATUS_MESSAGE_LENGTH 256\ntypedef struct _TimerMsg { char message[256]; char timerSrc[256]; char currentTime[256]; } TimerMsg;\n#endif\n' > systimerifc/itimermsg.h
 
       - name: Set clang toolchain
         if: ${{ matrix.compiler == 'clang' }}
@@ -471,10 +469,7 @@ jobs:
           -DRDK_SERVICE_L2_TEST
           -DHAS_API_POWERSTATE
           -DENABLE_THERMAL_PROTECTION
-          -DENABLE_SYSTIMEMGR_SUPPORT
-          -DHAS_API_SYSTEM
-          -DENABLE_DEEP_SLEEP
-          -DENABLE_DEVICE_MANUFACTURER_INFO"
+          -DENABLE_SYSTIMEMGR_SUPPORT"
           -DPLUGIN_PERSISTENTSTORE_PATH="/tmp/secure/persistent/rdkservicestore"
           -DPLUGIN_PERSISTENTSTORE_LEGACYPATH="/tmp/persistent/rdkservicestore"
           -DCOMCAST_CONFIG=OFF
