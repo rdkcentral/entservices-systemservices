@@ -880,22 +880,17 @@ TEST_F(SystemServicesTest, GetMigrationStatus_Success)
     removeFile("/opt/secure/persistent/opflashstore/migrationStatus.txt");
 }
 #endif
-TEST_F(SystemServicesTest, SetMigrationStatus_Success)
+TEST_F(SystemServicesTest, SetMigrationStatus_MigrationPluginNotAvailable)
 {
-    system("mkdir -p /opt/secure/persistent/opflashstore");
-    
-    uint32_t result = handler.Invoke(connection, _T("setMigrationStatus"), _T("{\"migrationStatus\":\"COMPLETED\"}"), response);
-    
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
-    
-    if (result == Core::ERROR_NONE && jsonResponse.HasLabel("success")) {
-        TEST_LOG("SetMigrationStatus test PASSED - Response: %s", response.c_str());
-    } else {
-        TEST_LOG("SetMigrationStatus - Response: %s", response.c_str());
-    }
-    
-    removeFile("/opt/secure/persistent/opflashstore/migrationStatus.txt");
+    // Migration plugin is not activated in unit test environment
+    // QueryInterfaceByCallsign returns nullptr (configured in fixture)
+    uint32_t result = handler.Invoke(connection, _T("setMigrationStatus"), _T("{\"status\":\"MIGRATION_COMPLETED\"}"), response);
+
+    // Plugin returns ERROR_GENERAL when Migration plugin is not activated
+    EXPECT_EQ(Core::ERROR_GENERAL, result) << "Should return ERROR_GENERAL when Migration plugin is not available";
+    EXPECT_TRUE(response.empty()) << "Response should be empty when Migration plugin is not activated";
+
+    TEST_LOG("SetMigrationStatus Migration plugin not available - Result: %u", result);
 }
 
 TEST_F(SystemServicesTest, GetNetworkStandbyMode_Success)
