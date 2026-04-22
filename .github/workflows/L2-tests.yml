@@ -277,17 +277,7 @@ jobs:
           dsRpc.h
           telemetry_busmessage_sender.h
           &&
-          echo '#ifndef __ITIMERMSG_H__
-          #define __ITIMERMSG_H__
-          #define IARM_BUS_SYSTIME_MGR_NAME "SYSTEMTIME"
-          #define cTIMER_STATUS_UPDATE 0
-          #define TIMER_STATUS_MSG "TimerStatus"
-          #define cTIMER_STATUS_MESSAGE_LENGTH 256
-          typedef struct _TimerMsg {
-              char message[256];
-              int status;
-          } TimerMsg;
-          #endif' > systimerifc/itimermsg.h
+          printf '#ifndef __ITIMERMSG_H__\n#define __ITIMERMSG_H__\n#define IARM_BUS_SYSTIME_MGR_NAME "SYSTEMTIME"\n#define cTIMER_STATUS_UPDATE 0\n#define TIMER_STATUS_MSG "TimerStatus"\n#define cTIMER_STATUS_MESSAGE_LENGTH 256\ntypedef struct _TimerMsg {\n    char message[256];\n    char timerSrc[256];\n    char currentTime[256];\n} TimerMsg;\n#endif\n' > systimerifc/itimermsg.h
           &&
           cp -r /usr/include/gstreamer-1.0/gst /usr/include/glib-2.0/* /usr/lib/x86_64-linux-gnu/glib-2.0/include/* /usr/local/include/trower-base64/base64.h /usr/include/libdrm/drm.h /usr/include/libdrm/drm_mode.h /usr/include/xf86drm.h .
 
@@ -467,8 +457,11 @@ jobs:
           -Wl,-wrap,popen -Wl,-wrap,syslog -Wl,-wrap,v_secure_system -Wl,-wrap,v_secure_popen -Wl,-wrap,v_secure_pclose -Wl,-wrap,unlink
           -DUSE_IARMBUS
           -DRDK_SERVICE_L2_TEST
+          -DHAS_API_SYSTEM
           -DHAS_API_POWERSTATE
           -DENABLE_THERMAL_PROTECTION
+          -DENABLE_DEEP_SLEEP
+          -DENABLE_DEVICE_MANUFACTURER_INFO
           -DENABLE_SYSTIMEMGR_SUPPORT"
           -DPLUGIN_PERSISTENTSTORE_PATH="/tmp/secure/persistent/rdkservicestore"
           -DPLUGIN_PERSISTENTSTORE_LEGACYPATH="/tmp/persistent/rdkservicestore"
