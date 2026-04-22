@@ -861,13 +861,13 @@ namespace WPEFramework {
             string otherReason = "No other reason supplied";
             string requestor = "SystemServices";
             bool result = false;
-            string fname = "nrdPluginApp";
+            string fname = "nrdplugin";
 
             nfxResult = Utils::killProcess(fname);
             if (true == nfxResult) {
                 LOGINFO("SystemService shutting down Netflix...\n");
                 //give Netflix process some time to terminate gracefully.
-                sleep(10);
+                sleep(5);
             } else {
                 LOGINFO("SystemService unable to shutdown Netflix \
                         process. nfxResult = %ld\n", (long int)nfxResult);
