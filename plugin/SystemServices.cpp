@@ -322,6 +322,16 @@ void stringToIarmMode(std::string mode, IARM_Bus_Daemon_SysMode_t& iarmMode)
 
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
 
+static std::string extractMacAddress(const std::string& raw)
+{
+    static const std::regex kMacPattern("([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5})");
+    std::smatch macMatch;
+    if (std::regex_search(raw, macMatch, kMacPattern)) {
+        return macMatch[1].str();
+    }
+    return "";
+}
+
 // TODO: remove this
 #define registerMethod(...) for (uint8_t i = 1; GetHandler(i); i++) GetHandler(i)->Register<JsonObject, JsonObject>(__VA_ARGS__)
 
@@ -1319,7 +1329,13 @@ namespace WPEFramework {
                         {
                             std::string key = line.substr(0, eq);
                             std::string value = line.substr(eq + 1);
-
+                            Utils::String::trim(value);
+                            if (key == "bluetooth_mac") {
+                                std::string mac = extractMacAddress(value);
+                                if (!mac.empty()) {
+                                    value = std::move(mac);
+                                }
+                            }
                             response[key.c_str()] = value;
 
                             // some tweaks for backward compatibility
@@ -1346,8 +1362,15 @@ namespace WPEFramework {
                 } else {
                     retAPIStatus = true;
                     Utils::String::trim(res);
-                        response[queryParams.c_str()] = res;
+                    std::string responseValue = std::move(res);
+                    if (queryParams == "bluetooth_mac") {
+                        std::string mac = extractMacAddress(responseValue);
+                        if (!mac.empty()) {
+                            responseValue = std::move(mac);
+                        }
                     }
+                    response[queryParams.c_str()] = std::move(responseValue);
+                }
                 }
             returnResponse(retAPIStatus);
         }
@@ -2925,9 +2948,17 @@ namespace WPEFramework {
 
                }
 
-                removeCharsFromString(tempBuffer, "\n\r");
+                Utils::String::trim(tempBuffer);
+                if (tempBuffer.empty()) {
+                    tempBuffer = "00:00:00:00:00:00";
+                } else if (macTypeList[i] == "bluetooth_mac") {
+                    std::string mac = extractMacAddress(tempBuffer);
+                    if (!mac.empty()) {
+                        tempBuffer = std::move(mac);
+                    }
+                }
                 LOGWARN("resp = %s\n", tempBuffer.c_str());
-                params[macTypeList[i].c_str()] = (tempBuffer.empty()? "00:00:00:00:00:00" : tempBuffer.c_str());
+                params[macTypeList[i].c_str()] = tempBuffer.c_str();
                 listLength++;
             }
             if (listLength != i) {
