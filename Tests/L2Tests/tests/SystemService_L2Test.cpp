@@ -956,8 +956,9 @@ TEST_F(SystemService_L2Test,SystemServiceGetSetBlocklistFlag)
     EXPECT_TRUE(result["success"].Boolean());
     EXPECT_TRUE(result["blocklist"].Boolean());
 
-    /* Request status for Onlogupload. */
-    message = "{\"oldBlocklistFlag\": true,\"newBlocklistFlag\": false}";
+    // The JSON-RPC onBlocklistChanged event carries string values ("true"/"false"),
+    // not booleans, because ISystemServices::INotification::OnBlocklistChanged takes string params.
+    message = "{\"oldBlocklistFlag\": \"true\",\"newBlocklistFlag\": \"false\"}";
     expected_status.FromString(message);
     EXPECT_CALL(async_handler, onBlocklistChanged(MatchRequestStatus(expected_status)))
         .WillOnce(Invoke(this, &SystemService_L2Test::onBlocklistChanged));
@@ -1321,10 +1322,11 @@ TEST_F(SystemService_L2Test, GetBuildType_JSONRPC)
         EXPECT_TRUE(result["success"].Boolean());
     }
 
-    EXPECT_TRUE(result.HasLabel("buildType"));
-    if (result.HasLabel("buildType")) {
-        string buildType = result["buildType"].String();
-        TEST_LOG("  buildType: %s", buildType.c_str());
+    // JSON-RPC response field is "build_type" (snake_case), not "buildType"
+    EXPECT_TRUE(result.HasLabel("build_type"));
+    if (result.HasLabel("build_type")) {
+        string buildType = result["build_type"].String();
+        TEST_LOG("  build_type: %s", buildType.c_str());
         EXPECT_FALSE(buildType.empty());
     }
 }
