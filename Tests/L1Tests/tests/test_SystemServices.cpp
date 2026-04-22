@@ -487,7 +487,13 @@ protected:
     {
         plugin->Deinitialize(&service);
 
-	Core::IWorkerPool::Assign(nullptr);
+		if (dispatcher != nullptr) {
+            dispatcher->Deactivate();
+            dispatcher->Release();
+            dispatcher = nullptr;
+        }
+
+		Core::IWorkerPool::Assign(nullptr);
         workerPool.Release();
         dispatcher->Deactivate();
         dispatcher->Release();
