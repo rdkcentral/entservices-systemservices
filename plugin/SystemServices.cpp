@@ -1362,16 +1362,14 @@ namespace WPEFramework {
                 } else {
                     retAPIStatus = true;
                     Utils::String::trim(res);
+                    std::string responseValue = std::move(res);
                     if (queryParams == "bluetooth_mac") {
-                        std::string mac = extractMacAddress(res);
+                        std::string mac = extractMacAddress(responseValue);
                         if (!mac.empty()) {
-                            response[queryParams.c_str()] = std::move(mac);
-                        } else {
-                            response[queryParams.c_str()] = res;
+                            responseValue = std::move(mac);
                         }
-                    } else {
-                        response[queryParams.c_str()] = std::move(res);
                     }
+                    response[queryParams.c_str()] = std::move(responseValue);
                     }
                 }
             returnResponse(retAPIStatus);
