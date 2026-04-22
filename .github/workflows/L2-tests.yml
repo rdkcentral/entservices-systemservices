@@ -211,6 +211,7 @@ jobs:
           headers/rdk/ds
           headers/rdk/iarmbus
           headers/rdk/iarmmgrs-hal
+          headers/rdk/halif/deepsleep-manager
           headers/systemservices
           headers/systemservices/proc
           headers/systimerifc
@@ -247,6 +248,7 @@ jobs:
           rdk/iarmmgrs-hal/pwrMgr.h
           rdk/iarmmgrs-hal/sysMgr.h
           rdk/iarmbus/iarmUtil.h
+          rdk/halif/deepsleep-manager/deepSleepMgr.h
           rfcapi.h
           rbus.h
           libudev.h
