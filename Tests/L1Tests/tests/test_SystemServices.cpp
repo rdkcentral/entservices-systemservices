@@ -355,7 +355,11 @@ namespace
     
     static void createFile(const char* fileName, const char* fileContent)
     {
-        removeFile(fileName);
+        // Only remove if file already exists to avoid ENOENT noise in logs
+        if (std::ifstream(fileName).good())
+        {
+            removeFile(fileName);
+        }
 
         std::ofstream fileContentStream(fileName);
         fileContentStream << fileContent;
