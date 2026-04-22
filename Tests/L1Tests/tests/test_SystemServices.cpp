@@ -355,12 +355,8 @@ namespace
     
     static void createFile(const char* fileName, const char* fileContent)
     {
-        // Only remove if file already exists to avoid ENOENT noise in logs
-        if (std::ifstream(fileName).good())
-        {
-            removeFile(fileName);
-        }
-
+        // Use ofstream directly — it truncates/creates the file without needing
+        // removeFile first (avoiding "Permission denied" on undeletable system files).
         std::ofstream fileContentStream(fileName);
         fileContentStream << fileContent;
         fileContentStream << "\n";
@@ -697,8 +693,9 @@ TEST_F(SystemServicesTest, GetBuildType_Success)
     EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Request failed: " << response;
     
     TEST_LOG("GetBuildType test PASSED - Response: %s", response.c_str());
-    
-    removeFile("/etc/device.properties");
+
+    // Truncate rather than delete — CI runner can write but not unlink /etc/device.properties
+    std::ofstream("/etc/device.properties").close();
 }
 
 #if 0
@@ -2139,8 +2136,8 @@ TEST_F(SystemServicesTest, GetBuildType_ProductionBuild)
     EXPECT_EQ("prod", jsonResponse["build_type"].String()) << "Unexpected build type: " << response;
     
     TEST_LOG("GetBuildType production test - Response: %s", response.c_str());
-    
-    removeFile("/etc/device.properties");
+
+    std::ofstream("/etc/device.properties").close();
 }
 
 TEST_F(SystemServicesTest, RequestSystemUptime_MultipleInvocations)
@@ -2377,8 +2374,8 @@ TEST_F(SystemServicesTest, GetBuildType_VBN)
     ASSERT_TRUE(jsonResponse.HasLabel("build_type")) << "Missing build_type: " << response;
     
     TEST_LOG("GetBuildType VBN test - Response: %s", response.c_str());
-    
-    removeFile("/etc/device.properties");
+
+    std::ofstream("/etc/device.properties").close();
 }
 
 TEST_F(SystemServicesTest, GetBuildType_Sprint)
@@ -2392,8 +2389,8 @@ TEST_F(SystemServicesTest, GetBuildType_Sprint)
     ASSERT_TRUE(jsonResponse.HasLabel("build_type")) << "Missing build_type: " << response;
     
     TEST_LOG("GetBuildType sprint test - Response: %s", response.c_str());
-    
-    removeFile("/etc/device.properties");
+
+    std::ofstream("/etc/device.properties").close();
 }
 
 TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_ValidSource)
