@@ -1488,13 +1488,11 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_InvalidFileWrite)
     createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "BLOCKLIST=false");
     system("chmod 444 /opt/secure/persistent/opflashstore/devicestate.txt");
 
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"), _T("{\"blocklist\":true}"), response));
-    
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
-    
+    // Plugin returns Core::ERROR_GENERAL when the file write fails (read-only)
+    EXPECT_EQ(Core::ERROR_GENERAL, handler.Invoke(connection, _T("setBlocklistFlag"), _T("{\"blocklist\":true}"), response));
+
     TEST_LOG("SetBlocklistFlag file write failure test - Response: %s", response.c_str());
-    
+
     // Cleanup - restore permissions before removing
     system("chmod 644 /opt/secure/persistent/opflashstore/devicestate.txt");
     removeFile("/opt/secure/persistent/opflashstore/devicestate.txt");
@@ -1527,9 +1525,9 @@ TEST_F(SystemServicesTest, GetPowerStateBeforeReboot_Success)
 
 TEST_F(SystemServicesTest, GetTerritory_Success)
 {
-    // Create territory file
-    system("mkdir -p /opt/persistent");
-    createFile(TERRITORYFILE, "USA");
+    // Create territory file with colon-separated format expected by safeExtractAfterColon()
+    system("mkdir -p /opt/secure/persistent/System");
+    createFile(TERRITORYFILE, "territory:USA");
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTerritory"), _T("{}"), response));
     
@@ -1975,8 +1973,9 @@ TEST_F(SystemServicesTest, SetTimeZoneDST_InvalidFormat)
 
 TEST_F(SystemServicesTest, GetTerritory_WithRegion)
 {
-    system("mkdir -p /opt/persistent/System");
-    createFile(TERRITORYFILE, "USA,California");
+    // Territory file: line1=<prefix>:USA, line2=<prefix>:US-CA (format required by readTerritoryFromFile)
+    system("mkdir -p /opt/secure/persistent/System");
+    createFile(TERRITORYFILE, "territory:USA\nregion:US-CA");
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTerritory"), _T("{}"), response));
     
