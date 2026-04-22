@@ -125,7 +125,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-testframework
           path: entservices-testframework
-          ref: 1.0.1
+          ref: 1.0.4
 
       - name: Checkout entservices-systemservices
         if: ${{ inputs.caller_source == 'local' }}
