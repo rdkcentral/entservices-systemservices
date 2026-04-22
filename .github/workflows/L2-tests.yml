@@ -576,6 +576,7 @@ jobs:
           /opt/secure/reboot
           /opt/secure/persistent
           /opt/secure/persistent/System
+          /opt/secure/persistent/opflashstore
           /tmp/secure/persistent
           /tmp/persistent
           /tmp/persistent/rdkservicestore
@@ -651,6 +652,8 @@ jobs:
           /tmp/bus/usb/devices/101-124/serial
           /tmp/block/sdb/device/vendor
           /tmp/block/sdb/device/model
+          &&
+          echo "BUILD_TYPE=VBN" | sudo tee /etc/device.properties
           &&
           cd /dev/disk/by-id/
           &&
