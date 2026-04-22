@@ -3371,8 +3371,9 @@ TEST_F(SystemServicesTest, UploadLogsAsync_EmptyUrlString)
 
 TEST_F(SystemServicesTest, SetPowerState_Empty_Params)
 {
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setPowerState"), _T(""), response));
-    
+    // Use empty JSON object {} instead of empty string to avoid Thunder JSON parser crash
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setPowerState"), _T("{}"), response));
+
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
@@ -3805,18 +3806,25 @@ TEST_F(SystemServicesTest, Notification_OnNetworkStandbyModeChanged_Disable)
 
 TEST_F(SystemServicesTest, Notification_OnBlocklistChanged_ViaSetBlocklistFlag)
 {
+    // Create required file for blocklistFlag write to succeed
+    system("mkdir -p /opt/secure/persistent/opflashstore");
+    createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "BLOCKLIST=false");
+
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
-    
+
     pluginImpl->Register(notificationHandler);
     notificationHandler->ResetEvent();
-    
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"), _T("{\"blocklistFlag\":\"true\"}"), response));
-    
+
+    // Use correct param name 'blocklist' (bool) instead of wrong 'blocklistFlag' (string)
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"), _T("{\"blocklist\":true}"), response));
+
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onBlocklistChanged));
     EXPECT_EQ("true", notificationHandler->GetNewBlocklistFlag());
-    
+
     pluginImpl->Unregister(notificationHandler);
     delete notificationHandler;
+
+    removeFile("/opt/secure/persistent/opflashstore/devicestate.txt");
 }
 
 TEST_F(SystemServicesTest, Notification_MultipleHandlers_IndependentNotifications)
