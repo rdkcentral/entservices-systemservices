@@ -4051,22 +4051,29 @@ TEST_F(SystemServicesTest, Notification_SequentialEvents_BothReceived)
 
 TEST_F(SystemServicesTest, Notification_OnBlocklistChanged_MultipleChanges)
 {
+    // Create required directory and file for blocklist write to succeed
+    system("mkdir -p /opt/secure/persistent/opflashstore");
+    createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "BLOCKLIST=false");
+
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
-    
+
     pluginImpl->Register(notificationHandler);
     notificationHandler->ResetEvent();
-    
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"), _T("{\"blocklistFlag\":\"true\"}"), response));
+
+    // Use correct param key "blocklist" (bool) — not "blocklistFlag" (string)
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"), _T("{\"blocklist\":true}"), response));
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onBlocklistChanged));
-    
+
     notificationHandler->ResetEvent(SystemServices_onBlocklistChanged);
-    
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"), _T("{\"blocklistFlag\":\"false\"}"), response));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"), _T("{\"blocklist\":false}"), response));
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onBlocklistChanged));
     EXPECT_EQ("false", notificationHandler->GetNewBlocklistFlag());
-    
+
     pluginImpl->Unregister(notificationHandler);
     delete notificationHandler;
+
+    removeFile("/opt/secure/persistent/opflashstore/devicestate.txt");
 }
 
 TEST_F(SystemServicesTest, Notification_GetEventSignalled_ReturnsCorrectFlags)
