@@ -1903,11 +1903,17 @@ TEST_F(SystemServicesTest, AbortLogUpload_WhenNoUpload)
 TEST_F(SystemServicesTest, GetMacAddresses_Async)
 {
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getMacAddresses"), _T("{\"GUID\":\"test-guid-123\"}"), response));
-    
+
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
-    
+
+    // /lib/rdk/getDeviceDetails.sh does not exist in unit test environment
+    // plugin correctly returns success=false with SysSrv_FileNotPresent status
+    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "Expected success=false in test env: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("errorMessage")) << "Missing errorMessage: " << response;
+    EXPECT_FALSE(jsonResponse["errorMessage"].String().empty()) << "errorMessage should not be empty: " << response;
+
     TEST_LOG("GetMacAddresses async test - Response: %s", response.c_str());
 }
 
@@ -1950,11 +1956,17 @@ TEST_F(SystemServicesTest, SetTimeZoneDST_UniversalTimezone)
 TEST_F(SystemServicesTest, SetTimeZoneDST_InvalidFormat)
 {
     uint32_t result = handler.Invoke(connection, _T("setTimeZoneDST"), _T("{\"timeZone\":\"InvalidFormat\"}"), response);
-    
+
+    // Plugin validates timezone against TZ database; "InvalidFormat" has no "/" separator
+    // and does not exist in /usr/share/zoneinfo, so plugin returns ERROR_NONE with success=false
+    EXPECT_EQ(Core::ERROR_NONE, result) << "Expected ERROR_NONE with success=false in response";
+
     JsonObject jsonResponse;
-    if (result == Core::ERROR_NONE && jsonResponse.FromString(response)) {
-        TEST_LOG("SetTimeZoneDST invalid format test - Response: %s", response.c_str());
-    }
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
+    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "Should fail with invalid timezone: " << response;
+
+    TEST_LOG("SetTimeZoneDST invalid format test - Response: %s", response.c_str());
 }
 
 TEST_F(SystemServicesTest, GetTerritory_WithRegion)
