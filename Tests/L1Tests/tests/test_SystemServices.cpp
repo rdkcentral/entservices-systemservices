@@ -493,6 +493,8 @@ protected:
             dispatcher = nullptr;
         }
 
+		pluginImpl = Core::ProxyType<Plugin::SystemServicesImplementation>();
+
 		Core::IWorkerPool::Assign(nullptr);
         workerPool.Release();
         dispatcher->Deactivate();
