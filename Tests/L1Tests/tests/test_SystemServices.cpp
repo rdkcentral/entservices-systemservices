@@ -487,15 +487,15 @@ protected:
     {
         plugin->Deinitialize(&service);
 
-		if (dispatcher != nullptr) {
-            dispatcher->Deactivate();
-            dispatcher->Release();
-            dispatcher = nullptr;
-        }
+        // Explicitly destroy pluginImpl HERE, while 'service' is still alive.
+        // Member destruction runs in reverse-declaration order:
+        //   service (declared pos 6) is destroyed BEFORE pluginImpl (pos 3).
+        // ~SystemServicesImplementation() calls m_shellService->Release() which
+        // dereferences 'service' — if that mock is already dead, it's a SIGSEGV.
+        // Resetting the ProxyType here forces the destructor to run now, safely.
+        pluginImpl = Core::ProxyType<Plugin::SystemServicesImplementation>();
 
-		pluginImpl = Core::ProxyType<Plugin::SystemServicesImplementation>();
-
-		Core::IWorkerPool::Assign(nullptr);
+	Core::IWorkerPool::Assign(nullptr);
         workerPool.Release();
         dispatcher->Deactivate();
         dispatcher->Release();
