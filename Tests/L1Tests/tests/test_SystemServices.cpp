@@ -519,6 +519,15 @@ protected:
     {
         plugin->Deinitialize(&service);
 
+        // *** IMPORTANT: Reset pluginImpl HERE — before deleting ANY mock. ***
+        // ~SystemServicesImplementation() calls _powerManagerPlugin->Unregister() x4.
+        // pluginImpl is a member of the parent class (SystemServicesInitializeTest), so
+        // C++ would normally destroy it AFTER this destructor body finishes — meaning
+        // after all mocks below are already deleted (use-after-free → SIGSEGV).
+        // Resetting it here forces ~SystemServicesImplementation() to run NOW while
+        // every mock is still alive. All future mock deletions below are then safe.
+        pluginImpl = Core::ProxyType<Plugin::SystemServicesImplementation>();
+
 	Core::IWorkerPool::Assign(nullptr);
         workerPool.Release();
         dispatcher->Deactivate();
@@ -573,15 +582,6 @@ protected:
             delete p_readprocImplMock;
             p_readprocImplMock = nullptr;
         }
-
-        // Force pluginImpl release BEFORE PowerManagerMock::Delete().
-        // pluginImpl is a member of SystemServicesInitializeTest, so its destructor
-        // would normally run AFTER ~SystemServicesTest() body. But ~SystemServicesImplementation()
-        // calls _powerManagerPlugin->Unregister() x4 — if the PowerManagerMock is deleted
-        // first (via PowerManagerMock::Delete()), those calls become use-after-free → SIGSEGV.
-        // Explicitly resetting the ProxyType to empty here forces refcount to 0 immediately,
-        // running ~SystemServicesImplementation() while the mock is still alive.
-        pluginImpl = Core::ProxyType<Plugin::SystemServicesImplementation>();
 
         PowerManagerMock::Delete();
     }
