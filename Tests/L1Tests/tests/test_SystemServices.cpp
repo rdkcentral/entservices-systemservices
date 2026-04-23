@@ -573,7 +573,16 @@ protected:
             delete p_readprocImplMock;
             p_readprocImplMock = nullptr;
         }
-        
+
+        // Force pluginImpl release BEFORE PowerManagerMock::Delete().
+        // pluginImpl is a member of SystemServicesInitializeTest, so its destructor
+        // would normally run AFTER ~SystemServicesTest() body. But ~SystemServicesImplementation()
+        // calls _powerManagerPlugin->Unregister() x4 — if the PowerManagerMock is deleted
+        // first (via PowerManagerMock::Delete()), those calls become use-after-free → SIGSEGV.
+        // Explicitly resetting the ProxyType to empty here forces refcount to 0 immediately,
+        // running ~SystemServicesImplementation() while the mock is still alive.
+        pluginImpl = Core::ProxyType<Plugin::SystemServicesImplementation>();
+
         PowerManagerMock::Delete();
     }
 };
