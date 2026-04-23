@@ -369,10 +369,10 @@ protected:
     Core::ProxyType<Plugin::SystemServices> plugin;
     Core::JSONRPC::Handler& handler;
     DECL_CORE_JSONRPC_CONX connection;
+    NiceMock<ServiceMock> service;       // declared BEFORE pluginImpl so it outlives it
     Core::ProxyType<Plugin::SystemServicesImplementation> pluginImpl;
     Core::ProxyType<WorkerPoolImplementation> workerPool;
     NiceMock<FactoriesImplementation> factoriesImplementation;
-    NiceMock<ServiceMock> service;
     PLUGINHOST_DISPATCHER* dispatcher;
     NiceMock<COMLinkMock> comLinkMock;
     Core::JSONRPC::Message message;
@@ -454,22 +454,34 @@ protected:
                 return &pluginImpl;
             }));
 
-        ON_CALL(PowerManagerMock::Mock(), Register(::testing::Matcher<Exchange::IPowerManager::INetworkStandbyModeChangedNotification*>(::testing::_)))
-            .WillByDefault(::testing::Return(Core::ERROR_NONE));
-        ON_CALL(PowerManagerMock::Mock(), Register(::testing::Matcher<Exchange::IPowerManager::IRebootNotification*>(::testing::_)))
-            .WillByDefault(::testing::Return(Core::ERROR_NONE));
-        ON_CALL(PowerManagerMock::Mock(), Register(::testing::Matcher<Exchange::IPowerManager::IThermalModeChangedNotification*>(::testing::_)))
-            .WillByDefault(::testing::Return(Core::ERROR_NONE));
-        ON_CALL(PowerManagerMock::Mock(), Register(::testing::Matcher<Exchange::IPowerManager::IModeChangedNotification*>(::testing::_)))
-            .WillByDefault(::testing::Return(Core::ERROR_NONE));
-        ON_CALL(PowerManagerMock::Mock(), Unregister(::testing::Matcher<const Exchange::IPowerManager::INetworkStandbyModeChangedNotification*>(::testing::_)))
-            .WillByDefault(::testing::Return(Core::ERROR_NONE));
-        ON_CALL(PowerManagerMock::Mock(), Unregister(::testing::Matcher<const Exchange::IPowerManager::IRebootNotification*>(::testing::_)))
-            .WillByDefault(::testing::Return(Core::ERROR_NONE));
-        ON_CALL(PowerManagerMock::Mock(), Unregister(::testing::Matcher<const Exchange::IPowerManager::IThermalModeChangedNotification*>(::testing::_)))
-            .WillByDefault(::testing::Return(Core::ERROR_NONE));
-        ON_CALL(PowerManagerMock::Mock(), Unregister(::testing::Matcher<const Exchange::IPowerManager::IModeChangedNotification*>(::testing::_)))
-            .WillByDefault(::testing::Return(Core::ERROR_NONE));
+        // Use EXPECT_CALL with AnyNumber() instead of ON_CALL to suppress
+        // "Uninteresting mock function call" GMOCK warnings. ON_CALL on a base-class
+        // reference loses the NiceMock suppression; EXPECT_CALL.Times(AnyNumber())
+        // explicitly declares these calls are expected any number of times.
+        EXPECT_CALL(PowerManagerMock::Mock(), Register(::testing::Matcher<Exchange::IPowerManager::INetworkStandbyModeChangedNotification*>(::testing::_)))
+            .Times(::testing::AnyNumber())
+            .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
+        EXPECT_CALL(PowerManagerMock::Mock(), Register(::testing::Matcher<Exchange::IPowerManager::IRebootNotification*>(::testing::_)))
+            .Times(::testing::AnyNumber())
+            .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
+        EXPECT_CALL(PowerManagerMock::Mock(), Register(::testing::Matcher<Exchange::IPowerManager::IThermalModeChangedNotification*>(::testing::_)))
+            .Times(::testing::AnyNumber())
+            .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
+        EXPECT_CALL(PowerManagerMock::Mock(), Register(::testing::Matcher<Exchange::IPowerManager::IModeChangedNotification*>(::testing::_)))
+            .Times(::testing::AnyNumber())
+            .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
+        EXPECT_CALL(PowerManagerMock::Mock(), Unregister(::testing::Matcher<const Exchange::IPowerManager::INetworkStandbyModeChangedNotification*>(::testing::_)))
+            .Times(::testing::AnyNumber())
+            .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
+        EXPECT_CALL(PowerManagerMock::Mock(), Unregister(::testing::Matcher<const Exchange::IPowerManager::IRebootNotification*>(::testing::_)))
+            .Times(::testing::AnyNumber())
+            .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
+        EXPECT_CALL(PowerManagerMock::Mock(), Unregister(::testing::Matcher<const Exchange::IPowerManager::IThermalModeChangedNotification*>(::testing::_)))
+            .Times(::testing::AnyNumber())
+            .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
+        EXPECT_CALL(PowerManagerMock::Mock(), Unregister(::testing::Matcher<const Exchange::IPowerManager::IModeChangedNotification*>(::testing::_)))
+            .Times(::testing::AnyNumber())
+            .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
 
 	Core::IWorkerPool::Assign(&(*workerPool));
         workerPool->Run();
@@ -486,14 +498,6 @@ protected:
     virtual ~SystemServicesTest() override
     {
         plugin->Deinitialize(&service);
-
-        // Explicitly destroy pluginImpl HERE, while 'service' is still alive.
-        // Member destruction runs in reverse-declaration order:
-        //   service (declared pos 6) is destroyed BEFORE pluginImpl (pos 3).
-        // ~SystemServicesImplementation() calls m_shellService->Release() which
-        // dereferences 'service' — if that mock is already dead, it's a SIGSEGV.
-        // Resetting the ProxyType here forces the destructor to run now, safely.
-        pluginImpl = Core::ProxyType<Plugin::SystemServicesImplementation>();
 
 	Core::IWorkerPool::Assign(nullptr);
         workerPool.Release();
