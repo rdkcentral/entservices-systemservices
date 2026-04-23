@@ -519,24 +519,30 @@ protected:
     {
         plugin->Deinitialize(&service);
 
-        // Drain the WorkerPool BEFORE resetting pluginImpl.
-        // dispatchEvent() (called from SetFriendlyName, SetBlocklistFlag, etc.) submits
-        // async jobs to the WorkerPool holding a raw `this*` to SystemServicesImplementation.
-        // If pluginImpl is reset first, those pending jobs call Dispatch() on already-destroyed
-        // memory when the pool drains during workerPool.Release() → use-after-free → SIGSEGV.
-        // Clearing the global first prevents new submissions; Release() joins all threads and
-        // executes remaining jobs while SystemServicesImplementation is still alive.
+        // *** IMPORTANT: Reset pluginImpl BEFORE IWorkerPool::Assign(nullptr). ***
+        //
+        // Reason 1 — Static timer race:
+        //   SystemServicesImplementation has a static cTimer (m_operatingModeTimer) that fires
+        //   every 1 second via updateDuration().  When it fires it calls dispatchEvent() which
+        //   calls IWorkerPool::Instance().Submit().  If Assign(nullptr) is called first the
+        //   Instance() returns null and Submit dereferences it → SIGSEGV.
+        //   ~SystemServicesImplementation() calls m_operatingModeTimer.stop(), so resetting
+        //   pluginImpl here stops the timer before the global pool slot is cleared.
+        //
+        // Reason 2 — Mock lifetime:
+        //   ~SystemServicesImplementation() calls _powerManagerPlugin->Unregister() x4.
+        //   pluginImpl is a parent-class member variable, so C++ would normally destroy it
+        //   AFTER this destructor body completes — i.e. after all mocks below are deleted
+        //   (use-after-free → SIGSEGV).  Resetting here runs ~SystemServicesImplementation()
+        //   NOW, while every mock is still alive.
+        //
+        // Note: any pending WorkerPool job holds an AddRef on SystemServicesImplementation, so
+        // resetting the ProxyType does NOT destroy the implementation prematurely; it is only
+        // destroyed when the last Job releases its reference (during workerPool.Release()).
+        pluginImpl = Core::ProxyType<Plugin::SystemServicesImplementation>();
+
         Core::IWorkerPool::Assign(nullptr);
         workerPool.Release();
-
-        // *** IMPORTANT: Reset pluginImpl HERE — before deleting ANY mock. ***
-        // ~SystemServicesImplementation() calls _powerManagerPlugin->Unregister() x4.
-        // pluginImpl is a member of the parent class (SystemServicesInitializeTest), so
-        // C++ would normally destroy it AFTER this destructor body finishes — meaning
-        // after all mocks below are already deleted (use-after-free → SIGSEGV).
-        // Resetting it here forces ~SystemServicesImplementation() to run NOW, after the
-        // WorkerPool is fully stopped, and while every mock is still alive.
-        pluginImpl = Core::ProxyType<Plugin::SystemServicesImplementation>();
         dispatcher->Deactivate();
         dispatcher->Release();
         PluginHost::IFactories::Assign(nullptr);
