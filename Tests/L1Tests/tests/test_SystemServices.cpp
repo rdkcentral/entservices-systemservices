@@ -119,8 +119,8 @@ public:
     SystemServicesNotificationHandler() 
         : m_event_signalled(0)
         , m_refCount(1)
+        , m_eventData{}  // value-initialize instead of memset (memset on std::string members is UB)
     {
-        memset(&m_eventData, 0, sizeof(m_eventData));
     }
 
     virtual ~SystemServicesNotificationHandler() = default;
@@ -480,6 +480,26 @@ protected:
             .Times(::testing::AnyNumber())
             .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
         EXPECT_CALL(PowerManagerMock::Mock(), Unregister(::testing::Matcher<const Exchange::IPowerManager::IModeChangedNotification*>(::testing::_)))
+            .Times(::testing::AnyNumber())
+            .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
+        // Suppress GMOCK warnings for PowerManager methods called without per-test EXPECT_CALL.
+        // Accessed via base-class reference so NiceMock suppression is bypassed.
+        EXPECT_CALL(PowerManagerMock::Mock(), GetPowerStateBeforeReboot(::testing::_))
+            .Times(::testing::AnyNumber())
+            .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
+        EXPECT_CALL(PowerManagerMock::Mock(), GetPowerState(::testing::_, ::testing::_))
+            .Times(::testing::AnyNumber())
+            .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
+        EXPECT_CALL(PowerManagerMock::Mock(), GetLastWakeupReason(::testing::_))
+            .Times(::testing::AnyNumber())
+            .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
+        EXPECT_CALL(PowerManagerMock::Mock(), GetLastWakeupKeyCode(::testing::_))
+            .Times(::testing::AnyNumber())
+            .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
+        EXPECT_CALL(PowerManagerMock::Mock(), SetNetworkStandbyMode(::testing::_))
+            .Times(::testing::AnyNumber())
+            .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
+        EXPECT_CALL(PowerManagerMock::Mock(), GetNetworkStandbyMode(::testing::_))
             .Times(::testing::AnyNumber())
             .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
 
