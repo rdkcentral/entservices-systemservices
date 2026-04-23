@@ -1161,9 +1161,18 @@ INSTANTIATE_TEST_SUITE_P(
 #endif
 TEST_F(SystemServicesTest, GetTimeStatus_Success)
 {
-    // ENABLE_SYSTIMEMGR_SUPPORT is defined in the L1 build.
-    // GetTimeStatus calls IARM_Bus_Call, which the fixture ON_CALL mocks to return IARM_RESULT_SUCCESS.
-    // So the plugin returns Core::ERROR_NONE (not ERROR_GENERAL).
+    // GetTimeStatus calls IARM_Bus_Call and reads the output param (TimerMsg: three char[256] fields).
+    // The generic ON_CALL fixture returns IARM_RESULT_SUCCESS but does NOT populate the output buffer,
+    // leaving 768 bytes of stack garbage.  The plugin then constructs std::string(garbage, 256) which
+    // can contain embedded nulls / non-printable bytes and crash in LOGINFO → SIGSEGV.
+    // Fix: override IARM_Bus_Call here to zero-initialise the TimerMsg buffer before returning.
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke(
+            [](const char*, const char*, void* arg, size_t argLen) -> IARM_Result_t {
+                memset(arg, 0, argLen);   // zero all three char[256] fields
+                return IARM_RESULT_SUCCESS;
+            }));
+
     uint32_t result = handler.Invoke(connection, _T("getTimeStatus"), _T("{}"), response);
 
     EXPECT_EQ(Core::ERROR_NONE, result) << "GetTimeStatus should return ERROR_NONE when IARM_Bus_Call succeeds";
