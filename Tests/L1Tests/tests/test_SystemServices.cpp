@@ -407,6 +407,9 @@ protected:
     // pluginImpl (Core::ProxyType) is null in in-process builds because
     // comLinkMock.Instantiate is never called. Use m_sysServices instead.
     Exchange::ISystemServices* m_sysServices = nullptr;
+    // Saved during Initialize() so notification tests can fire the PowerManager
+    // INetworkStandbyModeChangedNotification callback manually via the mock.
+    Exchange::IPowerManager::INetworkStandbyModeChangedNotification* m_pmNwStandbyNotif = nullptr;
 
     SystemServicesTest()
         : SystemServicesInitializeTest()
@@ -464,7 +467,9 @@ protected:
         // explicitly declares these calls are expected any number of times.
         EXPECT_CALL(PowerManagerMock::Mock(), Register(::testing::Matcher<Exchange::IPowerManager::INetworkStandbyModeChangedNotification*>(::testing::_)))
             .Times(::testing::AnyNumber())
-            .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
+            .WillRepeatedly(::testing::DoAll(
+                ::testing::SaveArg<0>(&m_pmNwStandbyNotif),
+                ::testing::Return(Core::ERROR_NONE)));
         EXPECT_CALL(PowerManagerMock::Mock(), Register(::testing::Matcher<Exchange::IPowerManager::IRebootNotification*>(::testing::_)))
             .Times(::testing::AnyNumber())
             .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
@@ -3988,8 +3993,13 @@ TEST_F(SystemServicesTest, Notification_OnNetworkStandbyModeChanged_ViaSetNetwor
     m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
     
+    // SetNetworkStandbyMode does not fire OnNetworkStandbyModeChanged directly;
+    // it relies on the PowerManager firing a callback. Simulate that here.
     EXPECT_CALL(PowerManagerMock::Mock(), SetNetworkStandbyMode(true))
-        .WillOnce(::testing::Return(Core::ERROR_NONE));
+        .WillOnce(::testing::Invoke([this](bool nwStandby) -> Core::hresult {
+            if (m_pmNwStandbyNotif) m_pmNwStandbyNotif->OnNetworkStandbyModeChanged(nwStandby);
+            return Core::ERROR_NONE;
+        }));
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setNetworkStandbyMode"), _T("{\"nwStandby\":true}"), response));
     
@@ -4008,8 +4018,13 @@ TEST_F(SystemServicesTest, Notification_OnNetworkStandbyModeChanged_Disable)
     m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
     
+    // SetNetworkStandbyMode does not fire OnNetworkStandbyModeChanged directly;
+    // it relies on the PowerManager firing a callback. Simulate that here.
     EXPECT_CALL(PowerManagerMock::Mock(), SetNetworkStandbyMode(false))
-        .WillOnce(::testing::Return(Core::ERROR_NONE));
+        .WillOnce(::testing::Invoke([this](bool nwStandby) -> Core::hresult {
+            if (m_pmNwStandbyNotif) m_pmNwStandbyNotif->OnNetworkStandbyModeChanged(nwStandby);
+            return Core::ERROR_NONE;
+        }));
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setNetworkStandbyMode"), _T("{\"nwStandby\":false}"), response));
     
@@ -4022,9 +4037,12 @@ TEST_F(SystemServicesTest, Notification_OnNetworkStandbyModeChanged_Disable)
 
 TEST_F(SystemServicesTest, Notification_OnBlocklistChanged_ViaSetBlocklistFlag)
 {
-    // Create required file for blocklistFlag write to succeed
+    // Create required file for blocklistFlag write to succeed.
+    // IMPORTANT: key must be lowercase 'blocklist' to match #define BLOCKLIST "blocklist".
+    // If the file uses uppercase 'BLOCKLIST', write_parameters won't find the key,
+    // update stays false, and OnBlocklistChanged is never fired.
     system("mkdir -p /opt/secure/persistent/opflashstore");
-    createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "BLOCKLIST=false");
+    createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "blocklist=false");
 
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
 
@@ -4130,13 +4148,17 @@ TEST_F(SystemServicesTest, Notification_Timeout_ReturnsFalse)
 TEST_F(SystemServicesTest, Notification_OnFriendlyNameChanged_EmptyName)
 {
     ASSERT_NE(nullptr, m_sysServices) << "ISystemServices not available";
+
+    // SetFriendlyName only fires OnFriendlyNameChanged when m_friendlyName changes.
+    // Default m_friendlyName is "", so setting "" is a no-op. Pre-set a non-empty
+    // name first so the subsequent set-to-empty actually triggers the notification.
+    EXPECT_CALL(*p_rfcApiMock, setRFCParameter(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillRepeatedly(::testing::Return(WDMP_SUCCESS));
+    handler.Invoke(connection, _T("setFriendlyName"), _T("{\"friendlyName\":\"nonEmpty\"}"), response);
+
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
-    
     m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
-    
-    EXPECT_CALL(*p_rfcApiMock, setRFCParameter(::testing::_, ::testing::_, ::testing::_, ::testing::_))
-        .WillOnce(::testing::Return(WDMP_SUCCESS));
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setFriendlyName"), _T("{\"friendlyName\":\"\"}"), response));
     
@@ -4194,9 +4216,10 @@ TEST_F(SystemServicesTest, Notification_SequentialEvents_BothReceived)
 
 TEST_F(SystemServicesTest, Notification_OnBlocklistChanged_MultipleChanges)
 {
-    // Create required directory and file for blocklist write to succeed
+    // Create required directory and file for blocklist write to succeed.
+    // Key must be lowercase 'blocklist' to match #define BLOCKLIST "blocklist".
     system("mkdir -p /opt/secure/persistent/opflashstore");
-    createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "BLOCKLIST=false");
+    createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "blocklist=false");
 
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
 
