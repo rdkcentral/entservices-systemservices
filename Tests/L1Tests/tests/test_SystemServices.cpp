@@ -524,6 +524,13 @@ protected:
 
     virtual ~SystemServicesTest() override
     {
+        // Clean up devicestate.txt so the NEXT test's fixture constructor
+        // (which calls plugin->Initialize → JSystemServices::Register →
+        // GetBlocklistFlag) never sees "blocklist=true" and crashes.
+        // This must run BEFORE Deinitialize so it is guaranteed even if
+        // the test body exited early via ASSERT.
+        system("rm -f /opt/secure/persistent/opflashstore/devicestate.txt");
+
         plugin->Deinitialize(&service);
 
         // *** CRITICAL TEARDOWN ORDER — DO NOT CHANGE THIS SEQUENCE ***
