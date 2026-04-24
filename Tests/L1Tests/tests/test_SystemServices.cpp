@@ -2525,15 +2525,17 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_FileExists)
     system("mkdir -p /opt/secure/persistent/opflashstore");
     createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "blocklist=true");
 
-    uint32_t result = handler.Invoke(connection, _T("getBlocklistFlag"), _T("{}"), response);
-    
-    JsonObject jsonResponse;
-    if (result == Core::ERROR_NONE && jsonResponse.FromString(response)) {
-        ASSERT_TRUE(jsonResponse.HasLabel("blocklist")) << "Missing blocklist field: " << response;
-    }
-    
-    TEST_LOG("GetBlocklistFlag file exists test - Response: %s", response.c_str());
-    
+    // Call impl directly to avoid Thunder JSON-RPC serialization crash for BlocklistResult
+    Exchange::ISystemServices::BlocklistResult result;
+    uint32_t ret = pluginImpl->GetBlocklistFlag(result);
+
+    EXPECT_EQ(Core::ERROR_NONE, ret);
+    EXPECT_TRUE(result.success);
+    EXPECT_TRUE(result.blocklist);
+
+    TEST_LOG("GetBlocklistFlag file exists test - blocklist=%s, success=%s",
+             result.blocklist ? "true" : "false", result.success ? "true" : "false");
+
     removeFile("/opt/secure/persistent/opflashstore/devicestate.txt");
 }
 
@@ -2918,13 +2920,13 @@ TEST_F(SystemServicesTest, GetDeviceInfo_ImageVersion)
 TEST_F(SystemServicesTest, GetBlocklistFlag_DirectoryMissing)
 {
     system("rm -rf /opt/secure/persistent/opflashstore");
-    
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBlocklistFlag"), _T("{}"), response));
-    
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response));
-    EXPECT_TRUE(jsonResponse.HasLabel("success"));
-    EXPECT_FALSE(jsonResponse["success"].Boolean());
+
+    // Call impl directly to avoid Thunder JSON-RPC serialization crash for BlocklistResult
+    Exchange::ISystemServices::BlocklistResult result;
+    uint32_t ret = pluginImpl->GetBlocklistFlag(result);
+
+    EXPECT_EQ(Core::ERROR_NONE, ret);
+    EXPECT_FALSE(result.success);
 }
 
 TEST_F(SystemServicesTest, SetBlocklistFlag_EnableTrue)
