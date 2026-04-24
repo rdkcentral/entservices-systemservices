@@ -521,26 +521,33 @@ protected:
 
         // *** CRITICAL TEARDOWN ORDER — DO NOT CHANGE THIS SEQUENCE ***
         //
-        // Step 1: Drain ALL pending async jobs FIRST, while pluginImpl is still alive
-        //         AND IWorkerPool::Instance() is still valid.
-        //   dispatchEvent() submits Jobs holding a raw `this` + AddRef.
-        //   In-flight jobs may call IWorkerPool::Instance()->Submit() internally
-        //   (e.g. via Notify()). Assigning nullptr to the global pool BEFORE all
-        //   threads finish creates a race: Instance() returns null mid-execution
-        //   and Submit on null → SIGSEGV.
-        //   WorkerPool::Stop() (invoked by ~WorkerPoolImplementation) joins all
-        //   worker threads. After it returns, no thread is running — safe to null
-        //   the global pointer in Step 2.
+        // There are TWO independent sources of IWorkerPool::Instance()->Submit() calls
+        // that can race against Assign(nullptr):
+        //   A) WorkerPool jobs: dispatchEvent() enqueues Jobs that call Submit() internally
+        //      (e.g. from Notify() during Dispatch). These run on WorkerPool threads.
+        //   B) Static cTimer thread: m_operatingModeTimer fires every 1 second, calls
+        //      updateDuration() → dispatchEvent() → Instance()->Submit(). This thread is
+        //      completely independent of the WorkerPool and only stops when
+        //      ~SystemServicesImplementation() calls m_operatingModeTimer.stop().
+        //
+        // Safe order that eliminates BOTH races:
+
+        // Step 1: Drain all currently queued/in-flight WorkerPool jobs while pluginImpl
+        //         is alive and IWorkerPool::Instance() is still valid.
+        //   WorkerPool::Stop() joins all worker threads. After it returns, no WorkerPool
+        //   thread can call Instance() again.
         workerPool.Release();
 
-        // Step 2: NOW disable global WorkerPool access — all threads are stopped.
-        //   No code can call Instance() anymore, so nulling it is safe.
-        Core::IWorkerPool::Assign(nullptr);
-
-        // Step 3: NOW destroy pluginImpl — all jobs done, global pool nulled.
-        //   ~SystemServicesImplementation() calls _powerManagerPlugin->Unregister() x4.
-        //   All mocks are still alive (deleted in Step 4 below) → no use-after-free.
+        // Step 2: Destroy pluginImpl — this calls ~SystemServicesImplementation() which
+        //         calls m_operatingModeTimer.stop(), halting the cTimer thread.
+        //   All mocks are still alive (deleted below) so Unregister() x4 is safe.
+        //   Any Job still holding AddRef keeps the object alive until its dtor runs,
+        //   but those jobs are already done (Step 1 drained the pool).
         pluginImpl = Core::ProxyType<Plugin::SystemServicesImplementation>();
+
+        // Step 3: ONLY NOW null the global pool — WorkerPool drained (Step 1) and
+        //         cTimer stopped (Step 2), so Instance() can never be called again.
+        Core::IWorkerPool::Assign(nullptr);
         dispatcher->Deactivate();
         dispatcher->Release();
         PluginHost::IFactories::Assign(nullptr);
