@@ -521,32 +521,39 @@ protected:
 
         // *** CRITICAL TEARDOWN ORDER — DO NOT CHANGE THIS SEQUENCE ***
         //
-        // There are TWO independent sources of IWorkerPool::Instance()->Submit() calls
-        // that can race against Assign(nullptr):
-        //   A) WorkerPool jobs: dispatchEvent() enqueues Jobs that call Submit() internally
-        //      (e.g. from Notify() during Dispatch). These run on WorkerPool threads.
-        //   B) Static cTimer thread: m_operatingModeTimer fires every 1 second, calls
-        //      updateDuration() → dispatchEvent() → Instance()->Submit(). This thread is
-        //      completely independent of the WorkerPool and only stops when
-        //      ~SystemServicesImplementation() calls m_operatingModeTimer.stop().
+        // Rule: destroy objects in reverse dependency order.
+        //   Plugin (impl) depends on WorkerPool (to submit jobs)
+        //   WorkerPool depends on IWorkerPool global (Instance())
+        //   cTimer thread is inside plugin, stops only in ~SystemServicesImplementation()
         //
-        // Safe order that eliminates BOTH races:
-
-        // Step 1: Drain all currently queued/in-flight WorkerPool jobs while pluginImpl
-        //         is alive and IWorkerPool::Instance() is still valid.
-        //   WorkerPool::Stop() joins all worker threads. After it returns, no WorkerPool
-        //   thread can call Instance() again.
-        workerPool.Release();
-
-        // Step 2: Destroy pluginImpl — this calls ~SystemServicesImplementation() which
-        //         calls m_operatingModeTimer.stop(), halting the cTimer thread.
-        //   All mocks are still alive (deleted below) so Unregister() x4 is safe.
-        //   Any Job still holding AddRef keeps the object alive until its dtor runs,
-        //   but those jobs are already done (Step 1 drained the pool).
+        //   ┌─ setBlocklistFlag / setFriendlyName / etc.
+        //   │       └─ dispatchEvent() → WorkerPool.Submit(Job{this})
+        //   │                                   ↑ uses Instance()
+        //   └─ m_operatingModeTimer (1s tick) → dispatchEvent() → WorkerPool.Submit()
+        //           stops only in ~SystemServicesImplementation()
+        //
+        // STEP 1: Drop pluginImpl reference first.
+        //   If no pending Jobs: ref=0 → ~SystemServicesImplementation() runs immediately
+        //     → m_operatingModeTimer.stop() called, cTimer thread exits
+        //     → _instance=nullptr, so even if cTimer fires once more it won't Submit()
+        //   If pending Jobs hold AddRef: impl stays alive until Step 2 drains them.
+        //     During that window the cTimer CAN fire, but Instance() is still valid
+        //     (global not nulled yet) so Submit() succeeds.
+        //   Mock lifetime: ~SystemServicesImplementation() calls Unregister()x4 via
+        //     _powerManagerPlugin. Mocks are deleted in Step 4 → no use-after-free.
         pluginImpl = Core::ProxyType<Plugin::SystemServicesImplementation>();
 
-        // Step 3: ONLY NOW null the global pool — WorkerPool drained (Step 1) and
-        //         cTimer stopped (Step 2), so Instance() can never be called again.
+        // STEP 2: Drain the WorkerPool while Instance() is still valid.
+        //   WorkerPool::Stop() (in ~WorkerPoolImplementation) joins all threads and
+        //   processes or destructs every queued Job.  Each Job dtor calls impl->Release().
+        //   When the LAST Job releases, refcount→0 → ~SystemServicesImplementation()
+        //   runs (if not already in Step 1), stopping cTimer and setting _instance=nullptr.
+        //   After this call returns the WorkerPool object is destroyed; the global
+        //   IWorkerPool pointer is now dangling — but nothing calls Instance() anymore
+        //   because both threads (worker + cTimer) are stopped.
+        workerPool.Release();
+
+        // STEP 3: Null the global — all callers of Instance() are gone.
         Core::IWorkerPool::Assign(nullptr);
         dispatcher->Deactivate();
         dispatcher->Release();
