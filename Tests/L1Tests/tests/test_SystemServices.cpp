@@ -519,30 +519,28 @@ protected:
     {
         plugin->Deinitialize(&service);
 
-        // *** IMPORTANT: Reset pluginImpl BEFORE IWorkerPool::Assign(nullptr). ***
+        // *** CRITICAL TEARDOWN ORDER — DO NOT CHANGE THIS SEQUENCE ***
         //
-        // Reason 1 — Static timer race:
-        //   SystemServicesImplementation has a static cTimer (m_operatingModeTimer) that fires
-        //   every 1 second via updateDuration().  When it fires it calls dispatchEvent() which
-        //   calls IWorkerPool::Instance().Submit().  If Assign(nullptr) is called first the
-        //   Instance() returns null and Submit dereferences it → SIGSEGV.
-        //   ~SystemServicesImplementation() calls m_operatingModeTimer.stop(), so resetting
-        //   pluginImpl here stops the timer before the global pool slot is cleared.
-        //
-        // Reason 2 — Mock lifetime:
-        //   ~SystemServicesImplementation() calls _powerManagerPlugin->Unregister() x4.
-        //   pluginImpl is a parent-class member variable, so C++ would normally destroy it
-        //   AFTER this destructor body completes — i.e. after all mocks below are deleted
-        //   (use-after-free → SIGSEGV).  Resetting here runs ~SystemServicesImplementation()
-        //   NOW, while every mock is still alive.
-        //
-        // Note: any pending WorkerPool job holds an AddRef on SystemServicesImplementation, so
-        // resetting the ProxyType does NOT destroy the implementation prematurely; it is only
-        // destroyed when the last Job releases its reference (during workerPool.Release()).
-        pluginImpl = Core::ProxyType<Plugin::SystemServicesImplementation>();
-
-        Core::IWorkerPool::Assign(nullptr);
+        // Step 1: Drain ALL pending async jobs FIRST, while pluginImpl is still alive
+        //         AND IWorkerPool::Instance() is still valid.
+        //   dispatchEvent() submits Jobs holding a raw `this` + AddRef.
+        //   In-flight jobs may call IWorkerPool::Instance()->Submit() internally
+        //   (e.g. via Notify()). Assigning nullptr to the global pool BEFORE all
+        //   threads finish creates a race: Instance() returns null mid-execution
+        //   and Submit on null → SIGSEGV.
+        //   WorkerPool::Stop() (invoked by ~WorkerPoolImplementation) joins all
+        //   worker threads. After it returns, no thread is running — safe to null
+        //   the global pointer in Step 2.
         workerPool.Release();
+
+        // Step 2: NOW disable global WorkerPool access — all threads are stopped.
+        //   No code can call Instance() anymore, so nulling it is safe.
+        Core::IWorkerPool::Assign(nullptr);
+
+        // Step 3: NOW destroy pluginImpl — all jobs done, global pool nulled.
+        //   ~SystemServicesImplementation() calls _powerManagerPlugin->Unregister() x4.
+        //   All mocks are still alive (deleted in Step 4 below) → no use-after-free.
+        pluginImpl = Core::ProxyType<Plugin::SystemServicesImplementation>();
         dispatcher->Deactivate();
         dispatcher->Release();
         PluginHost::IFactories::Assign(nullptr);
