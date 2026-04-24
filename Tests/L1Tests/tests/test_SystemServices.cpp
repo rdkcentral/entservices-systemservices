@@ -528,7 +528,8 @@ protected:
         // Obtain the live ISystemServices* via INTERFACE_AGGREGATE (always valid).
         // This is the implementation pointer used for notification Register/Unregister
         // without depending on pluginImpl (which is null in in-process builds).
-        m_sysServices = plugin->QueryInterface<Exchange::ISystemServices>();
+        m_sysServices = static_cast<Exchange::ISystemServices*>(
+            plugin->QueryInterface(Exchange::ISystemServices::ID));
     }
 
     virtual ~SystemServicesTest() override
