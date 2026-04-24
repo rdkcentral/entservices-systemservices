@@ -512,6 +512,13 @@ protected:
            plugin->QueryInterface(PLUGINHOST_DISPATCHER_ID));
         dispatcher->Activate(&service);
 
+        // Remove any stale devicestate.txt before Initialize.
+        // JSystemServices::Register (called inside Initialize) reads the initial
+        // getBlocklistFlag property value; if the file contains "blocklist=true"
+        // from a previous test, Thunder's serializer crashes (SIGSEGV) before
+        // the test body even starts.
+        system("rm -f /opt/secure/persistent/opflashstore/devicestate.txt");
+
         plugin->Initialize(&service);
     }
 
