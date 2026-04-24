@@ -403,6 +403,10 @@ protected:
     SleepModeMock* p_sleepModeMock = nullptr;
     TelemetryApiImplMock* p_telemetryApiImplMock = nullptr;
     readprocImplMock* p_readprocImplMock = nullptr;
+    // Live ISystemServices* obtained via INTERFACE_AGGREGATE from plugin.
+    // pluginImpl (Core::ProxyType) is null in in-process builds because
+    // comLinkMock.Instantiate is never called. Use m_sysServices instead.
+    Exchange::ISystemServices* m_sysServices = nullptr;
 
     SystemServicesTest()
         : SystemServicesInitializeTest()
@@ -520,10 +524,20 @@ protected:
         system("rm -f /opt/secure/persistent/opflashstore/devicestate.txt");
 
         plugin->Initialize(&service);
+
+        // Obtain the live ISystemServices* via INTERFACE_AGGREGATE (always valid).
+        // This is the implementation pointer used for notification Register/Unregister
+        // without depending on pluginImpl (which is null in in-process builds).
+        m_sysServices = plugin->QueryInterface<Exchange::ISystemServices>();
     }
 
     virtual ~SystemServicesTest() override
     {
+        if (m_sysServices) {
+            m_sysServices->Release();
+            m_sysServices = nullptr;
+        }
+
         // Clean up devicestate.txt so the NEXT test's fixture constructor
         // (which calls plugin->Initialize → JSystemServices::Register →
         // GetBlocklistFlag) never sees "blocklist=true" and crashes.
@@ -3946,9 +3960,10 @@ TEST_F(SystemServicesTest, GetLastWakeupKeyCode_ZeroKeyCode)
 
 TEST_F(SystemServicesTest, Notification_OnFriendlyNameChanged_ViaSetFriendlyName)
 {
+    ASSERT_NE(nullptr, m_sysServices) << "ISystemServices not available";
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     
-    pluginImpl->Register(notificationHandler);
+    m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
     
     EXPECT_CALL(*p_rfcApiMock, setRFCParameter(::testing::_, ::testing::_, ::testing::_, ::testing::_))
@@ -3959,16 +3974,17 @@ TEST_F(SystemServicesTest, Notification_OnFriendlyNameChanged_ViaSetFriendlyName
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onFriendlyNameChanged));
     EXPECT_EQ("MyDevice", notificationHandler->GetFriendlyName());
     
-    pluginImpl->Unregister(notificationHandler);
+    m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
 }
 
 
 TEST_F(SystemServicesTest, Notification_OnNetworkStandbyModeChanged_ViaSetNetworkStandbyMode)
 {
+    ASSERT_NE(nullptr, m_sysServices) << "ISystemServices not available";
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     
-    pluginImpl->Register(notificationHandler);
+    m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
     
     EXPECT_CALL(PowerManagerMock::Mock(), SetNetworkStandbyMode(true))
@@ -3979,15 +3995,16 @@ TEST_F(SystemServicesTest, Notification_OnNetworkStandbyModeChanged_ViaSetNetwor
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onNetworkStandbyModeChanged));
     EXPECT_TRUE(notificationHandler->GetNwStandby());
     
-    pluginImpl->Unregister(notificationHandler);
+    m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
 }
 
 TEST_F(SystemServicesTest, Notification_OnNetworkStandbyModeChanged_Disable)
 {
+    ASSERT_NE(nullptr, m_sysServices) << "ISystemServices not available";
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     
-    pluginImpl->Register(notificationHandler);
+    m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
     
     EXPECT_CALL(PowerManagerMock::Mock(), SetNetworkStandbyMode(false))
@@ -3998,7 +4015,7 @@ TEST_F(SystemServicesTest, Notification_OnNetworkStandbyModeChanged_Disable)
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onNetworkStandbyModeChanged));
     EXPECT_FALSE(notificationHandler->GetNwStandby());
     
-    pluginImpl->Unregister(notificationHandler);
+    m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
 }
 
@@ -4010,7 +4027,8 @@ TEST_F(SystemServicesTest, Notification_OnBlocklistChanged_ViaSetBlocklistFlag)
 
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
 
-    pluginImpl->Register(notificationHandler);
+    ASSERT_NE(nullptr, m_sysServices) << "ISystemServices not available";
+    m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
 
     // Use correct param name 'blocklist' (bool) instead of wrong 'blocklistFlag' (string)
@@ -4019,7 +4037,7 @@ TEST_F(SystemServicesTest, Notification_OnBlocklistChanged_ViaSetBlocklistFlag)
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onBlocklistChanged));
     EXPECT_EQ("true", notificationHandler->GetNewBlocklistFlag());
 
-    pluginImpl->Unregister(notificationHandler);
+    m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
 
     removeFile("/opt/secure/persistent/opflashstore/devicestate.txt");
@@ -4027,11 +4045,12 @@ TEST_F(SystemServicesTest, Notification_OnBlocklistChanged_ViaSetBlocklistFlag)
 
 TEST_F(SystemServicesTest, Notification_MultipleHandlers_IndependentNotifications)
 {
+    ASSERT_NE(nullptr, m_sysServices) << "ISystemServices not available";
     SystemServicesNotificationHandler* handler1 = new SystemServicesNotificationHandler();
     SystemServicesNotificationHandler* handler2 = new SystemServicesNotificationHandler();
     
-    pluginImpl->Register(handler1);
-    pluginImpl->Register(handler2);
+    m_sysServices->Register(handler1);
+    m_sysServices->Register(handler2);
     handler1->ResetEvent();
     handler2->ResetEvent();
     
@@ -4045,18 +4064,19 @@ TEST_F(SystemServicesTest, Notification_MultipleHandlers_IndependentNotification
     EXPECT_EQ("TestDevice", handler1->GetFriendlyName());
     EXPECT_EQ("TestDevice", handler2->GetFriendlyName());
     
-    pluginImpl->Unregister(handler1);
-    pluginImpl->Unregister(handler2);
+    m_sysServices->Unregister(handler1);
+    m_sysServices->Unregister(handler2);
     delete handler1;
     delete handler2;
 }
 
 TEST_F(SystemServicesTest, Notification_UnregisterHandler_NoNotificationReceived)
 {
+    ASSERT_NE(nullptr, m_sysServices) << "ISystemServices not available";
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     
-    pluginImpl->Register(notificationHandler);
-    pluginImpl->Unregister(notificationHandler);
+    m_sysServices->Register(notificationHandler);
+    m_sysServices->Unregister(notificationHandler);
     notificationHandler->ResetEvent();
     
     EXPECT_CALL(*p_rfcApiMock, setRFCParameter(::testing::_, ::testing::_, ::testing::_, ::testing::_))
@@ -4071,9 +4091,10 @@ TEST_F(SystemServicesTest, Notification_UnregisterHandler_NoNotificationReceived
 
 TEST_F(SystemServicesTest, Notification_ResetEvent_ClearsEventFlags)
 {
+    ASSERT_NE(nullptr, m_sysServices) << "ISystemServices not available";
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     
-    pluginImpl->Register(notificationHandler);
+    m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
     
     EXPECT_CALL(*p_rfcApiMock, setRFCParameter(::testing::_, ::testing::_, ::testing::_, ::testing::_))
@@ -4087,28 +4108,30 @@ TEST_F(SystemServicesTest, Notification_ResetEvent_ClearsEventFlags)
     
     EXPECT_FALSE(notificationHandler->WaitForRequestStatus(100, SystemServices_onFriendlyNameChanged));
     
-    pluginImpl->Unregister(notificationHandler);
+    m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
 }
 
 TEST_F(SystemServicesTest, Notification_Timeout_ReturnsFalse)
 {
+    ASSERT_NE(nullptr, m_sysServices) << "ISystemServices not available";
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     
-    pluginImpl->Register(notificationHandler);
+    m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
     
     EXPECT_FALSE(notificationHandler->WaitForRequestStatus(100, SystemServices_onFriendlyNameChanged));
     
-    pluginImpl->Unregister(notificationHandler);
+    m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
 }
 
 TEST_F(SystemServicesTest, Notification_OnFriendlyNameChanged_EmptyName)
 {
+    ASSERT_NE(nullptr, m_sysServices) << "ISystemServices not available";
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     
-    pluginImpl->Register(notificationHandler);
+    m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
     
     EXPECT_CALL(*p_rfcApiMock, setRFCParameter(::testing::_, ::testing::_, ::testing::_, ::testing::_))
@@ -4119,15 +4142,16 @@ TEST_F(SystemServicesTest, Notification_OnFriendlyNameChanged_EmptyName)
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onFriendlyNameChanged));
     EXPECT_EQ("", notificationHandler->GetFriendlyName());
     
-    pluginImpl->Unregister(notificationHandler);
+    m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
 }
 
 TEST_F(SystemServicesTest, Notification_OnFriendlyNameChanged_SpecialCharacters)
 {
+    ASSERT_NE(nullptr, m_sysServices) << "ISystemServices not available";
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     
-    pluginImpl->Register(notificationHandler);
+    m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
     
     EXPECT_CALL(*p_rfcApiMock, setRFCParameter(::testing::_, ::testing::_, ::testing::_, ::testing::_))
@@ -4138,15 +4162,16 @@ TEST_F(SystemServicesTest, Notification_OnFriendlyNameChanged_SpecialCharacters)
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onFriendlyNameChanged));
     EXPECT_EQ("Test-Device_123", notificationHandler->GetFriendlyName());
     
-    pluginImpl->Unregister(notificationHandler);
+    m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
 }
 
 TEST_F(SystemServicesTest, Notification_SequentialEvents_BothReceived)
 {
+    ASSERT_NE(nullptr, m_sysServices) << "ISystemServices not available";
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     
-    pluginImpl->Register(notificationHandler);
+    m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
     
     EXPECT_CALL(*p_rfcApiMock, setRFCParameter(::testing::_, ::testing::_, ::testing::_, ::testing::_))
@@ -4162,7 +4187,7 @@ TEST_F(SystemServicesTest, Notification_SequentialEvents_BothReceived)
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onFriendlyNameChanged));
     EXPECT_EQ("Second", notificationHandler->GetFriendlyName());
     
-    pluginImpl->Unregister(notificationHandler);
+    m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
 }
 
@@ -4174,7 +4199,8 @@ TEST_F(SystemServicesTest, Notification_OnBlocklistChanged_MultipleChanges)
 
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
 
-    pluginImpl->Register(notificationHandler);
+    ASSERT_NE(nullptr, m_sysServices) << "ISystemServices not available";
+    m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
 
     // Use correct param key "blocklist" (bool) — not "blocklistFlag" (string)
@@ -4187,7 +4213,7 @@ TEST_F(SystemServicesTest, Notification_OnBlocklistChanged_MultipleChanges)
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onBlocklistChanged));
     EXPECT_EQ("false", notificationHandler->GetNewBlocklistFlag());
 
-    pluginImpl->Unregister(notificationHandler);
+    m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
 
     removeFile("/opt/secure/persistent/opflashstore/devicestate.txt");
@@ -4195,9 +4221,10 @@ TEST_F(SystemServicesTest, Notification_OnBlocklistChanged_MultipleChanges)
 
 TEST_F(SystemServicesTest, Notification_GetEventSignalled_ReturnsCorrectFlags)
 {
+    ASSERT_NE(nullptr, m_sysServices) << "ISystemServices not available";
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     
-    pluginImpl->Register(notificationHandler);
+    m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
     
     EXPECT_EQ(0u, notificationHandler->GetEventSignalled());
@@ -4210,17 +4237,18 @@ TEST_F(SystemServicesTest, Notification_GetEventSignalled_ReturnsCorrectFlags)
     
     EXPECT_TRUE(notificationHandler->GetEventSignalled() & SystemServices_onFriendlyNameChanged);
     
-    pluginImpl->Unregister(notificationHandler);
+    m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
 }
 
 TEST_F(SystemServicesTest, Notification_ReRegisterHandler_ReceivesNotifications)
 {
+    ASSERT_NE(nullptr, m_sysServices) << "ISystemServices not available";
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     
-    pluginImpl->Register(notificationHandler);
-    pluginImpl->Unregister(notificationHandler);
-    pluginImpl->Register(notificationHandler);
+    m_sysServices->Register(notificationHandler);
+    m_sysServices->Unregister(notificationHandler);
+    m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
     
     EXPECT_CALL(*p_rfcApiMock, setRFCParameter(::testing::_, ::testing::_, ::testing::_, ::testing::_))
@@ -4231,6 +4259,6 @@ TEST_F(SystemServicesTest, Notification_ReRegisterHandler_ReceivesNotifications)
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onFriendlyNameChanged));
     EXPECT_EQ("ReRegistered", notificationHandler->GetFriendlyName());
     
-    pluginImpl->Unregister(notificationHandler);
+    m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
 }
