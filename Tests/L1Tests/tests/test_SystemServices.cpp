@@ -3909,59 +3909,25 @@ TEST_F(SystemServicesTest, GetLastWakeupKeyCode_ZeroKeyCode)
     EXPECT_EQ(jsonResponse["wakeupKeyCode"].Number(), 0) << "Wakeup key code should be 0: " << response;
 }
 
-// TEST_F(SystemServicesTest, Notification_OnFriendlyNameChanged_ViaSetFriendlyName)
-// {
-//     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
-    
-//     pluginImpl->Register(notificationHandler);
-//     notificationHandler->ResetEvent();
-    
-//     EXPECT_CALL(*p_rfcApiMock, setRFCParameter(::testing::_, ::testing::_, ::testing::_, ::testing::_))
-//         .WillOnce(::testing::Return(WDMP_SUCCESS));
-    
-//     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setFriendlyName"), _T("{\"friendlyName\":\"MyDevice\"}"), response));
-    
-//     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onFriendlyNameChanged));
-//     EXPECT_EQ("MyDevice", notificationHandler->GetFriendlyName());
-    
-//     pluginImpl->Unregister(notificationHandler);
-//     delete notificationHandler;
-// }
 TEST_F(SystemServicesTest, Notification_OnFriendlyNameChanged_ViaSetFriendlyName)
 {
-    auto* notificationHandler = new SystemServicesNotificationHandler();
-
-    // ✅ Use plugin (NOT pluginImpl)
-    plugin->Register(notificationHandler);
-
+    SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
+    
+    pluginImpl->Register(notificationHandler);
     notificationHandler->ResetEvent();
-
-    EXPECT_CALL(*p_rfcApiMock,
-        setRFCParameter(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+    
+    EXPECT_CALL(*p_rfcApiMock, setRFCParameter(::testing::_, ::testing::_, ::testing::_, ::testing::_))
         .WillOnce(::testing::Return(WDMP_SUCCESS));
-
-    EXPECT_EQ(Core::ERROR_NONE,
-        handler.Invoke(connection,
-            _T("setFriendlyName"),
-            _T("{\"friendlyName\":\"MyDevice\"}"),
-            response));
-
-    // ✅ Wait for async event
-    EXPECT_TRUE(notificationHandler->WaitForRequestStatus(
-        2000,
-        SystemServices_onFriendlyNameChanged));
-
+    
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setFriendlyName"), _T("{\"friendlyName\":\"MyDevice\"}"), response));
+    
+    EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onFriendlyNameChanged));
     EXPECT_EQ("MyDevice", notificationHandler->GetFriendlyName());
-
-    // ✅ Proper unregister
-    plugin->Unregister(notificationHandler);
-
-    // ✅ Small delay to avoid race
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-
-    // ✅ Use Release (NOT delete)
-    notificationHandler->Release();
+    
+    pluginImpl->Unregister(notificationHandler);
+    delete notificationHandler;
 }
+
 
 TEST_F(SystemServicesTest, Notification_OnNetworkStandbyModeChanged_ViaSetNetworkStandbyMode)
 {
