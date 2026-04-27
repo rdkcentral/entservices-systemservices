@@ -4286,6 +4286,7 @@ TEST_F(SystemServicesTest, Notification_ReRegisterHandler_ReceivesNotifications)
     m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
 }
+//
 
 // ======================================
 // getFirmwareUpdateInfo — zero-coverage API
@@ -5198,8 +5199,8 @@ TEST_F(SystemServicesTest, GetFSRFlag_FlagSet)
 {
     EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
         .WillOnce(::testing::Invoke([](const char*, const char*, void* arg, size_t) -> IARM_Result_t {
-            auto* param = static_cast<IARM_Bus_MFRLib_FsrFlag_Param_t*>(arg);
-            param->fsrFlag = 1;
+            auto* param = static_cast<bool*>(arg);
+            *param = true;
             return IARM_RESULT_SUCCESS;
         }));
 
@@ -5217,7 +5218,7 @@ TEST_F(SystemServicesTest, GetFSRFlag_FlagSet)
 // getPlatformConfiguration — various queries
 // ======================================
 
-TEST_F(SystemServicesTest, GetPlatformConfiguration_EmptyQuery)
+TEST_F(SystemServicesTest, GetPlatformConfiguration_EmptyQuery_ReturnsOk)
 {
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getPlatformConfiguration"),
               _T("{\"query\":\"\"}"), response));
@@ -5225,7 +5226,7 @@ TEST_F(SystemServicesTest, GetPlatformConfiguration_EmptyQuery)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
 
-    TEST_LOG("GetPlatformConfiguration_EmptyQuery - Response: %s", response.c_str());
+    TEST_LOG("GetPlatformConfiguration_EmptyQuery_ReturnsOk - Response: %s", response.c_str());
 }
 
 TEST_F(SystemServicesTest, GetPlatformConfiguration_AccountInfo)
