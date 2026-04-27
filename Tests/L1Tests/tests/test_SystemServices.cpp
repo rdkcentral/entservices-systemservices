@@ -30,6 +30,7 @@
 
 #include "SystemServices.h"
 #include "SystemServicesImplementation.h"
+#include "thermonitor.h"
 #include "ServiceMock.h"
 #include "FactoriesImplementation.h"
 #include "IarmBusMock.h"
@@ -410,6 +411,9 @@ protected:
     // Saved during Initialize() so notification tests can fire the PowerManager
     // INetworkStandbyModeChangedNotification callback manually via the mock.
     Exchange::IPowerManager::INetworkStandbyModeChangedNotification* m_pmNwStandbyNotif = nullptr;
+    // Saved during Initialize() so thermal notification tests can fire OnThermalModeChanged
+    // via the registered IThermalModeChangedNotification interface (avoids calling private method).
+    Exchange::IPowerManager::IThermalModeChangedNotification* m_pmThermalNotif = nullptr;
 
     SystemServicesTest()
         : SystemServicesInitializeTest()
@@ -475,7 +479,9 @@ protected:
             .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
         EXPECT_CALL(PowerManagerMock::Mock(), Register(::testing::Matcher<Exchange::IPowerManager::IThermalModeChangedNotification*>(::testing::_)))
             .Times(::testing::AnyNumber())
-            .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
+            .WillRepeatedly(::testing::DoAll(
+                ::testing::SaveArg<0>(&m_pmThermalNotif),
+                ::testing::Return(Core::ERROR_NONE)));
         EXPECT_CALL(PowerManagerMock::Mock(), Register(::testing::Matcher<Exchange::IPowerManager::IModeChangedNotification*>(::testing::_)))
             .Times(::testing::AnyNumber())
             .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
@@ -6937,9 +6943,9 @@ TEST_F(SystemServicesTest, CThermalMonitor_ReportTemperatureThresholdChange_Dire
 
 TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_HighToNormal_EmitsWARN)
 {
-    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+    ASSERT_NE(nullptr, m_pmThermalNotif) << "IThermalModeChangedNotification not registered";
     // HIGH→NORMAL: crossOver=false, "WARN"
-    Plugin::SystemServicesImplementation::_instance->OnThermalModeChanged(
+    m_pmThermalNotif->OnThermalModeChanged(
         WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH,
         WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL,
         50.0f);
@@ -6949,9 +6955,9 @@ TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_HighToNormal_Emi
 
 TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_CriticalToNormal_EmitsWARN)
 {
-    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+    ASSERT_NE(nullptr, m_pmThermalNotif) << "IThermalModeChangedNotification not registered";
     // CRITICAL→NORMAL: crossOver=false, "WARN"
-    Plugin::SystemServicesImplementation::_instance->OnThermalModeChanged(
+    m_pmThermalNotif->OnThermalModeChanged(
         WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL,
         WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL,
         48.0f);
@@ -6961,9 +6967,9 @@ TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_CriticalToNormal
 
 TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_NormalToHigh_EmitsWARN)
 {
-    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+    ASSERT_NE(nullptr, m_pmThermalNotif) << "IThermalModeChangedNotification not registered";
     // NORMAL→HIGH: crossOver=true, "WARN"
-    Plugin::SystemServicesImplementation::_instance->OnThermalModeChanged(
+    m_pmThermalNotif->OnThermalModeChanged(
         WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL,
         WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH,
         88.0f);
@@ -6973,9 +6979,9 @@ TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_NormalToHigh_Emi
 
 TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_CriticalToHigh_EmitsMAX)
 {
-    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+    ASSERT_NE(nullptr, m_pmThermalNotif) << "IThermalModeChangedNotification not registered";
     // CRITICAL→HIGH: crossOver=false, "MAX"
-    Plugin::SystemServicesImplementation::_instance->OnThermalModeChanged(
+    m_pmThermalNotif->OnThermalModeChanged(
         WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL,
         WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH,
         105.0f);
@@ -6985,9 +6991,9 @@ TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_CriticalToHigh_E
 
 TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_HighToCritical_EmitsMAX)
 {
-    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+    ASSERT_NE(nullptr, m_pmThermalNotif) << "IThermalModeChangedNotification not registered";
     // HIGH→CRITICAL: crossOver=true, "MAX"
-    Plugin::SystemServicesImplementation::_instance->OnThermalModeChanged(
+    m_pmThermalNotif->OnThermalModeChanged(
         WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH,
         WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL,
         115.0f);
@@ -6997,9 +7003,9 @@ TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_HighToCritical_E
 
 TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_NormalToCritical_EmitsMAX)
 {
-    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+    ASSERT_NE(nullptr, m_pmThermalNotif) << "IThermalModeChangedNotification not registered";
     // NORMAL→CRITICAL: crossOver=true, "MAX"
-    Plugin::SystemServicesImplementation::_instance->OnThermalModeChanged(
+    m_pmThermalNotif->OnThermalModeChanged(
         WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL,
         WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL,
         120.0f);
@@ -7009,9 +7015,9 @@ TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_NormalToCritical
 
 TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_NormalToNormal_InvalidParams)
 {
-    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+    ASSERT_NE(nullptr, m_pmThermalNotif) << "IThermalModeChangedNotification not registered";
     // NORMAL→NORMAL: default→default in inner switch, validparams=false
-    Plugin::SystemServicesImplementation::_instance->OnThermalModeChanged(
+    m_pmThermalNotif->OnThermalModeChanged(
         WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL,
         WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL,
         45.0f);
@@ -7021,9 +7027,9 @@ TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_NormalToNormal_I
 
 TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_HighToHigh_InvalidParams)
 {
-    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+    ASSERT_NE(nullptr, m_pmThermalNotif) << "IThermalModeChangedNotification not registered";
     // HIGH→HIGH: default in inner switch, validparams=false
-    Plugin::SystemServicesImplementation::_instance->OnThermalModeChanged(
+    m_pmThermalNotif->OnThermalModeChanged(
         WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH,
         WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH,
         90.0f);
@@ -7033,13 +7039,130 @@ TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_HighToHigh_Inval
 
 TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_CriticalToCritical_InvalidParams)
 {
-    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+    ASSERT_NE(nullptr, m_pmThermalNotif) << "IThermalModeChangedNotification not registered";
     // CRITICAL→CRITICAL: default in inner switch, validparams=false
-    Plugin::SystemServicesImplementation::_instance->OnThermalModeChanged(
+    m_pmThermalNotif->OnThermalModeChanged(
         WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL,
         WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL,
         118.0f);
 
     TEST_LOG("CThermalMonitor_OnThermalModeChanged_CriticalToCritical_Invalid - PASSED");
+}
+
+// ===================== Upload Logs Coverage Tests =====================
+// These tests exercise uploadlogs.cpp: checkmTlsLogUploadFlag, getDCMconfigDetails,
+// getUploadLogParameters (internal 3-arg helper), and the fork/exec path of logUploadAsync.
+
+TEST_F(SystemServicesTest, UploadLogs_BinaryPresent_NoDeviceProperties_ReturnsSuccess)
+{
+    // Covers: checkmTlsLogUploadFlag() and getUploadLogParameters up to DEVICE_PROPERTIES failure.
+    // /usr/bin/logupload exists → passes fileExists gate → enters getUploadLogParameters
+    // → parseConfigFile(DEVICE_PROPERTIES, "BUILD_TYPE") fails (empty file) → returns E_NOK
+    createFile("/usr/bin/logupload", "#!/bin/sh\nexit 0");
+    system("chmod +x /usr/bin/logupload");
+    std::ofstream("/etc/device.properties").close(); // empty — no BUILD_TYPE key
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("uploadLogsAsync"), _T("{}"), response));
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
+
+    removeFile("/usr/bin/logupload");
+    std::ofstream("/etc/device.properties").close();
+    TEST_LOG("UploadLogs_BinaryPresent_NoDeviceProperties - PASSED");
+}
+
+TEST_F(SystemServicesTest, UploadLogs_BuildTypeProd_NoLogServerInEtcDCM_ReturnsSuccess)
+{
+    // Covers: BUILD_TYPE=prod → dcmFile=ETC_DCM_PROPERTIES path
+    // → parseConfigFile(ETC_DCM_PROPERTIES, "LOG_SERVER") fails (empty) → E_NOK
+    createFile("/usr/bin/logupload", "#!/bin/sh\nexit 0");
+    system("chmod +x /usr/bin/logupload");
+    createFile("/etc/device.properties", "BUILD_TYPE=prod");
+    std::ofstream("/etc/dcm.properties").close(); // empty — no LOG_SERVER
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("uploadLogsAsync"), _T("{}"), response));
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
+
+    removeFile("/usr/bin/logupload");
+    std::ofstream("/etc/device.properties").close();
+    std::ofstream("/etc/dcm.properties").close();
+    TEST_LOG("UploadLogs_BuildTypeProd_NoLogServerInEtcDCM - PASSED");
+}
+
+TEST_F(SystemServicesTest, UploadLogs_BuildTypeDev_OptDCMExists_EmptyDCMSettings_ReturnsSuccess)
+{
+    // Covers: non-prod build_type + fileExists(OPT_DCM_PROPERTIES) → dcmFile=OPT_DCM_PROPERTIES
+    // + getDCMconfigDetails with empty /tmp/DCMSettings.conf → length < 1 → returns false → E_NOK
+    createFile("/usr/bin/logupload", "#!/bin/sh\nexit 0");
+    system("chmod +x /usr/bin/logupload");
+    createFile("/etc/device.properties", "BUILD_TYPE=dev");
+    createFile("/opt/dcm.properties", "LOG_SERVER=logs.example.com");
+    std::ofstream("/tmp/DCMSettings.conf").close(); // empty → getDCMconfigDetails returns false
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("uploadLogsAsync"), _T("{}"), response));
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
+
+    removeFile("/usr/bin/logupload");
+    std::ofstream("/etc/device.properties").close();
+    removeFile("/opt/dcm.properties");
+    removeFile("/tmp/DCMSettings.conf");
+    TEST_LOG("UploadLogs_BuildTypeDev_OptDCMExists_EmptyDCMSettings - PASSED");
+}
+
+TEST_F(SystemServicesTest, UploadLogs_ValidDCMSettings_NoForceMTLS_URLReplacedWithSecure)
+{
+    // Covers: getDCMconfigDetails with valid content (parses protocol/URL/uploadCheck)
+    // + getUploadLogParameters returns E_OK + mTlsLogUpload=true, no FORCE_MTLS
+    // → "true" != force_mtls("") → regex_replace(cgi-bin → secure/cgi-bin) is called
+    // → logUploadAsync forks and execs the stub binary
+    createFile("/usr/bin/logupload", "#!/bin/sh\nexit 0");
+    system("chmod +x /usr/bin/logupload");
+    createFile("/etc/device.properties", "BUILD_TYPE=prod");
+    createFile("/etc/dcm.properties", "LOG_SERVER=logs.example.com");
+    createFile("/tmp/DCMSettings.conf",
+        "LogUploadSettings:UploadRepository:uploadProtocol=tftp\n"
+        "LogUploadSettings:UploadRepository:URL=http://example.com/cgi-bin/logs.sh\n"
+        "LogUploadSettings:UploadOnReboot=true");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("uploadLogsAsync"), _T("{}"), response));
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
+
+    removeFile("/usr/bin/logupload");
+    std::ofstream("/etc/device.properties").close();
+    std::ofstream("/etc/dcm.properties").close();
+    removeFile("/tmp/DCMSettings.conf");
+    TEST_LOG("UploadLogs_ValidDCMSettings_NoForceMTLS_URLReplaced - PASSED");
+}
+
+TEST_F(SystemServicesTest, UploadLogs_ForceMTLS_True_URLNotReplaced)
+{
+    // Covers: FORCE_MTLS=true in device.properties → mTlsLogUpload=true AND force_mtls="true"
+    // → mTlsLogUpload block entered but "true" != "true" is false → regex_replace NOT called
+    createFile("/usr/bin/logupload", "#!/bin/sh\nexit 0");
+    system("chmod +x /usr/bin/logupload");
+    createFile("/etc/device.properties", "BUILD_TYPE=prod\nFORCE_MTLS=true");
+    createFile("/etc/dcm.properties", "LOG_SERVER=logs.example.com");
+    createFile("/tmp/DCMSettings.conf",
+        "LogUploadSettings:UploadRepository:uploadProtocol=tftp\n"
+        "LogUploadSettings:UploadRepository:URL=http://example.com/cgi-bin/logs.sh\n"
+        "LogUploadSettings:UploadOnReboot=true");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("uploadLogsAsync"), _T("{}"), response));
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
+
+    removeFile("/usr/bin/logupload");
+    std::ofstream("/etc/device.properties").close();
+    std::ofstream("/etc/dcm.properties").close();
+    removeFile("/tmp/DCMSettings.conf");
+    TEST_LOG("UploadLogs_ForceMTLS_True_URLNotReplaced - PASSED");
 }
 
