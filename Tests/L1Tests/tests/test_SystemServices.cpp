@@ -4286,3 +4286,1227 @@ TEST_F(SystemServicesTest, Notification_ReRegisterHandler_ReceivesNotifications)
     m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
 }
+
+// ======================================
+// getFirmwareUpdateInfo — zero-coverage API
+// ======================================
+
+TEST_F(SystemServicesTest, GetFirmwareUpdateInfo_Success)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getFirmwareUpdateInfo"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("asyncResponse")) << "Missing asyncResponse: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Expected success=true: " << response;
+    EXPECT_TRUE(jsonResponse["asyncResponse"].Boolean()) << "Expected asyncResponse=true: " << response;
+
+    TEST_LOG("GetFirmwareUpdateInfo_Success - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetFirmwareUpdateInfo_WithGUID)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getFirmwareUpdateInfo"),
+              _T("{\"GUID\":\"test-guid-12345\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+
+    TEST_LOG("GetFirmwareUpdateInfo_WithGUID - Response: %s", response.c_str());
+}
+
+// ======================================
+// setFirmwareAutoReboot — zero-coverage API
+// ======================================
+
+TEST_F(SystemServicesTest, SetFirmwareAutoReboot_PluginNotAvailable_Enable)
+{
+    uint32_t result = handler.Invoke(connection, _T("setFirmwareAutoReboot"),
+                                     _T("{\"autoreboot\":true}"), response);
+    EXPECT_EQ(Core::ERROR_GENERAL, result)
+        << "Expected ERROR_GENERAL when FirmwareUpdate plugin not available";
+
+    TEST_LOG("SetFirmwareAutoReboot_PluginNotAvailable_Enable - Result: %u", result);
+}
+
+TEST_F(SystemServicesTest, SetFirmwareAutoReboot_PluginNotAvailable_Disable)
+{
+    uint32_t result = handler.Invoke(connection, _T("setFirmwareAutoReboot"),
+                                     _T("{\"autoreboot\":false}"), response);
+    EXPECT_EQ(Core::ERROR_GENERAL, result)
+        << "Expected ERROR_GENERAL when FirmwareUpdate plugin not available";
+
+    TEST_LOG("SetFirmwareAutoReboot_PluginNotAvailable_Disable - Result: %u", result);
+}
+
+// ======================================
+// setMode — zero-coverage API
+// ======================================
+
+TEST_F(SystemServicesTest, SetMode_Normal_NoDuration)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setMode"),
+              _T("{\"modeInfo\":{\"mode\":\"NORMAL\",\"duration\":0}}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+
+    TEST_LOG("SetMode_Normal_NoDuration - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetMode_EmptyMode_SuccessFalse)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setMode"),
+              _T("{\"modeInfo\":{\"mode\":\"\",\"duration\":0}}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "Empty mode should fail: " << response;
+
+    TEST_LOG("SetMode_EmptyMode_SuccessFalse - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetMode_InvalidMode_SuccessFalse)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setMode"),
+              _T("{\"modeInfo\":{\"mode\":\"INVALID_MODE\",\"duration\":0}}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "Invalid mode should fail: " << response;
+
+    TEST_LOG("SetMode_InvalidMode_SuccessFalse - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetMode_Warehouse_IarmSuccess)
+{
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(IARM_RESULT_SUCCESS));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setMode"),
+              _T("{\"modeInfo\":{\"mode\":\"WAREHOUSE\",\"duration\":60}}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+
+    TEST_LOG("SetMode_Warehouse_IarmSuccess - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetMode_EAS_IarmFailure)
+{
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(IARM_RESULT_INVALID_PARAM));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setMode"),
+              _T("{\"modeInfo\":{\"mode\":\"EAS\",\"duration\":30}}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "IARM failure should fail: " << response;
+
+    TEST_LOG("SetMode_EAS_IarmFailure - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetMode_Normal_WithDuration)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setMode"),
+              _T("{\"modeInfo\":{\"mode\":\"NORMAL\",\"duration\":60}}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+
+    TEST_LOG("SetMode_Normal_WithDuration - Response: %s", response.c_str());
+}
+
+// ======================================
+// getPowerStateBeforeReboot — branch coverage
+// ======================================
+
+TEST_F(SystemServicesTest, GetPowerStateBeforeReboot_PowerManagerFailure)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), GetPowerStateBeforeReboot(::testing::_))
+        .WillOnce(::testing::Return(Core::ERROR_GENERAL));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getPowerStateBeforeReboot"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("state")) << "Missing state: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "PM failure should yield success=false: " << response;
+
+    TEST_LOG("GetPowerStateBeforeReboot_PowerManagerFailure - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetPowerStateBeforeReboot_CachedAfterFirstCall)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), GetPowerStateBeforeReboot(::testing::_))
+        .WillOnce(::testing::DoAll(
+            ::testing::SetArgReferee<0>(static_cast<Exchange::IPowerManager::PowerState>(
+                WPEFramework::Exchange::IPowerManager::POWER_STATE_ON)),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getPowerStateBeforeReboot"), _T("{}"), response));
+
+    JsonObject jsonResponse1;
+    ASSERT_TRUE(jsonResponse1.FromString(response));
+    EXPECT_TRUE(jsonResponse1["success"].Boolean()) << "First call should succeed: " << response;
+    string state1 = jsonResponse1["state"].String();
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getPowerStateBeforeReboot"), _T("{}"), response));
+
+    JsonObject jsonResponse2;
+    ASSERT_TRUE(jsonResponse2.FromString(response));
+    EXPECT_TRUE(jsonResponse2["success"].Boolean()) << "Cached call should succeed: " << response;
+    EXPECT_EQ(state1, jsonResponse2["state"].String()) << "Cached state should match first call";
+
+    TEST_LOG("GetPowerStateBeforeReboot_CachedAfterFirstCall - Response: %s", response.c_str());
+}
+
+// ======================================
+// setTimeZoneDST — branch coverage
+// ======================================
+
+TEST_F(SystemServicesTest, SetTimeZoneDST_EmptyString_SuccessFalse)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTimeZoneDST"),
+              _T("{\"timeZone\":\"\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "Empty timezone should fail: " << response;
+
+    TEST_LOG("SetTimeZoneDST_EmptyString_SuccessFalse - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetTimeZoneDST_NoSlash_SuccessFalse)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTimeZoneDST"),
+              _T("{\"timeZone\":\"NoSlashZone\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "No-slash zone should fail: " << response;
+
+    TEST_LOG("SetTimeZoneDST_NoSlash_SuccessFalse - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetTimeZoneDST_TrailingSlash_SuccessFalse)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTimeZoneDST"),
+              _T("{\"timeZone\":\"America/\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "Trailing slash should fail: " << response;
+
+    TEST_LOG("SetTimeZoneDST_TrailingSlash_SuccessFalse - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetTimeZoneDST_ValidZone_ExistingFile)
+{
+    system("mkdir -p /usr/share/zoneinfo/America");
+    system("touch /usr/share/zoneinfo/America/Chicago");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTimeZoneDST"),
+              _T("{\"timeZone\":\"America/Chicago\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+
+    TEST_LOG("SetTimeZoneDST_ValidZone_ExistingFile - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetTimeZoneDST_ValidZone_AccuracyINITIAL)
+{
+    system("mkdir -p /usr/share/zoneinfo/America");
+    system("touch /usr/share/zoneinfo/America/Denver");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTimeZoneDST"),
+              _T("{\"timeZone\":\"America/Denver\",\"accuracy\":\"INITIAL\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+
+    TEST_LOG("SetTimeZoneDST_ValidZone_AccuracyINITIAL - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetTimeZoneDST_ValidZone_AccuracyINTERIM)
+{
+    system("mkdir -p /usr/share/zoneinfo/America");
+    system("touch /usr/share/zoneinfo/America/Detroit");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTimeZoneDST"),
+              _T("{\"timeZone\":\"America/Detroit\",\"accuracy\":\"INTERIM\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+
+    TEST_LOG("SetTimeZoneDST_ValidZone_AccuracyINTERIM - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetTimeZoneDST_ValidZone_AccuracyFINAL)
+{
+    system("mkdir -p /usr/share/zoneinfo/Europe");
+    system("touch /usr/share/zoneinfo/Europe/Paris");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTimeZoneDST"),
+              _T("{\"timeZone\":\"Europe/Paris\",\"accuracy\":\"FINAL\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+
+    TEST_LOG("SetTimeZoneDST_ValidZone_AccuracyFINAL - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetTimeZoneDST_InvalidAccuracy_Ignored)
+{
+    system("mkdir -p /usr/share/zoneinfo/America");
+    system("touch /usr/share/zoneinfo/America/Los_Angeles");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTimeZoneDST"),
+              _T("{\"timeZone\":\"America/Los_Angeles\",\"accuracy\":\"BOGUS\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+
+    TEST_LOG("SetTimeZoneDST_InvalidAccuracy_Ignored - Response: %s", response.c_str());
+}
+
+// ======================================
+// getTimeZoneDST — file absent/present branches
+// ======================================
+
+TEST_F(SystemServicesTest, GetTimeZoneDST_FileAbsent_ReturnsDefault)
+{
+    system("rm -f /opt/persistent/timeZoneDST");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTimeZoneDST"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("timeZone")) << "Missing timeZone: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Absent file should return default: " << response;
+
+    TEST_LOG("GetTimeZoneDST_FileAbsent_ReturnsDefault - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetTimeZoneDST_FilePresent_ReturnsContents)
+{
+    system("mkdir -p /opt/persistent");
+    std::ofstream tzFile("/opt/persistent/timeZoneDST");
+    tzFile << "America/New_York";
+    tzFile.close();
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTimeZoneDST"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("timeZone")) << "Missing timeZone: " << response;
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "File present should succeed: " << response;
+
+    system("rm -f /opt/persistent/timeZoneDST");
+
+    TEST_LOG("GetTimeZoneDST_FilePresent_ReturnsContents - Response: %s", response.c_str());
+}
+
+// ======================================
+// getTerritory — file absent/present branches
+// ======================================
+
+TEST_F(SystemServicesTest, GetTerritory_FileAbsent_SuccessFalse)
+{
+    system("rm -f /opt/secure/persistent/System/territorial.setting");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTerritory"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+
+    TEST_LOG("GetTerritory_FileAbsent_SuccessFalse - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetTerritory_FileWithTerritoryAndRegion)
+{
+    system("mkdir -p /opt/secure/persistent/System");
+    createFile(TERRITORYFILE, "territory:USA\nregion:US-NY");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTerritory"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("territory")) << "Missing territory: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Should succeed with file: " << response;
+    EXPECT_EQ("USA", jsonResponse["territory"].String()) << "Territory mismatch: " << response;
+
+    removeFile(TERRITORYFILE);
+
+    TEST_LOG("GetTerritory_FileWithTerritoryAndRegion - Response: %s", response.c_str());
+}
+
+// ======================================
+// setTerritory — branch coverage
+// ======================================
+
+TEST_F(SystemServicesTest, SetTerritory_ValidGBR)
+{
+    system("mkdir -p /opt/secure/persistent/System");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
+              _T("{\"territory\":\"GBR\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "GBR should succeed: " << response;
+
+    removeFile(TERRITORYFILE);
+
+    TEST_LOG("SetTerritory_ValidGBR - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetTerritory_TooShort_Invalid)
+{
+    uint32_t result = handler.Invoke(connection, _T("setTerritory"),
+                                     _T("{\"territory\":\"US\"}"), response);
+    EXPECT_EQ(Core::ERROR_GENERAL, result) << "2-char territory should fail";
+
+    TEST_LOG("SetTerritory_TooShort_Invalid - Result: %u", result);
+}
+
+TEST_F(SystemServicesTest, SetTerritory_TooLong_Invalid)
+{
+    uint32_t result = handler.Invoke(connection, _T("setTerritory"),
+                                     _T("{\"territory\":\"USAA\"}"), response);
+    EXPECT_EQ(Core::ERROR_GENERAL, result) << "4-char territory should fail";
+
+    TEST_LOG("SetTerritory_TooLong_Invalid - Result: %u", result);
+}
+
+TEST_F(SystemServicesTest, SetTerritory_EmptyTerritory_SuccessFalse)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
+              _T("{\"territory\":\"\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "Empty territory should fail: " << response;
+
+    TEST_LOG("SetTerritory_EmptyTerritory_SuccessFalse - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetTerritory_ValidRegion_US_CA)
+{
+    system("mkdir -p /opt/secure/persistent/System");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
+              _T("{\"territory\":\"USA\",\"region\":\"US-CA\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+
+    removeFile(TERRITORYFILE);
+
+    TEST_LOG("SetTerritory_ValidRegion_US_CA - Response: %s", response.c_str());
+}
+
+// ======================================
+// getBlocklistFlag — lowercase key success path
+// ======================================
+
+TEST_F(SystemServicesTest, GetBlocklistFlag_LowercaseKey_SuccessTrue)
+{
+    system("mkdir -p /opt/secure/persistent/opflashstore");
+    createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "blocklist=false");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBlocklistFlag"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Lowercase key should succeed: " << response;
+
+    removeFile("/opt/secure/persistent/opflashstore/devicestate.txt");
+
+    TEST_LOG("GetBlocklistFlag_LowercaseKey_SuccessTrue - Response: %s", response.c_str());
+}
+
+// ======================================
+// setBlocklistFlag — same/different value branches
+// ======================================
+
+TEST_F(SystemServicesTest, SetBlocklistFlag_SameValue_NoEvent)
+{
+    system("mkdir -p /opt/secure/persistent/opflashstore");
+    createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "blocklist=true");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"),
+              _T("{\"blocklist\":true}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Same-value set should succeed: " << response;
+
+    removeFile("/opt/secure/persistent/opflashstore/devicestate.txt");
+
+    TEST_LOG("SetBlocklistFlag_SameValue_NoEvent - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetBlocklistFlag_DifferentValue_FiresEvent)
+{
+    system("mkdir -p /opt/secure/persistent/opflashstore");
+    createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "blocklist=false");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"),
+              _T("{\"blocklist\":true}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Different-value set should succeed: " << response;
+
+    removeFile("/opt/secure/persistent/opflashstore/devicestate.txt");
+
+    TEST_LOG("SetBlocklistFlag_DifferentValue_FiresEvent - Response: %s", response.c_str());
+}
+
+// ======================================
+// getSystemVersions — version field branches
+// ======================================
+
+TEST_F(SystemServicesTest, GetSystemVersions_VersionFieldPattern)
+{
+    std::ofstream f("/version.txt");
+    f << "imagename:TEST_STB_1.0\nVERSION=1.2.3.4.5\n";
+    f.close();
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getSystemVersions"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Should succeed: " << response;
+
+    std::remove("/version.txt");
+    TEST_LOG("GetSystemVersions_VersionFieldPattern - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetSystemVersions_BuildTimeField)
+{
+    std::ofstream f("/version.txt");
+    f << "imagename:TEST_STB_1.0\nBUILD_TIME=\"2026-04-01 12:00:00\"\n";
+    f.close();
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getSystemVersions"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+
+    std::remove("/version.txt");
+    TEST_LOG("GetSystemVersions_BuildTimeField - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetSystemVersions_NoFile_DefaultStrings)
+{
+    std::remove("/version.txt");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getSystemVersions"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+
+    TEST_LOG("GetSystemVersions_NoFile_DefaultStrings - Response: %s", response.c_str());
+}
+
+// ======================================
+// getDownloadedFirmwareInfo — status file branches
+// ======================================
+
+TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_WithStatusFile)
+{
+    std::ofstream f("/opt/fwdnldstatus.txt");
+    f << "Method|https\nProto|https\nStatus|Successful\n"
+         "DwnldVersn|TEST_FW_1.0\nDwnldLocation|/tmp/test.bin\nRebootImmediate|0\n";
+    f.close();
+
+    std::ofstream vf("/version.txt");
+    vf << "imagename:CURRENT_FW\n";
+    vf.close();
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDownloadedFirmwareInfo"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("currentFWVersion")) << "Missing currentFWVersion: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+
+    std::remove("/opt/fwdnldstatus.txt");
+    std::remove("/version.txt");
+    TEST_LOG("GetDownloadedFirmwareInfo_WithStatusFile - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_RebootImmediateOne)
+{
+    std::ofstream f("/opt/fwdnldstatus.txt");
+    f << "Method|https\nProto|https\nStatus|Successful\n"
+         "DwnldVersn|TEST_FW_2.0\nDwnldLocation|/tmp/fw2.bin\nRebootImmediate|1\n";
+    f.close();
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDownloadedFirmwareInfo"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+
+    std::remove("/opt/fwdnldstatus.txt");
+    TEST_LOG("GetDownloadedFirmwareInfo_RebootImmediateOne - Response: %s", response.c_str());
+}
+
+// ======================================
+// getFirmwareDownloadPercent — progress file branches
+// ======================================
+
+TEST_F(SystemServicesTest, GetFirmwareDownloadPercent_ProgressFile_Returns50)
+{
+    system("mkdir -p /opt");
+    std::ofstream f("/opt/curl_progress");
+    f << "50\n";
+    f.close();
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getFirmwareDownloadPercent"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("downloadPercent")) << "Missing downloadPercent: " << response;
+
+    std::remove("/opt/curl_progress");
+    TEST_LOG("GetFirmwareDownloadPercent_ProgressFile_Returns50 - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetFirmwareDownloadPercent_NoFile_ReturnsMinus1)
+{
+    std::remove("/opt/curl_progress");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getFirmwareDownloadPercent"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("downloadPercent")) << "Missing downloadPercent: " << response;
+    EXPECT_EQ(-1, static_cast<int>(jsonResponse["downloadPercent"].Number()))
+        << "No file should return -1: " << response;
+
+    TEST_LOG("GetFirmwareDownloadPercent_NoFile_ReturnsMinus1 - Response: %s", response.c_str());
+}
+
+// ======================================
+// getLastFirmwareFailureReason — file content branches
+// ======================================
+
+TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_SigVerifyFailed)
+{
+    system("mkdir -p /opt/persistent");
+    std::ofstream f("/opt/persistent/.lastswupdatestatus");
+    f << "LastStatus|Failed|Signature verification failed\n";
+    f.close();
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getLastFirmwareFailureReason"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("failReason")) << "Missing failReason: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Should succeed: " << response;
+
+    std::remove("/opt/persistent/.lastswupdatestatus");
+    TEST_LOG("GetLastFirmwareFailureReason_SigVerifyFailed - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_EmptyFile)
+{
+    system("mkdir -p /opt/persistent");
+    std::ofstream("/opt/persistent/.lastswupdatestatus").close();
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getLastFirmwareFailureReason"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+
+    std::remove("/opt/persistent/.lastswupdatestatus");
+    TEST_LOG("GetLastFirmwareFailureReason_EmptyFile - Response: %s", response.c_str());
+}
+
+// ======================================
+// getNetworkStandbyMode — PowerManager branches
+// ======================================
+
+TEST_F(SystemServicesTest, GetNetworkStandbyMode_PMSuccess_True)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), GetNetworkStandbyMode(::testing::_))
+        .WillOnce(::testing::DoAll(
+            ::testing::SetArgReferee<0>(true),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getNetworkStandbyMode"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("nwStandby")) << "Missing nwStandby: " << response;
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Should succeed: " << response;
+    EXPECT_TRUE(jsonResponse["nwStandby"].Boolean()) << "nwStandby should be true: " << response;
+
+    TEST_LOG("GetNetworkStandbyMode_PMSuccess_True - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetNetworkStandbyMode_PMSuccess_False)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), GetNetworkStandbyMode(::testing::_))
+        .WillOnce(::testing::DoAll(
+            ::testing::SetArgReferee<0>(false),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getNetworkStandbyMode"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("nwStandby")) << "Missing nwStandby: " << response;
+    EXPECT_FALSE(jsonResponse["nwStandby"].Boolean()) << "nwStandby should be false: " << response;
+
+    TEST_LOG("GetNetworkStandbyMode_PMSuccess_False - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetNetworkStandbyMode_PMFailure_SuccessFalse)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), GetNetworkStandbyMode(::testing::_))
+        .WillOnce(::testing::Return(Core::ERROR_GENERAL));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getNetworkStandbyMode"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "PM failure should yield success=false: " << response;
+
+    TEST_LOG("GetNetworkStandbyMode_PMFailure_SuccessFalse - Response: %s", response.c_str());
+}
+
+// ======================================
+// setNetworkStandbyMode — PowerManager failure
+// ======================================
+
+TEST_F(SystemServicesTest, SetNetworkStandbyMode_PMFailure_SuccessFalse)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), SetNetworkStandbyMode(::testing::_))
+        .WillOnce(::testing::Return(Core::ERROR_GENERAL));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setNetworkStandbyMode"),
+              _T("{\"nwStandby\":true}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "PM failure should give success=false: " << response;
+
+    TEST_LOG("SetNetworkStandbyMode_PMFailure_SuccessFalse - Response: %s", response.c_str());
+}
+
+// ======================================
+// getBuildType — additional build type values
+// ======================================
+
+TEST_F(SystemServicesTest, GetBuildType_QA)
+{
+    createFile("/etc/device.properties", "BUILD_TYPE=qa");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBuildType"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("build_type")) << "Missing build_type: " << response;
+    EXPECT_EQ("qa", jsonResponse["build_type"].String()) << "Unexpected build type: " << response;
+
+    std::ofstream("/etc/device.properties").close();
+    TEST_LOG("GetBuildType_QA - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetBuildType_FileAbsent_SuccessFalse)
+{
+    std::remove("/etc/device.properties");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBuildType"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "Missing file should fail: " << response;
+
+    TEST_LOG("GetBuildType_FileAbsent_SuccessFalse - Response: %s", response.c_str());
+}
+
+// ======================================
+// getRFCConfig — regex validation branch
+// ======================================
+
+TEST_F(SystemServicesTest, GetRFCConfig_NameWithSpecialChars_Error)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getRFCConfig"),
+              _T("{\"rfcList\":[\"Invalid Name!@#\"]}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+
+    TEST_LOG("GetRFCConfig_NameWithSpecialChars_Error - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetRFCConfig_TwoValidNames_BothSucceed)
+{
+    RFC_ParamData_t rfcParam;
+    strcpy(rfcParam.value, "TestValue");
+
+    EXPECT_CALL(*p_rfcApiMock, getRFCParameter(::testing::_, ::testing::_, ::testing::_))
+        .WillRepeatedly(::testing::DoAll(
+            ::testing::SetArgPointee<2>(rfcParam),
+            ::testing::Return(WDMP_SUCCESS)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getRFCConfig"),
+              _T("{\"rfcList\":[\"Device.DeviceInfo.Alpha\",\"Device.DeviceInfo.Beta\"]}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+
+    TEST_LOG("GetRFCConfig_TwoValidNames_BothSucceed - Response: %s", response.c_str());
+}
+
+// ======================================
+// setDeepSleepTimer — PowerManager failure and clamping
+// ======================================
+
+TEST_F(SystemServicesTest, SetDeepSleepTimer_PMFailure_ReturnsError)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), SetDeepSleepTimer(::testing::_))
+        .WillOnce(::testing::Return(Core::ERROR_GENERAL));
+
+    uint32_t result = handler.Invoke(connection, _T("setDeepSleepTimer"),
+                                     _T("{\"seconds\":120}"), response);
+    EXPECT_EQ(Core::ERROR_GENERAL, result) << "PM failure should return ERROR_GENERAL";
+
+    TEST_LOG("SetDeepSleepTimer_PMFailure_ReturnsError - Result: %u", result);
+}
+
+TEST_F(SystemServicesTest, SetDeepSleepTimer_Oversized_ClampedToZero)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), SetDeepSleepTimer(0))
+        .WillOnce(::testing::Return(Core::ERROR_NONE));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setDeepSleepTimer"),
+              _T("{\"seconds\":999999}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Clamped call should succeed: " << response;
+
+    TEST_LOG("SetDeepSleepTimer_Oversized_ClampedToZero - Response: %s", response.c_str());
+}
+
+// ======================================
+// getTimeStatus — IARM failure
+// ======================================
+
+TEST_F(SystemServicesTest, GetTimeStatus_IarmFailure_ReturnsError)
+{
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(IARM_RESULT_IPCCORE_FAIL));
+
+    uint32_t result = handler.Invoke(connection, _T("getTimeStatus"), _T("{}"), response);
+    EXPECT_EQ(Core::ERROR_GENERAL, result) << "IARM failure should return ERROR_GENERAL";
+
+    TEST_LOG("GetTimeStatus_IarmFailure_ReturnsError - Result: %u", result);
+}
+
+// ======================================
+// reboot — empty reason uses default
+// ======================================
+
+TEST_F(SystemServicesTest, Reboot_EmptyReason_DefaultUsed)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), Reboot(::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(Core::ERROR_NONE));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("reboot"),
+              _T("{\"rebootReason\":\"\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Empty reason reboot should succeed: " << response;
+
+    TEST_LOG("Reboot_EmptyReason_DefaultUsed - Response: %s", response.c_str());
+}
+
+// ======================================
+// getMfgSerialNumber — buffer populated
+// ======================================
+
+TEST_F(SystemServicesTest, GetMfgSerialNumber_BufferPopulated)
+{
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke([](const char*, const char*, void* arg, size_t) -> IARM_Result_t {
+            auto* param = static_cast<IARM_Bus_MFRLib_GetSerializedData_Param_t*>(arg);
+            strncpy(reinterpret_cast<char*>(param->buffer), "SN12345678",
+                    sizeof(param->buffer) - 1);
+            param->buffer[sizeof(param->buffer) - 1] = '\0';
+            param->bufLen = 10;
+            return IARM_RESULT_SUCCESS;
+        }));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getMfgSerialNumber"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("mfgSerialNumber")) << "Missing mfgSerialNumber: " << response;
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Should succeed: " << response;
+
+    TEST_LOG("GetMfgSerialNumber_BufferPopulated - Response: %s", response.c_str());
+}
+
+// ======================================
+// getFSRFlag — flag value populated
+// ======================================
+
+TEST_F(SystemServicesTest, GetFSRFlag_FlagSet)
+{
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke([](const char*, const char*, void* arg, size_t) -> IARM_Result_t {
+            auto* param = static_cast<IARM_Bus_MFRLib_FsrFlag_Param_t*>(arg);
+            param->fsrFlag = 1;
+            return IARM_RESULT_SUCCESS;
+        }));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getFSRFlag"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("fsrFlag")) << "Missing fsrFlag: " << response;
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Should succeed: " << response;
+
+    TEST_LOG("GetFSRFlag_FlagSet - Response: %s", response.c_str());
+}
+
+// ======================================
+// getPlatformConfiguration — various queries
+// ======================================
+
+TEST_F(SystemServicesTest, GetPlatformConfiguration_EmptyQuery)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getPlatformConfiguration"),
+              _T("{\"query\":\"\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+
+    TEST_LOG("GetPlatformConfiguration_EmptyQuery - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetPlatformConfiguration_AccountInfo)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getPlatformConfiguration"),
+              _T("{\"query\":\"AccountInfo\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+
+    TEST_LOG("GetPlatformConfiguration_AccountInfo - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetPlatformConfiguration_Features)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getPlatformConfiguration"),
+              _T("{\"query\":\"Features\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+
+    TEST_LOG("GetPlatformConfiguration_Features - Response: %s", response.c_str());
+}
+
+// ======================================
+// uploadLogsAsync + abortLogUpload — running branch
+// ======================================
+
+TEST_F(SystemServicesTest, UploadLogsAsync_ThenAbort)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("uploadLogsAsync"),
+              _T("{\"url\":\"http://logs.example.com\"}"), response));
+
+    JsonObject jsonResponse1;
+    ASSERT_TRUE(jsonResponse1.FromString(response)) << "Failed to parse first response: " << response;
+    ASSERT_TRUE(jsonResponse1.HasLabel("success")) << "Missing success: " << response;
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("abortLogUpload"), _T("{}"), response));
+
+    JsonObject jsonResponse2;
+    ASSERT_TRUE(jsonResponse2.FromString(response)) << "Failed to parse abort response: " << response;
+    ASSERT_TRUE(jsonResponse2.HasLabel("success")) << "Missing success in abort: " << response;
+
+    TEST_LOG("UploadLogsAsync_ThenAbort - Response: %s", response.c_str());
+}
+
+// ======================================
+// getMacAddresses — no GUID
+// ======================================
+
+TEST_F(SystemServicesTest, GetMacAddresses_NoGUID_ScriptAbsent)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getMacAddresses"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "Script absent should yield false: " << response;
+
+    TEST_LOG("GetMacAddresses_NoGUID_ScriptAbsent - Response: %s", response.c_str());
+}
+
+// ======================================
+// getFriendlyName — reads cached value
+// ======================================
+
+TEST_F(SystemServicesTest, GetFriendlyName_ReturnsCachedValue)
+{
+    EXPECT_CALL(*p_rfcApiMock, setRFCParameter(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(WDMP_SUCCESS));
+
+    handler.Invoke(connection, _T("setFriendlyName"),
+                   _T("{\"friendlyName\":\"CachedDevice\"}"), response);
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getFriendlyName"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("friendlyName")) << "Missing friendlyName: " << response;
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Should succeed: " << response;
+    EXPECT_EQ("CachedDevice", jsonResponse["friendlyName"].String())
+        << "Friendly name mismatch: " << response;
+
+    TEST_LOG("GetFriendlyName_ReturnsCachedValue - Response: %s", response.c_str());
+}
+
+// ======================================
+// requestSystemUptime — value is positive
+// ======================================
+
+TEST_F(SystemServicesTest, RequestSystemUptime_ReturnsPositiveValue)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("requestSystemUptime"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("systemUptime")) << "Missing systemUptime: " << response;
+
+    double uptime = std::stod(jsonResponse["systemUptime"].String());
+    EXPECT_GT(uptime, 0.0) << "Uptime must be positive: " << response;
+
+    TEST_LOG("RequestSystemUptime_ReturnsPositiveValue - Response: %s", response.c_str());
+}
+
+// ======================================
+// getWakeupReason — PowerManager failure
+// ======================================
+
+TEST_F(SystemServicesTest, GetWakeupReason_PMFailure_ReturnsUnknown)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), GetLastWakeupReason(::testing::_))
+        .WillOnce(::testing::Return(Core::ERROR_GENERAL));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getWakeupReason"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("wakeupReason")) << "Missing wakeupReason: " << response;
+    EXPECT_EQ("WAKEUP_REASON_UNKNOWN", jsonResponse["wakeupReason"].String())
+        << "Failure should return UNKNOWN: " << response;
+
+    TEST_LOG("GetWakeupReason_PMFailure_ReturnsUnknown - Response: %s", response.c_str());
+}
+
+// ======================================
+// getMigrationStatus / getBootTypeInfo — plugin absent
+// ======================================
+
+TEST_F(SystemServicesTest, GetMigrationStatus_PluginAbsent)
+{
+    uint32_t result = handler.Invoke(connection, _T("getMigrationStatus"), _T("{}"), response);
+    EXPECT_EQ(Core::ERROR_GENERAL, result)
+        << "Migration plugin absent should return ERROR_GENERAL";
+
+    TEST_LOG("GetMigrationStatus_PluginAbsent - Result: %u", result);
+}
+
+TEST_F(SystemServicesTest, GetBootTypeInfo_PluginAbsent)
+{
+    uint32_t result = handler.Invoke(connection, _T("getBootTypeInfo"), _T("{}"), response);
+    EXPECT_EQ(Core::ERROR_GENERAL, result)
+        << "Migration plugin absent should return ERROR_GENERAL";
+
+    TEST_LOG("GetBootTypeInfo_PluginAbsent - Result: %u", result);
+}
+
+// ======================================
+// setFriendlyName — RFC failure still succeeds
+// ======================================
+
+TEST_F(SystemServicesTest, SetFriendlyName_RfcFails_SuccessStillTrue)
+{
+    EXPECT_CALL(*p_rfcApiMock, setRFCParameter(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(WDMP_FAILURE));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setFriendlyName"),
+              _T("{\"friendlyName\":\"RfcFailDevice\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    EXPECT_TRUE(jsonResponse["success"].Boolean())
+        << "setFriendlyName always returns success=true: " << response;
+
+    TEST_LOG("SetFriendlyName_RfcFails_SuccessStillTrue - Response: %s", response.c_str());
+}
+
+// ======================================
+// setPowerState — PowerManager failure
+// ======================================
+
+TEST_F(SystemServicesTest, SetPowerState_PMFailure_ReturnsError)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), SetPowerState(::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(Core::ERROR_GENERAL));
+
+    uint32_t result = handler.Invoke(connection, _T("setPowerState"),
+                                     _T("{\"powerState\":\"ON\"}"), response);
+    EXPECT_EQ(Core::ERROR_GENERAL, result) << "PM failure should return ERROR_GENERAL";
+
+    TEST_LOG("SetPowerState_PMFailure_ReturnsError - Result: %u", result);
+}
+
+// ======================================
+// getPowerState — returns STANDBY / failure
+// ======================================
+
+TEST_F(SystemServicesTest, GetPowerState_PMReturnsStandby)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), GetPowerState(::testing::_, ::testing::_))
+        .WillOnce(::testing::DoAll(
+            ::testing::SetArgReferee<0>(static_cast<Exchange::IPowerManager::PowerState>(
+                WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY)),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getPowerState"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("powerState")) << "Missing powerState: " << response;
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Should succeed: " << response;
+
+    TEST_LOG("GetPowerState_PMReturnsStandby - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetPowerState_PMFailure_SuccessFalse)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), GetPowerState(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(Core::ERROR_GENERAL));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getPowerState"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "PM failure should give success=false: " << response;
+
+    TEST_LOG("GetPowerState_PMFailure_SuccessFalse - Response: %s", response.c_str());
+}
+
+// ======================================
+// getTimeZones — null iterator processes all
+// ======================================
+
+TEST_F(SystemServicesTest, GetTimeZones_NullIterator_ProcessAll)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTimeZones"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("zoneinfo")) << "Missing zoneinfo: " << response;
+
+    TEST_LOG("GetTimeZones_NullIterator_ProcessAll - Response: %s", response.c_str());
+}
+
+// ======================================
+// isOptOutTelemetry / setOptOutTelemetry — plugin absent
+// ======================================
+
+TEST_F(SystemServicesTest, IsOptOutTelemetry_PluginAbsent_ReturnsError)
+{
+    uint32_t result = handler.Invoke(connection, _T("isOptOutTelemetry"), _T("{}"), response);
+    EXPECT_EQ(Core::ERROR_GENERAL, result)
+        << "Telemetry plugin absent should give ERROR_GENERAL";
+
+    TEST_LOG("IsOptOutTelemetry_PluginAbsent_ReturnsError - Result: %u", result);
+}
+
+TEST_F(SystemServicesTest, SetOptOutTelemetry_True_PluginAbsent)
+{
+    uint32_t result = handler.Invoke(connection, _T("setOptOutTelemetry"),
+                                     _T("{\"Opt-Out\":true}"), response);
+    EXPECT_EQ(Core::ERROR_GENERAL, result)
+        << "Telemetry plugin absent should give ERROR_GENERAL";
+
+    TEST_LOG("SetOptOutTelemetry_True_PluginAbsent - Result: %u", result);
+}
+
+TEST_F(SystemServicesTest, SetOptOutTelemetry_False_PluginAbsent)
+{
+    uint32_t result = handler.Invoke(connection, _T("setOptOutTelemetry"),
+                                     _T("{\"Opt-Out\":false}"), response);
+    EXPECT_EQ(Core::ERROR_GENERAL, result)
+        << "Telemetry plugin absent should give ERROR_GENERAL";
+
+    TEST_LOG("SetOptOutTelemetry_False_PluginAbsent - Result: %u", result);
+}
+
+// ======================================
+// updateFirmware — always succeeds
+// ======================================
+
+TEST_F(SystemServicesTest, UpdateFirmware_ReturnsSuccess)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("updateFirmware"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "updateFirmware should always succeed: " << response;
+
+    TEST_LOG("UpdateFirmware_ReturnsSuccess - Response: %s", response.c_str());
+}
