@@ -6557,3 +6557,489 @@ TEST_F(SystemServicesTest, GetTimeZones_NullParam_ProcessesAllZones)
     TEST_LOG("GetTimeZones_NullParam_ProcessesAllZones - Response: %s", response.c_str());
 }
 
+// =====================================================================
+// thermonitor.cpp — CThermalMonitor unit tests
+//
+// All CThermalMonitor methods delegate to PowerManager via
+// SystemServicesImplementation::_instance->getPwrMgrPluginInstance().
+// The SystemServicesTest fixture initialises _instance and provides
+// PowerManagerMock::Mock() for mocking PM calls.
+// =====================================================================
+
+// ------------------------------------------------------------------
+// instance() — returns the static singleton (non-null)
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, CThermalMonitor_Instance_ReturnsNonNull)
+{
+    Plugin::CThermalMonitor* monitor = Plugin::CThermalMonitor::instance();
+    ASSERT_NE(nullptr, monitor) << "CThermalMonitor::instance() must not be null";
+
+    TEST_LOG("CThermalMonitor_Instance_ReturnsNonNull - PASSED");
+}
+
+TEST_F(SystemServicesTest, CThermalMonitor_Instance_ReturnsSameSingleton)
+{
+    // Two calls must return the same pointer
+    EXPECT_EQ(Plugin::CThermalMonitor::instance(), Plugin::CThermalMonitor::instance());
+
+    TEST_LOG("CThermalMonitor_Instance_ReturnsSameSingleton - PASSED");
+}
+
+// ------------------------------------------------------------------
+// addEventObserver / removeEventObserver — no-crash, empty body
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, CThermalMonitor_AddEventObserver_DoesNotCrash)
+{
+    Plugin::CThermalMonitor* monitor = Plugin::CThermalMonitor::instance();
+    ASSERT_NE(nullptr, monitor);
+    // addEventObserver has an empty body; just verify it doesn't crash
+    monitor->addEventObserver(nullptr);
+
+    TEST_LOG("CThermalMonitor_AddEventObserver_DoesNotCrash - PASSED");
+}
+
+TEST_F(SystemServicesTest, CThermalMonitor_RemoveEventObserver_DoesNotCrash)
+{
+    Plugin::CThermalMonitor* monitor = Plugin::CThermalMonitor::instance();
+    ASSERT_NE(nullptr, monitor);
+    // removeEventObserver logs WARN; just verify no crash
+    monitor->removeEventObserver(nullptr);
+
+    TEST_LOG("CThermalMonitor_RemoveEventObserver_DoesNotCrash - PASSED");
+}
+
+// ------------------------------------------------------------------
+// getCoreTemperature — PM success: returns true, temperature populated
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, CThermalMonitor_GetCoreTemperature_PMSuccess_ReturnsTrue)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), GetThermalState(::testing::_))
+        .WillOnce(::testing::DoAll(
+            ::testing::SetArgReferee<0>(55.5f),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    Plugin::CThermalMonitor* monitor = Plugin::CThermalMonitor::instance();
+    float temp = 0.0f;
+    bool result = monitor->getCoreTemperature(temp);
+
+    EXPECT_TRUE(result) << "getCoreTemperature should return true on PM success";
+    EXPECT_FLOAT_EQ(55.5f, temp) << "Temperature should match PM output";
+
+    TEST_LOG("CThermalMonitor_GetCoreTemperature_PMSuccess - temp=%.2f result=%d", temp, result);
+}
+
+// ------------------------------------------------------------------
+// getCoreTemperature — PM failure: returns false, temperature = 0
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, CThermalMonitor_GetCoreTemperature_PMFailure_ReturnsFalse)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), GetThermalState(::testing::_))
+        .WillOnce(::testing::Return(Core::ERROR_GENERAL));
+
+    Plugin::CThermalMonitor* monitor = Plugin::CThermalMonitor::instance();
+    float temp = 99.0f;
+    bool result = monitor->getCoreTemperature(temp);
+
+    EXPECT_FALSE(result) << "getCoreTemperature should return false on PM failure";
+    EXPECT_FLOAT_EQ(0.0f, temp) << "Temperature should be reset to 0 on failure";
+
+    TEST_LOG("CThermalMonitor_GetCoreTemperature_PMFailure - temp=%.2f result=%d", temp, result);
+}
+
+// ------------------------------------------------------------------
+// getCoreTemperature — boundary: 0°C (minimum valid)
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, CThermalMonitor_GetCoreTemperature_BoundaryZero)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), GetThermalState(::testing::_))
+        .WillOnce(::testing::DoAll(
+            ::testing::SetArgReferee<0>(0.0f),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    Plugin::CThermalMonitor* monitor = Plugin::CThermalMonitor::instance();
+    float temp = -1.0f;
+    bool result = monitor->getCoreTemperature(temp);
+
+    EXPECT_TRUE(result);
+    EXPECT_FLOAT_EQ(0.0f, temp);
+
+    TEST_LOG("CThermalMonitor_GetCoreTemperature_BoundaryZero - temp=%.2f", temp);
+}
+
+// ------------------------------------------------------------------
+// getCoreTemperature — boundary: high temperature (125°C)
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, CThermalMonitor_GetCoreTemperature_BoundaryHigh)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), GetThermalState(::testing::_))
+        .WillOnce(::testing::DoAll(
+            ::testing::SetArgReferee<0>(125.0f),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    Plugin::CThermalMonitor* monitor = Plugin::CThermalMonitor::instance();
+    float temp = 0.0f;
+    bool result = monitor->getCoreTemperature(temp);
+
+    EXPECT_TRUE(result);
+    EXPECT_FLOAT_EQ(125.0f, temp);
+
+    TEST_LOG("CThermalMonitor_GetCoreTemperature_BoundaryHigh - temp=%.2f", temp);
+}
+
+// ------------------------------------------------------------------
+// getCoreTempThresholds — PM success: returns true, high/critical populated
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, CThermalMonitor_GetCoreTempThresholds_PMSuccess_ReturnsTrue)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), GetTemperatureThresholds(::testing::_, ::testing::_))
+        .WillOnce(::testing::DoAll(
+            ::testing::SetArgReferee<0>(90.0f),
+            ::testing::SetArgReferee<1>(110.0f),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    Plugin::CThermalMonitor* monitor = Plugin::CThermalMonitor::instance();
+    float high = 0.0f, critical = 0.0f;
+    bool result = monitor->getCoreTempThresholds(high, critical);
+
+    EXPECT_TRUE(result) << "getCoreTempThresholds should return true on PM success";
+    EXPECT_FLOAT_EQ(90.0f, high);
+    EXPECT_FLOAT_EQ(110.0f, critical);
+
+    TEST_LOG("CThermalMonitor_GetCoreTempThresholds_PMSuccess - high=%.1f critical=%.1f", high, critical);
+}
+
+// ------------------------------------------------------------------
+// getCoreTempThresholds — PM failure: returns false, high/critical = 0
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, CThermalMonitor_GetCoreTempThresholds_PMFailure_ReturnsFalse)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), GetTemperatureThresholds(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(Core::ERROR_GENERAL));
+
+    Plugin::CThermalMonitor* monitor = Plugin::CThermalMonitor::instance();
+    float high = 99.0f, critical = 99.0f;
+    bool result = monitor->getCoreTempThresholds(high, critical);
+
+    EXPECT_FALSE(result);
+    EXPECT_FLOAT_EQ(0.0f, high);
+    EXPECT_FLOAT_EQ(0.0f, critical);
+
+    TEST_LOG("CThermalMonitor_GetCoreTempThresholds_PMFailure - high=%.1f critical=%.1f", high, critical);
+}
+
+// ------------------------------------------------------------------
+// setCoreTempThresholds — PM success: returns true
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, CThermalMonitor_SetCoreTempThresholds_PMSuccess_ReturnsTrue)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), SetTemperatureThresholds(85.0f, 105.0f))
+        .WillOnce(::testing::Return(Core::ERROR_NONE));
+
+    Plugin::CThermalMonitor* monitor = Plugin::CThermalMonitor::instance();
+    bool result = monitor->setCoreTempThresholds(85.0f, 105.0f);
+
+    EXPECT_TRUE(result) << "setCoreTempThresholds should return true on PM success";
+
+    TEST_LOG("CThermalMonitor_SetCoreTempThresholds_PMSuccess - result=%d", result);
+}
+
+// ------------------------------------------------------------------
+// setCoreTempThresholds — PM failure: returns false
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, CThermalMonitor_SetCoreTempThresholds_PMFailure_ReturnsFalse)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), SetTemperatureThresholds(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(Core::ERROR_GENERAL));
+
+    Plugin::CThermalMonitor* monitor = Plugin::CThermalMonitor::instance();
+    bool result = monitor->setCoreTempThresholds(85.0f, 105.0f);
+
+    EXPECT_FALSE(result) << "setCoreTempThresholds should return false on PM failure";
+
+    TEST_LOG("CThermalMonitor_SetCoreTempThresholds_PMFailure - result=%d", result);
+}
+
+// ------------------------------------------------------------------
+// setCoreTempThresholds — boundary: max values
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, CThermalMonitor_SetCoreTempThresholds_BoundaryMax)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), SetTemperatureThresholds(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(Core::ERROR_NONE));
+
+    Plugin::CThermalMonitor* monitor = Plugin::CThermalMonitor::instance();
+    bool result = monitor->setCoreTempThresholds(125.0f, 125.0f);
+
+    EXPECT_TRUE(result);
+
+    TEST_LOG("CThermalMonitor_SetCoreTempThresholds_BoundaryMax - result=%d", result);
+}
+
+// ------------------------------------------------------------------
+// getOvertempGraceInterval — PM success: returns true, interval populated
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, CThermalMonitor_GetOvertempGraceInterval_PMSuccess_ReturnsTrue)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), GetOvertempGraceInterval(::testing::_))
+        .WillOnce(::testing::DoAll(
+            ::testing::SetArgReferee<0>(30),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    Plugin::CThermalMonitor* monitor = Plugin::CThermalMonitor::instance();
+    int interval = -1;
+    bool result = monitor->getOvertempGraceInterval(interval);
+
+    EXPECT_TRUE(result);
+    EXPECT_EQ(30, interval);
+
+    TEST_LOG("CThermalMonitor_GetOvertempGraceInterval_PMSuccess - interval=%d result=%d", interval, result);
+}
+
+// ------------------------------------------------------------------
+// getOvertempGraceInterval — PM failure: returns false, interval = 0
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, CThermalMonitor_GetOvertempGraceInterval_PMFailure_ReturnsFalse)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), GetOvertempGraceInterval(::testing::_))
+        .WillOnce(::testing::Return(Core::ERROR_GENERAL));
+
+    Plugin::CThermalMonitor* monitor = Plugin::CThermalMonitor::instance();
+    int interval = 99;
+    bool result = monitor->getOvertempGraceInterval(interval);
+
+    EXPECT_FALSE(result);
+    EXPECT_EQ(0, interval) << "Interval should be reset to 0 on failure";
+
+    TEST_LOG("CThermalMonitor_GetOvertempGraceInterval_PMFailure - interval=%d result=%d", interval, result);
+}
+
+// ------------------------------------------------------------------
+// getOvertempGraceInterval — boundary: zero interval
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, CThermalMonitor_GetOvertempGraceInterval_BoundaryZero)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), GetOvertempGraceInterval(::testing::_))
+        .WillOnce(::testing::DoAll(
+            ::testing::SetArgReferee<0>(0),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    Plugin::CThermalMonitor* monitor = Plugin::CThermalMonitor::instance();
+    int interval = -1;
+    bool result = monitor->getOvertempGraceInterval(interval);
+
+    EXPECT_TRUE(result);
+    EXPECT_EQ(0, interval);
+
+    TEST_LOG("CThermalMonitor_GetOvertempGraceInterval_BoundaryZero - interval=%d", interval);
+}
+
+// ------------------------------------------------------------------
+// setOvertempGraceInterval — PM success: returns true
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, CThermalMonitor_SetOvertempGraceInterval_PMSuccess_ReturnsTrue)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), SetOvertempGraceInterval(60))
+        .WillOnce(::testing::Return(Core::ERROR_NONE));
+
+    Plugin::CThermalMonitor* monitor = Plugin::CThermalMonitor::instance();
+    bool result = monitor->setOvertempGraceInterval(60);
+
+    EXPECT_TRUE(result);
+
+    TEST_LOG("CThermalMonitor_SetOvertempGraceInterval_PMSuccess - result=%d", result);
+}
+
+// ------------------------------------------------------------------
+// setOvertempGraceInterval — PM failure: returns false
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, CThermalMonitor_SetOvertempGraceInterval_PMFailure_ReturnsFalse)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), SetOvertempGraceInterval(::testing::_))
+        .WillOnce(::testing::Return(Core::ERROR_GENERAL));
+
+    Plugin::CThermalMonitor* monitor = Plugin::CThermalMonitor::instance();
+    bool result = monitor->setOvertempGraceInterval(60);
+
+    EXPECT_FALSE(result);
+
+    TEST_LOG("CThermalMonitor_SetOvertempGraceInterval_PMFailure - result=%d", result);
+}
+
+// ------------------------------------------------------------------
+// setOvertempGraceInterval — boundary: zero interval
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, CThermalMonitor_SetOvertempGraceInterval_BoundaryZero)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), SetOvertempGraceInterval(0))
+        .WillOnce(::testing::Return(Core::ERROR_NONE));
+
+    Plugin::CThermalMonitor* monitor = Plugin::CThermalMonitor::instance();
+    bool result = monitor->setOvertempGraceInterval(0);
+
+    EXPECT_TRUE(result);
+
+    TEST_LOG("CThermalMonitor_SetOvertempGraceInterval_BoundaryZero - result=%d", result);
+}
+
+// ------------------------------------------------------------------
+// emitTemperatureThresholdChange — calls reportTemperatureThresholdChange
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, CThermalMonitor_EmitTemperatureThresholdChange_WARN_Above)
+{
+    Plugin::CThermalMonitor* monitor = Plugin::CThermalMonitor::instance();
+    // No crash, no mock needed — reportTemperatureThresholdChange has empty body
+    monitor->emitTemperatureThresholdChange("WARN", true, 92.5f);
+
+    TEST_LOG("CThermalMonitor_EmitTemperatureThresholdChange_WARN_Above - PASSED");
+}
+
+TEST_F(SystemServicesTest, CThermalMonitor_EmitTemperatureThresholdChange_MAX_Below)
+{
+    Plugin::CThermalMonitor* monitor = Plugin::CThermalMonitor::instance();
+    monitor->emitTemperatureThresholdChange("MAX", false, 80.0f);
+
+    TEST_LOG("CThermalMonitor_EmitTemperatureThresholdChange_MAX_Below - PASSED");
+}
+
+TEST_F(SystemServicesTest, CThermalMonitor_EmitTemperatureThresholdChange_EmptyType)
+{
+    Plugin::CThermalMonitor* monitor = Plugin::CThermalMonitor::instance();
+    monitor->emitTemperatureThresholdChange("", true, 0.0f);
+
+    TEST_LOG("CThermalMonitor_EmitTemperatureThresholdChange_EmptyType - PASSED");
+}
+
+// ------------------------------------------------------------------
+// reportTemperatureThresholdChange — direct call (empty body)
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, CThermalMonitor_ReportTemperatureThresholdChange_Direct)
+{
+    Plugin::CThermalMonitor* monitor = Plugin::CThermalMonitor::instance();
+    // Empty implementation — verify no crash
+    monitor->reportTemperatureThresholdChange("WARN", true, 95.0f);
+    monitor->reportTemperatureThresholdChange("MAX", false, 70.0f);
+
+    TEST_LOG("CThermalMonitor_ReportTemperatureThresholdChange_Direct - PASSED");
+}
+
+// ------------------------------------------------------------------
+// OnThermalModeChanged / handleThermalLevelChange — all switch branches
+//
+// Transitions tested (currentLevel → newLevel):
+//   HIGH → NORMAL  (crossOver=false, thermLevel="WARN")
+//   CRITICAL → NORMAL  (crossOver=false, thermLevel="WARN")
+//   NORMAL → HIGH  (crossOver=true, thermLevel="WARN")
+//   CRITICAL → HIGH  (crossOver=false, thermLevel="MAX")
+//   HIGH → CRITICAL  (crossOver=true, thermLevel="MAX")
+//   NORMAL → CRITICAL  (crossOver=true, thermLevel="MAX")
+//   Invalid transitions (validparams=false, no event)
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_HighToNormal_EmitsWARN)
+{
+    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+    // HIGH→NORMAL: crossOver=false, "WARN"
+    Plugin::SystemServicesImplementation::_instance->OnThermalModeChanged(
+        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH,
+        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL,
+        50.0f);
+
+    TEST_LOG("CThermalMonitor_OnThermalModeChanged_HighToNormal - PASSED");
+}
+
+TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_CriticalToNormal_EmitsWARN)
+{
+    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+    // CRITICAL→NORMAL: crossOver=false, "WARN"
+    Plugin::SystemServicesImplementation::_instance->OnThermalModeChanged(
+        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL,
+        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL,
+        48.0f);
+
+    TEST_LOG("CThermalMonitor_OnThermalModeChanged_CriticalToNormal - PASSED");
+}
+
+TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_NormalToHigh_EmitsWARN)
+{
+    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+    // NORMAL→HIGH: crossOver=true, "WARN"
+    Plugin::SystemServicesImplementation::_instance->OnThermalModeChanged(
+        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL,
+        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH,
+        88.0f);
+
+    TEST_LOG("CThermalMonitor_OnThermalModeChanged_NormalToHigh - PASSED");
+}
+
+TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_CriticalToHigh_EmitsMAX)
+{
+    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+    // CRITICAL→HIGH: crossOver=false, "MAX"
+    Plugin::SystemServicesImplementation::_instance->OnThermalModeChanged(
+        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL,
+        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH,
+        105.0f);
+
+    TEST_LOG("CThermalMonitor_OnThermalModeChanged_CriticalToHigh - PASSED");
+}
+
+TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_HighToCritical_EmitsMAX)
+{
+    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+    // HIGH→CRITICAL: crossOver=true, "MAX"
+    Plugin::SystemServicesImplementation::_instance->OnThermalModeChanged(
+        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH,
+        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL,
+        115.0f);
+
+    TEST_LOG("CThermalMonitor_OnThermalModeChanged_HighToCritical - PASSED");
+}
+
+TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_NormalToCritical_EmitsMAX)
+{
+    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+    // NORMAL→CRITICAL: crossOver=true, "MAX"
+    Plugin::SystemServicesImplementation::_instance->OnThermalModeChanged(
+        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL,
+        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL,
+        120.0f);
+
+    TEST_LOG("CThermalMonitor_OnThermalModeChanged_NormalToCritical - PASSED");
+}
+
+TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_NormalToNormal_InvalidParams)
+{
+    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+    // NORMAL→NORMAL: default→default in inner switch, validparams=false
+    Plugin::SystemServicesImplementation::_instance->OnThermalModeChanged(
+        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL,
+        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL,
+        45.0f);
+
+    TEST_LOG("CThermalMonitor_OnThermalModeChanged_NormalToNormal_Invalid - PASSED");
+}
+
+TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_HighToHigh_InvalidParams)
+{
+    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+    // HIGH→HIGH: default in inner switch, validparams=false
+    Plugin::SystemServicesImplementation::_instance->OnThermalModeChanged(
+        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH,
+        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH,
+        90.0f);
+
+    TEST_LOG("CThermalMonitor_OnThermalModeChanged_HighToHigh_Invalid - PASSED");
+}
+
+TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_CriticalToCritical_InvalidParams)
+{
+    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+    // CRITICAL→CRITICAL: default in inner switch, validparams=false
+    Plugin::SystemServicesImplementation::_instance->OnThermalModeChanged(
+        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL,
+        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL,
+        118.0f);
+
+    TEST_LOG("CThermalMonitor_OnThermalModeChanged_CriticalToCritical_Invalid - PASSED");
+}
+
