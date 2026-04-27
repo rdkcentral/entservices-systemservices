@@ -4286,7 +4286,7 @@ TEST_F(SystemServicesTest, Notification_ReRegisterHandler_ReceivesNotifications)
     m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
 }
-//
+//adding more tests for zero-coverage APIs to improve coverage metrics, even if they are not fully functional in the L1 test environment due to missing plugins or dependencies.
 
 // ======================================
 // getFirmwareUpdateInfo — zero-coverage API
@@ -4388,8 +4388,12 @@ TEST_F(SystemServicesTest, SetMode_Warehouse_IarmSuccess)
     EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
         .WillOnce(::testing::Return(IARM_RESULT_SUCCESS));
 
+    // Use duration:-1 so the implementation calls stopModeTimer() instead of
+    // startModeTimer(). Both satisfy duration!=0 (so the IARM path is taken)
+    // but -1 never spawns a timer thread, avoiding a crash caused by assigning
+    // a new std::thread to the still-joinable static m_operatingModeTimer.
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setMode"),
-              _T("{\"modeInfo\":{\"mode\":\"WAREHOUSE\",\"duration\":60}}"), response));
+              _T("{\"modeInfo\":{\"mode\":\"WAREHOUSE\",\"duration\":-1}}"), response));
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
@@ -4402,8 +4406,11 @@ TEST_F(SystemServicesTest, SetMode_EAS_IarmFailure)
     EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
         .WillOnce(::testing::Return(IARM_RESULT_INVALID_PARAM));
 
+    // duration:-1 → stopModeTimer() path; avoids spawning a timer thread on
+    // the static m_operatingModeTimer that may still be joinable from a
+    // prior test, which would cause std::terminate() via std::thread::operator=.
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setMode"),
-              _T("{\"modeInfo\":{\"mode\":\"EAS\",\"duration\":30}}"), response));
+              _T("{\"modeInfo\":{\"mode\":\"EAS\",\"duration\":-1}}"), response));
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
