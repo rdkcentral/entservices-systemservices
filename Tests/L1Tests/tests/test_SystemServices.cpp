@@ -7166,3 +7166,85 @@ TEST_F(SystemServicesTest, UploadLogs_ForceMTLS_True_URLNotReplaced)
     TEST_LOG("UploadLogs_ForceMTLS_True_URLNotReplaced - PASSED");
 }
 
+// ------------------------------------------------------------------
+// Test 6: Binary explicitly absent → fileExists gate returns -1
+// Covers the !Utils::fileExists("/usr/bin/logupload") → return -1 branch
+// (previously only implicitly covered by non-uploadlogs tests)
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, UploadLogs_BinaryMissing_FileExistsGateFails)
+{
+    removeFile("/usr/bin/logupload"); // ensure absent
+
+    EXPECT_EQ(Core::ERROR_NONE,
+        handler.Invoke(connection, _T("uploadLogsAsync"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    // logUploadAsync returns -1 (binary absent), UploadLogsAsync still sets success=true
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << response;
+
+    TEST_LOG("UploadLogs_BinaryMissing_FileExistsGateFails - PASSED");
+}
+
+// ------------------------------------------------------------------
+// Test 7: DCMSettings.conf has content but no matching keys
+// Covers: getDCMconfigDetails regex no-match branches — all 3 if(temp.size()>0) are false,
+// fields stay empty, function still returns true → getUploadLogParameters returns E_OK
+// → logUploadAsync forks with empty protocol/url args
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, UploadLogs_InvalidDCMSettingsFormat_RegexNoMatch)
+{
+    createFile("/usr/bin/logupload", "#!/bin/sh\nexit 0");
+    system("chmod +x /usr/bin/logupload");
+    createFile("/etc/device.properties", "BUILD_TYPE=prod");
+    createFile("/etc/dcm.properties", "LOG_SERVER=logs.example.com");
+    // Content has bytes (passes length<1 check) but no keys match any regex
+    createFile("/tmp/DCMSettings.conf", "INVALID_DATA_NO_MATCHING_KEYS");
+
+    EXPECT_EQ(Core::ERROR_NONE,
+        handler.Invoke(connection, _T("uploadLogsAsync"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+
+    removeFile("/usr/bin/logupload");
+    std::ofstream("/etc/device.properties").close();
+    std::ofstream("/etc/dcm.properties").close();
+    removeFile("/tmp/DCMSettings.conf");
+    TEST_LOG("UploadLogs_InvalidDCMSettingsFormat_RegexNoMatch - PASSED");
+}
+
+// ------------------------------------------------------------------
+// Test 8: URL without "cgi-bin" → regex_replace is called but has no effect
+// Covers: mTlsLogUpload=true, force_mtls="" → "true" != "" is true →
+// regex_replace(url, "cgi-bin" → "secure/cgi-bin") called but URL is unchanged
+// (different from test 4 where URL has "cgi-bin" and gets replaced)
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, UploadLogs_URLWithoutCgiBin_RegexReplaceNoEffect)
+{
+    createFile("/usr/bin/logupload", "#!/bin/sh\nexit 0");
+    system("chmod +x /usr/bin/logupload");
+    createFile("/etc/device.properties", "BUILD_TYPE=prod");
+    createFile("/etc/dcm.properties", "LOG_SERVER=logs.example.com");
+    // URL has no "cgi-bin" — regex_replace is called but string is unchanged
+    createFile("/tmp/DCMSettings.conf",
+        "LogUploadSettings:UploadRepository:uploadProtocol=https\n"
+        "LogUploadSettings:UploadRepository:URL=http://example.com/logs.sh\n"
+        "LogUploadSettings:UploadOnReboot=false");
+
+    EXPECT_EQ(Core::ERROR_NONE,
+        handler.Invoke(connection, _T("uploadLogsAsync"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+
+    removeFile("/usr/bin/logupload");
+    std::ofstream("/etc/device.properties").close();
+    std::ofstream("/etc/dcm.properties").close();
+    removeFile("/tmp/DCMSettings.conf");
+    TEST_LOG("UploadLogs_URLWithoutCgiBin_RegexReplaceNoEffect - PASSED");
+}
+
