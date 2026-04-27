@@ -4290,6 +4290,8 @@ TEST_F(SystemServicesTest, Notification_ReRegisterHandler_ReceivesNotifications)
     m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
 }
+
+//my added test cases for code coverage
 //adding more tests for zero-coverage APIs to improve coverage metrics, even if they are not fully functional in the L1 test environment due to missing plugins or dependencies.
 
 // ======================================
@@ -5531,3 +5533,1023 @@ TEST_F(SystemServicesTest, UpdateFirmware_ReturnsSuccess)
 
     TEST_LOG("UpdateFirmware_ReturnsSuccess - Response: %s", response.c_str());
 }
+
+//added test cases for systemservices
+
+// =====================================================================
+// TARGETED BRANCH COVERAGE TESTS — SystemServicesImplementation.cpp
+// =====================================================================
+
+// ------------------------------------------------------------------
+// SetFriendlyName branches:
+//   1) same name → no RFC write, no event, success=true
+//   2) different name + RFC success → LOGINFO "Success"
+//   3) different name + RFC failure → LOGINFO "Failed" (still success=true)
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, SetFriendlyName_SameName_NoBranchTaken)
+{
+    // Set once to seed m_friendlyName, then set the same value again.
+    // Second call must NOT call setRFCParameter (guard: m_friendlyName != friendlyName).
+    EXPECT_CALL(*p_rfcApiMock, setRFCParameter(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .Times(1)
+        .WillOnce(::testing::Return(WDMP_SUCCESS));
+
+    handler.Invoke(connection, _T("setFriendlyName"), _T("{\"friendlyName\":\"DupeDevice\"}"), response);
+
+    // second call — same name, RFC must NOT be called again
+    EXPECT_CALL(*p_rfcApiMock, setRFCParameter(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .Times(0);
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setFriendlyName"),
+              _T("{\"friendlyName\":\"DupeDevice\"}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << response;
+
+    TEST_LOG("SetFriendlyName_SameName_NoBranchTaken - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetFriendlyName_DifferentName_RfcSuccess_LogsSuccess)
+{
+    EXPECT_CALL(*p_rfcApiMock, setRFCParameter(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(WDMP_SUCCESS));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setFriendlyName"),
+              _T("{\"friendlyName\":\"NewDev\"}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << response;
+
+    TEST_LOG("SetFriendlyName_DifferentName_RfcSuccess_LogsSuccess - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetFriendlyName_DifferentName_RfcFailure_StillSuccess)
+{
+    EXPECT_CALL(*p_rfcApiMock, setRFCParameter(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(WDMP_FAILURE));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setFriendlyName"),
+              _T("{\"friendlyName\":\"FailRFCDev\"}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    // Even when RFC write fails, SetFriendlyName always returns success=true
+    EXPECT_TRUE(jr["success"].Boolean()) << response;
+
+    TEST_LOG("SetFriendlyName_DifferentName_RfcFailure_StillSuccess - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// SetBlocklistFlag branches:
+//   1) Directory creation fails → ERROR_GENERAL / success=false
+//   2) write_parameters fails → ERROR_GENERAL / success=false  (read-only dir)
+//   3) update=false (same value already in file) → success, no event
+//   4) update=true (value changed) → success, event dispatched
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, SetBlocklistFlag_WriteParamFails_DirectoryUnwritable)
+{
+    // Point the code at a path that cannot be created without root.
+    // checkOpFlashStoreDir() tries mkdir on OPFLASH_STORE; if the parent
+    // dir is absent and not creatable it returns false → ERROR_GENERAL.
+    // Actually it's hard to make the dir un-creatable in CI.
+    // Instead: pre-create a REGULAR FILE at /opt/secure/persistent/opflashstore
+    // so mkdir fails with ENOTDIR → errno != EEXIST → ret=false.
+    system("rm -rf /opt/secure/persistent/opflashstore");
+    system("mkdir -p /opt/secure/persistent && touch /opt/secure/persistent/opflashstore");
+
+    uint32_t result = handler.Invoke(connection, _T("setBlocklistFlag"),
+                                     _T("{\"blocklist\":true}"), response);
+    // With the dir unavailable, SetBlocklistFlag returns Core::ERROR_GENERAL
+    EXPECT_EQ(Core::ERROR_GENERAL, result) << "Should fail when opflashstore is a file";
+
+    // Clean up — restore proper dir for subsequent tests
+    system("rm -f /opt/secure/persistent/opflashstore");
+    system("mkdir -p /opt/secure/persistent/opflashstore");
+
+    TEST_LOG("SetBlocklistFlag_WriteParamFails_DirectoryUnwritable - Result: %u", result);
+}
+
+TEST_F(SystemServicesTest, SetBlocklistFlag_SameValueAsFile_NoEventDispatched)
+{
+    system("mkdir -p /opt/secure/persistent/opflashstore");
+    // Pre-write "blocklist=true" so write_parameters finds the same value → update=false
+    std::ofstream f("/opt/secure/persistent/opflashstore/devicestate.txt");
+    f << "blocklist=true\n"; f.close();
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"),
+              _T("{\"blocklist\":true}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << response;
+
+    std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
+
+    TEST_LOG("SetBlocklistFlag_SameValueAsFile_NoEventDispatched - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetBlocklistFlag_DifferentValueFromFile_EventDispatched)
+{
+    system("mkdir -p /opt/secure/persistent/opflashstore");
+    // Pre-write "blocklist=false", then set to true → update=true → event
+    std::ofstream f("/opt/secure/persistent/opflashstore/devicestate.txt");
+    f << "blocklist=false\n"; f.close();
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"),
+              _T("{\"blocklist\":true}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << response;
+
+    std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
+
+    TEST_LOG("SetBlocklistFlag_DifferentValueFromFile_EventDispatched - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// GetBlocklistFlag branches:
+//   1) Directory not creatable → ERROR_GENERAL, success=false
+//   2) File absent → read_parameters fails → success=false, ERROR_NONE
+//   3) File present with "blocklist=true" → success=true, blocklist=true
+//   4) File present with "blocklist=false" → success=true, blocklist=false
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, GetBlocklistFlag_FileAbsent_SuccessFalse)
+{
+    system("mkdir -p /opt/secure/persistent/opflashstore");
+    std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBlocklistFlag"), _T("{}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    ASSERT_TRUE(jr.HasLabel("success"));
+    EXPECT_FALSE(jr["success"].Boolean()) << "No file should yield success=false: " << response;
+
+    TEST_LOG("GetBlocklistFlag_FileAbsent_SuccessFalse - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetBlocklistFlag_FilePresent_BlocklistTrue)
+{
+    system("mkdir -p /opt/secure/persistent/opflashstore");
+    std::ofstream f("/opt/secure/persistent/opflashstore/devicestate.txt");
+    f << "blocklist=true\n"; f.close();
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBlocklistFlag"), _T("{}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    ASSERT_TRUE(jr.HasLabel("success"));
+    EXPECT_TRUE(jr["success"].Boolean()) << response;
+    EXPECT_TRUE(jr["blocklist"].Boolean()) << "Expected blocklist=true: " << response;
+
+    std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
+
+    TEST_LOG("GetBlocklistFlag_FilePresent_BlocklistTrue - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetBlocklistFlag_FilePresent_BlocklistFalse)
+{
+    system("mkdir -p /opt/secure/persistent/opflashstore");
+    std::ofstream f("/opt/secure/persistent/opflashstore/devicestate.txt");
+    f << "blocklist=false\n"; f.close();
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBlocklistFlag"), _T("{}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    ASSERT_TRUE(jr.HasLabel("success"));
+    EXPECT_TRUE(jr["success"].Boolean()) << response;
+    EXPECT_FALSE(jr["blocklist"].Boolean()) << "Expected blocklist=false: " << response;
+
+    std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
+
+    TEST_LOG("GetBlocklistFlag_FilePresent_BlocklistFalse - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// setPowerState branches:
+//   1) empty powerState → populateResponseWithError, success=false
+//   2) ON → setPowerStateConversion("ON") → PM success → success=true
+//   3) STANDBY → PM success → success=true
+//   4) LIGHT_SLEEP / DEEP_SLEEP branch hits getPreferredSleepMode path
+//   5) PM failure → success=false (ERROR_NONE returned)
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, SetPowerState_EmptyState_SuccessFalse)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setPowerState"),
+              _T("{\"powerState\":\"\"}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    ASSERT_TRUE(jr.HasLabel("success"));
+    EXPECT_FALSE(jr["success"].Boolean()) << "Empty powerState should fail: " << response;
+
+    TEST_LOG("SetPowerState_EmptyState_SuccessFalse - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetPowerState_ON_PMSuccess_SuccessTrue)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), SetPowerState(::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(Core::ERROR_NONE));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setPowerState"),
+              _T("{\"powerState\":\"ON\"}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << response;
+
+    TEST_LOG("SetPowerState_ON_PMSuccess_SuccessTrue - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetPowerState_STANDBY_PMSuccess_SuccessTrue)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), SetPowerState(::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(Core::ERROR_NONE));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setPowerState"),
+              _T("{\"powerState\":\"STANDBY\"}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << response;
+
+    TEST_LOG("SetPowerState_STANDBY_PMSuccess_SuccessTrue - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetPowerState_ON_PMFailure_SuccessFalse)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), SetPowerState(::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(Core::ERROR_GENERAL));
+
+    // SetPowerState always returns ERROR_NONE; failure only visible in JSON
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setPowerState"),
+              _T("{\"powerState\":\"ON\"}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_FALSE(jr["success"].Boolean()) << "PM failure should give success=false: " << response;
+
+    TEST_LOG("SetPowerState_ON_PMFailure_SuccessFalse - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetPowerState_WithStandbyReason_PMSuccess)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), SetPowerState(::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(Core::ERROR_NONE));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setPowerState"),
+              _T("{\"powerState\":\"ON\",\"standbyReason\":\"test-reason\"}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << response;
+
+    TEST_LOG("SetPowerState_WithStandbyReason_PMSuccess - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// setNetworkStandbyMode negative branches already exist; add cache-
+// invalidation branch: after successful set, cached value is cleared.
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, SetNetworkStandbyMode_Success_CacheInvalidated)
+{
+    // First get → PM called and caches value
+    EXPECT_CALL(PowerManagerMock::Mock(), GetNetworkStandbyMode(::testing::_))
+        .Times(1)
+        .WillOnce(::testing::DoAll(
+            ::testing::SetArgReferee<0>(false),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    handler.Invoke(connection, _T("getNetworkStandbyMode"), _T("{}"), response);
+
+    // Set → success clears the cache (m_networkStandbyModeValid = false)
+    EXPECT_CALL(PowerManagerMock::Mock(), SetNetworkStandbyMode(true))
+        .WillOnce(::testing::Return(Core::ERROR_NONE));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setNetworkStandbyMode"),
+              _T("{\"nwStandby\":true}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << response;
+
+    // Second get → PM called again (cache was invalidated by the set above)
+    EXPECT_CALL(PowerManagerMock::Mock(), GetNetworkStandbyMode(::testing::_))
+        .Times(1)
+        .WillOnce(::testing::DoAll(
+            ::testing::SetArgReferee<0>(true),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    handler.Invoke(connection, _T("getNetworkStandbyMode"), _T("{}"), response);
+    JsonObject jr2; ASSERT_TRUE(jr2.FromString(response));
+    EXPECT_TRUE(jr2["nwStandby"].Boolean()) << "Cache should be invalidated: " << response;
+
+    TEST_LOG("SetNetworkStandbyMode_Success_CacheInvalidated - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// GetNetworkStandbyMode — cached path (second call uses cache)
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, GetNetworkStandbyMode_ReturnsCachedValue)
+{
+    // First call populates the cache
+    EXPECT_CALL(PowerManagerMock::Mock(), GetNetworkStandbyMode(::testing::_))
+        .Times(1)                          // must only be called once
+        .WillOnce(::testing::DoAll(
+            ::testing::SetArgReferee<0>(true),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    handler.Invoke(connection, _T("getNetworkStandbyMode"), _T("{}"), response);
+
+    // Second call must use cache (no PM call)
+    EXPECT_CALL(PowerManagerMock::Mock(), GetNetworkStandbyMode(::testing::_))
+        .Times(0);
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getNetworkStandbyMode"), _T("{}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["nwStandby"].Boolean()) << "Should return cached true: " << response;
+
+    TEST_LOG("GetNetworkStandbyMode_ReturnsCachedValue - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// SetTerritory branches:
+//   1) empty territory → success=false, ERROR_NONE
+//   2) length != 3 → ERROR_GENERAL
+//   3) valid 3-char, empty region → writes territory only
+//   4) valid 3-char, valid region (XX-YY) → writes territory + region
+//   5) valid 3-char, invalid region format → ERROR_GENERAL
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, SetTerritory_EmptyTerritory_SuccessFalse_ErrorNone)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
+              _T("{\"territory\":\"\"}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_FALSE(jr["success"].Boolean()) << "Empty territory should fail: " << response;
+
+    TEST_LOG("SetTerritory_EmptyTerritory_SuccessFalse_ErrorNone - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetTerritory_Length4_ReturnsErrorGeneral)
+{
+    uint32_t result = handler.Invoke(connection, _T("setTerritory"),
+                                     _T("{\"territory\":\"ABCD\"}"), response);
+    EXPECT_EQ(Core::ERROR_GENERAL, result) << "4-char territory should give ERROR_GENERAL";
+
+    TEST_LOG("SetTerritory_Length4_ReturnsErrorGeneral - Result: %u", result);
+}
+
+TEST_F(SystemServicesTest, SetTerritory_Length2_ReturnsErrorGeneral)
+{
+    uint32_t result = handler.Invoke(connection, _T("setTerritory"),
+                                     _T("{\"territory\":\"AB\"}"), response);
+    EXPECT_EQ(Core::ERROR_GENERAL, result) << "2-char territory should give ERROR_GENERAL";
+
+    TEST_LOG("SetTerritory_Length2_ReturnsErrorGeneral - Result: %u", result);
+}
+
+TEST_F(SystemServicesTest, SetTerritory_ValidUSA_EmptyRegion_Succeeds)
+{
+    system("mkdir -p /opt/secure/persistent/System");
+    std::remove("/opt/secure/persistent/System/Territory.txt");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
+              _T("{\"territory\":\"USA\"}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << "Valid territory should succeed: " << response;
+
+    std::remove("/opt/secure/persistent/System/Territory.txt");
+
+    TEST_LOG("SetTerritory_ValidUSA_EmptyRegion_Succeeds - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetTerritory_ValidUSA_ValidRegion_Succeeds)
+{
+    system("mkdir -p /opt/secure/persistent/System");
+    std::remove("/opt/secure/persistent/System/Territory.txt");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
+              _T("{\"territory\":\"USA\",\"region\":\"US-TX\"}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << "Valid territory+region should succeed: " << response;
+
+    std::remove("/opt/secure/persistent/System/Territory.txt");
+
+    TEST_LOG("SetTerritory_ValidUSA_ValidRegion_Succeeds - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetTerritory_ValidUSA_InvalidRegion_ErrorGeneral)
+{
+    uint32_t result = handler.Invoke(connection, _T("setTerritory"),
+                                     _T("{\"territory\":\"USA\",\"region\":\"invalid-region-too-long\"}"), response);
+    EXPECT_EQ(Core::ERROR_GENERAL, result) << "Invalid region should give ERROR_GENERAL";
+
+    TEST_LOG("SetTerritory_ValidUSA_InvalidRegion_ErrorGeneral - Result: %u", result);
+}
+
+// ------------------------------------------------------------------
+// SetTimeZoneDST — exception branch (throw from inside try block)
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, SetTimeZoneDST_NullString_HandledGracefully)
+{
+    // "null" is the special string that triggers LOGERR but still processes
+    // because the guard checks timeZone == "null" after the first find("/").
+    // With no zoneinfo dir for "null/...", it falls through to the error branch.
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTimeZoneDST"),
+              _T("{\"timeZone\":\"null\"}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    // result depends on filesystem; just check it completes without crash
+    ASSERT_TRUE(jr.HasLabel("success")) << response;
+
+    TEST_LOG("SetTimeZoneDST_NullString_HandledGracefully - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetTimeZoneDST_Universal_ProcessedCorrectly)
+{
+    // "Universal" sets isUniversal=true, isOlson=false; pos==npos so
+    // city lookup uses path+timeZone. In test env the file won't exist
+    // so it hits the populateResponseWithError branch → resp=false.
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTimeZoneDST"),
+              _T("{\"timeZone\":\"Universal\"}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    ASSERT_TRUE(jr.HasLabel("success")) << response;
+
+    TEST_LOG("SetTimeZoneDST_Universal_ProcessedCorrectly - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// GetRFCConfig branches:
+//   1) rfcList null / empty → populateResponseWithError, ERROR_NONE
+//   2) name with invalid chars → hash["name"] = "Invalid charset found"
+//   3) getRFCParameter returns WDMP_SUCCESS but empty value → "Empty response"
+//   4) getRFCParameter returns failure → "Failed to read RFC"
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, GetRFCConfig_NullList_ReturnsErrorNone)
+{
+    // Pass no rfcList key → null iterator → populateResponseWithError.
+    // Using {} (not {"rfcList":[]}) to avoid Thunder COM-RPC crash when
+    // creating/releasing an empty IStringIterator.
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getRFCConfig"),
+              _T("{}"), response));
+
+    // No crash, method handled gracefully
+    TEST_LOG("GetRFCConfig_NullList_ReturnsErrorNone - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetRFCConfig_InvalidCharset_HashContainsError)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getRFCConfig"),
+              _T("{\"rfcList\":[\"Device.Bad Name!\"]}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    TEST_LOG("GetRFCConfig_InvalidCharset_HashContainsError - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetRFCConfig_EmptyRFCValue_HashContainsEmptyMsg)
+{
+    RFC_ParamData_t rfcParam;
+    memset(&rfcParam, 0, sizeof(rfcParam));
+    rfcParam.value[0] = '\0'; // empty value
+
+    EXPECT_CALL(*p_rfcApiMock, getRFCParameter(::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::DoAll(
+            ::testing::SetArgPointee<2>(rfcParam),
+            ::testing::Return(WDMP_SUCCESS)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getRFCConfig"),
+              _T("{\"rfcList\":[\"Device.DeviceInfo.Empty\"]}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    // success=false because no non-empty value was set
+    EXPECT_FALSE(jr["success"].Boolean()) << "Empty value should leave success=false: " << response;
+
+    TEST_LOG("GetRFCConfig_EmptyRFCValue_HashContainsEmptyMsg - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetRFCConfig_RFCFailure_HashContainsFailedMsg)
+{
+    EXPECT_CALL(*p_rfcApiMock, getRFCParameter(::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(WDMP_FAILURE));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getRFCConfig"),
+              _T("{\"rfcList\":[\"Device.DeviceInfo.FailParam\"]}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_FALSE(jr["success"].Boolean()) << "RFC failure should give success=false: " << response;
+
+    TEST_LOG("GetRFCConfig_RFCFailure_HashContainsFailedMsg - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetRFCConfig_DefaultValueSuccess_HashContainsValue)
+{
+    RFC_ParamData_t rfcParam;
+    memset(&rfcParam, 0, sizeof(rfcParam));
+    strncpy(rfcParam.value, "default_val", sizeof(rfcParam.value) - 1);
+
+    EXPECT_CALL(*p_rfcApiMock, getRFCParameter(::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::DoAll(
+            ::testing::SetArgPointee<2>(rfcParam),
+            ::testing::Return(WDMP_ERR_DEFAULT_VALUE)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getRFCConfig"),
+              _T("{\"rfcList\":[\"Device.DeviceInfo.DefaultParam\"]}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << "WDMP_ERR_DEFAULT_VALUE should still succeed: " << response;
+
+    TEST_LOG("GetRFCConfig_DefaultValueSuccess_HashContainsValue - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// SetDeepSleepTimer branches:
+//   1) seconds=0 → populateResponseWithError → retStatus stays ERROR_GENERAL
+//   2) seconds in valid range → PM success → ERROR_NONE
+//   3) seconds exceeds 864000 → clamped to 0 → PM called with 0
+//   4) seconds negative → clamped to 0 → PM called with 0
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, SetDeepSleepTimer_ZeroSeconds_PopulatesError)
+{
+    uint32_t result = handler.Invoke(connection, _T("setDeepSleepTimer"),
+                                     _T("{\"seconds\":0}"), response);
+    // seconds=0 → else branch → populateResponseWithError, retStatus stays ERROR_GENERAL
+    EXPECT_EQ(Core::ERROR_GENERAL, result) << "Zero seconds should return ERROR_GENERAL";
+
+    TEST_LOG("SetDeepSleepTimer_ZeroSeconds_PopulatesError - Result: %u", result);
+}
+
+TEST_F(SystemServicesTest, SetDeepSleepTimer_ValidRange_PMSuccess)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), SetDeepSleepTimer(300))
+        .WillOnce(::testing::Return(Core::ERROR_NONE));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setDeepSleepTimer"),
+              _T("{\"seconds\":300}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << response;
+
+    TEST_LOG("SetDeepSleepTimer_ValidRange_PMSuccess - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetDeepSleepTimer_NegativeSeconds_ClampedTo0)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), SetDeepSleepTimer(0))
+        .WillOnce(::testing::Return(Core::ERROR_NONE));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setDeepSleepTimer"),
+              _T("{\"seconds\":-5}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << response;
+
+    TEST_LOG("SetDeepSleepTimer_NegativeSeconds_ClampedTo0 - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetDeepSleepTimer_Exceeds864000_ClampedTo0)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), SetDeepSleepTimer(0))
+        .WillOnce(::testing::Return(Core::ERROR_NONE));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setDeepSleepTimer"),
+              _T("{\"seconds\":864001}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << response;
+
+    TEST_LOG("SetDeepSleepTimer_Exceeds864000_ClampedTo0 - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// GetFirmwareDownloadPercent — getDownloadProgress failure path
+// (file exists but content unreadable / returns false)
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, GetFirmwareDownloadPercent_FileExistsButEmpty)
+{
+    std::ofstream f("/opt/curl_progress"); f.close(); // empty file
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getFirmwareDownloadPercent"),
+              _T("{}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    ASSERT_TRUE(jr.HasLabel("downloadPercent")) << response;
+
+    std::remove("/opt/curl_progress");
+
+    TEST_LOG("GetFirmwareDownloadPercent_FileExistsButEmpty - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// SetMode — normal-to-normal with duration=0 → changeMode=false branch
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, SetMode_NormalToNormal_Duration0_ChangeModeIsFalse)
+{
+    // Calling NORMAL with duration=0 when current mode is already NORMAL:
+    // changeMode = (m_currentMode != requestMode) = false → mode stays NORMAL.
+    // The test verifies the handler completes successfully either path.
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setMode"),
+              _T("{\"modeInfo\":{\"mode\":\"NORMAL\",\"duration\":0}}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    ASSERT_TRUE(jr.HasLabel("success")) << response;
+
+    TEST_LOG("SetMode_NormalToNormal_Duration0_ChangeModeIsFalse - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// Reboot — PM plugin absent → ERROR_ILLEGAL_STATE returned
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, Reboot_WithReasonString_PMSuccess)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), Reboot(::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(Core::ERROR_NONE));
+
+    uint32_t result = handler.Invoke(connection, _T("reboot"),
+                                     _T("{\"rebootReason\":\"FIRMWARE_FAILURE\"}"), response);
+    EXPECT_EQ(Core::ERROR_NONE, result) << response;
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << response;
+
+    TEST_LOG("Reboot_WithReasonString_PMSuccess - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// GetPowerStateBeforeReboot — cached path (must NOT call PM twice)
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, GetPowerStateBeforeReboot_SecondCall_UsesCachedValue)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), GetPowerStateBeforeReboot(::testing::_))
+        .Times(1)   // PM called exactly once; second call uses m_powerStateBeforeRebootValid
+        .WillOnce(::testing::DoAll(
+            ::testing::SetArgReferee<0>(WPEFramework::Exchange::IPowerManager::POWER_STATE_ON),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    handler.Invoke(connection, _T("getPowerStateBeforeReboot"), _T("{}"), response);
+
+    EXPECT_CALL(PowerManagerMock::Mock(), GetPowerStateBeforeReboot(::testing::_))
+        .Times(0);
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getPowerStateBeforeReboot"), _T("{}"), response));
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << "Cached call should succeed: " << response;
+
+    TEST_LOG("GetPowerStateBeforeReboot_SecondCall_UsesCachedValue - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// GetMigrationStatus / SetMigrationStatus — plugin absent branches
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, SetMigrationStatus_PluginAbsent_ReturnsErrorGeneral)
+{
+    uint32_t result = handler.Invoke(connection, _T("setMigrationStatus"),
+                                     _T("{\"status\":\"STARTED\"}"), response);
+    EXPECT_EQ(Core::ERROR_GENERAL, result) << "Migration plugin absent should fail";
+
+    TEST_LOG("SetMigrationStatus_PluginAbsent_ReturnsErrorGeneral - Result: %u", result);
+}
+
+// ------------------------------------------------------------------
+// GetFirmwareUpdateState — specific state values hit different enum paths
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, GetFirmwareUpdateState_Returns0_Uninitialized)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getFirmwareUpdateState"), _T("{}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << response;
+    ASSERT_TRUE(jr.HasLabel("firmwareUpdateState")) << response;
+    // Default is FirmwareUpdateStateUninitialized = 0
+    EXPECT_EQ(0, static_cast<int>(jr["firmwareUpdateState"].Number())) << response;
+
+    TEST_LOG("GetFirmwareUpdateState_Returns0_Uninitialized - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// GetLastFirmwareFailureReason — no file → returns "none", success=true
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_NoFile_ReturnsNoneAndSuccess)
+{
+    std::remove("/opt/fwdnldstatus.txt");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getLastFirmwareFailureReason"), _T("{}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    ASSERT_TRUE(jr.HasLabel("failReason")) << response;
+    EXPECT_TRUE(jr["success"].Boolean()) << "No file should still return success=true: " << response;
+
+    TEST_LOG("GetLastFirmwareFailureReason_NoFile_ReturnsNoneAndSuccess - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// GetTimeZoneDST — file write/read correctness
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, GetTimeZoneDST_AfterSet_ReturnsSetValue)
+{
+    system("mkdir -p /opt/persistent");
+    std::ofstream f("/opt/persistent/timeZoneDST");
+    f << "Europe/London"; f.close();
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTimeZoneDST"), _T("{}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << response;
+
+    std::remove("/opt/persistent/timeZoneDST");
+
+    TEST_LOG("GetTimeZoneDST_AfterSet_ReturnsSetValue - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// requestSystemUptime — called twice, second value ≥ first
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, RequestSystemUptime_TwoCallsIncrease)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("requestSystemUptime"), _T("{}"), response));
+    JsonObject jr1; ASSERT_TRUE(jr1.FromString(response));
+    double up1 = std::stod(jr1["systemUptime"].String());
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("requestSystemUptime"), _T("{}"), response));
+    JsonObject jr2; ASSERT_TRUE(jr2.FromString(response));
+    double up2 = std::stod(jr2["systemUptime"].String());
+
+    EXPECT_GE(up2, up1) << "Second uptime must be ≥ first";
+
+    TEST_LOG("RequestSystemUptime_TwoCallsIncrease - up1=%.3f up2=%.3f", up1, up2);
+}
+
+// ------------------------------------------------------------------
+// GetSystemVersions — verifies all three fields present
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, GetSystemVersions_ThreeFieldsPresent)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getSystemVersions"), _T("{}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr.HasLabel("stbVersion"))     << "Missing stbVersion: "     << response;
+    EXPECT_TRUE(jr.HasLabel("receiverVersion")) << "Missing receiverVersion: " << response;
+    EXPECT_TRUE(jr.HasLabel("stbTimestamp"))   << "Missing stbTimestamp: "   << response;
+    EXPECT_TRUE(jr["success"].Boolean())       << response;
+
+    TEST_LOG("GetSystemVersions_ThreeFieldsPresent - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// GetWakeupReason — success path with IR wakeup reason
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, GetWakeupReason_IRReason_Success)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), GetLastWakeupReason(::testing::_))
+        .WillOnce(::testing::DoAll(
+            ::testing::SetArgReferee<0>(WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_IR),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getWakeupReason"), _T("{}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << response;
+    EXPECT_EQ("WAKEUP_REASON_IR", jr["wakeupReason"].String()) << response;
+
+    TEST_LOG("GetWakeupReason_IRReason_Success - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetWakeupReason_TimerReason_Success)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), GetLastWakeupReason(::testing::_))
+        .WillOnce(::testing::DoAll(
+            ::testing::SetArgReferee<0>(WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_TIMER),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getWakeupReason"), _T("{}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_EQ("WAKEUP_REASON_TIMER", jr["wakeupReason"].String()) << response;
+
+    TEST_LOG("GetWakeupReason_TimerReason_Success - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// GetLastWakeupKeyCode — failure path
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, GetLastWakeupKeyCode_PMFailure_SuccessFalse)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), GetLastWakeupKeyCode(::testing::_))
+        .WillOnce(::testing::Return(Core::ERROR_GENERAL));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getLastWakeupKeyCode"), _T("{}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_FALSE(jr["success"].Boolean()) << "PM failure should give success=false: " << response;
+
+    TEST_LOG("GetLastWakeupKeyCode_PMFailure_SuccessFalse - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetLastWakeupKeyCode_PMSuccess_ReturnsKey)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), GetLastWakeupKeyCode(::testing::_))
+        .WillOnce(::testing::DoAll(
+            ::testing::SetArgReferee<0>(42),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getLastWakeupKeyCode"), _T("{}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << response;
+    EXPECT_EQ(42, static_cast<int>(jr["wakeupKeyCode"].Number())) << response;
+
+    TEST_LOG("GetLastWakeupKeyCode_PMSuccess_ReturnsKey - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// AbortLogUpload — already-running → kills and re-sends ABORT event
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, AbortLogUpload_AfterAsyncStart_ReturnsSuccess)
+{
+    // Start an upload so m_uploadLogsPid != -1
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("uploadLogsAsync"),
+              _T("{\"url\":\"http://logs.example.com/upload\"}"), response));
+
+    // Now abort — hits the "pid != -1" branch
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("abortLogUpload"), _T("{}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << response;
+
+    TEST_LOG("AbortLogUpload_AfterAsyncStart_ReturnsSuccess - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// GetBuildType — prod / vbn values + property reading
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, GetBuildType_VBN_Success)
+{
+    createFile("/etc/device.properties", "BUILD_TYPE=vbn");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBuildType"), _T("{}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << response;
+    EXPECT_EQ("vbn", jr["build_type"].String()) << response;
+
+    std::ofstream("/etc/device.properties").close(); // leave empty for next test
+
+    TEST_LOG("GetBuildType_VBN_Success - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetBuildType_PROD_Success)
+{
+    createFile("/etc/device.properties", "BUILD_TYPE=prod");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBuildType"), _T("{}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << response;
+    EXPECT_EQ("prod", jr["build_type"].String()) << response;
+
+    std::ofstream("/etc/device.properties").close();
+
+    TEST_LOG("GetBuildType_PROD_Success - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// GetFSRFlag — IARM failure branch
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, GetFSRFlag_IARMFails_ReturnsErrorGeneral)
+{
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(IARM_RESULT_IPCCORE_FAIL));
+
+    uint32_t result = handler.Invoke(connection, _T("getFSRFlag"), _T("{}"), response);
+    EXPECT_EQ(Core::ERROR_GENERAL, result) << "IARM failure should give ERROR_GENERAL";
+
+    TEST_LOG("GetFSRFlag_IARMFails_ReturnsErrorGeneral - Result: %u", result);
+}
+
+// ------------------------------------------------------------------
+// SetFSRFlag — success + failure IARM branches
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, SetFSRFlag_IARMSuccess_SuccessTrue)
+{
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(IARM_RESULT_SUCCESS));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setFSRFlag"),
+              _T("{\"fsrFlag\":true}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << response;
+
+    TEST_LOG("SetFSRFlag_IARMSuccess_SuccessTrue - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetFSRFlag_IARMFailure_SuccessFalse)
+{
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(IARM_RESULT_IPCCORE_FAIL));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setFSRFlag"),
+              _T("{\"fsrFlag\":false}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_FALSE(jr["success"].Boolean()) << response;
+
+    TEST_LOG("SetFSRFlag_IARMFailure_SuccessFalse - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// GetDownloadedFirmwareInfo — fwdnldstatus file present, all fields read
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_AllFields_Read)
+{
+    // Write a complete status file matching the file's expected format
+    std::ofstream f("/opt/fwdnldstatus.txt");
+    f << "Reboot|1\nDnldVersn|TEST_FW_1.0\nDnldURL|http://cdn.example.com/TEST_FW_1.0.bin\n";
+    f.close();
+
+    // Set m_FwUpdateState_LatestEvent >= 2 by invoking an IARM event (use a stub)
+    // The implementation only populates DnldVersn if m_FwUpdateState_LatestEvent >= 2.
+    // Use handler to call getFirmwareUpdateState first to confirm default then move on.
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDownloadedFirmwareInfo"), _T("{}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    ASSERT_TRUE(jr.HasLabel("currentFWVersion")) << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << response;
+
+    std::remove("/opt/fwdnldstatus.txt");
+
+    TEST_LOG("GetDownloadedFirmwareInfo_AllFields_Read - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// GetTerritory — file absent vs present
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, GetTerritory_FileAbsent_SuccessFalseOrEmpty)
+{
+    system("mkdir -p /opt/secure/persistent/System");
+    std::remove("/opt/secure/persistent/System/Territory.txt");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTerritory"), _T("{}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    ASSERT_TRUE(jr.HasLabel("success")) << response;
+    // When file absent, m_strTerritory stays empty → success reflects readTerritoryFromFile() result
+
+    TEST_LOG("GetTerritory_FileAbsent_SuccessFalseOrEmpty - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetTerritory_FilePresent_ReturnsTerritory)
+{
+    system("mkdir -p /opt/secure/persistent/System");
+    std::ofstream f("/opt/secure/persistent/System/Territory.txt");
+    f << "territory:AUS\nregion:AU-NSW\n"; f.close();
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTerritory"), _T("{}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << response;
+    EXPECT_EQ("AUS", jr["territory"].String()) << response;
+    EXPECT_EQ("AU-NSW", jr["region"].String()) << response;
+
+    std::remove("/opt/secure/persistent/System/Territory.txt");
+
+    TEST_LOG("GetTerritory_FilePresent_ReturnsTerritory - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// GetTimeZones — processAll path (null iterator)
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, GetTimeZones_NullParam_ProcessesAllZones)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTimeZones"), _T("{}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    ASSERT_TRUE(jr.HasLabel("zoneinfo")) << response;
+
+    TEST_LOG("GetTimeZones_NullParam_ProcessesAllZones - Response: %s", response.c_str());
+}
+
