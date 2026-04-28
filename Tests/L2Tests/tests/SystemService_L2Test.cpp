@@ -2095,3 +2095,272 @@ TEST_F(SystemService_L2Test, SetNetworkStandbyMode_JSONRPC)
     }
 }
 
+********************************************************
+************Test case Details **************************
+** Coverage Enhancement Tests
+** Testing additional SystemServices APIs for coverage
+*******************************************************/
+
+TEST_F(SystemService_L2Test, GetMigrationStatus_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetMigrationStatus via COM-RPC");
+
+                // Declare output parameters
+                Exchange::ISystemServices::MigrationStatus migrationStatus;
+
+                // Call the API
+                uint32_t result = m_SystemServicesPlugin->GetMigrationStatus(migrationStatus);
+
+                // Validate result
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+
+                // Log output
+                TEST_LOG("Migration Status: %s", migrationStatus.status.c_str());
+                
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, GetBootTypeInfo_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetBootTypeInfo via COM-RPC");
+
+                // Declare output parameters
+                Exchange::ISystemServices::BootType bootInfo;
+
+                // Call the API
+                uint32_t result = m_SystemServicesPlugin->GetBootTypeInfo(bootInfo);
+
+                // Validate result
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+
+                // Log output
+                TEST_LOG("Boot Type: %s", bootInfo.boottype.c_str());
+                
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, SetMode_NORMAL_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing SetMode NORMAL via COM-RPC");
+
+                // Declare input/output parameters
+                Exchange::ISystemServices::ModeInfo modeInfo;
+                modeInfo.mode = "NORMAL";
+                modeInfo.duration = -1;
+                uint32_t SysSrv_Status = 0;
+                string errorMessage;
+                bool success = false;
+
+                // Call the API
+                uint32_t result = m_SystemServicesPlugin->SetMode(modeInfo, SysSrv_Status, errorMessage, success);
+
+                // Validate result
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+                EXPECT_TRUE(success);
+
+                // Log output
+                TEST_LOG("SetMode NORMAL success: %s", success ? "true" : "false");
+                
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, SetMode_EAS_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing SetMode EAS via COM-RPC");
+
+                // Declare input/output parameters
+                Exchange::ISystemServices::ModeInfo modeInfo;
+                modeInfo.mode = "EAS";
+                modeInfo.duration = 300;
+                uint32_t SysSrv_Status = 0;
+                string errorMessage;
+                bool success = false;
+
+                // Call the API
+                uint32_t result = m_SystemServicesPlugin->SetMode(modeInfo, SysSrv_Status, errorMessage, success);
+
+                // Validate result
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+                EXPECT_TRUE(success);
+
+                // Log output
+                TEST_LOG("SetMode EAS success: %s", success ? "true" : "false");
+                
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, GetMigrationStatus_JSONRPC)
+{
+    TEST_LOG("Testing getMigrationStatus via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getMigrationStatus", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    // Validate status field
+    EXPECT_TRUE(result.HasLabel("status"));
+    if (result.HasLabel("status")) {
+        string migrationStatus = result["status"].String();
+        TEST_LOG("  status: %s", migrationStatus.c_str());
+    }
+}
+
+TEST_F(SystemService_L2Test, GetBootTypeInfo_JSONRPC)
+{
+    TEST_LOG("Testing getBootTypeInfo via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getBootTypeInfo", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    // Validate boottype field
+    EXPECT_TRUE(result.HasLabel("boottype"));
+    if (result.HasLabel("boottype")) {
+        string bootType = result["boottype"].String();
+        TEST_LOG("  boottype: %s", bootType.c_str());
+    }
+}
+
+TEST_F(SystemService_L2Test, SetMode_NORMAL_JSONRPC)
+{
+    TEST_LOG("Testing setMode NORMAL via JSON-RPC");
+
+    JsonObject params;
+    params["modeInfo"]["mode"] = "NORMAL";
+    params["modeInfo"]["duration"] = -1;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    // Validate success field
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+        TEST_LOG("  setMode NORMAL succeeded");
+    }
+}
+
+TEST_F(SystemService_L2Test, SetMode_EAS_JSONRPC)
+{
+    TEST_LOG("Testing setMode EAS via JSON-RPC");
+
+    JsonObject params;
+    params["modeInfo"]["mode"] = "EAS";
+    params["modeInfo"]["duration"] = 300;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    // Validate success field
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+        TEST_LOG("  setMode EAS succeeded");
+    }
+}
+
+TEST_F(SystemService_L2Test, SetMigrationStatus_JSONRPC)
+{
+    TEST_LOG("Testing setMigrationStatus via JSON-RPC");
+
+    JsonObject params;
+    params["status"] = "InProgress";
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMigrationStatus", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    // Validate success field
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+        TEST_LOG("  setMigrationStatus succeeded");
+    }
+}
