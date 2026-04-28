@@ -2095,10 +2095,9 @@ TEST_F(SystemService_L2Test, SetNetworkStandbyMode_JSONRPC)
     }
 }
 
-********************************************************
-************Test case Details **************************
-** Coverage Enhancement Tests
-** Testing additional SystemServices APIs for coverage
+*******************************************************
+**** Coverage Enhancement Tests ************************
+** Testing additional SystemServices APIs coverage
 *******************************************************/
 
 TEST_F(SystemService_L2Test, GetMigrationStatus_COMRPC)
