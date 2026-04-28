@@ -9929,13 +9929,13 @@ TEST_F(SystemServicesTest, SetTerritory_LowercaseRegion_TriggersIsStrAlphaUpperF
 {
     // territory="USA" is valid (3 chars, in standard list)
     // region="ab-XY" (5 chars < 7) → isRegionValid → isStrAlphaUpper("ab") fails
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
-        _T("{\"territory\":\"USA\",\"region\":\"ab-XY\"}"), response));
+    // → implementation returns Core::ERROR_GENERAL (same as invalid territory path)
+    uint32_t result = handler.Invoke(connection, _T("setTerritory"),
+        _T("{\"territory\":\"USA\",\"region\":\"ab-XY\"}"), response);
 
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
-    // invalid region → success should be false
-    TEST_LOG("SetTerritory_LowercaseRegion - Response: %s", response.c_str());
+    EXPECT_EQ(Core::ERROR_GENERAL, result) << "Should return ERROR_GENERAL for invalid region";
+    EXPECT_TRUE(response.empty()) << "Response should be empty on error";
+    TEST_LOG("SetTerritory_LowercaseRegion - Result: %u", result);
 }
 
 TEST_F(SystemServicesTest, SetTerritory_ValidUppercaseRegion_PassesIsStrAlphaUpper)
