@@ -466,6 +466,10 @@ SystemService_L2Test::SystemService_L2Test()
          status = ActivateService("org.rdk.PowerManager");
          EXPECT_EQ(Core::ERROR_NONE, status);
 
+         /* Activate Migration plugin */
+         status = ActivateService("org.rdk.Migration");
+         EXPECT_EQ(Core::ERROR_NONE, status);
+
          /* Activate SystemServices plugin with retry logic */
          int retry_count = 0;
          const int max_retries = 10;
@@ -501,6 +505,10 @@ SystemService_L2Test::~SystemService_L2Test()
     status = DeactivateService("org.rdk.System");
     EXPECT_EQ(Core::ERROR_NONE, status);
     TEST_LOG("Deactivated org.rdk.System");
+
+    status = DeactivateService("org.rdk.Migration");
+    EXPECT_EQ(Core::ERROR_NONE, status);
+    TEST_LOG("Deactivated org.rdk.Migration");
 
     EXPECT_CALL(*p_powerManagerHalMock, PLAT_TERM())
         .WillOnce(::testing::Return(PWRMGR_SUCCESS));
