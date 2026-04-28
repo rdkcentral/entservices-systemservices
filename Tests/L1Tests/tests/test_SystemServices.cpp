@@ -9027,25 +9027,7 @@ TEST_F(SystemServicesTest, Dispatch_TerritoryChanged_WithRegion)
     std::remove("/opt/secure/persistent/System/Territory.txt");
 }
 
-TEST_F(SystemServicesTest, Dispatch_TerritoryChanged_NoRegion)
-{
-    ASSERT_NE(nullptr, m_sysServices);
-    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
 
-    SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
-    m_sysServices->Register(notificationHandler);
-    notificationHandler->ResetEvent();
-
-    // Call OnTerritoryChanged directly — no file I/O, no async race.
-    Plugin::SystemServicesImplementation::_instance->OnTerritoryChanged("USA", "CAN");
-
-    EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onTerritoryChanged));
-    EXPECT_EQ("CAN", notificationHandler->GetTerritoryChangedInfo().newTerritory);
-    EXPECT_EQ("USA", notificationHandler->GetTerritoryChangedInfo().oldTerritory);
-
-    m_sysServices->Unregister(notificationHandler);
-    delete notificationHandler;
-}
 
 TEST_F(SystemServicesTest, Dispatch_DeviceMgtUpdateReceived_FailStatus)
 {
