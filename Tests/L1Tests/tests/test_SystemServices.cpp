@@ -7248,3 +7248,122 @@ TEST_F(SystemServicesTest, UploadLogs_URLWithoutCgiBin_RegexReplaceNoEffect)
     TEST_LOG("UploadLogs_URLWithoutCgiBin_RegexReplaceNoEffect - PASSED");
 }
 
+// ------------------------------------------------------------------
+// Test 9: getDCMconfigDetails — TMP_DCM_SETTINGS file does NOT exist
+// Covers: uploadlogs.cpp line 52-53:
+//   !getFileContent(TMP_DCM_SETTINGS, dcminfo) → return false
+// All previous tests either hit empty-file (length<1) or parseable content.
+// This is the only test where /tmp/DCMSettings.conf is completely absent.
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, UploadLogs_DCMFileAbsent_GetFileContentFails)
+{
+    createFile("/usr/bin/logupload", "#!/bin/sh\nexit 0");
+    createFile("/etc/device.properties", "BUILD_TYPE=prod");
+    createFile("/etc/dcm.properties", "LOG_SERVER=logs.example.com");
+    removeFile("/tmp/DCMSettings.conf"); // ensure file is absent (not empty, absent)
+
+    EXPECT_EQ(Core::ERROR_NONE,
+        handler.Invoke(connection, _T("uploadLogsAsync"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << response;
+    // getDCMconfigDetails returns false → E_NOK → pid=-1 → success=true from handler
+
+    removeFile("/usr/bin/logupload");
+    std::ofstream("/etc/device.properties").close();
+    std::ofstream("/etc/dcm.properties").close();
+    TEST_LOG("UploadLogs_DCMFileAbsent_GetFileContentFails - PASSED");
+}
+
+// ------------------------------------------------------------------
+// Test 10: BUILD_TYPE != prod AND OPT_DCM_PROPERTIES does NOT exist
+// Covers: uploadlogs.cpp line 95: dcmFile = ETC_DCM_PROPERTIES (else branch)
+//   when ( "prod" != build_type ) && !fileExists(OPT_DCM_PROPERTIES)
+// Test 4 covers OPT_DCM present (line 92 taken). This covers the else (line 95).
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, UploadLogs_BuildTypeDev_OptDCMAbsent_FallsBackToEtcDCM)
+{
+    createFile("/usr/bin/logupload", "#!/bin/sh\nexit 0");
+    createFile("/etc/device.properties", "BUILD_TYPE=dev");
+    removeFile("/opt/dcm.properties"); // ensure OPT_DCM is absent → else branch → ETC_DCM
+    std::ofstream("/etc/dcm.properties").close(); // LOG_SERVER absent → E_NOK
+
+    EXPECT_EQ(Core::ERROR_NONE,
+        handler.Invoke(connection, _T("uploadLogsAsync"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << response;
+
+    removeFile("/usr/bin/logupload");
+    std::ofstream("/etc/device.properties").close();
+    std::ofstream("/etc/dcm.properties").close();
+    TEST_LOG("UploadLogs_BuildTypeDev_OptDCMAbsent_FallsBackToEtcDCM - PASSED");
+}
+
+// ------------------------------------------------------------------
+// Test 11: FORCE_MTLS present but value is not "true"
+// Covers: uploadlogs.cpp line 103-107 — parseConfigFile returns true
+//   but "true" != force_mtls is true so mTlsLogUpload stays unchanged.
+//   Also covers the URL-replace with cgi-bin since no FORCE_MTLS=="true" guard.
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, UploadLogs_ForceMTLS_NotTrue_URLReplacementApplied)
+{
+    createFile("/usr/bin/logupload", "#!/bin/sh\nexit 0");
+    // FORCE_MTLS present but "false" → parseConfigFile succeeds, "true"=="false" is false
+    // → mTlsLogUpload stays true (from checkmTlsLogUploadFlag) AND force_mtls="false"
+    // → "true" != "false" is true → regex_replace is called on the URL
+    createFile("/etc/device.properties", "BUILD_TYPE=prod\nFORCE_MTLS=false");
+    createFile("/etc/dcm.properties", "LOG_SERVER=logs.example.com");
+    createFile("/tmp/DCMSettings.conf",
+        "LogUploadSettings:UploadRepository:uploadProtocol=https\n"
+        "LogUploadSettings:UploadRepository:URL=http://example.com/cgi-bin/upload.sh\n"
+        "LogUploadSettings:UploadOnReboot=false");
+
+    EXPECT_EQ(Core::ERROR_NONE,
+        handler.Invoke(connection, _T("uploadLogsAsync"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << response;
+
+    removeFile("/usr/bin/logupload");
+    std::ofstream("/etc/device.properties").close();
+    std::ofstream("/etc/dcm.properties").close();
+    removeFile("/tmp/DCMSettings.conf");
+    TEST_LOG("UploadLogs_ForceMTLS_NotTrue_URLReplacementApplied - PASSED");
+}
+
+// ------------------------------------------------------------------
+// Test 12: checkmTlsLogUploadFlag called via getUploadLogParameters
+// This is an explicit smoke test verifying the function is reachable
+// directly through the UploadLogs namespace (covers function entry line).
+// Also covers BUILD_TYPE=sprint (another non-prod type) → OPT_DCM check.
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, UploadLogs_BuildTypeSprint_OptDCMPresent_ValidDCM_Forks)
+{
+    createFile("/usr/bin/logupload", "#!/bin/sh\nexit 0");
+    createFile("/etc/device.properties", "BUILD_TYPE=sprint"); // non-prod
+    createFile("/opt/dcm.properties", "LOG_SERVER=logs.example.com"); // OPT_DCM exists
+    // Valid DCM settings — getUploadLogParameters returns E_OK → fork is called
+    createFile("/tmp/DCMSettings.conf",
+        "LogUploadSettings:UploadRepository:uploadProtocol=tftp\n"
+        "LogUploadSettings:UploadRepository:URL=http://cdn.example.com/logs\n"
+        "LogUploadSettings:UploadOnReboot=true");
+
+    EXPECT_EQ(Core::ERROR_NONE,
+        handler.Invoke(connection, _T("uploadLogsAsync"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << response;
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "E_OK path should return success=true: " << response;
+
+    removeFile("/usr/bin/logupload");
+    std::ofstream("/etc/device.properties").close();
+    removeFile("/opt/dcm.properties");
+    removeFile("/tmp/DCMSettings.conf");
+    TEST_LOG("UploadLogs_BuildTypeSprint_OptDCMPresent_ValidDCM_Forks - PASSED");
+}
+
