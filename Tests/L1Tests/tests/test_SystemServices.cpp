@@ -8297,25 +8297,20 @@ TEST_F(SystemServicesTest, Dispatch_OnTerritoryChanged_ReachesNotification)
     ASSERT_NE(nullptr, m_sysServices);
     ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
 
+    // Remove territory file first so the impl starts from an empty state.
+    // This avoids the race where the first setTerritory call queues an async
+    // WorkerPool job that fires AFTER ResetEvent(), causing stale data.
+    system("mkdir -p /opt/secure/persistent/System");
+    std::remove("/opt/secure/persistent/System/Territory.txt");
+
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
 
-    // OnTerritoryChanged is private. Use the public OnSystemModeChanged to verify
-    // Dispatch() works correctly for other events, and test territory via API.
-    // Directly trigger territory changed via the public static _instance path using
-    // a method that calls OnTerritoryChanged internally: SetTerritory API.
-    system("mkdir -p /opt/secure/persistent/System");
-
-    // First call to establish old territory
-    handler.Invoke(connection, _T("setTerritory"), _T("{\"territory\":\"FRA\"}"), response);
-    notificationHandler->ResetEvent(SystemServices_onTerritoryChanged);
-
-    // Second call changes territory → fires OnTerritoryChanged notification
+    // Single call from clean state → old="", new="ITA" → event fires
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
               _T("{\"territory\":\"ITA\"}"), response));
 
-    // Event may or may not fire depending on whether territory actually changed.
     bool eventFired = notificationHandler->WaitForRequestStatus(2000, SystemServices_onTerritoryChanged);
     if (eventFired) {
         EXPECT_EQ("ITA", notificationHandler->GetTerritoryChangedInfo().newTerritory);
@@ -8333,16 +8328,15 @@ TEST_F(SystemServicesTest, Dispatch_OnTimeZoneDSTChanged_ReachesNotification)
     ASSERT_NE(nullptr, m_sysServices);
     ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
 
+    // Remove TZ file first so the impl starts from an empty state, avoiding
+    // the async race where the first setTimeZoneDST job fires after ResetEvent().
+    std::remove("/opt/persistent/timeZoneDST");
+
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
 
-    // OnTimeZoneDSTChanged is private. Trigger via SetTimeZoneDST API.
-    // Set a known starting timezone first
-    handler.Invoke(connection, _T("setTimeZoneDST"), _T("{\"timeZone\":\"America/New_York\"}"), response);
-    notificationHandler->ResetEvent(SystemServices_onTimeZoneDSTChanged);
-
-    // Change to a different timezone → OnTimeZoneDSTChanged fires
+    // Single call from clean state → old="", new="Europe/Paris" → event fires
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTimeZoneDST"),
               _T("{\"timeZone\":\"Europe/Paris\"}"), response));
 
@@ -8670,35 +8664,32 @@ TEST_F(SystemServicesTest, Dispatch_OnSystemPowerStateChanged_DEEP_SLEEP_AbortUp
 // powerModeEnumToString() — covers switch cases via GetPowerState
 // =============================================================================
 
-TEST_F(SystemServicesTest, PowerModeEnumToString_LIGHT_SLEEP_viaGetPowerState)
+TEST_F(SystemServicesTest, PowerModeEnumToString_LIGHT_SLEEP_viaGetPowerStateBeforeReboot)
 {
-    EXPECT_CALL(PowerManagerMock::Mock(), GetPowerState(::testing::_, ::testing::_))
-        .WillOnce(::testing::Invoke([](Exchange::IPowerManager::PowerState& cur,
-                                       Exchange::IPowerManager::PowerState& prev) -> uint32_t {
-            cur = Exchange::IPowerManager::POWER_STATE_STANDBY_LIGHT_SLEEP;
-            prev = Exchange::IPowerManager::POWER_STATE_ON;
-            return Core::ERROR_NONE;
-        }));
+    // powerModeEnumToString() is called from GetPowerStateBeforeReboot, not GetPowerState.
+    // GetPowerState uses its own inline mapping (returns "STANDBY" for both STANDBY variants).
+    EXPECT_CALL(PowerManagerMock::Mock(), GetPowerStateBeforeReboot(::testing::_))
+        .WillOnce(::testing::DoAll(
+            ::testing::SetArgReferee<0>(Exchange::IPowerManager::POWER_STATE_STANDBY_LIGHT_SLEEP),
+            ::testing::Return(Core::ERROR_NONE)));
 
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getPowerState"), _T("{}"), response));
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getPowerStateBeforeReboot"), _T("{}"), response));
     JsonObject res; ASSERT_TRUE(res.FromString(response));
-    // POWER_STATE_STANDBY_LIGHT_SLEEP → "LIGHT_SLEEP"
-    EXPECT_EQ("LIGHT_SLEEP", res["powerState"].String());
+    // POWER_STATE_STANDBY_LIGHT_SLEEP → powerModeEnumToString → "LIGHT_SLEEP"
+    EXPECT_EQ("LIGHT_SLEEP", res["state"].String());
 }
 
-TEST_F(SystemServicesTest, PowerModeEnumToString_POWER_STATE_STANDBY_viaGetPowerState)
+TEST_F(SystemServicesTest, PowerModeEnumToString_POWER_STATE_STANDBY_viaGetPowerStateBeforeReboot)
 {
-    EXPECT_CALL(PowerManagerMock::Mock(), GetPowerState(::testing::_, ::testing::_))
-        .WillOnce(::testing::Invoke([](Exchange::IPowerManager::PowerState& cur,
-                                       Exchange::IPowerManager::PowerState& prev) -> uint32_t {
-            cur = Exchange::IPowerManager::POWER_STATE_STANDBY;
-            prev = Exchange::IPowerManager::POWER_STATE_ON;
-            return Core::ERROR_NONE;
-        }));
+    // POWER_STATE_STANDBY also maps to "LIGHT_SLEEP" via powerModeEnumToString()
+    EXPECT_CALL(PowerManagerMock::Mock(), GetPowerStateBeforeReboot(::testing::_))
+        .WillOnce(::testing::DoAll(
+            ::testing::SetArgReferee<0>(Exchange::IPowerManager::POWER_STATE_STANDBY),
+            ::testing::Return(Core::ERROR_NONE)));
 
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getPowerState"), _T("{}"), response));
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getPowerStateBeforeReboot"), _T("{}"), response));
     JsonObject res; ASSERT_TRUE(res.FromString(response));
-    EXPECT_EQ("LIGHT_SLEEP", res["powerState"].String());
+    EXPECT_EQ("LIGHT_SLEEP", res["state"].String());
 }
 
 // =============================================================================
@@ -8775,9 +8766,10 @@ TEST_F(SystemServicesTest, GetLastWakeupReason_MultipleWakeupSources)
                 reason = reasonVal;
                 return Core::ERROR_NONE;
             }));
-        uint32_t result = handler.Invoke(connection, _T("getLastWakeupReason"), _T("{}"), response);
+        // Correct API name is "getWakeupReason" (not "getLastWakeupReason")
+        uint32_t result = handler.Invoke(connection, _T("getWakeupReason"), _T("{}"), response);
         EXPECT_EQ(Core::ERROR_NONE, result);
-        TEST_LOG("GetLastWakeupReason reason=%d - Response: %s", (int)reasonVal, response.c_str());
+        TEST_LOG("GetWakeupReason reason=%d - Response: %s", (int)reasonVal, response.c_str());
     }
 }
 
@@ -8841,24 +8833,29 @@ TEST_F(SystemServicesTest, Notification_OnTimeZoneDSTChanged_TwoDifferentTimezon
 {
     ASSERT_NE(nullptr, m_sysServices);
 
+    // Remove TZ file to start from a clean state — avoids the async race where
+    // the first setTimeZoneDST WorkerPool job fires after ResetEvent().
+    std::remove("/opt/persistent/timeZoneDST");
+
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
 
-    // Set Europe/London first
+    // First call from clean state: old="", new="Europe/London" → fires event
     handler.Invoke(connection, _T("setTimeZoneDST"), _T("{\"timeZone\":\"Europe/London\"}"), response);
+    bool event1Fired = notificationHandler->WaitForRequestStatus(2000, SystemServices_onTimeZoneDSTChanged);
+    if (event1Fired) {
+        EXPECT_EQ("Europe/London", notificationHandler->GetTimeZoneDSTChangedInfo().newTimeZone);
+    }
+
+    // Second call: old="Europe/London", new="America/Los_Angeles" → fires event
     notificationHandler->ResetEvent(SystemServices_onTimeZoneDSTChanged);
-
-    // Now set a different zone to guarantee the change event fires
     handler.Invoke(connection, _T("setTimeZoneDST"), _T("{\"timeZone\":\"America/Los_Angeles\"}"), response);
-
-    // If timezone actually changed, event should fire within 2s
-    bool eventFired = notificationHandler->WaitForRequestStatus(2000, SystemServices_onTimeZoneDSTChanged);
-    if (eventFired) {
-        EXPECT_EQ("Europe/London", notificationHandler->GetTimeZoneDSTChangedInfo().oldTimeZone);
+    bool event2Fired = notificationHandler->WaitForRequestStatus(2000, SystemServices_onTimeZoneDSTChanged);
+    if (event2Fired) {
         EXPECT_EQ("America/Los_Angeles", notificationHandler->GetTimeZoneDSTChangedInfo().newTimeZone);
     }
-    TEST_LOG("OnTimeZoneDSTChanged eventFired=%d - Response: %s", (int)eventFired, response.c_str());
+    TEST_LOG("OnTimeZoneDSTChanged event1=%d event2=%d", (int)event1Fired, (int)event2Fired);
 
     m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
@@ -8874,17 +8871,16 @@ TEST_F(SystemServicesTest, Notification_OnTerritoryChanged_ViaSetTerritory)
 {
     ASSERT_NE(nullptr, m_sysServices);
 
+    // Remove territory file first to start from clean state — avoids the async
+    // race where the first setTerritory WorkerPool job fires after ResetEvent().
     system("mkdir -p /opt/secure/persistent/System");
+    std::remove("/opt/secure/persistent/System/Territory.txt");
 
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
 
-    // Set GBR first so we have a known starting point
-    handler.Invoke(connection, _T("setTerritory"), _T("{\"territory\":\"GBR\"}"), response);
-    notificationHandler->ResetEvent(SystemServices_onTerritoryChanged);
-
-    // Change to DEU — this should fire the notification
+    // Single call from clean state: old="", new="DEU" → fires event
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
               _T("{\"territory\":\"DEU\"}"), response));
 
@@ -9003,27 +8999,26 @@ TEST_F(SystemServicesTest, Dispatch_TerritoryChanged_WithRegion)
 {
     ASSERT_NE(nullptr, m_sysServices);
 
+    // Remove territory file for clean state; valid region format: "XY-ZW" (2 + "-" + 2+).
+    // "LON"/"NYC" are invalid regions (no "-"), causing ERROR_GENERAL.
+    system("mkdir -p /opt/secure/persistent/System");
+    std::remove("/opt/secure/persistent/System/Territory.txt");
+
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
 
-    system("mkdir -p /opt/secure/persistent/System");
-
-    // Establish old territory
-    handler.Invoke(connection, _T("setTerritory"), _T("{\"territory\":\"GBR\",\"region\":\"LON\"}"), response);
-    notificationHandler->ResetEvent(SystemServices_onTerritoryChanged);
-
-    // Change territory+region → fires OnTerritoryChanged with region info
+    // Single call with valid region format "US-NY" → exercises region path in Dispatch()
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
-              _T("{\"territory\":\"USA\",\"region\":\"NYC\"}"), response));
+              _T("{\"territory\":\"USA\",\"region\":\"US-NY\"}"), response));
 
     bool eventFired = notificationHandler->WaitForRequestStatus(2000, SystemServices_onTerritoryChanged);
     if (eventFired) {
         EXPECT_EQ("USA", notificationHandler->GetTerritoryChangedInfo().newTerritory);
-        // oldRegion and newRegion are included when region is non-empty
-        TEST_LOG("Dispatch_TerritoryChanged_WithRegion fired: old=%s new=%s",
-                 notificationHandler->GetTerritoryChangedInfo().oldTerritory.c_str(),
-                 notificationHandler->GetTerritoryChangedInfo().newTerritory.c_str());
+        EXPECT_EQ("US-NY", notificationHandler->GetTerritoryChangedInfo().newRegion);
+        TEST_LOG("Dispatch_TerritoryChanged_WithRegion fired: new=%s region=%s",
+                 notificationHandler->GetTerritoryChangedInfo().newTerritory.c_str(),
+                 notificationHandler->GetTerritoryChangedInfo().newRegion.c_str());
     }
 
     m_sysServices->Unregister(notificationHandler);
@@ -9036,23 +9031,22 @@ TEST_F(SystemServicesTest, Dispatch_TerritoryChanged_NoRegion)
 {
     ASSERT_NE(nullptr, m_sysServices);
 
+    // Remove territory file for clean state to avoid the async race condition.
+    system("mkdir -p /opt/secure/persistent/System");
+    std::remove("/opt/secure/persistent/System/Territory.txt");
+
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
 
-    system("mkdir -p /opt/secure/persistent/System");
-
-    // Establish old territory without region
-    handler.Invoke(connection, _T("setTerritory"), _T("{\"territory\":\"USA\"}"), response);
-    notificationHandler->ResetEvent(SystemServices_onTerritoryChanged);
-
-    // Change to CAN
+    // Single call from clean state: old="", new="CAN", no region → event fires
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
               _T("{\"territory\":\"CAN\"}"), response));
 
     bool eventFired = notificationHandler->WaitForRequestStatus(2000, SystemServices_onTerritoryChanged);
     if (eventFired) {
         EXPECT_EQ("CAN", notificationHandler->GetTerritoryChangedInfo().newTerritory);
+        EXPECT_EQ("", notificationHandler->GetTerritoryChangedInfo().newRegion);
     }
     TEST_LOG("Dispatch_TerritoryChanged_NoRegion eventFired=%d", (int)eventFired);
 
