@@ -9357,7 +9357,7 @@ TEST_F(SystemServicesTest, Reboot_WithNetflixRunning_KillsProcess)
         .WillOnce(::testing::Invoke([](PROCTAB* /*pt*/, proc_t* p) -> proc_t* {
             memset(p, 0, sizeof(*p));
             strncpy(p->cmd, "nrdPluginApp", sizeof(p->cmd) - 1);
-            p->tid = static_cast<int>(getpid());
+            p->tid = 1; // kill(1, SIGTERM) fails with EPERM — safe, loop body still covered
             return p;
         }))
         .WillOnce(::testing::Return(nullptr));
