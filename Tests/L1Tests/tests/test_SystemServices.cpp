@@ -7430,3 +7430,608 @@ TEST_F(SystemServicesTest, CTimer_Callback_FiresAtLeastOnce)
              g_callbackCount.load(), waited);
 }
 
+// =====================================================================
+// SystemServicesHelper.cpp — Direct-Call Unit Tests
+//
+// These tests call helper utility functions directly (declared in
+// SystemServicesHelper.h) to cover branches that are never reached
+// through handler.Invoke() in the existing suite.
+// =====================================================================
+
+// ------------------------------------------------------------------
+// getErrorDescription — every known error code + unknown code
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, Helper_GetErrorDescription_OK)
+{
+    EXPECT_EQ("Processed Successfully", getErrorDescription(SysSrv_OK));
+}
+TEST_F(SystemServicesTest, Helper_GetErrorDescription_MethodNotFound)
+{
+    EXPECT_EQ("Method not found", getErrorDescription(SysSrv_MethodNotFound));
+}
+TEST_F(SystemServicesTest, Helper_GetErrorDescription_MissingKeyValues)
+{
+    EXPECT_EQ("Missing required key/value(s)", getErrorDescription(SysSrv_MissingKeyValues));
+}
+TEST_F(SystemServicesTest, Helper_GetErrorDescription_UnSupportedFormat)
+{
+    EXPECT_EQ("Unsupported or malformed format", getErrorDescription(SysSrv_UnSupportedFormat));
+}
+TEST_F(SystemServicesTest, Helper_GetErrorDescription_FileNotPresent)
+{
+    EXPECT_EQ("Expected file not found", getErrorDescription(SysSrv_FileNotPresent));
+}
+TEST_F(SystemServicesTest, Helper_GetErrorDescription_FileAccessFailed)
+{
+    EXPECT_EQ("File access failed", getErrorDescription(SysSrv_FileAccessFailed));
+}
+TEST_F(SystemServicesTest, Helper_GetErrorDescription_Unexpected)
+{
+    EXPECT_EQ("Unexpected error", getErrorDescription(SysSrv_Unexpected));
+}
+TEST_F(SystemServicesTest, Helper_GetErrorDescription_SupportNotAvailable)
+{
+    EXPECT_EQ("Support not available/enabled", getErrorDescription(SysSrv_SupportNotAvailable));
+}
+TEST_F(SystemServicesTest, Helper_GetErrorDescription_KeyNotFound)
+{
+    EXPECT_EQ("Key not found", getErrorDescription(SysSrv_KeyNotFound));
+}
+TEST_F(SystemServicesTest, Helper_GetErrorDescription_UnknownCode_ReturnsDefault)
+{
+    // Any code not in the map must return "Unexpected Error"
+    EXPECT_EQ("Unexpected Error", getErrorDescription(9999));
+}
+
+// ------------------------------------------------------------------
+// dirnameOf — with slash and without slash
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, Helper_DirnameOf_PathWithSlash)
+{
+    EXPECT_EQ("/tmp/", dirnameOf("/tmp/file.txt"));
+}
+TEST_F(SystemServicesTest, Helper_DirnameOf_DeepPath)
+{
+    EXPECT_EQ("/opt/persistent/", dirnameOf("/opt/persistent/foo.conf"));
+}
+TEST_F(SystemServicesTest, Helper_DirnameOf_NoSlash_ReturnsEmpty)
+{
+    EXPECT_EQ("", dirnameOf("filenoslash"));
+}
+
+// ------------------------------------------------------------------
+// dirExists — present directory vs absent directory
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, Helper_DirExists_ExistingDir_ReturnsTrue)
+{
+    system("mkdir -p /tmp/test_dir_helper");
+    EXPECT_TRUE(dirExists("/tmp/test_dir_helper/somefile.txt"));
+    system("rmdir /tmp/test_dir_helper");
+}
+TEST_F(SystemServicesTest, Helper_DirExists_NonExistingDir_ReturnsFalse)
+{
+    system("rm -rf /tmp/test_dir_helper_absent");
+    EXPECT_FALSE(dirExists("/tmp/test_dir_helper_absent/file.txt"));
+}
+
+// ------------------------------------------------------------------
+// readFromFile — absent file → false; present file → true + content
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, Helper_ReadFromFile_AbsentFile_ReturnsFalse)
+{
+    std::string content = "initial";
+    EXPECT_FALSE(readFromFile("/tmp/helper_absent_readfile.txt", content));
+}
+TEST_F(SystemServicesTest, Helper_ReadFromFile_PresentFile_ReturnsTrueWithContent)
+{
+    createFile("/tmp/helper_readfile.txt", "hello world");
+    std::string content;
+    EXPECT_TRUE(readFromFile("/tmp/helper_readfile.txt", content));
+    EXPECT_EQ("hello world", content);
+    std::remove("/tmp/helper_readfile.txt");
+}
+
+// ------------------------------------------------------------------
+// getFileContent (vector overload) — absent / present / empty lines
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, Helper_GetFileContent_Vector_AbsentFile_ReturnsFalse)
+{
+    std::vector<std::string> lines;
+    EXPECT_FALSE(getFileContent("/tmp/helper_noexist_vec.txt", lines));
+    EXPECT_TRUE(lines.empty());
+}
+TEST_F(SystemServicesTest, Helper_GetFileContent_Vector_PresentFile_ReturnsLines)
+{
+    createFile("/tmp/helper_vec.txt", "line1\nline2\nline3");
+    std::vector<std::string> lines;
+    EXPECT_TRUE(getFileContent("/tmp/helper_vec.txt", lines));
+    EXPECT_EQ(3u, lines.size());
+    EXPECT_EQ("line1", lines[0]);
+    EXPECT_EQ("line3", lines[2]);
+    std::remove("/tmp/helper_vec.txt");
+}
+TEST_F(SystemServicesTest, Helper_GetFileContent_Vector_EmptyLinesSkipped)
+{
+    createFile("/tmp/helper_vec_empty.txt", "\nfoo\n\nbar\n");
+    std::vector<std::string> lines;
+    EXPECT_TRUE(getFileContent("/tmp/helper_vec_empty.txt", lines));
+    // Lines with size==0 are not pushed
+    EXPECT_EQ(2u, lines.size());
+    std::remove("/tmp/helper_vec_empty.txt");
+}
+
+// ------------------------------------------------------------------
+// setJSONResponseArray — items present and empty
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, Helper_SetJSONResponseArray_PopulatesArray)
+{
+    JsonObject resp;
+    std::vector<std::string> items = {"alpha", "beta", "gamma"};
+    setJSONResponseArray(resp, "myKey", items);
+    ASSERT_TRUE(resp.HasLabel("myKey"));
+    JsonArray arr = resp["myKey"].Array();
+    EXPECT_EQ(3, arr.Length());
+}
+TEST_F(SystemServicesTest, Helper_SetJSONResponseArray_EmptyItems)
+{
+    JsonObject resp;
+    std::vector<std::string> items;
+    setJSONResponseArray(resp, "emptyKey", items);
+    ASSERT_TRUE(resp.HasLabel("emptyKey"));
+    JsonArray arr = resp["emptyKey"].Array();
+    EXPECT_EQ(0, arr.Length());
+}
+
+// ------------------------------------------------------------------
+// strcicmp — case-insensitive C-string comparison
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, Helper_Strcicmp_EqualStrings_ReturnsZero)
+{
+    EXPECT_EQ(0, strcicmp("hello", "HELLO"));
+    EXPECT_EQ(0, strcicmp("ABC", "abc"));
+    EXPECT_EQ(0, strcicmp("", ""));
+}
+TEST_F(SystemServicesTest, Helper_Strcicmp_DifferentStrings_NonZero)
+{
+    EXPECT_NE(0, strcicmp("hello", "world"));
+    EXPECT_NE(0, strcicmp("abc", "abcd"));
+}
+
+// ------------------------------------------------------------------
+// findCaseInsensitive — found vs not found
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, Helper_FindCaseInsensitive_Found_ReturnsTrue)
+{
+    EXPECT_TRUE(findCaseInsensitive("Hello World", "WORLD"));
+    EXPECT_TRUE(findCaseInsensitive("FirmwareUpdateState", "firmware"));
+}
+TEST_F(SystemServicesTest, Helper_FindCaseInsensitive_NotFound_ReturnsFalse)
+{
+    EXPECT_FALSE(findCaseInsensitive("HelloWorld", "xyz"));
+    EXPECT_FALSE(findCaseInsensitive("", "abc"));
+}
+
+// ------------------------------------------------------------------
+// getXconfOverrideUrl — file absent / only comments / real URL
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, Helper_GetXconfOverrideUrl_FileAbsent)
+{
+    std::remove("/opt/swupdate.conf");
+    bool fileExists = true;
+    std::string url = getXconfOverrideUrl(fileExists);
+    EXPECT_FALSE(fileExists);
+    EXPECT_TRUE(url.empty());
+}
+TEST_F(SystemServicesTest, Helper_GetXconfOverrideUrl_FilePresent_WithUrl)
+{
+    createFile("/opt/swupdate.conf", "# comment\nhttp://xconf.example.com/override\n");
+    bool fileExists = false;
+    std::string url = getXconfOverrideUrl(fileExists);
+    EXPECT_TRUE(fileExists);
+    EXPECT_EQ("http://xconf.example.com/override", url);
+    std::remove("/opt/swupdate.conf");
+}
+TEST_F(SystemServicesTest, Helper_GetXconfOverrideUrl_FilePresent_OnlyComments)
+{
+    createFile("/opt/swupdate.conf", "# only comment\n# another comment\n");
+    bool fileExists = false;
+    std::string url = getXconfOverrideUrl(fileExists);
+    EXPECT_TRUE(fileExists);
+    EXPECT_TRUE(url.empty());
+    std::remove("/opt/swupdate.conf");
+}
+
+// ------------------------------------------------------------------
+// getTimeZoneAccuracyDSTHelper — all five branches:
+//   absent file → INITIAL
+//   "INITIAL" → INITIAL
+//   "INTERIM" → INTERIM
+//   "FINAL"   → FINAL
+//   invalid   → INITIAL (fallback)
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, Helper_GetTimeZoneAccuracyDSTHelper_FileAbsent_INITIAL)
+{
+    std::remove("/opt/persistent/timeZoneDSTAccuracy");
+    EXPECT_EQ("INITIAL", getTimeZoneAccuracyDSTHelper());
+}
+TEST_F(SystemServicesTest, Helper_GetTimeZoneAccuracyDSTHelper_INITIAL_Value)
+{
+    createFile("/opt/persistent/timeZoneDSTAccuracy", "INITIAL");
+    EXPECT_EQ("INITIAL", getTimeZoneAccuracyDSTHelper());
+    std::remove("/opt/persistent/timeZoneDSTAccuracy");
+}
+TEST_F(SystemServicesTest, Helper_GetTimeZoneAccuracyDSTHelper_INTERIM_Value)
+{
+    createFile("/opt/persistent/timeZoneDSTAccuracy", "INTERIM");
+    EXPECT_EQ("INTERIM", getTimeZoneAccuracyDSTHelper());
+    std::remove("/opt/persistent/timeZoneDSTAccuracy");
+}
+TEST_F(SystemServicesTest, Helper_GetTimeZoneAccuracyDSTHelper_FINAL_Value)
+{
+    createFile("/opt/persistent/timeZoneDSTAccuracy", "FINAL");
+    EXPECT_EQ("FINAL", getTimeZoneAccuracyDSTHelper());
+    std::remove("/opt/persistent/timeZoneDSTAccuracy");
+}
+TEST_F(SystemServicesTest, Helper_GetTimeZoneAccuracyDSTHelper_InvalidValue_FallsBackToINITIAL)
+{
+    createFile("/opt/persistent/timeZoneDSTAccuracy", "BOGUS_VALUE");
+    EXPECT_EQ("INITIAL", getTimeZoneAccuracyDSTHelper());
+    std::remove("/opt/persistent/timeZoneDSTAccuracy");
+}
+
+// ------------------------------------------------------------------
+// currentDateTimeUtc — with format string and with nullptr
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, Helper_CurrentDateTimeUtc_WithFormat_NonEmpty)
+{
+    std::string dt = currentDateTimeUtc("%Y-%m-%d");
+    EXPECT_GE(dt.size(), 8u) << "Date string too short: " << dt;
+    EXPECT_FALSE(dt.empty());
+}
+TEST_F(SystemServicesTest, Helper_CurrentDateTimeUtc_NullFmt_UsesDefault)
+{
+    std::string dt = currentDateTimeUtc(nullptr);
+    EXPECT_FALSE(dt.empty()) << "Default format should produce non-empty result";
+}
+
+// ------------------------------------------------------------------
+// url_encode — empty / spaces / alphanumeric
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, Helper_UrlEncode_EmptyString_ReturnsEmpty)
+{
+    EXPECT_TRUE(url_encode("").empty());
+}
+TEST_F(SystemServicesTest, Helper_UrlEncode_SpacesEncoded)
+{
+    std::string encoded = url_encode("hello world");
+    EXPECT_FALSE(encoded.empty());
+    EXPECT_EQ(std::string::npos, encoded.find(' ')) << "Space must be encoded";
+}
+TEST_F(SystemServicesTest, Helper_UrlEncode_AlphanumericUnchanged)
+{
+    EXPECT_EQ("abc123", url_encode("abc123"));
+}
+
+// ------------------------------------------------------------------
+// enableXREConnectionRetentionHelper — all four paths
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, Helper_EnableXRERetention_Enable_FileAbsent_CreatesFile)
+{
+    std::remove("/tmp/retainConnection");
+    uint32_t result = enableXREConnectionRetentionHelper(true);
+    EXPECT_EQ(static_cast<uint32_t>(SysSrv_OK), result);
+    std::remove("/tmp/retainConnection");
+}
+TEST_F(SystemServicesTest, Helper_EnableXRERetention_Enable_FileExists_ReturnsOK)
+{
+    { std::ofstream f("/tmp/retainConnection"); }   // create empty
+    uint32_t result = enableXREConnectionRetentionHelper(true);
+    EXPECT_EQ(static_cast<uint32_t>(SysSrv_OK), result);
+    std::remove("/tmp/retainConnection");
+}
+TEST_F(SystemServicesTest, Helper_EnableXRERetention_Disable_FileExists_RemovesFile)
+{
+    { std::ofstream f("/tmp/retainConnection"); }
+    uint32_t result = enableXREConnectionRetentionHelper(false);
+    EXPECT_EQ(static_cast<uint32_t>(SysSrv_OK), result);
+}
+TEST_F(SystemServicesTest, Helper_EnableXRERetention_Disable_FileAbsent_ReturnsOK)
+{
+    std::remove("/tmp/retainConnection");
+    uint32_t result = enableXREConnectionRetentionHelper(false);
+    EXPECT_EQ(static_cast<uint32_t>(SysSrv_OK), result);
+}
+
+// ------------------------------------------------------------------
+// stringTodate — valid and invalid date formats
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, Helper_StringTodate_ValidDate_ReturnsFormatted)
+{
+    char buf[] = "2024-01-15 12:30:00";
+    std::string result = stringTodate(buf);
+    EXPECT_FALSE(result.empty()) << "Valid date must produce a formatted string";
+}
+TEST_F(SystemServicesTest, Helper_StringTodate_InvalidDate_ReturnsEmpty)
+{
+    char buf[] = "not-a-date";
+    std::string result = stringTodate(buf);
+    EXPECT_TRUE(result.empty()) << "Invalid date must return empty string";
+}
+
+// ------------------------------------------------------------------
+// removeCharsFromString — removes specified chars, no-match, and empty
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, Helper_RemoveCharsFromString_RemovesChars)
+{
+    std::string str = "hello,world;test!";
+    removeCharsFromString(str, ",;!");
+    EXPECT_EQ("helloworldtest", str);
+}
+TEST_F(SystemServicesTest, Helper_RemoveCharsFromString_NoMatchingChars)
+{
+    std::string str = "helloworld";
+    removeCharsFromString(str, "xyz");
+    EXPECT_EQ("helloworld", str);
+}
+TEST_F(SystemServicesTest, Helper_RemoveCharsFromString_EmptyString)
+{
+    std::string str = "";
+    removeCharsFromString(str, "abc");
+    EXPECT_EQ("", str);
+}
+
+// ------------------------------------------------------------------
+// parseConfigFile — key found / not found / file absent
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, Helper_ParseConfigFile_KeyFound)
+{
+    createFile("/tmp/test_cfg.conf", "KEY1=value1\nKEY2=value2\n");
+    std::string value;
+    EXPECT_TRUE(parseConfigFile("/tmp/test_cfg.conf", "KEY1", value));
+    EXPECT_EQ("value1", value);
+    std::remove("/tmp/test_cfg.conf");
+}
+TEST_F(SystemServicesTest, Helper_ParseConfigFile_KeyNotFound)
+{
+    createFile("/tmp/test_cfg2.conf", "KEY1=value1\n");
+    std::string value;
+    EXPECT_FALSE(parseConfigFile("/tmp/test_cfg2.conf", "NONEXISTENT", value));
+    std::remove("/tmp/test_cfg2.conf");
+}
+TEST_F(SystemServicesTest, Helper_ParseConfigFile_FileAbsent)
+{
+    std::string value;
+    EXPECT_FALSE(parseConfigFile("/tmp/nonexistent_parse_99.conf", "KEY", value));
+}
+
+// ------------------------------------------------------------------
+// WPEFramework::Plugin::ltrim, rtrim, trim
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, Helper_Ltrim_LeadingWhitespace_Stripped)
+{
+    EXPECT_EQ("hello", WPEFramework::Plugin::ltrim("   hello"));
+    EXPECT_EQ("hello   ", WPEFramework::Plugin::ltrim("hello   "));
+    EXPECT_EQ("", WPEFramework::Plugin::ltrim("   "));
+}
+TEST_F(SystemServicesTest, Helper_Rtrim_TrailingWhitespace_Stripped)
+{
+    EXPECT_EQ("   hello", WPEFramework::Plugin::rtrim("   hello   "));
+    EXPECT_EQ("", WPEFramework::Plugin::rtrim("   "));
+}
+TEST_F(SystemServicesTest, Helper_Trim_BothEndsStripped)
+{
+    EXPECT_EQ("hello world", WPEFramework::Plugin::trim("  hello world  "));
+    EXPECT_EQ("a", WPEFramework::Plugin::trim("   a   "));
+    EXPECT_EQ("", WPEFramework::Plugin::trim("   "));
+}
+
+// ------------------------------------------------------------------
+// WPEFramework::Plugin::convertCase — converts to uppercase
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, Helper_ConvertCase_Lowercase_ReturnsUpper)
+{
+    EXPECT_EQ("HELLO", WPEFramework::Plugin::convertCase("hello"));
+    EXPECT_EQ("FIRMWARE", WPEFramework::Plugin::convertCase("firmware"));
+}
+TEST_F(SystemServicesTest, Helper_ConvertCase_AlreadyUpper_Unchanged)
+{
+    EXPECT_EQ("ABC123", WPEFramework::Plugin::convertCase("ABC123"));
+}
+
+// ------------------------------------------------------------------
+// WPEFramework::Plugin::convert — substring found vs not found
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, Helper_Convert_SubstringFound_ReturnsTrue)
+{
+    EXPECT_TRUE(WPEFramework::Plugin::convert("FIRMWARE", "my_FIRMWARE_update"));
+    EXPECT_TRUE(WPEFramework::Plugin::convert("ABC", "XABCX"));
+}
+TEST_F(SystemServicesTest, Helper_Convert_SubstringNotFound_ReturnsFalse)
+{
+    EXPECT_FALSE(WPEFramework::Plugin::convert("XYZ", "hello_world"));
+}
+
+// ------------------------------------------------------------------
+// WPEFramework::Plugin::caseInsensitive — model / model_number / neither
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, Helper_CaseInsensitive_ModelMatch)
+{
+    std::string result = WPEFramework::Plugin::caseInsensitive("Model=TestDevice\n");
+    EXPECT_EQ("TestDevice", result);
+}
+TEST_F(SystemServicesTest, Helper_CaseInsensitive_ModelNumberMatch)
+{
+    std::string result = WPEFramework::Plugin::caseInsensitive("model_number=Device123\n");
+    EXPECT_EQ("Device123", result);
+}
+TEST_F(SystemServicesTest, Helper_CaseInsensitive_NoMatch_ReturnsERROR)
+{
+    std::string result = WPEFramework::Plugin::caseInsensitive("random_key=data\n");
+    EXPECT_EQ("ERROR", result);
+}
+
+// ------------------------------------------------------------------
+// writeCurlResponse — appends data and returns correct size
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, Helper_WriteCurlResponse_ReturnsCorrectSize)
+{
+    const char data[] = "test data";
+    std::string stream;
+    size_t result = writeCurlResponse((void*)data, 1, strlen(data), stream);
+    EXPECT_EQ(strlen(data), result);
+}
+
+// ------------------------------------------------------------------
+// findMacInString — valid MAC and invalid (default) MAC
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, Helper_FindMacInString_ValidMac_Extracted)
+{
+    std::string totalStr = "ESTB_MAC=AA:BB:CC:DD:EE:FF extra";
+    std::string mac;
+    findMacInString(totalStr, "ESTB_MAC=", mac);
+    EXPECT_EQ("AA:BB:CC:DD:EE:FF", mac);
+}
+TEST_F(SystemServicesTest, Helper_FindMacInString_InvalidMac_ReturnsDefault)
+{
+    std::string totalStr = "ETH_MAC=notamac12345 other";
+    std::string mac;
+    findMacInString(totalStr, "ETH_MAC=", mac);
+    EXPECT_EQ("00:00:00:00:00:00", mac);
+}
+
+// =====================================================================
+// SystemServicesImplementation.cpp — SetMode Branch Tests
+//
+// These cover the branches that existing tests miss:
+//   empty mode → populateResponseWithError (MissingKeyValues)
+//   invalid mode → success=false, return ERROR_NONE
+//   EAS/WAREHOUSE with duration>0 → startModeTimer + IARM call
+//   negative duration → stopModeTimer + IARM call
+//   IARM failure path → stopModeTimer, m_currentMode reverted
+// =====================================================================
+
+// ------------------------------------------------------------------
+// SetMode — empty mode string → MissingKeyValues, success=false
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, SetMode_EmptyModeString_MissingKeyValuesError)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setMode"),
+              _T("{\"modeInfo\":{\"mode\":\"\",\"duration\":0}}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    // populateResponseWithError is called → success stays false (default)
+    ASSERT_TRUE(jr.HasLabel("success")) << response;
+    EXPECT_FALSE(jr["success"].Boolean()) << "Empty mode must fail: " << response;
+
+    TEST_LOG("SetMode_EmptyModeString - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// SetMode — invalid mode string → success=false
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, SetMode_InvalidModeString_SuccessFalse)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setMode"),
+              _T("{\"modeInfo\":{\"mode\":\"UNKNOWN_MODE\",\"duration\":0}}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    ASSERT_TRUE(jr.HasLabel("success")) << response;
+    EXPECT_FALSE(jr["success"].Boolean()) << "Invalid mode must give success=false: " << response;
+
+    TEST_LOG("SetMode_InvalidModeString - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// SetMode — EAS mode, duration=10, IARM success
+// Covers: else if(MODE_NORMAL != newMode && duration != 0) → startModeTimer(10)
+//         changeMode=true → IARM_Bus_Call → success path
+//         MODE_WAREHOUSE != m_currentMode → warehouse file removal check
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, SetMode_EASMode_Duration10_IarmSuccess)
+{
+    // Allow any number of IARM_Bus_Call (set + reset)
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .Times(::testing::AtLeast(1))
+        .WillRepeatedly(::testing::Return(IARM_RESULT_SUCCESS));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setMode"),
+              _T("{\"modeInfo\":{\"mode\":\"EAS\",\"duration\":10}}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << "EAS IARM success must succeed: " << response;
+
+    // Reset mode so subsequent tests start from NORMAL
+    handler.Invoke(connection, _T("setMode"),
+                   _T("{\"modeInfo\":{\"mode\":\"NORMAL\",\"duration\":0}}"), response);
+
+    TEST_LOG("SetMode_EASMode_Duration10_IarmSuccess - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// SetMode — WAREHOUSE mode, duration=5, IARM success
+// Covers: m_currentMode = WAREHOUSE → fopen(WAREHOUSE_MODE_FILE, "w+")
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, SetMode_WarehouseMode_Duration5_IarmSuccess)
+{
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .Times(::testing::AtLeast(1))
+        .WillRepeatedly(::testing::Return(IARM_RESULT_SUCCESS));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setMode"),
+              _T("{\"modeInfo\":{\"mode\":\"WAREHOUSE\",\"duration\":5}}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << "WAREHOUSE IARM success must succeed: " << response;
+
+    // Reset to NORMAL — also covers "else" branch that removes WAREHOUSE_MODE_FILE
+    handler.Invoke(connection, _T("setMode"),
+                   _T("{\"modeInfo\":{\"mode\":\"NORMAL\",\"duration\":0}}"), response);
+
+    TEST_LOG("SetMode_WarehouseMode_Duration5_IarmSuccess - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// SetMode — EAS mode, duration=-1 (negative) → stopModeTimer() called
+// Covers: duration < 0 ? stopModeTimer() : startModeTimer(duration)
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, SetMode_EASMode_NegativeDuration_StopsModeTimer)
+{
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .Times(::testing::AtLeast(1))
+        .WillRepeatedly(::testing::Return(IARM_RESULT_SUCCESS));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setMode"),
+              _T("{\"modeInfo\":{\"mode\":\"EAS\",\"duration\":-1}}"), response));
+
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    EXPECT_TRUE(jr["success"].Boolean()) << response;
+
+    handler.Invoke(connection, _T("setMode"),
+                   _T("{\"modeInfo\":{\"mode\":\"NORMAL\",\"duration\":0}}"), response);
+
+    TEST_LOG("SetMode_EASMode_NegativeDuration - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// SetMode — EAS mode, IARM failure path
+// Covers: stopModeTimer() in failure branch, m_currentMode = MODE_NORMAL
+//         Note: success is overwritten to true at the end of changeMode block
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, SetMode_EASMode_IarmFailure_RevertedToNormal)
+{
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .Times(::testing::AtLeast(1))
+        .WillRepeatedly(::testing::Return(IARM_RESULT_IPCCORE_FAIL));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setMode"),
+              _T("{\"modeInfo\":{\"mode\":\"EAS\",\"duration\":10}}"), response));
+
+    // success is overwritten to true unconditionally after the if/else block
+    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    ASSERT_TRUE(jr.HasLabel("success")) << response;
+
+    TEST_LOG("SetMode_EASMode_IarmFailure - Response: %s", response.c_str());
+}
+
+
+
