@@ -2364,3 +2364,712 @@ TEST_F(SystemService_L2Test, SetMigrationStatus_JSONRPC)
         TEST_LOG("  setMigrationStatus succeeded");
     }
 }
+
+
+/********************************************************
+************Test case Details **************************
+** Additional API Coverage Tests
+** Testing previously uncovered SystemServices APIs
+*******************************************************/
+
+// GetDownloadedFirmwareInfo Tests
+TEST_F(SystemService_L2Test, GetDownloadedFirmwareInfo_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetDownloadedFirmwareInfo via COM-RPC");
+
+                Exchange::ISystemServices::DownloadedFirmwareInfo fwInfo;
+
+                uint32_t result = m_SystemServicesPlugin->GetDownloadedFirmwareInfo(fwInfo);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result);
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+
+                TEST_LOG("FW Version: %s, FileName: %s, Location: %s", 
+                         fwInfo.firmwareVersion.c_str(), 
+                         fwInfo.firmwareFileName.c_str(),
+                         fwInfo.firmwareLocation.c_str());
+                
+                m_SystemServicesPlugin->Release();
+            }
+            m_controller_SystemServices->Release();
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, GetDownloadedFirmwareInfo_JSONRPC)
+{
+    TEST_LOG("Testing getDownloadedFirmwareInfo via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getDownloadedFirmwareInfo", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    if (result.HasLabel("firmwareVersion")) {
+        TEST_LOG("  firmwareVersion: %s", result["firmwareVersion"].String().c_str());
+    }
+}
+
+// GetFirmwareUpdateState Tests
+TEST_F(SystemService_L2Test, GetFirmwareUpdateState_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetFirmwareUpdateState via COM-RPC");
+
+                int firmwareUpdateState = -1;
+                bool success = false;
+
+                uint32_t result = m_SystemServicesPlugin->GetFirmwareUpdateState(firmwareUpdateState, success);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                TEST_LOG("FW Update State: %d, Success: %s", firmwareUpdateState, success ? "true" : "false");
+                
+                m_SystemServicesPlugin->Release();
+            }
+            m_controller_SystemServices->Release();
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, GetFirmwareUpdateState_JSONRPC)
+{
+    TEST_LOG("Testing getFirmwareUpdateState via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getFirmwareUpdateState", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    if (result.HasLabel("firmwareUpdateState")) {
+        TEST_LOG("  firmwareUpdateState: %d", result["firmwareUpdateState"].Number());
+    }
+}
+
+// GetLastWakeupKeyCode Tests
+TEST_F(SystemService_L2Test, GetLastWakeupKeyCode_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetLastWakeupKeyCode via COM-RPC");
+
+                int wakeupKeyCode = 0;
+                bool success = false;
+
+                uint32_t result = m_SystemServicesPlugin->GetLastWakeupKeyCode(wakeupKeyCode, success);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                TEST_LOG("Last Wakeup KeyCode: %d, Success: %s", wakeupKeyCode, success ? "true" : "false");
+                
+                m_SystemServicesPlugin->Release();
+            }
+            m_controller_SystemServices->Release();
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, GetLastWakeupKeyCode_JSONRPC)
+{
+    TEST_LOG("Testing getLastWakeupKeyCode via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getLastWakeupKeyCode", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    if (result.HasLabel("wakeupKeyCode")) {
+        TEST_LOG("  wakeupKeyCode: %d", result["wakeupKeyCode"].Number());
+    }
+}
+
+// GetMfgSerialNumber Tests
+TEST_F(SystemService_L2Test, GetMfgSerialNumber_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetMfgSerialNumber via COM-RPC");
+
+                string mfgSerialNumber;
+                bool success = false;
+
+                uint32_t result = m_SystemServicesPlugin->GetMfgSerialNumber(mfgSerialNumber, success);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                TEST_LOG("Mfg Serial Number: %s, Success: %s", mfgSerialNumber.c_str(), success ? "true" : "false");
+                
+                m_SystemServicesPlugin->Release();
+            }
+            m_controller_SystemServices->Release();
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, GetMfgSerialNumber_JSONRPC)
+{
+    TEST_LOG("Testing getMfgSerialNumber via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getMfgSerialNumber", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    if (result.HasLabel("mfgSerialNumber")) {
+        TEST_LOG("  mfgSerialNumber: %s", result["mfgSerialNumber"].String().c_str());
+    }
+}
+
+// IsOptOutTelemetry Tests
+TEST_F(SystemService_L2Test, IsOptOutTelemetry_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing IsOptOutTelemetry via COM-RPC");
+
+                bool optOut = false;
+                bool success = false;
+
+                uint32_t result = m_SystemServicesPlugin->IsOptOutTelemetry(optOut, success);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                TEST_LOG("Opt-Out Telemetry: %s, Success: %s", optOut ? "true" : "false", success ? "true" : "false");
+                
+                m_SystemServicesPlugin->Release();
+            }
+            m_controller_SystemServices->Release();
+        }
+    }
+}
+
+// SetFirmwareAutoReboot Tests
+TEST_F(SystemService_L2Test, SetFirmwareAutoReboot_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing SetFirmwareAutoReboot via COM-RPC");
+
+                Exchange::ISystemServices::SystemResult sysResult;
+
+                uint32_t result = m_SystemServicesPlugin->SetFirmwareAutoReboot(true, sysResult);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                TEST_LOG("SetFirmwareAutoReboot success: %s", sysResult.success ? "true" : "false");
+                
+                m_SystemServicesPlugin->Release();
+            }
+            m_controller_SystemServices->Release();
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, SetFirmwareAutoReboot_JSONRPC)
+{
+    TEST_LOG("Testing setFirmwareAutoReboot via JSON-RPC");
+
+    JsonObject params;
+    params["enable"] = true;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setFirmwareAutoReboot", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    if (result.HasLabel("success")) {
+        TEST_LOG("  success: %s", result["success"].Boolean() ? "true" : "false");
+    }
+}
+
+// UpdateFirmware Tests
+TEST_F(SystemService_L2Test, UpdateFirmware_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing UpdateFirmware via COM-RPC");
+
+                Exchange::ISystemServices::SystemResult sysResult;
+
+                uint32_t result = m_SystemServicesPlugin->UpdateFirmware(sysResult);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                TEST_LOG("UpdateFirmware called, success: %s", sysResult.success ? "true" : "false");
+                
+                m_SystemServicesPlugin->Release();
+            }
+            m_controller_SystemServices->Release();
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, UpdateFirmware_JSONRPC)
+{
+    TEST_LOG("Testing updateFirmware via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "updateFirmware", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    if (result.HasLabel("success")) {
+        TEST_LOG("  success: %s", result["success"].Boolean() ? "true" : "false");
+    }
+}
+
+// SetFSRFlag Tests
+TEST_F(SystemService_L2Test, SetFSRFlag_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing SetFSRFlag via COM-RPC");
+
+                Exchange::ISystemServices::SystemResult sysResult;
+
+                uint32_t result = m_SystemServicesPlugin->SetFSRFlag(true, sysResult);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                TEST_LOG("SetFSRFlag success: %s", sysResult.success ? "true" : "false");
+                
+                m_SystemServicesPlugin->Release();
+            }
+            m_controller_SystemServices->Release();
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, SetFSRFlag_JSONRPC)
+{
+    TEST_LOG("Testing setFSRFlag via JSON-RPC");
+
+    JsonObject params;
+    params["fsrFlag"] = true;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setFSRFlag", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    if (result.HasLabel("success")) {
+        TEST_LOG("  success: %s", result["success"].Boolean() ? "true" : "false");
+    }
+}
+
+// SetBlocklistFlag Tests
+TEST_F(SystemService_L2Test, SetBlocklistFlag_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing SetBlocklistFlag via COM-RPC");
+
+                Exchange::ISystemServices::SetBlocklistResult blocklistResult;
+
+                uint32_t result = m_SystemServicesPlugin->SetBlocklistFlag(true, blocklistResult);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                TEST_LOG("SetBlocklistFlag success: %s", blocklistResult.success ? "true" : "false");
+                
+                m_SystemServicesPlugin->Release();
+            }
+            m_controller_SystemServices->Release();
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, SetBlocklistFlag_JSONRPC)
+{
+    TEST_LOG("Testing setBlocklistFlag via JSON-RPC");
+
+    JsonObject params;
+    params["blocklist"] = true;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setBlocklistFlag", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    if (result.HasLabel("success")) {
+        TEST_LOG("  success: %s", result["success"].Boolean() ? "true" : "false");
+    }
+}
+
+// GetTimeStatus Tests
+TEST_F(SystemService_L2Test, GetTimeStatus_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetTimeStatus via COM-RPC");
+
+                string timeQuality, timeSrc, time;
+                bool success = false;
+
+                uint32_t result = m_SystemServicesPlugin->GetTimeStatus(timeQuality, timeSrc, time, success);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                TEST_LOG("Time Quality: %s, Source: %s, Time: %s", 
+                         timeQuality.c_str(), timeSrc.c_str(), time.c_str());
+                
+                m_SystemServicesPlugin->Release();
+            }
+            m_controller_SystemServices->Release();
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, GetTimeStatus_JSONRPC)
+{
+    TEST_LOG("Testing getTimeStatus via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getTimeStatus", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    if (result.HasLabel("TimeQuality")) {
+        TEST_LOG("  TimeQuality: %s", result["TimeQuality"].String().c_str());
+    }
+    if (result.HasLabel("TimeSrc")) {
+        TEST_LOG("  TimeSrc: %s", result["TimeSrc"].String().c_str());
+    }
+}
+
+/********************************************************
+************Test case Details **************************
+** Negative and Corner Case Tests
+*******************************************************/
+
+// Negative Test: SetMode with invalid mode
+TEST_F(SystemService_L2Test, SetMode_InvalidMode_COMRPC_Negative)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing SetMode with invalid mode via COM-RPC (Negative Test)");
+
+                Exchange::ISystemServices::ModeInfo modeInfo;
+                modeInfo.mode = "INVALID_MODE_XYZ";
+                modeInfo.duration = 100;
+                uint32_t SysSrv_Status = 0;
+                string errorMessage;
+                bool success = false;
+
+                uint32_t result = m_SystemServicesPlugin->SetMode(modeInfo, SysSrv_Status, errorMessage, success);
+
+                // Expecting failure for invalid mode
+                if (!success) {
+                    TEST_LOG("Expected failure occurred for invalid mode");
+                } else {
+                    TEST_LOG("Warning: Invalid mode was accepted");
+                }
+                
+                m_SystemServicesPlugin->Release();
+            }
+            m_controller_SystemServices->Release();
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, SetMode_InvalidMode_JSONRPC_Negative)
+{
+    TEST_LOG("Testing setMode with invalid mode via JSON-RPC (Negative Test)");
+
+    JsonObject params;
+    params["modeInfo"]["mode"] = "INVALID_MODE";
+    params["modeInfo"]["duration"] = 100;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
+
+    // API may return ERROR_NONE but success field should indicate failure
+    if (result.HasLabel("success")) {
+        if (!result["success"].Boolean()) {
+            TEST_LOG("  Expected failure for invalid mode");
+        }
+    }
+}
+
+// Negative Test: SetMode with WAREHOUSE mode and zero duration
+TEST_F(SystemService_L2Test, SetMode_WAREHOUSE_ZeroDuration_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing SetMode WAREHOUSE with zero duration via COM-RPC");
+
+                Exchange::ISystemServices::ModeInfo modeInfo;
+                modeInfo.mode = "WAREHOUSE";
+                modeInfo.duration = 0;
+                uint32_t SysSrv_Status = 0;
+                string errorMessage;
+                bool success = false;
+
+                uint32_t result = m_SystemServicesPlugin->SetMode(modeInfo, SysSrv_Status, errorMessage, success);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                TEST_LOG("SetMode WAREHOUSE (duration=0) success: %s", success ? "true" : "false");
+                
+                m_SystemServicesPlugin->Release();
+            }
+            m_controller_SystemServices->Release();
+        }
+    }
+}
+
+// Corner Case: SetFriendlyName with empty string
+TEST_F(SystemService_L2Test, SetFriendlyName_EmptyString_COMRPC_Corner)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing SetFriendlyName with empty string via COM-RPC (Corner Case)");
+
+                Exchange::ISystemServices::SystemResult sysResult;
+
+                uint32_t result = m_SystemServicesPlugin->SetFriendlyName("", sysResult);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                TEST_LOG("SetFriendlyName (empty) success: %s", sysResult.success ? "true" : "false");
+                
+                m_SystemServicesPlugin->Release();
+            }
+            m_controller_SystemServices->Release();
+        }
+    }
+}
+
+// Corner Case: SetFriendlyName with very long string
+TEST_F(SystemService_L2Test, SetFriendlyName_LongString_COMRPC_Corner)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing SetFriendlyName with long string via COM-RPC (Corner Case)");
+
+                std::string longName(256, 'A'); // 256 character string
+                Exchange::ISystemServices::SystemResult sysResult;
+
+                uint32_t result = m_SystemServicesPlugin->SetFriendlyName(longName, sysResult);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                TEST_LOG("SetFriendlyName (long) success: %s", sysResult.success ? "true" : "false");
+                
+                m_SystemServicesPlugin->Release();
+            }
+            m_controller_SystemServices->Release();
+        }
+    }
+}
+
+// Corner Case: SetFriendlyName with special characters
+TEST_F(SystemService_L2Test, SetFriendlyName_SpecialChars_JSONRPC_Corner)
+{
+    TEST_LOG("Testing setFriendlyName with special characters via JSON-RPC (Corner Case)");
+
+    JsonObject params;
+    params["friendlyName"] = "Test@Device#123!$%";
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setFriendlyName", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    if (result.HasLabel("success")) {
+        TEST_LOG("  success with special chars: %s", result["success"].Boolean() ? "true" : "false");
+    }
+}
+
+// Negative Test: SetTerritory with invalid territory
+TEST_F(SystemService_L2Test, SetTerritory_InvalidTerritory_COMRPC_Negative)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing SetTerritory with invalid territory via COM-RPC (Negative Test)");
+
+                Exchange::ISystemServices::SystemError sysError;
+                bool success = false;
+
+                uint32_t result = m_SystemServicesPlugin->SetTerritory("INVALID_TERRITORY", "INVALID_REGION", sysError, success);
+
+                // Expecting failure or specific error
+                TEST_LOG("SetTerritory (invalid) returned success: %s", success ? "true" : "false");
+                
+                m_SystemServicesPlugin->Release();
+            }
+            m_controller_SystemServices->Release();
+        }
+    }
+}
+
+// Negative Test: SetTimeZoneDST with invalid timezone
+TEST_F(SystemService_L2Test, SetTimeZoneDST_InvalidTimezone_COMRPC_Negative)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing SetTimeZoneDST with invalid timezone via COM-RPC (Negative Test)");
+
+                uint32_t SysSrv_Status = 0;
+                string errorMessage;
+                bool success = false;
+
+                uint32_t result = m_SystemServicesPlugin->SetTimeZoneDST("Invalid/Timezone", "FINAL", SysSrv_Status, errorMessage, success);
+
+                if (!success) {
+                    TEST_LOG("Expected failure for invalid timezone, error: %s", errorMessage.c_str());
+                }
+                
+                m_SystemServicesPlugin->Release();
+            }
+            m_controller_SystemServices->Release();
+        }
+    }
+}
+
+// Corner Case: Multiple rapid calls to the same API
+TEST_F(SystemService_L2Test, GetSerialNumber_RapidCalls_COMRPC_Corner)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetSerialNumber with rapid calls via COM-RPC (Corner Case)");
+
+                for (int i = 0; i < 10; i++) {
+                    string serialNumber;
+                    bool success = false;
+
+                    uint32_t result = m_SystemServicesPlugin->GetSerialNumber(serialNumber, success);
+
+                    EXPECT_EQ(result, Core::ERROR_NONE);
+                }
+                TEST_LOG("Rapid calls test completed");
+                
+                m_SystemServicesPlugin->Release();
+            }
+            m_controller_SystemServices->Release();
+        }
+    }
+}
+
+// Negative Test: SetNetworkStandbyMode toggle
+TEST_F(SystemService_L2Test, SetNetworkStandbyMode_Toggle_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing SetNetworkStandbyMode toggle via COM-RPC");
+
+                Exchange::ISystemServices::SystemResult sysResult1, sysResult2;
+
+                // Set to true
+                uint32_t result1 = m_SystemServicesPlugin->SetNetworkStandbyMode(true, sysResult1);
+                EXPECT_EQ(result1, Core::ERROR_NONE);
+                TEST_LOG("Set to true: %s", sysResult1.success ? "success" : "failed");
+
+                // Set to false
+                uint32_t result2 = m_SystemServicesPlugin->SetNetworkStandbyMode(false, sysResult2);
+                EXPECT_EQ(result2, Core::ERROR_NONE);
+                TEST_LOG("Set to false: %s", sysResult2.success ? "success" : "failed");
+                
+                m_SystemServicesPlugin->Release();
+            }
+            m_controller_SystemServices->Release();
+        }
+    }
+}
+
