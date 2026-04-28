@@ -9347,18 +9347,19 @@ TEST_F(SystemServicesTest, Reboot_WithNetflixRunning_KillsProcess)
     static PROCTAB fakeProcTab;
     fakeProcTab.procfs = nullptr;
 
-    static proc_t fakeProcInfo;
-    memset(&fakeProcInfo, 0, sizeof(fakeProcInfo));
-    strncpy(fakeProcInfo.cmd, "nrdPluginApp", sizeof(fakeProcInfo.cmd) - 1);
-    fakeProcInfo.tid = getpid(); // use test PID so kill(SIGTERM, ...) won't actually terminate us
-
     // openproc → non-null (proceeds into the while loop)
     EXPECT_CALL(*p_readprocImplMock, openproc(::testing::_))
         .WillOnce(::testing::Return(&fakeProcTab));
 
-    // readproc returns fakeProcInfo once, then nullptr (end of list)
+    // readproc fills *p in-place (as real libproc does) then returns p;
+    // second call returns nullptr to end the loop.
     EXPECT_CALL(*p_readprocImplMock, readproc(::testing::_, ::testing::_))
-        .WillOnce(::testing::Return(&fakeProcInfo))
+        .WillOnce(::testing::Invoke([](PROCTAB* /*pt*/, proc_t* p) -> proc_t* {
+            memset(p, 0, sizeof(*p));
+            strncpy(p->cmd, "nrdPluginApp", sizeof(p->cmd) - 1);
+            p->tid = static_cast<int>(getpid());
+            return p;
+        }))
         .WillOnce(::testing::Return(nullptr));
 
     EXPECT_CALL(*p_readprocImplMock, closeproc(::testing::_))
@@ -9710,26 +9711,29 @@ TEST_F(SystemServicesTest, Utils_GetChildProcessIDs_WithMatchingProcess)
     static PROCTAB fakeProcTab2;
     fakeProcTab2.procfs = nullptr;
 
-    static proc_t fakeChildProc;
-    memset(&fakeChildProc, 0, sizeof(fakeChildProc));
-    fakeChildProc.ppid = getpid();  // mock a child of this test process
-    fakeChildProc.tid  = 9999;
+    const int testPpid = getpid();
 
     EXPECT_CALL(*p_readprocImplMock, openproc(::testing::_))
         .WillOnce(::testing::Return(&fakeProcTab2));
 
+    // Fill *p in-place so proc_info.ppid is set correctly in the implementation.
     EXPECT_CALL(*p_readprocImplMock, readproc(::testing::_, ::testing::_))
-        .WillOnce(::testing::Return(&fakeChildProc))
+        .WillOnce(::testing::Invoke([testPpid](PROCTAB* /*pt*/, proc_t* p) -> proc_t* {
+            memset(p, 0, sizeof(*p));
+            p->ppid = testPpid;
+            p->tid  = 9999;
+            return p;
+        }))
         .WillOnce(::testing::Return(nullptr));
 
     EXPECT_CALL(*p_readprocImplMock, closeproc(::testing::_))
         .Times(1);
 
     std::vector<int> childPids;
-    bool result = Utils::getChildProcessIDs(getpid(), childPids);
+    bool result = Utils::getChildProcessIDs(testPpid, childPids);
 
     EXPECT_TRUE(result);
-    EXPECT_EQ(1u, childPids.size());
+    ASSERT_EQ(1u, childPids.size());  // ASSERT so we don't access [0] on empty vector
     EXPECT_EQ(9999, childPids[0]);
 
     TEST_LOG("Utils_GetChildProcessIDs_WithMatchingProcess PASSED");
