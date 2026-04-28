@@ -2126,7 +2126,7 @@ TEST_F(SystemService_L2Test, GetMigrationStatus_COMRPC)
                 }
 
                 // Log output
-                TEST_LOG("Migration Status: %s", migrationStatus.status.c_str());
+                TEST_LOG("Migration Status: %s", migrationStatus.migrationStatus.c_str());
                 
                 m_SystemServicesPlugin->Release();
             } else {
@@ -2164,7 +2164,7 @@ TEST_F(SystemService_L2Test, GetBootTypeInfo_COMRPC)
                 }
 
                 // Log output
-                TEST_LOG("Boot Type: %s", bootInfo.boottype.c_str());
+                TEST_LOG("Boot Type: %s", bootInfo.bootType.c_str());
                 
                 m_SystemServicesPlugin->Release();
             } else {
@@ -2308,8 +2308,10 @@ TEST_F(SystemService_L2Test, SetMode_NORMAL_JSONRPC)
     TEST_LOG("Testing setMode NORMAL via JSON-RPC");
 
     JsonObject params;
-    params["modeInfo"]["mode"] = "NORMAL";
-    params["modeInfo"]["duration"] = -1;
+    JsonObject modeInfo;
+    modeInfo["mode"] = "NORMAL";
+    modeInfo["duration"] = -1;
+    params["modeInfo"] = modeInfo;
     JsonObject result;
 
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
@@ -2329,8 +2331,10 @@ TEST_F(SystemService_L2Test, SetMode_EAS_JSONRPC)
     TEST_LOG("Testing setMode EAS via JSON-RPC");
 
     JsonObject params;
-    params["modeInfo"]["mode"] = "EAS";
-    params["modeInfo"]["duration"] = 300;
+    JsonObject modeInfo;
+    modeInfo["mode"] = "EAS";
+    modeInfo["duration"] = 300;
+    params["modeInfo"] = modeInfo;
     JsonObject result;
 
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
@@ -2394,10 +2398,10 @@ TEST_F(SystemService_L2Test, GetDownloadedFirmwareInfo_COMRPC)
                     TEST_LOG("Err: %s", errorMsg.c_str());
                 }
 
-                TEST_LOG("FW Version: %s, FileName: %s, Location: %s", 
-                         fwInfo.firmwareVersion.c_str(), 
-                         fwInfo.firmwareFileName.c_str(),
-                         fwInfo.firmwareLocation.c_str());
+                TEST_LOG("Current FW: %s, Downloaded FW: %s, Location: %s", 
+                         fwInfo.currentFWVersion.c_str(), 
+                         fwInfo.downloadedFWVersion.c_str(),
+                         fwInfo.downloadedFWLocation.c_str());
                 
                 m_SystemServicesPlugin->Release();
             }
@@ -2461,7 +2465,7 @@ TEST_F(SystemService_L2Test, GetFirmwareUpdateState_JSONRPC)
     EXPECT_EQ(status, Core::ERROR_NONE);
 
     if (result.HasLabel("firmwareUpdateState")) {
-        TEST_LOG("  firmwareUpdateState: %d", result["firmwareUpdateState"].Number());
+        TEST_LOG("  firmwareUpdateState: %ld", (long)result["firmwareUpdateState"].Number());
     }
 }
 
@@ -2504,7 +2508,7 @@ TEST_F(SystemService_L2Test, GetLastWakeupKeyCode_JSONRPC)
     EXPECT_EQ(status, Core::ERROR_NONE);
 
     if (result.HasLabel("wakeupKeyCode")) {
-        TEST_LOG("  wakeupKeyCode: %d", result["wakeupKeyCode"].Number());
+        TEST_LOG("  wakeupKeyCode: %ld", (long)result["wakeupKeyCode"].Number());
     }
 }
 
@@ -2820,7 +2824,7 @@ TEST_F(SystemService_L2Test, SetMode_InvalidMode_COMRPC_Negative)
                 string errorMessage;
                 bool success = false;
 
-                uint32_t result = m_SystemServicesPlugin->SetMode(modeInfo, SysSrv_Status, errorMessage, success);
+                m_SystemServicesPlugin->SetMode(modeInfo, SysSrv_Status, errorMessage, success);
 
                 // Expecting failure for invalid mode
                 if (!success) {
@@ -2841,11 +2845,13 @@ TEST_F(SystemService_L2Test, SetMode_InvalidMode_JSONRPC_Negative)
     TEST_LOG("Testing setMode with invalid mode via JSON-RPC (Negative Test)");
 
     JsonObject params;
-    params["modeInfo"]["mode"] = "INVALID_MODE";
-    params["modeInfo"]["duration"] = 100;
+    JsonObject modeInfo;
+    modeInfo["mode"] = "INVALID_MODE";
+    modeInfo["duration"] = 100;
+    params["modeInfo"] = modeInfo;
     JsonObject result;
 
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
+    InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
 
     // API may return ERROR_NONE but success field should indicate failure
     if (result.HasLabel("success")) {
@@ -2972,7 +2978,7 @@ TEST_F(SystemService_L2Test, SetTerritory_InvalidTerritory_COMRPC_Negative)
                 Exchange::ISystemServices::SystemError sysError;
                 bool success = false;
 
-                uint32_t result = m_SystemServicesPlugin->SetTerritory("INVALID_TERRITORY", "INVALID_REGION", sysError, success);
+                m_SystemServicesPlugin->SetTerritory("INVALID_TERRITORY", "INVALID_REGION", sysError, success);
 
                 // Expecting failure or specific error
                 TEST_LOG("SetTerritory (invalid) returned success: %s", success ? "true" : "false");
@@ -3000,7 +3006,7 @@ TEST_F(SystemService_L2Test, SetTimeZoneDST_InvalidTimezone_COMRPC_Negative)
                 string errorMessage;
                 bool success = false;
 
-                uint32_t result = m_SystemServicesPlugin->SetTimeZoneDST("Invalid/Timezone", "FINAL", SysSrv_Status, errorMessage, success);
+                m_SystemServicesPlugin->SetTimeZoneDST("Invalid/Timezone", "FINAL", SysSrv_Status, errorMessage, success);
 
                 if (!success) {
                     TEST_LOG("Expected failure for invalid timezone, error: %s", errorMessage.c_str());
