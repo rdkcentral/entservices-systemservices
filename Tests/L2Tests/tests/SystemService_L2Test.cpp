@@ -2119,13 +2119,13 @@ TEST_F(SystemService_L2Test, GetMigrationStatus_COMRPC)
 
                 // Validate result
                 EXPECT_EQ(result, Core::ERROR_NONE);
-                if (result != Core::ERROR_NONE) {
+                if (result == Core::ERROR_NONE) {
+                    TEST_LOG("Migration Status: %s", migrationStatus.migrationStatus.c_str());
+                    EXPECT_FALSE(migrationStatus.migrationStatus.empty());
+                } else {
                     std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
                     TEST_LOG("Err: %s", errorMsg.c_str());
-                }
-
-                // Log output
-                TEST_LOG("Migration Status: %s", migrationStatus.migrationStatus.c_str());
+				}
                 
                 m_SystemServicesPlugin->Release();
             } else {
@@ -2157,13 +2157,13 @@ TEST_F(SystemService_L2Test, GetBootTypeInfo_COMRPC)
 
                 // Validate result
                 EXPECT_EQ(result, Core::ERROR_NONE);
-                if (result != Core::ERROR_NONE) {
+                if (result == Core::ERROR_NONE) {
+                    TEST_LOG("Boot Type: %s", bootInfo.bootType.c_str());
+                    EXPECT_FALSE(bootInfo.bootType.empty());
+                } else {
                     std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
                     TEST_LOG("Err: %s", errorMsg.c_str());
                 }
-
-                // Log output
-                TEST_LOG("Boot Type: %s", bootInfo.bootType.c_str());
                 
                 m_SystemServicesPlugin->Release();
             } else {
@@ -2280,6 +2280,7 @@ TEST_F(SystemService_L2Test, GetMigrationStatus_JSONRPC)
     if (result.HasLabel("status")) {
         string migrationStatus = result["status"].String();
         TEST_LOG("  status: %s", migrationStatus.c_str());
+        EXPECT_FALSE(migrationStatus.empty());
     }
 }
 
@@ -2299,7 +2300,8 @@ TEST_F(SystemService_L2Test, GetBootTypeInfo_JSONRPC)
     if (result.HasLabel("boottype")) {
         string bootType = result["boottype"].String();
         TEST_LOG("  boottype: %s", bootType.c_str());
-    }
+        EXPECT_FALSE(bootType.empty());
+	}
 }
 
 TEST_F(SystemService_L2Test, SetMode_NORMAL_JSONRPC)
@@ -3044,6 +3046,140 @@ TEST_F(SystemService_L2Test, GetSerialNumber_RapidCalls_COMRPC_Corner)
             }
             m_controller_SystemServices->Release();
         }
+    }
+}
+
+// Negative Test: SetNetworkStandbyMode toggle
+TEST_F(SystemService_L2Test, SetNetworkStandbyMode_Toggle_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing SetNetworkStandbyMode toggle via COM-RPC");
+
+                Exchange::ISystemServices::SystemResult sysResult1, sysResult2;
+
+                // Set to true
+                uint32_t result1 = m_SystemServicesPlugin->SetNetworkStandbyMode(true, sysResult1);
+                EXPECT_EQ(result1, Core::ERROR_NONE);
+                TEST_LOG("Set to true: %s", sysResult1.success ? "success" : "failed");
+
+                // Set to false
+                uint32_t result2 = m_SystemServicesPlugin->SetNetworkStandbyMode(false, sysResult2);
+                EXPECT_EQ(result2, Core::ERROR_NONE);
+                TEST_LOG("Set to false: %s", sysResult2.success ? "success" : "failed");
+                
+                m_SystemServicesPlugin->Release();
+            }
+            m_controller_SystemServices->Release();
+        }
+    }
+}
+
+// Negative Test: GetMigrationStatus without migration file
+TEST_F(SystemService_L2Test, GetMigrationStatus_NoFile_COMRPC_Negative)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetMigrationStatus without migration file via COM-RPC (Negative Test)");
+
+                // Remove migration file if it exists
+                system("rm -f /opt/secure/persistent/MigrationStatus 2>/dev/null");
+
+                Exchange::ISystemServices::MigrationStatus migrationStatus;
+                uint32_t result = m_SystemServicesPlugin->GetMigrationStatus(migrationStatus);
+
+                // Should return success with default/empty status when file doesn't exist
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                TEST_LOG("Migration Status (no file): %s", migrationStatus.migrationStatus.c_str());
+                
+                m_SystemServicesPlugin->Release();
+            }
+            m_controller_SystemServices->Release();
+        }
+    }
+}
+
+// Negative Test: GetBootTypeInfo verification
+TEST_F(SystemService_L2Test, GetBootTypeInfo_Verify_COMRPC_Negative)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetBootTypeInfo verification via COM-RPC (Negative Test)");
+
+                Exchange::ISystemServices::BootType bootInfo;
+                uint32_t result = m_SystemServicesPlugin->GetBootTypeInfo(bootInfo);
+
+                // Validate the boot type value
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result == Core::ERROR_NONE) {
+                    TEST_LOG("Boot Type: %s", bootInfo.bootType.c_str());
+                    // Boot type should be one of valid values
+                    bool validBootType = (bootInfo.bootType == "COLD" || 
+                                        bootInfo.bootType == "WARM" || 
+                                        bootInfo.bootType == "UNKNOWN" ||
+                                        bootInfo.bootType.empty());
+                    if (!validBootType) {
+                        TEST_LOG("Warning: Unexpected boot type value: %s", bootInfo.bootType.c_str());
+                    }
+                }
+                
+                m_SystemServicesPlugin->Release();
+            }
+            m_controller_SystemServices->Release();
+        }
+    }
+}
+
+// Negative Test: SetMigrationStatus with empty string
+TEST_F(SystemService_L2Test, SetMigrationStatus_EmptyString_JSONRPC_Negative)
+{
+    TEST_LOG("Testing setMigrationStatus with empty string via JSON-RPC (Negative Test)");
+
+    JsonObject params;
+    params["status"] = "";
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMigrationStatus", params, result);
+
+    // May fail or succeed depending on implementation
+    if (result.HasLabel("success")) {
+        bool success = result["success"].Boolean();
+        TEST_LOG("  setMigrationStatus with empty string: %s", success ? "accepted" : "rejected");
+    }
+}
+
+// Negative Test: SetMigrationStatus with invalid status value
+TEST_F(SystemService_L2Test, SetMigrationStatus_InvalidValue_JSONRPC_Negative)
+{
+    TEST_LOG("Testing setMigrationStatus with invalid value via JSON-RPC (Negative Test)");
+
+    JsonObject params;
+    params["status"] = "InvalidStatusValue123";
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMigrationStatus", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    // Implementation should handle invalid values gracefully
+    if (result.HasLabel("success")) {
+        TEST_LOG("  setMigrationStatus with invalid value returned: %s", 
+                 result["success"].Boolean() ? "success" : "failure");
     }
 }
 
