@@ -1693,3 +1693,387 @@ TEST_F(SystemService_L2Test, OnBlocklistChanged_Notification_COMRPC)
     }
 }
 
+/********************************************************
+************Test case Details **************************
+** Additional COM-RPC Tests
+** Testing remaining SystemServices APIs via COM-RPC interface
+*******************************************************/
+
+TEST_F(SystemService_L2Test, GetTimeZoneDST_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetTimeZoneDST via COM-RPC");
+
+                // Declare output parameters
+                string timeZone;
+                string accuracy;
+                bool success = false;
+
+                // Call the API
+                uint32_t result = m_SystemServicesPlugin->GetTimeZoneDST(timeZone, accuracy, success);
+
+                // Validate result
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+                EXPECT_TRUE(success);
+
+                // Log and validate output
+                TEST_LOG("TimeZone: %s", timeZone.c_str());
+                TEST_LOG("Accuracy: %s", accuracy.c_str());
+                EXPECT_FALSE(timeZone.empty());
+                EXPECT_FALSE(accuracy.empty());
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, GetTerritory_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetTerritory via COM-RPC");
+
+                // Declare output parameters
+                string territory;
+                string region;
+                bool success = false;
+
+                // Call the API
+                uint32_t result = m_SystemServicesPlugin->GetTerritory(territory, region, success);
+
+                // Validate result
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+                EXPECT_TRUE(success);
+
+                // Log and validate output
+                TEST_LOG("Territory: %s", territory.c_str());
+                TEST_LOG("Region: %s", region.c_str());
+                
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, GetSystemVersions_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetSystemVersions via COM-RPC");
+
+                // Declare output parameters
+                Exchange::ISystemServices::SystemVersionsInfo systemVersionsInfo;
+
+                // Call the API
+                uint32_t result = m_SystemServicesPlugin->GetSystemVersions(systemVersionsInfo);
+
+                // Validate result
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+
+                // Log and validate output
+                TEST_LOG("stbVersion: %s", systemVersionsInfo.stbVersion.c_str());
+                TEST_LOG("receiverVersion: %s", systemVersionsInfo.receiverVersion.c_str());
+                TEST_LOG("stbTimestamp: %s", systemVersionsInfo.stbTimestamp.c_str());
+                
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, GetPowerStateBeforeReboot_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetPowerStateBeforeReboot via COM-RPC");
+
+                // Declare output parameters
+                string state;
+                bool success = false;
+
+                // Call the API
+                uint32_t result = m_SystemServicesPlugin->GetPowerStateBeforeReboot(state, success);
+
+                // Validate result
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+                EXPECT_TRUE(success);
+
+                // Log and validate output
+                TEST_LOG("Power state before reboot: %s", state.c_str());
+                
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, GetFSRFlag_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetFSRFlag via COM-RPC");
+
+                // Declare output parameters
+                bool fsrFlag = false;
+                bool success = false;
+
+                // Call the API
+                uint32_t result = m_SystemServicesPlugin->GetFSRFlag(fsrFlag, success);
+
+                // Validate result
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+                EXPECT_TRUE(success);
+
+                // Log and validate output
+                TEST_LOG("FSR Flag: %s", fsrFlag ? "true" : "false");
+                
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, GetBlocklistFlag_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetBlocklistFlag via COM-RPC");
+
+                // Declare output parameters
+                Exchange::ISystemServices::BlocklistResult blocklistResult;
+
+                // Call the API
+                uint32_t result = m_SystemServicesPlugin->GetBlocklistFlag(blocklistResult);
+
+                // Validate result
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+                EXPECT_TRUE(blocklistResult.success);
+
+                // Log and validate output
+                TEST_LOG("Blocklist Flag: %s", blocklistResult.blocklist ? "true" : "false");
+                
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+/********************************************************
+************Test case Details **************************
+** Additional JSON-RPC Tests
+** Testing remaining SystemServices APIs via JSON-RPC interface
+*******************************************************/
+
+TEST_F(SystemService_L2Test, GetTimeZoneDST_JSONRPC)
+{
+    TEST_LOG("Testing getTimeZoneDST via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getTimeZoneDST", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    // Validate success field
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+
+    // Validate timeZone field
+    EXPECT_TRUE(result.HasLabel("timeZone"));
+    if (result.HasLabel("timeZone")) {
+        string timeZone = result["timeZone"].String();
+        TEST_LOG("  timeZone: %s", timeZone.c_str());
+        EXPECT_FALSE(timeZone.empty());
+    }
+
+    // Validate accuracy field
+    EXPECT_TRUE(result.HasLabel("accuracy"));
+    if (result.HasLabel("accuracy")) {
+        string accuracy = result["accuracy"].String();
+        TEST_LOG("  accuracy: %s", accuracy.c_str());
+        EXPECT_FALSE(accuracy.empty());
+    }
+}
+
+TEST_F(SystemService_L2Test, GetPowerStateBeforeReboot_JSONRPC)
+{
+    TEST_LOG("Testing getPowerStateBeforeReboot via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPowerStateBeforeReboot", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    // Validate success field
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+
+    // Validate state field
+    EXPECT_TRUE(result.HasLabel("state"));
+    if (result.HasLabel("state")) {
+        string state = result["state"].String();
+        TEST_LOG("  state: %s", state.c_str());
+    }
+}
+
+TEST_F(SystemService_L2Test, GetBlocklistFlag_JSONRPC)
+{
+    TEST_LOG("Testing getBlocklistFlag via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getBlocklistFlag", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    // Validate success field
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+
+    // Validate blocklist field
+    EXPECT_TRUE(result.HasLabel("blocklist"));
+    if (result.HasLabel("blocklist")) {
+        bool blocklist = result["blocklist"].Boolean();
+        TEST_LOG("  blocklist: %s", blocklist ? "true" : "false");
+    }
+}
+
+TEST_F(SystemService_L2Test, SetOptOutTelemetry_JSONRPC)
+{
+    TEST_LOG("Testing setOptOutTelemetry via JSON-RPC");
+
+    JsonObject params;
+    params["Opt-Out"] = true;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setOptOutTelemetry", params, result);
+
+    // setOptOutTelemetry depends on the org.rdk.Telemetry plugin (QueryInterfaceByCallsign).
+    // In the L2 test environment, Telemetry plugin is not activated, so graceful failure is acceptable.
+    if (status == Core::ERROR_NONE) {
+        EXPECT_TRUE(result.HasLabel("success"));
+        if (result.HasLabel("success")) {
+            EXPECT_TRUE(result["success"].Boolean());
+            TEST_LOG("  setOptOutTelemetry succeeded");
+        }
+    } else {
+        TEST_LOG("setOptOutTelemetry failed with status %u - Telemetry plugin not available in L2 test environment", status);
+    }
+}
+
+TEST_F(SystemService_L2Test, SetNetworkStandbyMode_JSONRPC)
+{
+    TEST_LOG("Testing setNetworkStandbyMode via JSON-RPC");
+
+    JsonObject params;
+    params["nwStandby"] = true;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setNetworkStandbyMode", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    // Validate success field
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+        TEST_LOG("  setNetworkStandbyMode succeeded");
+    }
+}
+
