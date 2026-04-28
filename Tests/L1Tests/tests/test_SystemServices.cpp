@@ -8755,28 +8755,29 @@ TEST_F(SystemServicesTest, SetWakeupSrcConfig_UnknownSource_HandledGracefully)
 
 TEST_F(SystemServicesTest, GetLastWakeupReason_MultipleWakeupSources)
 {
-    // Exercise the path through multiple wakeup source types
-    const Exchange::IPowerManager::WakeupSrcType wakeupSrcs[] = {
-        Exchange::IPowerManager::WAKEUP_SRC_VOICE,
-        Exchange::IPowerManager::WAKEUP_SRC_IR,
-        Exchange::IPowerManager::WAKEUP_SRC_POWERKEY,
-        Exchange::IPowerManager::WAKEUP_SRC_TIMER,
-        Exchange::IPowerManager::WAKEUP_SRC_CEC,
-        Exchange::IPowerManager::WAKEUP_SRC_LAN,
-        Exchange::IPowerManager::WAKEUP_SRC_RF4CE,
-        Exchange::IPowerManager::WAKEUP_SRC_PRESENCEDETECTED,
-        Exchange::IPowerManager::WAKEUP_SRC_BLUETOOTH,
-        Exchange::IPowerManager::WAKEUP_SRC_WIFI,
+    // Exercise getWakeupReasonString() with WakeupReason enum values
+    // WakeupReason is a plain enum — assign directly, not via struct member
+    const Exchange::IPowerManager::WakeupReason reasons[] = {
+        Exchange::IPowerManager::WAKEUP_REASON_UNKNOWN,
+        Exchange::IPowerManager::WAKEUP_REASON_IR,
+        Exchange::IPowerManager::WAKEUP_REASON_BLUETOOTH,
+        Exchange::IPowerManager::WAKEUP_REASON_RF4CE,
+        Exchange::IPowerManager::WAKEUP_REASON_GPIO,
+        Exchange::IPowerManager::WAKEUP_REASON_LAN,
+        Exchange::IPowerManager::WAKEUP_REASON_WIFI,
+        Exchange::IPowerManager::WAKEUP_REASON_TIMER,
+        Exchange::IPowerManager::WAKEUP_REASON_FRONTPANEL,
+        Exchange::IPowerManager::WAKEUP_REASON_WATCHDOG,
     };
-    for (auto src : wakeupSrcs) {
+    for (auto reasonVal : reasons) {
         EXPECT_CALL(PowerManagerMock::Mock(), GetLastWakeupReason(::testing::_))
-            .WillOnce(::testing::Invoke([src](Exchange::IPowerManager::WakeupReason& reason) -> uint32_t {
-                reason.wakeupSrc = static_cast<uint32_t>(src);
+            .WillOnce(::testing::Invoke([reasonVal](Exchange::IPowerManager::WakeupReason& reason) -> uint32_t {
+                reason = reasonVal;
                 return Core::ERROR_NONE;
             }));
         uint32_t result = handler.Invoke(connection, _T("getLastWakeupReason"), _T("{}"), response);
         EXPECT_EQ(Core::ERROR_NONE, result);
-        TEST_LOG("GetLastWakeupReason src=%d - Response: %s", (int)src, response.c_str());
+        TEST_LOG("GetLastWakeupReason reason=%d - Response: %s", (int)reasonVal, response.c_str());
     }
 }
 
