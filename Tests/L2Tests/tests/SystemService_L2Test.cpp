@@ -2311,10 +2311,8 @@ TEST_F(SystemService_L2Test, SetMode_NORMAL_JSONRPC)
     TEST_LOG("Testing setMode NORMAL via JSON-RPC");
 
     JsonObject params;
-    JsonObject modeInfo;
-    modeInfo["mode"] = "NORMAL";
-    modeInfo["duration"] = -1;
-    params["modeInfo"] = modeInfo;
+    params["mode"] = "NORMAL";
+    params["duration"] = -1;
     JsonObject result;
 
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
@@ -2334,10 +2332,8 @@ TEST_F(SystemService_L2Test, SetMode_EAS_JSONRPC)
     TEST_LOG("Testing setMode EAS via JSON-RPC");
 
     JsonObject params;
-    JsonObject modeInfo;
-    modeInfo["mode"] = "EAS";
-    modeInfo["duration"] = 300;
-    params["modeInfo"] = modeInfo;
+    params["mode"] = "EAS";
+    params["duration"] = 300;
     JsonObject result;
 
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
@@ -2848,10 +2844,8 @@ TEST_F(SystemService_L2Test, SetMode_InvalidMode_JSONRPC_Negative)
     TEST_LOG("Testing setMode with invalid mode via JSON-RPC (Negative Test)");
 
     JsonObject params;
-    JsonObject modeInfo;
-    modeInfo["mode"] = "INVALID_MODE";
-    modeInfo["duration"] = 100;
-    params["modeInfo"] = modeInfo;
+    params["mode"] = "INVALID_MODE";
+    params["duration"] = 100;
     JsonObject result;
 
     InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
