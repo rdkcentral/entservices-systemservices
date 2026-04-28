@@ -2095,8 +2095,8 @@ TEST_F(SystemService_L2Test, SetNetworkStandbyMode_JSONRPC)
     }
 }
 
-*******************************************************
-**** Coverage Enhancement Tests ************************
+/*******************************************************
+** Coverage Enhancement Tests ************************
 ** Testing additional SystemServices APIs coverage
 *******************************************************/
 
