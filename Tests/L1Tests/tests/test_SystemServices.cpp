@@ -27,6 +27,7 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <atomic>
 
 #include "SystemServices.h"
 #include "SystemServicesImplementation.h"
@@ -7318,5 +7319,114 @@ TEST_F(SystemServicesTest, UploadLogs_LogUploadAsync_BinaryAbsent_ReturnsMinus1)
     ASSERT_TRUE(jsonResponse.FromString(response)) << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << response;
     TEST_LOG("UploadLogs_LogUploadAsync_BinaryAbsent - PASSED");
+}
+
+// =====================================================================
+// cTimer.cpp — Unit Tests
+//
+// cTimer is a simple repeating timer that runs a callback in a thread.
+// Public methods: constructor, destructor, setInterval, start, stop,
+//                 detach, join
+// Branches in start(): interval<=0 && callback==NULL → return false
+//                      otherwise → start thread → return true
+// Branch in join():    timerThread.joinable() → true/false
+// =====================================================================
+
+namespace {
+    // Shared flag incremented by timer callbacks in tests
+    static std::atomic<int> g_callbackCount{0};
+    static void timerCallbackIncrement() { g_callbackCount++; }
+    static void timerCallbackNoOp() {}
+}
+
+// ------------------------------------------------------------------
+// Test 1: start() with no interval and no callback → returns false
+// Covers: cTimer.cpp line 63-65: interval<=0 && callBack_function==NULL → return false
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, CTimer_Start_NoIntervalNoCallback_ReturnsFalse)
+{
+    cTimer timer;
+    // Default state: interval=0, callBack_function=NULL
+    // → condition (interval<=0 && callBack==NULL) is true → return false
+    bool result = timer.start();
+    EXPECT_FALSE(result) << "start() must return false when no interval and no callback";
+    TEST_LOG("CTimer_Start_NoIntervalNoCallback_ReturnsFalse - PASSED");
+}
+
+// ------------------------------------------------------------------
+// Test 2: setInterval + start() → returns true, then stop + join
+// Covers: cTimer.cpp lines 98-102 (setInterval), lines 66-68 (start success path),
+//         lines 75-78 (stop sets clear=true), lines 87-89 (join: joinable=true branch)
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, CTimer_SetInterval_Start_Stop_Join_Success)
+{
+    cTimer timer;
+    g_callbackCount = 0;
+    timer.setInterval(timerCallbackNoOp, 500); // 500ms interval
+    bool result = timer.start();
+    EXPECT_TRUE(result) << "start() must return true after setInterval";
+    // stop immediately — sets clear=true so timerFunction exits
+    timer.stop();
+    timer.join(); // timerThread.joinable()==true → joins
+    TEST_LOG("CTimer_SetInterval_Start_Stop_Join_Success - PASSED");
+}
+
+// ------------------------------------------------------------------
+// Test 3: stop() without start — no crash (stop just sets clear=true)
+// Covers: lines 75-78 (stop): verifies stop is safe to call on unstarted timer
+//         join() with non-joinable thread — covers line 87: joinable()==false branch
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, CTimer_Stop_WithoutStart_NoCrash)
+{
+    cTimer timer;
+    timer.stop(); // safe: just sets this->clear = true
+    timer.join(); // timerThread not started → joinable()==false → no join() call
+    TEST_LOG("CTimer_Stop_WithoutStart_NoCrash - PASSED");
+}
+
+// ------------------------------------------------------------------
+// Test 4: start() with interval>0 but callback=NULL
+// Covers: line 63: condition interval<=0 is false, callBack==NULL is true
+//         → overall condition false (AND) → does NOT return false → starts thread
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, CTimer_Start_WithInterval_NullCallback_StartsThread)
+{
+    cTimer timer;
+    timer.setInterval(nullptr, 100); // interval=100, callback=NULL
+    // interval>0 so condition (interval<=0 && callback==NULL) = (false && true) = false
+    // → start proceeds — but callback=NULL means timerFunction will crash when called
+    // So we stop immediately before the thread can fire the callback
+    bool result = timer.start();
+    EXPECT_TRUE(result) << "start() returns true when only interval is set (no callback)";
+    timer.stop();
+    timer.join();
+    TEST_LOG("CTimer_Start_WithInterval_NullCallback_StartsThread - PASSED");
+}
+
+// ------------------------------------------------------------------
+// Test 5: callback actually fires — timer runs, callback is invoked, then stop+join
+// Covers: timerFunction lines 44-56: while(true), both clear checks,
+//         sleep_for, and callBack_function() call
+// Uses a very short interval and waits minimally for the callback to fire
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, CTimer_Callback_FiresAtLeastOnce)
+{
+    cTimer timer;
+    g_callbackCount = 0;
+    timer.setInterval(timerCallbackIncrement, 50); // 50ms interval
+    timer.start();
+
+    // Wait up to 500ms for at least one callback invocation
+    int waited = 0;
+    while (g_callbackCount == 0 && waited < 500) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        waited += 10;
+    }
+    timer.stop();
+    timer.join();
+
+    EXPECT_GT(g_callbackCount.load(), 0) << "Callback must fire at least once";
+    TEST_LOG("CTimer_Callback_FiresAtLeastOnce - count=%d waited=%dms",
+             g_callbackCount.load(), waited);
 }
 
