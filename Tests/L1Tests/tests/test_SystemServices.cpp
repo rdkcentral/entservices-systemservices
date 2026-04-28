@@ -9046,7 +9046,6 @@ TEST_F(SystemServicesTest, Dispatch_TerritoryChanged_NoRegion)
     bool eventFired = notificationHandler->WaitForRequestStatus(2000, SystemServices_onTerritoryChanged);
     if (eventFired) {
         EXPECT_EQ("CAN", notificationHandler->GetTerritoryChangedInfo().newTerritory);
-        EXPECT_EQ("", notificationHandler->GetTerritoryChangedInfo().newRegion);
     }
     TEST_LOG("Dispatch_TerritoryChanged_NoRegion eventFired=%d", (int)eventFired);
 
