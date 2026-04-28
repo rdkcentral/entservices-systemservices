@@ -50,7 +50,16 @@
 using ::testing::NiceMock;
 using namespace WPEFramework;
 
-// ======================================
+// Forward-declare uploadlogs.cpp internal functions so tests can call them directly
+// without needing /usr/bin/logupload to exist (which requires root in CI).
+// These are defined in the UploadLogs namespace but not exposed via the header.
+namespace WPEFramework { namespace Plugin { namespace UploadLogs {
+    bool checkmTlsLogUploadFlag();
+    bool getDCMconfigDetails(std::string& upload_protocol, std::string& httplink, std::string& uploadCheck);
+    std::int32_t getUploadLogParameters(std::string& tftp_server, std::string& upload_protocol, std::string& upload_httplink);
+} } }
+
+
 // SystemServices Event Type Enumeration
 // ======================================
 typedef enum : uint32_t {
@@ -7050,320 +7059,264 @@ TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_CriticalToCritic
 }
 
 // ===================== Upload Logs Coverage Tests =====================
-// These tests exercise uploadlogs.cpp: checkmTlsLogUploadFlag, getDCMconfigDetails,
-// getUploadLogParameters (internal 3-arg helper), and the fork/exec path of logUploadAsync.
+// These tests call uploadlogs.cpp internal functions DIRECTLY (via forward declarations)
+// to avoid the /usr/bin/logupload binary gate that blocks coverage in CI.
+// The system() call is wrapped/mocked in this test binary so chmod commands
+// are no-ops; and /usr/bin/ is not writable as non-root in CI environments.
+// Direct calls cover all branches without that limitation.
 
-TEST_F(SystemServicesTest, UploadLogs_BinaryPresent_NoDeviceProperties_ReturnsSuccess)
+// ------------------------------------------------------------------
+// checkmTlsLogUploadFlag — always returns true, just logs
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, UploadLogs_CheckMtlsFlag_AlwaysReturnsTrue)
 {
-    // Covers: checkmTlsLogUploadFlag() and getUploadLogParameters up to DEVICE_PROPERTIES failure.
-    // /usr/bin/logupload exists → passes fileExists gate → enters getUploadLogParameters
-    // → parseConfigFile(DEVICE_PROPERTIES, "BUILD_TYPE") fails (empty file) → returns E_NOK
-    createFile("/usr/bin/logupload", "#!/bin/sh\nexit 0");
-    system("chmod +x /usr/bin/logupload");
-    std::ofstream("/etc/device.properties").close(); // empty — no BUILD_TYPE key
-
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("uploadLogsAsync"), _T("{}"), response));
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
-    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
-
-    removeFile("/usr/bin/logupload");
-    std::ofstream("/etc/device.properties").close();
-    TEST_LOG("UploadLogs_BinaryPresent_NoDeviceProperties - PASSED");
+    // Covers: uploadlogs.cpp lines 43-46 (the entire function)
+    bool result = WPEFramework::Plugin::UploadLogs::checkmTlsLogUploadFlag();
+    EXPECT_TRUE(result) << "checkmTlsLogUploadFlag must always return true";
+    TEST_LOG("UploadLogs_CheckMtlsFlag_AlwaysReturnsTrue - PASSED");
 }
 
-TEST_F(SystemServicesTest, UploadLogs_BuildTypeProd_NoLogServerInEtcDCM_ReturnsSuccess)
+// ------------------------------------------------------------------
+// getDCMconfigDetails — /tmp/DCMSettings.conf absent
+// Covers: line 52-53: !getFileContent(TMP_DCM_SETTINGS) → return false
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, UploadLogs_GetDCMconfigDetails_FileAbsent_ReturnsFalse)
 {
-    // Covers: BUILD_TYPE=prod → dcmFile=ETC_DCM_PROPERTIES path
-    // → parseConfigFile(ETC_DCM_PROPERTIES, "LOG_SERVER") fails (empty) → E_NOK
-    createFile("/usr/bin/logupload", "#!/bin/sh\nexit 0");
-    system("chmod +x /usr/bin/logupload");
+    removeFile("/tmp/DCMSettings.conf");
+    std::string protocol, httplink, uploadCheck;
+    bool result = WPEFramework::Plugin::UploadLogs::getDCMconfigDetails(protocol, httplink, uploadCheck);
+    EXPECT_FALSE(result) << "Must return false when /tmp/DCMSettings.conf is absent";
+    EXPECT_TRUE(protocol.empty() && httplink.empty() && uploadCheck.empty());
+    TEST_LOG("UploadLogs_GetDCMconfigDetails_FileAbsent - PASSED");
+}
+
+// ------------------------------------------------------------------
+// getDCMconfigDetails — /tmp/DCMSettings.conf present but empty
+// Covers: line 55-57: dcminfo.length() < 1 → return false
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, UploadLogs_GetDCMconfigDetails_EmptyFile_ReturnsFalse)
+{
+    std::ofstream("/tmp/DCMSettings.conf").close(); // create empty file
+    std::string protocol, httplink, uploadCheck;
+    bool result = WPEFramework::Plugin::UploadLogs::getDCMconfigDetails(protocol, httplink, uploadCheck);
+    EXPECT_FALSE(result) << "Must return false when /tmp/DCMSettings.conf is empty";
+    removeFile("/tmp/DCMSettings.conf");
+    TEST_LOG("UploadLogs_GetDCMconfigDetails_EmptyFile - PASSED");
+}
+
+// ------------------------------------------------------------------
+// getDCMconfigDetails — content present, no keys match any regex
+// Covers: lines 61-71 (all 3 regex_search calls, all if(temp.size()>0) = false)
+//         returns true with empty output fields
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, UploadLogs_GetDCMconfigDetails_NoKeyMatch_ReturnsTrue)
+{
+    createFile("/tmp/DCMSettings.conf", "RANDOM_INVALID_DATA_NO_MATCHING_KEYS");
+    std::string protocol, httplink, uploadCheck;
+    bool result = WPEFramework::Plugin::UploadLogs::getDCMconfigDetails(protocol, httplink, uploadCheck);
+    EXPECT_TRUE(result) << "Must return true when file has content but no keys match";
+    EXPECT_TRUE(protocol.empty()) << "Protocol should be empty when no match";
+    EXPECT_TRUE(httplink.empty()) << "httplink should be empty when no match";
+    removeFile("/tmp/DCMSettings.conf");
+    TEST_LOG("UploadLogs_GetDCMconfigDetails_NoKeyMatch - PASSED");
+}
+
+// ------------------------------------------------------------------
+// getDCMconfigDetails — all 3 keys present and matched
+// Covers: all 3 regex_search hit path (if(temp.size()>0) = true for all)
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, UploadLogs_GetDCMconfigDetails_AllKeysMatch_FieldsPopulated)
+{
+    createFile("/tmp/DCMSettings.conf",
+        "LogUploadSettings:UploadRepository:uploadProtocol=tftp\n"
+        "LogUploadSettings:UploadRepository:URL=http://example.com/cgi-bin/logs.sh\n"
+        "LogUploadSettings:UploadOnReboot=true");
+    std::string protocol, httplink, uploadCheck;
+    bool result = WPEFramework::Plugin::UploadLogs::getDCMconfigDetails(protocol, httplink, uploadCheck);
+    EXPECT_TRUE(result);
+    EXPECT_EQ("tftp", protocol);
+    EXPECT_EQ("http://example.com/cgi-bin/logs.sh", httplink);
+    EXPECT_EQ("true", uploadCheck);
+    removeFile("/tmp/DCMSettings.conf");
+    TEST_LOG("UploadLogs_GetDCMconfigDetails_AllKeysMatch - PASSED");
+}
+
+// ------------------------------------------------------------------
+// getUploadLogParameters — no DEVICE_PROPERTIES (BUILD_TYPE absent)
+// Covers: line 88-90: !parseConfigFile(DEVICE_PROPERTIES, "BUILD_TYPE") → return E_NOK
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_NoBuildType_ReturnsENOK)
+{
+    std::ofstream("/etc/device.properties").close(); // empty — no BUILD_TYPE
+    std::string tftp, protocol, httplink;
+    std::int32_t result = WPEFramework::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
+    EXPECT_EQ(-1, result) << "Must return E_NOK when BUILD_TYPE missing";
+    std::ofstream("/etc/device.properties").close();
+    TEST_LOG("UploadLogs_GetUploadLogParams_NoBuildType - PASSED");
+}
+
+// ------------------------------------------------------------------
+// getUploadLogParameters — BUILD_TYPE=prod → ETC_DCM, no LOG_SERVER
+// Covers: line 95 else branch (prod → ETC_DCM) + line 97-99 LOG_SERVER fail → E_NOK
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_ProdNoLogServer_ReturnsENOK)
+{
     createFile("/etc/device.properties", "BUILD_TYPE=prod");
-    std::ofstream("/etc/dcm.properties").close(); // empty — no LOG_SERVER
-
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("uploadLogsAsync"), _T("{}"), response));
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
-    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
-
-    removeFile("/usr/bin/logupload");
+    std::ofstream("/etc/dcm.properties").close(); // empty
+    std::string tftp, protocol, httplink;
+    std::int32_t result = WPEFramework::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
+    EXPECT_EQ(-1, result) << "Must return E_NOK when LOG_SERVER missing from ETC_DCM";
     std::ofstream("/etc/device.properties").close();
     std::ofstream("/etc/dcm.properties").close();
-    TEST_LOG("UploadLogs_BuildTypeProd_NoLogServerInEtcDCM - PASSED");
+    TEST_LOG("UploadLogs_GetUploadLogParams_ProdNoLogServer - PASSED");
 }
 
-TEST_F(SystemServicesTest, UploadLogs_BuildTypeDev_OptDCMExists_EmptyDCMSettings_ReturnsSuccess)
+// ------------------------------------------------------------------
+// getUploadLogParameters — BUILD_TYPE=dev, OPT_DCM exists → OPT_DCM path
+// Covers: line 92-93: BUILD_TYPE!=prod && fileExists(OPT_DCM) → dcmFile=OPT_DCM
+//         getDCMconfigDetails fails (no /tmp/DCMSettings.conf) → E_NOK
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_DevOptDCMPath_ReturnsENOK)
 {
-    // Covers: non-prod build_type + fileExists(OPT_DCM_PROPERTIES) → dcmFile=OPT_DCM_PROPERTIES
-    // + getDCMconfigDetails with empty /tmp/DCMSettings.conf → length < 1 → returns false → E_NOK
-    createFile("/usr/bin/logupload", "#!/bin/sh\nexit 0");
-    system("chmod +x /usr/bin/logupload");
     createFile("/etc/device.properties", "BUILD_TYPE=dev");
     createFile("/opt/dcm.properties", "LOG_SERVER=logs.example.com");
-    std::ofstream("/tmp/DCMSettings.conf").close(); // empty → getDCMconfigDetails returns false
-
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("uploadLogsAsync"), _T("{}"), response));
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
-    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
-
-    removeFile("/usr/bin/logupload");
+    removeFile("/tmp/DCMSettings.conf"); // getDCMconfigDetails → false → E_NOK
+    std::string tftp, protocol, httplink;
+    std::int32_t result = WPEFramework::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
+    EXPECT_EQ(-1, result) << "Must return E_NOK when DCMSettings absent";
     std::ofstream("/etc/device.properties").close();
     removeFile("/opt/dcm.properties");
-    removeFile("/tmp/DCMSettings.conf");
-    TEST_LOG("UploadLogs_BuildTypeDev_OptDCMExists_EmptyDCMSettings - PASSED");
+    TEST_LOG("UploadLogs_GetUploadLogParams_DevOptDCMPath - PASSED");
 }
 
-TEST_F(SystemServicesTest, UploadLogs_ValidDCMSettings_NoForceMTLS_URLReplacedWithSecure)
+// ------------------------------------------------------------------
+// getUploadLogParameters — BUILD_TYPE=dev, OPT_DCM absent → ETC_DCM fallback
+// Covers: line 95 else branch when BUILD_TYPE!=prod BUT OPT_DCM absent
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_DevOptDCMAbsent_EtcFallback)
 {
-    // Covers: getDCMconfigDetails with valid content (parses protocol/URL/uploadCheck)
-    // + getUploadLogParameters returns E_OK + mTlsLogUpload=true, no FORCE_MTLS
-    // → "true" != force_mtls("") → regex_replace(cgi-bin → secure/cgi-bin) is called
-    // → logUploadAsync forks and execs the stub binary
-    createFile("/usr/bin/logupload", "#!/bin/sh\nexit 0");
-    system("chmod +x /usr/bin/logupload");
+    createFile("/etc/device.properties", "BUILD_TYPE=dev");
+    removeFile("/opt/dcm.properties");
+    std::ofstream("/etc/dcm.properties").close(); // empty → LOG_SERVER absent → E_NOK
+    std::string tftp, protocol, httplink;
+    std::int32_t result = WPEFramework::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
+    EXPECT_EQ(-1, result);
+    std::ofstream("/etc/device.properties").close();
+    std::ofstream("/etc/dcm.properties").close();
+    TEST_LOG("UploadLogs_GetUploadLogParams_DevOptDCMAbsent - PASSED");
+}
+
+// ------------------------------------------------------------------
+// getUploadLogParameters — full success path, no FORCE_MTLS key
+// Covers: lines 103-104 parseConfigFile(FORCE_MTLS) returns false (key absent)  
+//         getDCMconfigDetails → true → E_OK
+//         mTlsLogUpload=true (from checkmTlsLogUploadFlag), force_mtls=""
+//         → "true" != "" → regex_replace("cgi-bin") is called on URL
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_SuccessPath_RegexReplaceApplied)
+{
     createFile("/etc/device.properties", "BUILD_TYPE=prod");
     createFile("/etc/dcm.properties", "LOG_SERVER=logs.example.com");
     createFile("/tmp/DCMSettings.conf",
         "LogUploadSettings:UploadRepository:uploadProtocol=tftp\n"
         "LogUploadSettings:UploadRepository:URL=http://example.com/cgi-bin/logs.sh\n"
         "LogUploadSettings:UploadOnReboot=true");
-
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("uploadLogsAsync"), _T("{}"), response));
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
-    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
-
-    removeFile("/usr/bin/logupload");
+    std::string tftp, protocol, httplink;
+    std::int32_t result = WPEFramework::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
+    EXPECT_EQ(0, result) << "Must return E_OK on full success path";
+    EXPECT_EQ("logs.example.com", tftp);
+    EXPECT_EQ("tftp", protocol);
+    // regex_replace applied: cgi-bin → secure/cgi-bin
+    EXPECT_NE(std::string::npos, httplink.find("secure/cgi-bin")) << "URL should have secure/cgi-bin: " << httplink;
     std::ofstream("/etc/device.properties").close();
     std::ofstream("/etc/dcm.properties").close();
     removeFile("/tmp/DCMSettings.conf");
-    TEST_LOG("UploadLogs_ValidDCMSettings_NoForceMTLS_URLReplaced - PASSED");
+    TEST_LOG("UploadLogs_GetUploadLogParams_SuccessPath_RegexReplace - PASSED");
 }
 
-TEST_F(SystemServicesTest, UploadLogs_ForceMTLS_True_URLNotReplaced)
+// ------------------------------------------------------------------
+// getUploadLogParameters — FORCE_MTLS=true → mTlsLogUpload=true, skip regex_replace
+// Covers: lines 104-106: if("true"==force_mtls) mTlsLogUpload=true
+//         lines 117-121: mTlsLogUpload=true BUT "true"==force_mtls → skip replace
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_ForceMTLS_True_SkipsReplace)
 {
-    // Covers: FORCE_MTLS=true in device.properties → mTlsLogUpload=true AND force_mtls="true"
-    // → mTlsLogUpload block entered but "true" != "true" is false → regex_replace NOT called
-    createFile("/usr/bin/logupload", "#!/bin/sh\nexit 0");
-    system("chmod +x /usr/bin/logupload");
     createFile("/etc/device.properties", "BUILD_TYPE=prod\nFORCE_MTLS=true");
     createFile("/etc/dcm.properties", "LOG_SERVER=logs.example.com");
     createFile("/tmp/DCMSettings.conf",
         "LogUploadSettings:UploadRepository:uploadProtocol=tftp\n"
         "LogUploadSettings:UploadRepository:URL=http://example.com/cgi-bin/logs.sh\n"
         "LogUploadSettings:UploadOnReboot=true");
-
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("uploadLogsAsync"), _T("{}"), response));
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
-    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
-
-    removeFile("/usr/bin/logupload");
+    std::string tftp, protocol, httplink;
+    std::int32_t result = WPEFramework::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
+    EXPECT_EQ(0, result);
+    // force_mtls=="true" → inner if is false → regex_replace NOT called, URL unchanged
+    EXPECT_EQ(std::string::npos, httplink.find("secure/cgi-bin")) << "URL must NOT be replaced when FORCE_MTLS=true: " << httplink;
     std::ofstream("/etc/device.properties").close();
     std::ofstream("/etc/dcm.properties").close();
     removeFile("/tmp/DCMSettings.conf");
-    TEST_LOG("UploadLogs_ForceMTLS_True_URLNotReplaced - PASSED");
+    TEST_LOG("UploadLogs_GetUploadLogParams_ForceMTLS_True_SkipsReplace - PASSED");
 }
 
 // ------------------------------------------------------------------
-// Test 6: Binary explicitly absent → fileExists gate returns -1
-// Covers the !Utils::fileExists("/usr/bin/logupload") → return -1 branch
-// (previously only implicitly covered by non-uploadlogs tests)
+// getUploadLogParameters — FORCE_MTLS=false (present but not "true")
+// Covers: lines 103-107: parseConfigFile returns true, but "true"!="false"
+//         → mTlsLogUpload stays true, force_mtls="false"
+//         → "true" != "false" → regex_replace IS called
 // ------------------------------------------------------------------
-TEST_F(SystemServicesTest, UploadLogs_BinaryMissing_FileExistsGateFails)
+TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_ForceMTLS_False_RegexApplied)
 {
-    removeFile("/usr/bin/logupload"); // ensure absent
-
-    EXPECT_EQ(Core::ERROR_NONE,
-        handler.Invoke(connection, _T("uploadLogsAsync"), _T("{}"), response));
-
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse: " << response;
-    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    // logUploadAsync returns -1 (binary absent), UploadLogsAsync still sets success=true
-    EXPECT_TRUE(jsonResponse["success"].Boolean()) << response;
-
-    TEST_LOG("UploadLogs_BinaryMissing_FileExistsGateFails - PASSED");
-}
-
-// ------------------------------------------------------------------
-// Test 7: DCMSettings.conf has content but no matching keys
-// Covers: getDCMconfigDetails regex no-match branches — all 3 if(temp.size()>0) are false,
-// fields stay empty, function still returns true → getUploadLogParameters returns E_OK
-// → logUploadAsync forks with empty protocol/url args
-// ------------------------------------------------------------------
-TEST_F(SystemServicesTest, UploadLogs_InvalidDCMSettingsFormat_RegexNoMatch)
-{
-    createFile("/usr/bin/logupload", "#!/bin/sh\nexit 0");
-    system("chmod +x /usr/bin/logupload");
-    createFile("/etc/device.properties", "BUILD_TYPE=prod");
-    createFile("/etc/dcm.properties", "LOG_SERVER=logs.example.com");
-    // Content has bytes (passes length<1 check) but no keys match any regex
-    createFile("/tmp/DCMSettings.conf", "INVALID_DATA_NO_MATCHING_KEYS");
-
-    EXPECT_EQ(Core::ERROR_NONE,
-        handler.Invoke(connection, _T("uploadLogsAsync"), _T("{}"), response));
-
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse: " << response;
-    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-
-    removeFile("/usr/bin/logupload");
-    std::ofstream("/etc/device.properties").close();
-    std::ofstream("/etc/dcm.properties").close();
-    removeFile("/tmp/DCMSettings.conf");
-    TEST_LOG("UploadLogs_InvalidDCMSettingsFormat_RegexNoMatch - PASSED");
-}
-
-// ------------------------------------------------------------------
-// Test 8: URL without "cgi-bin" → regex_replace is called but has no effect
-// Covers: mTlsLogUpload=true, force_mtls="" → "true" != "" is true →
-// regex_replace(url, "cgi-bin" → "secure/cgi-bin") called but URL is unchanged
-// (different from test 4 where URL has "cgi-bin" and gets replaced)
-// ------------------------------------------------------------------
-TEST_F(SystemServicesTest, UploadLogs_URLWithoutCgiBin_RegexReplaceNoEffect)
-{
-    createFile("/usr/bin/logupload", "#!/bin/sh\nexit 0");
-    system("chmod +x /usr/bin/logupload");
-    createFile("/etc/device.properties", "BUILD_TYPE=prod");
-    createFile("/etc/dcm.properties", "LOG_SERVER=logs.example.com");
-    // URL has no "cgi-bin" — regex_replace is called but string is unchanged
-    createFile("/tmp/DCMSettings.conf",
-        "LogUploadSettings:UploadRepository:uploadProtocol=https\n"
-        "LogUploadSettings:UploadRepository:URL=http://example.com/logs.sh\n"
-        "LogUploadSettings:UploadOnReboot=false");
-
-    EXPECT_EQ(Core::ERROR_NONE,
-        handler.Invoke(connection, _T("uploadLogsAsync"), _T("{}"), response));
-
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse: " << response;
-    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-
-    removeFile("/usr/bin/logupload");
-    std::ofstream("/etc/device.properties").close();
-    std::ofstream("/etc/dcm.properties").close();
-    removeFile("/tmp/DCMSettings.conf");
-    TEST_LOG("UploadLogs_URLWithoutCgiBin_RegexReplaceNoEffect - PASSED");
-}
-
-// ------------------------------------------------------------------
-// Test 9: getDCMconfigDetails — TMP_DCM_SETTINGS file does NOT exist
-// Covers: uploadlogs.cpp line 52-53:
-//   !getFileContent(TMP_DCM_SETTINGS, dcminfo) → return false
-// All previous tests either hit empty-file (length<1) or parseable content.
-// This is the only test where /tmp/DCMSettings.conf is completely absent.
-// ------------------------------------------------------------------
-TEST_F(SystemServicesTest, UploadLogs_DCMFileAbsent_GetFileContentFails)
-{
-    createFile("/usr/bin/logupload", "#!/bin/sh\nexit 0");
-    createFile("/etc/device.properties", "BUILD_TYPE=prod");
-    createFile("/etc/dcm.properties", "LOG_SERVER=logs.example.com");
-    removeFile("/tmp/DCMSettings.conf"); // ensure file is absent (not empty, absent)
-
-    EXPECT_EQ(Core::ERROR_NONE,
-        handler.Invoke(connection, _T("uploadLogsAsync"), _T("{}"), response));
-
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response)) << response;
-    ASSERT_TRUE(jsonResponse.HasLabel("success")) << response;
-    // getDCMconfigDetails returns false → E_NOK → pid=-1 → success=true from handler
-
-    removeFile("/usr/bin/logupload");
-    std::ofstream("/etc/device.properties").close();
-    std::ofstream("/etc/dcm.properties").close();
-    TEST_LOG("UploadLogs_DCMFileAbsent_GetFileContentFails - PASSED");
-}
-
-// ------------------------------------------------------------------
-// Test 10: BUILD_TYPE != prod AND OPT_DCM_PROPERTIES does NOT exist
-// Covers: uploadlogs.cpp line 95: dcmFile = ETC_DCM_PROPERTIES (else branch)
-//   when ( "prod" != build_type ) && !fileExists(OPT_DCM_PROPERTIES)
-// Test 4 covers OPT_DCM present (line 92 taken). This covers the else (line 95).
-// ------------------------------------------------------------------
-TEST_F(SystemServicesTest, UploadLogs_BuildTypeDev_OptDCMAbsent_FallsBackToEtcDCM)
-{
-    createFile("/usr/bin/logupload", "#!/bin/sh\nexit 0");
-    createFile("/etc/device.properties", "BUILD_TYPE=dev");
-    removeFile("/opt/dcm.properties"); // ensure OPT_DCM is absent → else branch → ETC_DCM
-    std::ofstream("/etc/dcm.properties").close(); // LOG_SERVER absent → E_NOK
-
-    EXPECT_EQ(Core::ERROR_NONE,
-        handler.Invoke(connection, _T("uploadLogsAsync"), _T("{}"), response));
-
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response)) << response;
-    ASSERT_TRUE(jsonResponse.HasLabel("success")) << response;
-
-    removeFile("/usr/bin/logupload");
-    std::ofstream("/etc/device.properties").close();
-    std::ofstream("/etc/dcm.properties").close();
-    TEST_LOG("UploadLogs_BuildTypeDev_OptDCMAbsent_FallsBackToEtcDCM - PASSED");
-}
-
-// ------------------------------------------------------------------
-// Test 11: FORCE_MTLS present but value is not "true"
-// Covers: uploadlogs.cpp line 103-107 — parseConfigFile returns true
-//   but "true" != force_mtls is true so mTlsLogUpload stays unchanged.
-//   Also covers the URL-replace with cgi-bin since no FORCE_MTLS=="true" guard.
-// ------------------------------------------------------------------
-TEST_F(SystemServicesTest, UploadLogs_ForceMTLS_NotTrue_URLReplacementApplied)
-{
-    createFile("/usr/bin/logupload", "#!/bin/sh\nexit 0");
-    // FORCE_MTLS present but "false" → parseConfigFile succeeds, "true"=="false" is false
-    // → mTlsLogUpload stays true (from checkmTlsLogUploadFlag) AND force_mtls="false"
-    // → "true" != "false" is true → regex_replace is called on the URL
     createFile("/etc/device.properties", "BUILD_TYPE=prod\nFORCE_MTLS=false");
     createFile("/etc/dcm.properties", "LOG_SERVER=logs.example.com");
     createFile("/tmp/DCMSettings.conf",
         "LogUploadSettings:UploadRepository:uploadProtocol=https\n"
         "LogUploadSettings:UploadRepository:URL=http://example.com/cgi-bin/upload.sh\n"
         "LogUploadSettings:UploadOnReboot=false");
-
-    EXPECT_EQ(Core::ERROR_NONE,
-        handler.Invoke(connection, _T("uploadLogsAsync"), _T("{}"), response));
-
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response)) << response;
-    ASSERT_TRUE(jsonResponse.HasLabel("success")) << response;
-
-    removeFile("/usr/bin/logupload");
+    std::string tftp, protocol, httplink;
+    std::int32_t result = WPEFramework::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
+    EXPECT_EQ(0, result);
+    // force_mtls="false" → "true" != "false" is true → regex_replace applied
+    EXPECT_NE(std::string::npos, httplink.find("secure/cgi-bin")) << "URL should have secure/cgi-bin: " << httplink;
     std::ofstream("/etc/device.properties").close();
     std::ofstream("/etc/dcm.properties").close();
     removeFile("/tmp/DCMSettings.conf");
-    TEST_LOG("UploadLogs_ForceMTLS_NotTrue_URLReplacementApplied - PASSED");
+    TEST_LOG("UploadLogs_GetUploadLogParams_ForceMTLS_False_RegexApplied - PASSED");
 }
 
 // ------------------------------------------------------------------
-// Test 12: checkmTlsLogUploadFlag called via getUploadLogParameters
-// This is an explicit smoke test verifying the function is reachable
-// directly through the UploadLogs namespace (covers function entry line).
-// Also covers BUILD_TYPE=sprint (another non-prod type) → OPT_DCM check.
+// getUploadLogParameters — URL without "cgi-bin" — regex_replace has no effect
+// Covers: same mTlsLogUpload=true path, force_mtls="" → regex called but no-op
 // ------------------------------------------------------------------
-TEST_F(SystemServicesTest, UploadLogs_BuildTypeSprint_OptDCMPresent_ValidDCM_Forks)
+TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_URLNoCgiBin_ReplaceNoEffect)
 {
-    createFile("/usr/bin/logupload", "#!/bin/sh\nexit 0");
-    createFile("/etc/device.properties", "BUILD_TYPE=sprint"); // non-prod
-    createFile("/opt/dcm.properties", "LOG_SERVER=logs.example.com"); // OPT_DCM exists
-    // Valid DCM settings — getUploadLogParameters returns E_OK → fork is called
+    createFile("/etc/device.properties", "BUILD_TYPE=prod");
+    createFile("/etc/dcm.properties", "LOG_SERVER=logs.example.com");
     createFile("/tmp/DCMSettings.conf",
-        "LogUploadSettings:UploadRepository:uploadProtocol=tftp\n"
-        "LogUploadSettings:UploadRepository:URL=http://cdn.example.com/logs\n"
-        "LogUploadSettings:UploadOnReboot=true");
+        "LogUploadSettings:UploadRepository:uploadProtocol=https\n"
+        "LogUploadSettings:UploadRepository:URL=http://example.com/logs.sh\n"
+        "LogUploadSettings:UploadOnReboot=false");
+    std::string tftp, protocol, httplink;
+    std::int32_t result = WPEFramework::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
+    EXPECT_EQ(0, result);
+    EXPECT_EQ("http://example.com/logs.sh", httplink) << "URL without cgi-bin must remain unchanged: " << httplink;
+    std::ofstream("/etc/device.properties").close();
+    std::ofstream("/etc/dcm.properties").close();
+    removeFile("/tmp/DCMSettings.conf");
+    TEST_LOG("UploadLogs_GetUploadLogParams_URLNoCgiBin - PASSED");
+}
 
+// ------------------------------------------------------------------
+// logUploadAsync — binary absent gate (fileExists == false → return -1)
+// Covers: uploadlogs.cpp lines 131-133
+// ------------------------------------------------------------------
+TEST_F(SystemServicesTest, UploadLogs_LogUploadAsync_BinaryAbsent_ReturnsMinus1)
+{
+    removeFile("/usr/bin/logupload");
     EXPECT_EQ(Core::ERROR_NONE,
         handler.Invoke(connection, _T("uploadLogsAsync"), _T("{}"), response));
-
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << response;
-    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "E_OK path should return success=true: " << response;
-
-    removeFile("/usr/bin/logupload");
-    std::ofstream("/etc/device.properties").close();
-    removeFile("/opt/dcm.properties");
-    removeFile("/tmp/DCMSettings.conf");
-    TEST_LOG("UploadLogs_BuildTypeSprint_OptDCMPresent_ValidDCM_Forks - PASSED");
+    TEST_LOG("UploadLogs_LogUploadAsync_BinaryAbsent - PASSED");
 }
 
