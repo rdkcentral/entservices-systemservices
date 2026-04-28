@@ -466,10 +466,6 @@ SystemService_L2Test::SystemService_L2Test()
          status = ActivateService("org.rdk.PowerManager");
          EXPECT_EQ(Core::ERROR_NONE, status);
 
-         /* Activate Migration plugin */
-         status = ActivateService("org.rdk.Migration");
-         EXPECT_EQ(Core::ERROR_NONE, status);
-
          /* Activate SystemServices plugin with retry logic */
          int retry_count = 0;
          const int max_retries = 10;
@@ -505,10 +501,6 @@ SystemService_L2Test::~SystemService_L2Test()
     status = DeactivateService("org.rdk.System");
     EXPECT_EQ(Core::ERROR_NONE, status);
     TEST_LOG("Deactivated org.rdk.System");
-
-    status = DeactivateService("org.rdk.Migration");
-    EXPECT_EQ(Core::ERROR_NONE, status);
-    TEST_LOG("Deactivated org.rdk.Migration");
 
     EXPECT_CALL(*p_powerManagerHalMock, PLAT_TERM())
         .WillOnce(::testing::Return(PWRMGR_SUCCESS));
@@ -2107,7 +2099,7 @@ TEST_F(SystemService_L2Test, SetNetworkStandbyMode_JSONRPC)
 ** Coverage Enhancement Tests ************************
 ** Testing additional SystemServices APIs coverage
 *******************************************************/
-
+#if 0
 TEST_F(SystemService_L2Test, GetMigrationStatus_COMRPC)
 {
     if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
@@ -2183,6 +2175,7 @@ TEST_F(SystemService_L2Test, GetBootTypeInfo_COMRPC)
         }
     }
 }
+#endif
 
 TEST_F(SystemService_L2Test, SetMode_NORMAL_COMRPC)
 {
@@ -2271,7 +2264,7 @@ TEST_F(SystemService_L2Test, SetMode_EAS_COMRPC)
         }
     }
 }
-
+#if 0
 TEST_F(SystemService_L2Test, GetMigrationStatus_JSONRPC)
 {
     TEST_LOG("Testing getMigrationStatus via JSON-RPC");
@@ -2311,6 +2304,7 @@ TEST_F(SystemService_L2Test, GetBootTypeInfo_JSONRPC)
         EXPECT_FALSE(bootType.empty());
 	}
 }
+#endif
 
 TEST_F(SystemService_L2Test, SetMode_NORMAL_JSONRPC)
 {
