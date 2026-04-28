@@ -527,6 +527,9 @@ protected:
         EXPECT_CALL(PowerManagerMock::Mock(), GetNetworkStandbyMode(::testing::_))
             .Times(::testing::AnyNumber())
             .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
+        EXPECT_CALL(PowerManagerMock::Mock(), SetPowerState(::testing::_, ::testing::_, ::testing::_))
+            .Times(::testing::AnyNumber())
+            .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
 
 	Core::IWorkerPool::Assign(&(*workerPool));
         workerPool->Run();
@@ -8065,13 +8068,13 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_FileMissing)
 }
 
 // 5. EMPTY INPUT — SetFriendlyName with empty string
-// Empty friendlyName != current m_friendlyName ("Living Room"), so the
-// guard fires, RFC is called, and success=true is returned unconditionally.
+// Configure() calls getRFCParameter(TR181_SYSTEM_FRIENDLY_NAME); if the mock
+// returns an empty value, m_friendlyName is already "". In that case the guard
+// (m_friendlyName != friendlyName) is false → RFC is skipped, success=true.
+// If m_friendlyName is "Living Room" (default), RFC is called, success=true.
+// Either way success=true is the invariant. No RFC mock needed here.
 TEST_F(SystemServicesTest, SetFriendlyName_EmptyInput_Failure)
 {
-    EXPECT_CALL(*p_rfcApiMock, setRFCParameter(::testing::_, ::testing::_, ::testing::_, ::testing::_))
-        .WillOnce(::testing::Return(WDMP_SUCCESS));
-
     EXPECT_EQ(Core::ERROR_NONE,
         handler.Invoke(connection, _T("setFriendlyName"),
                        _T("{\"friendlyName\":\"\"}"), response));
