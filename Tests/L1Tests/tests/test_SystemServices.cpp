@@ -8759,6 +8759,15 @@ TEST_F(SystemServicesTest, GetLastWakeupReason_MultipleWakeupSources)
         Exchange::IPowerManager::WAKEUP_REASON_TIMER,
         Exchange::IPowerManager::WAKEUP_REASON_FRONTPANEL,
         Exchange::IPowerManager::WAKEUP_REASON_WATCHDOG,
+        // Additional cases to cover remaining getWakeupReasonString() branches
+        Exchange::IPowerManager::WAKEUP_REASON_SOFTWARERESET,
+        Exchange::IPowerManager::WAKEUP_REASON_THERMALRESET,
+        Exchange::IPowerManager::WAKEUP_REASON_WARMRESET,
+        Exchange::IPowerManager::WAKEUP_REASON_COLDBOOT,
+        Exchange::IPowerManager::WAKEUP_REASON_STRAUTHFAIL,
+        Exchange::IPowerManager::WAKEUP_REASON_CEC,
+        Exchange::IPowerManager::WAKEUP_REASON_PRESENCE,
+        Exchange::IPowerManager::WAKEUP_REASON_VOICE,
     };
     for (auto reasonVal : reasons) {
         EXPECT_CALL(PowerManagerMock::Mock(), GetLastWakeupReason(::testing::_))
@@ -9107,6 +9116,172 @@ TEST_F(SystemServicesTest, GetDeviceInfo_NoParams_AllFieldsRequested)
     TEST_LOG("GetDeviceInfo no-params - Response: %s", response.c_str());
 
     std::ofstream("/etc/device.properties").close();
+}
+
+// =============================================================================
+// reportFirmwareUpdateInfoReceived() — all 5 httpStatus branches
+// This is a public method called directly to cover Dispatch()
+// SYSTEMSERVICES_EVT_ONFIRMWAREUPDATEINFORECEIVED and all httpStatus logic.
+// =============================================================================
+
+TEST_F(SystemServicesTest, ReportFirmwareUpdateInfo_HttpStatus460_EmptySwUpdateConf)
+{
+    ASSERT_NE(nullptr, m_sysServices);
+    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+
+    SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
+    m_sysServices->Register(notificationHandler);
+    notificationHandler->ResetEvent();
+
+    // httpStatus == 460 (STATUS_CODE_NO_SWUPDATE_CONF) branch
+    Plugin::SystemServicesImplementation::_instance->reportFirmwareUpdateInfoReceived(
+        "", 460, true, "", "");
+
+    EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onFirmwareUpdateInfoReceived));
+    EXPECT_FALSE(notificationHandler->GetFirmwareUpdateInfo().updateAvailable);
+    EXPECT_EQ(3, notificationHandler->GetFirmwareUpdateInfo().updateAvailableEnum); // EMPTY_SW_UPDATE_CONF = 3
+    EXPECT_TRUE(notificationHandler->GetFirmwareUpdateInfo().success);
+
+    m_sysServices->Unregister(notificationHandler);
+    delete notificationHandler;
+}
+
+TEST_F(SystemServicesTest, ReportFirmwareUpdateInfo_HttpStatus404_NoFwAvailable)
+{
+    ASSERT_NE(nullptr, m_sysServices);
+    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+
+    SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
+    m_sysServices->Register(notificationHandler);
+    notificationHandler->ResetEvent();
+
+    // httpStatus == 404 branch
+    Plugin::SystemServicesImplementation::_instance->reportFirmwareUpdateInfoReceived(
+        "", 404, true, "", "");
+
+    EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onFirmwareUpdateInfoReceived));
+    EXPECT_FALSE(notificationHandler->GetFirmwareUpdateInfo().updateAvailable);
+    EXPECT_EQ(1, notificationHandler->GetFirmwareUpdateInfo().updateAvailableEnum); // FW_MATCH_CURRENT_VER = 1
+    EXPECT_TRUE(notificationHandler->GetFirmwareUpdateInfo().success);
+
+    m_sysServices->Unregister(notificationHandler);
+    delete notificationHandler;
+}
+
+TEST_F(SystemServicesTest, ReportFirmwareUpdateInfo_NewVersionAvailable)
+{
+    ASSERT_NE(nullptr, m_sysServices);
+    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+
+    SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
+    m_sysServices->Register(notificationHandler);
+    notificationHandler->ResetEvent();
+
+    // Normal case: firmwareUpdateVersion != firmwareVersion → FW_UPDATE_AVAILABLE
+    Plugin::SystemServicesImplementation::_instance->reportFirmwareUpdateInfoReceived(
+        "NEW_FW_2.0", 200, true, "CURRENT_FW_1.0", "");
+
+    EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onFirmwareUpdateInfoReceived));
+    EXPECT_TRUE(notificationHandler->GetFirmwareUpdateInfo().updateAvailable);
+    EXPECT_EQ(0, notificationHandler->GetFirmwareUpdateInfo().updateAvailableEnum); // FW_UPDATE_AVAILABLE = 0
+    EXPECT_EQ("NEW_FW_2.0", notificationHandler->GetFirmwareUpdateInfo().firmwareUpdateVersion);
+
+    m_sysServices->Unregister(notificationHandler);
+    delete notificationHandler;
+}
+
+TEST_F(SystemServicesTest, ReportFirmwareUpdateInfo_SameVersionNoUpdate)
+{
+    ASSERT_NE(nullptr, m_sysServices);
+    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+
+    SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
+    m_sysServices->Register(notificationHandler);
+    notificationHandler->ResetEvent();
+
+    // Normal case: firmwareUpdateVersion == firmwareVersion → FW_MATCH_CURRENT_VER
+    Plugin::SystemServicesImplementation::_instance->reportFirmwareUpdateInfoReceived(
+        "SAME_FW_1.0", 200, true, "SAME_FW_1.0", "");
+
+    EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onFirmwareUpdateInfoReceived));
+    EXPECT_FALSE(notificationHandler->GetFirmwareUpdateInfo().updateAvailable);
+    EXPECT_EQ(1, notificationHandler->GetFirmwareUpdateInfo().updateAvailableEnum); // FW_MATCH_CURRENT_VER = 1
+
+    m_sysServices->Unregister(notificationHandler);
+    delete notificationHandler;
+}
+
+TEST_F(SystemServicesTest, ReportFirmwareUpdateInfo_EmptyFirmwareVersion_NoFwVersion)
+{
+    ASSERT_NE(nullptr, m_sysServices);
+    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+
+    SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
+    m_sysServices->Register(notificationHandler);
+    notificationHandler->ResetEvent();
+
+    // Normal case: empty firmwareUpdateVersion → NO_FW_VERSION
+    Plugin::SystemServicesImplementation::_instance->reportFirmwareUpdateInfoReceived(
+        "", 200, false, "CURRENT_FW_1.0", "");
+
+    EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onFirmwareUpdateInfoReceived));
+    EXPECT_FALSE(notificationHandler->GetFirmwareUpdateInfo().updateAvailable);
+    EXPECT_EQ(2, notificationHandler->GetFirmwareUpdateInfo().updateAvailableEnum); // NO_FW_VERSION = 2
+
+    m_sysServices->Unregister(notificationHandler);
+    delete notificationHandler;
+}
+
+TEST_F(SystemServicesTest, ReportFirmwareUpdateInfo_WithRebootImmediatelyResponse)
+{
+    ASSERT_NE(nullptr, m_sysServices);
+    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+
+    SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
+    m_sysServices->Register(notificationHandler);
+    notificationHandler->ResetEvent();
+
+    // Non-empty responseString with valid JSON — covers rebootImmediately parsing path
+    Plugin::SystemServicesImplementation::_instance->reportFirmwareUpdateInfoReceived(
+        "NEW_FW_3.0", 200, true, "OLD_FW_2.0",
+        "{\"firmwareVersion\":\"NEW_FW_3.0\",\"rebootImmediately\":true}");
+
+    EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onFirmwareUpdateInfoReceived));
+    EXPECT_TRUE(notificationHandler->GetFirmwareUpdateInfo().rebootImmediately);
+    EXPECT_TRUE(notificationHandler->GetFirmwareUpdateInfo().updateAvailable);
+
+    m_sysServices->Unregister(notificationHandler);
+    delete notificationHandler;
+}
+
+// =============================================================================
+// OnSystemPowerStateChanged — RFC log-upload branch
+// When powerState == LIGHT_SLEEP and currentPowerState == ON,
+// if RFC_LOG_UPLOAD returns "true", UploadLogsAsync is called.
+// =============================================================================
+
+TEST_F(SystemServicesTest, OnPowerModeChanged_ON_to_LIGHTSLEEEP_RFCLogUploadEnabled)
+{
+    ASSERT_NE(nullptr, m_pmModeNotif) << "IModeChangedNotification not saved";
+
+    // Mock RFC to return WDMP_SUCCESS with WDMP_BOOLEAN type and value "true"
+    // This covers the UploadLogsAsync call inside OnSystemPowerStateChanged
+    EXPECT_CALL(*p_rfcApiMock, getRFCParameter(::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke(
+            [](char* callerID, const char* paramName, RFC_ParamData_t* param) {
+                param->type = WDMP_BOOLEAN;
+                strncpy(param->value, "true", sizeof(param->value) - 1);
+                return WDMP_SUCCESS;
+            }));
+
+    // ON → LIGHT_SLEEP triggers RFC check for log upload
+    m_pmModeNotif->OnPowerModeChanged(
+        Exchange::IPowerManager::POWER_STATE_ON,
+        Exchange::IPowerManager::POWER_STATE_STANDBY_LIGHT_SLEEP);
+
+    // Give the dispatch a moment to process
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    TEST_LOG("OnPowerModeChanged ON→LIGHT_SLEEP with RFC log upload enabled");
 }
 
 
