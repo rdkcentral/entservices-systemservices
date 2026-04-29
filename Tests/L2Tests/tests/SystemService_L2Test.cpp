@@ -1049,11 +1049,9 @@ TEST_F(SystemService_L2Test, GetSerialNumber_COMRPC)
                     EXPECT_FALSE(success);
                 }
 
-                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -1085,11 +1083,10 @@ TEST_F(SystemService_L2Test, GetFriendlyName_COMRPC)
 
                 TEST_LOG("FriendlyName: %s", friendlyName.c_str());
 
-                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-            m_controller_SystemServices->Release();
+
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -1121,11 +1118,10 @@ TEST_F(SystemService_L2Test, GetNetworkStandbyMode_COMRPC)
 
                 TEST_LOG("NetworkStandbyMode: %s", nwStandby ? "Enabled" : "Disabled");
 
-                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-            m_controller_SystemServices->Release();
+
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -1158,11 +1154,10 @@ TEST_F(SystemService_L2Test, GetBuildType_COMRPC)
                 TEST_LOG("BuildType: %s", buildType.c_str());
                 EXPECT_FALSE(buildType.empty());
 
-                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-            m_controller_SystemServices->Release();
+
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -1195,11 +1190,10 @@ TEST_F(SystemService_L2Test, RequestSystemUptime_COMRPC)
                 TEST_LOG("SystemUptime: %s", systemUptime.c_str());
                 EXPECT_FALSE(systemUptime.empty());
 
-                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-            m_controller_SystemServices->Release();
+
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -1501,11 +1495,10 @@ TEST_F(SystemService_L2Test, RegisterUnregister_COMRPC)
                     TEST_LOG("Successfully unregistered from notifications");
                 }
 
-                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-            m_controller_SystemServices->Release();
+
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -1570,11 +1563,10 @@ TEST_F(SystemService_L2Test, OnSystemPowerStateChanged_Notification_COMRPC)
                     TEST_LOG("Successfully unregistered from notifications");
                 }
 
-                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-            m_controller_SystemServices->Release();
+
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -1635,11 +1627,10 @@ TEST_F(SystemService_L2Test, OnSystemModeChanged_Notification_COMRPC)
                 result = m_SystemServicesPlugin->Unregister(&m_notificationHandler);
                 EXPECT_EQ(result, Core::ERROR_NONE);
 
-                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-            m_controller_SystemServices->Release();
+
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -1704,11 +1695,10 @@ TEST_F(SystemService_L2Test, OnBlocklistChanged_Notification_COMRPC)
                 result = m_SystemServicesPlugin->Unregister(&m_notificationHandler);
                 EXPECT_EQ(result, Core::ERROR_NONE);
 
-                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-            m_controller_SystemServices->Release();
+
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -1754,11 +1744,10 @@ TEST_F(SystemService_L2Test, GetTimeZoneDST_COMRPC)
                 EXPECT_FALSE(timeZone.empty());
                 EXPECT_FALSE(accuracy.empty());
 
-                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-            m_controller_SystemServices->Release();
+
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -1796,11 +1785,10 @@ TEST_F(SystemService_L2Test, GetTerritory_COMRPC)
                 TEST_LOG("Territory: %s", territory.c_str());
                 TEST_LOG("Region: %s", region.c_str());
                 
-                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-            m_controller_SystemServices->Release();
+
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -1836,11 +1824,10 @@ TEST_F(SystemService_L2Test, GetSystemVersions_COMRPC)
                 TEST_LOG("receiverVersion: %s", systemVersionsInfo.receiverVersion.c_str());
                 TEST_LOG("stbTimestamp: %s", systemVersionsInfo.stbTimestamp.c_str());
                 
-                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-            m_controller_SystemServices->Release();
+
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -1876,11 +1863,10 @@ TEST_F(SystemService_L2Test, GetPowerStateBeforeReboot_COMRPC)
                 // Log and validate output
                 TEST_LOG("Power state before reboot: %s", state.c_str());
                 
-                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-            m_controller_SystemServices->Release();
+
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -1916,11 +1902,10 @@ TEST_F(SystemService_L2Test, GetFSRFlag_COMRPC)
                 // Log and validate output
                 TEST_LOG("FSR Flag: %s", fsrFlag ? "true" : "false");
                 
-                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-            m_controller_SystemServices->Release();
+
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -1960,11 +1945,11 @@ TEST_F(SystemService_L2Test, GetBlocklistFlag_COMRPC)
                 if (!blocklistResult.success) {
                     TEST_LOG("GetBlocklistFlag returned success=false (blocklist file may not exist)");
                 }                
-                m_SystemServicesPlugin->Release();
+
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-            m_controller_SystemServices->Release();
+
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -2155,11 +2140,10 @@ TEST_F(SystemService_L2Test, SetMode_NORMAL_COMRPC)
                 // Log output
                 TEST_LOG("SetMode NORMAL success: %s", success ? "true" : "false");
                 
-                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-            m_controller_SystemServices->Release();
+
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -2199,11 +2183,10 @@ TEST_F(SystemService_L2Test, SetMode_EAS_COMRPC)
                 // Log output
                 TEST_LOG("SetMode EAS success: %s", success ? "true" : "false");
                 
-                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-            m_controller_SystemServices->Release();
+
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -2313,9 +2296,7 @@ TEST_F(SystemService_L2Test, GetDownloadedFirmwareInfo_COMRPC)
                          fwInfo.downloadedFWVersion.c_str(),
                          fwInfo.downloadedFWLocation.c_str());
                 
-                m_SystemServicesPlugin->Release();
             }
-            m_controller_SystemServices->Release();
         }
     }
 }
@@ -2356,9 +2337,7 @@ TEST_F(SystemService_L2Test, GetFirmwareUpdateState_COMRPC)
                 EXPECT_EQ(result, Core::ERROR_NONE);
                 TEST_LOG("FW Update State: %d, Success: %s", firmwareUpdateState, success ? "true" : "false");
                 
-                m_SystemServicesPlugin->Release();
             }
-            m_controller_SystemServices->Release();
         }
     }
 }
@@ -2399,9 +2378,7 @@ TEST_F(SystemService_L2Test, GetLastWakeupKeyCode_COMRPC)
                 EXPECT_EQ(result, Core::ERROR_NONE);
                 TEST_LOG("Last Wakeup KeyCode: %d, Success: %s", wakeupKeyCode, success ? "true" : "false");
                 
-                m_SystemServicesPlugin->Release();
             }
-            m_controller_SystemServices->Release();
         }
     }
 }
@@ -2442,9 +2419,7 @@ TEST_F(SystemService_L2Test, GetMfgSerialNumber_COMRPC)
                 EXPECT_EQ(result, Core::ERROR_NONE);
                 TEST_LOG("Mfg Serial Number: %s, Success: %s", mfgSerialNumber.c_str(), success ? "true" : "false");
                 
-                m_SystemServicesPlugin->Release();
             }
-            m_controller_SystemServices->Release();
         }
     }
 }
@@ -2487,9 +2462,7 @@ TEST_F(SystemService_L2Test, IsOptOutTelemetry_COMRPC)
                 } else {
                     TEST_LOG("IsOptOutTelemetry failed with result %u - Telemetry plugin not available in L2 test environment", result);
                 }
-                m_SystemServicesPlugin->Release();
             }
-            m_controller_SystemServices->Release();
         }
     }
 }
@@ -2514,11 +2487,8 @@ TEST_F(SystemService_L2Test, SetFirmwareAutoReboot_COMRPC)
                     TEST_LOG("SetFirmwareAutoReboot success: %s", sysResult.success ? "true" : "false");
                 } else {
                     TEST_LOG("SetFirmwareAutoReboot failed with result %u - FirmwareUpdate plugin not available in L2 test environment", result);
-                }
-                
-                m_SystemServicesPlugin->Release();
+                }                
             }
-            m_controller_SystemServices->Release();
         }
     }
 }
@@ -2561,9 +2531,7 @@ TEST_F(SystemService_L2Test, UpdateFirmware_COMRPC)
                 EXPECT_EQ(result, Core::ERROR_NONE);
                 TEST_LOG("UpdateFirmware called, success: %s", sysResult.success ? "true" : "false");
                 
-                m_SystemServicesPlugin->Release();
             }
-            m_controller_SystemServices->Release();
         }
     }
 }
@@ -2603,9 +2571,7 @@ TEST_F(SystemService_L2Test, SetFSRFlag_COMRPC)
                 EXPECT_EQ(result, Core::ERROR_NONE);
                 TEST_LOG("SetFSRFlag success: %s", sysResult.success ? "true" : "false");
                 
-                m_SystemServicesPlugin->Release();
             }
-            m_controller_SystemServices->Release();
         }
     }
 }
@@ -2646,9 +2612,7 @@ TEST_F(SystemService_L2Test, SetBlocklistFlag_COMRPC)
                 EXPECT_EQ(result, Core::ERROR_NONE);
                 TEST_LOG("SetBlocklistFlag success: %s", blocklistResult.success ? "true" : "false");
                 
-                m_SystemServicesPlugin->Release();
             }
-            m_controller_SystemServices->Release();
         }
     }
 }
@@ -2703,9 +2667,7 @@ TEST_F(SystemService_L2Test, SetMode_InvalidMode_COMRPC_Negative)
                     TEST_LOG("Warning: Invalid mode was accepted");
                 }
                 
-                m_SystemServicesPlugin->Release();
             }
-            m_controller_SystemServices->Release();
         }
     }
 }
@@ -2753,9 +2715,7 @@ TEST_F(SystemService_L2Test, SetMode_WAREHOUSE_ZeroDuration_COMRPC)
                 EXPECT_EQ(result, Core::ERROR_NONE);
                 TEST_LOG("SetMode WAREHOUSE (duration=0) success: %s", success ? "true" : "false");
                 
-                m_SystemServicesPlugin->Release();
             }
-            m_controller_SystemServices->Release();
         }
     }
 }
@@ -2779,9 +2739,7 @@ TEST_F(SystemService_L2Test, SetFriendlyName_EmptyString_COMRPC_Corner)
                 EXPECT_EQ(result, Core::ERROR_NONE);
                 TEST_LOG("SetFriendlyName (empty) success: %s", sysResult.success ? "true" : "false");
                 
-                m_SystemServicesPlugin->Release();
             }
-            m_controller_SystemServices->Release();
         }
     }
 }
@@ -2851,9 +2809,7 @@ TEST_F(SystemService_L2Test, SetTerritory_InvalidTerritory_COMRPC_Negative)
                 // Expecting failure or specific error
                 TEST_LOG("SetTerritory (invalid) returned success: %s", success ? "true" : "false");
                 
-                m_SystemServicesPlugin->Release();
             }
-            m_controller_SystemServices->Release();
         }
     }
 }
@@ -2880,9 +2836,7 @@ TEST_F(SystemService_L2Test, SetTimeZoneDST_InvalidTimezone_COMRPC_Negative)
                     TEST_LOG("Expected failure for invalid timezone, error: %s", errorMessage.c_str());
                 }
                 
-                m_SystemServicesPlugin->Release();
             }
-            m_controller_SystemServices->Release();
         }
     }
 }
@@ -2911,9 +2865,7 @@ TEST_F(SystemService_L2Test, SetNetworkStandbyMode_Toggle_COMRPC)
                 EXPECT_EQ(result2, Core::ERROR_NONE);
                 TEST_LOG("Set to false: %s", sysResult2.success ? "success" : "failed");
                 
-                m_SystemServicesPlugin->Release();
             }
-            m_controller_SystemServices->Release();
         }
     }
 }
@@ -2979,9 +2931,7 @@ TEST_F(SystemService_L2Test, GetLastFirmwareFailureReason_COMRPC)
                 EXPECT_EQ(result, Core::ERROR_NONE);
                 TEST_LOG("Failure reason: %s, success: %s", failReason.c_str(), success ? "true" : "false");
                 
-                m_SystemServicesPlugin->Release();
             }
-            m_controller_SystemServices->Release();
         }
     }
 }
@@ -3023,9 +2973,7 @@ TEST_F(SystemService_L2Test, GetWakeupReason_COMRPC)
                 EXPECT_EQ(result, Core::ERROR_NONE);
                 TEST_LOG("Wakeup reason: %s, success: %s", wakeupReason.c_str(), success ? "true" : "false");
                 
-                m_SystemServicesPlugin->Release();
             }
-            m_controller_SystemServices->Release();
         }
     }
 }
@@ -3074,9 +3022,7 @@ TEST_F(SystemService_L2Test, SetDeepSleepTimer_COMRPC)
                     TEST_LOG("Error: %s, status: %u", errorMessage.c_str(), sysSrvStatus);
                 }
                 
-                m_SystemServicesPlugin->Release();
             }
-            m_controller_SystemServices->Release();
         }
     }
 }
@@ -3117,9 +3063,7 @@ TEST_F(SystemService_L2Test, AbortLogUpload_COMRPC)
                 EXPECT_EQ(result, Core::ERROR_NONE);
                 TEST_LOG("Abort log upload: %s", sysResult.success ? "success" : "failed");
                 
-                m_SystemServicesPlugin->Release();
             }
-            m_controller_SystemServices->Release();
         }
     }
 }
@@ -3164,9 +3108,7 @@ TEST_F(SystemService_L2Test, GetPlatformConfiguration_COMRPC)
                     TEST_LOG("Account ID: %s", platformConfig.accountInfo.accountId.c_str());
                 }
                 
-                m_SystemServicesPlugin->Release();
             }
-            m_controller_SystemServices->Release();
         }
     }
 }
@@ -3283,11 +3225,9 @@ TEST_F(SystemService_L2Test, OnFriendlyNameChanged_Notification_COMRPC)
                     TEST_LOG("Successfully unregistered from notifications");
                 }
 
-                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -3348,11 +3288,9 @@ TEST_F(SystemService_L2Test, OnNetworkStandbyModeChanged_Notification_COMRPC)
                     TEST_LOG("Successfully unregistered from notifications");
                 }
 
-                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -3410,11 +3348,9 @@ TEST_F(SystemService_L2Test, OnFirmwareUpdateInfoReceived_Notification_COMRPC)
                     TEST_LOG("Successfully unregistered from notifications");
                 }
 
-                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -3458,11 +3394,9 @@ TEST_F(SystemService_L2Test, OnRebootRequest_Notification_COMRPC)
                     TEST_LOG("Successfully unregistered from notifications");
                 }
 
-                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -3520,11 +3454,9 @@ TEST_F(SystemService_L2Test, OnTerritoryChanged_Notification_COMRPC)
                     TEST_LOG("Successfully unregistered from notifications");
                 }
 
-                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -3567,11 +3499,9 @@ TEST_F(SystemService_L2Test, OnTemperatureThresholdChanged_Notification_COMRPC)
                     TEST_LOG("Successfully unregistered from notifications");
                 }
 
-                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
