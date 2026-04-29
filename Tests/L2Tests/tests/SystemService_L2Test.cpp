@@ -499,6 +499,53 @@ SystemService_L2Test::~SystemService_L2Test()
 
         try { TEST_LOG("Cleaning up SystemServices L2 Test"); } catch (...) {}
 
+        // Clean up COM-RPC interface objects first
+        try {
+            if (m_SystemServicesPlugin != nullptr) {
+                try {
+                    m_SystemServicesPlugin->Release();
+                    m_SystemServicesPlugin = nullptr;
+                    try { TEST_LOG("Released m_SystemServicesPlugin"); } catch (...) {}
+                } catch (...) {
+                    try { TEST_LOG("Exception releasing m_SystemServicesPlugin"); } catch (...) {}
+                }
+            }
+        } catch (...) {}
+
+        try {
+            if (m_controller_SystemServices != nullptr) {
+                try {
+                    m_controller_SystemServices->Release();
+                    m_controller_SystemServices = nullptr;
+                    try { TEST_LOG("Released m_controller_SystemServices"); } catch (...) {}
+                } catch (...) {
+                    try { TEST_LOG("Exception releasing m_controller_SystemServices"); } catch (...) {}
+                }
+            }
+        } catch (...) {}
+
+        try {
+            if (SystemServices_Client.IsValid()) {
+                try {
+                    SystemServices_Client.Release();
+                    try { TEST_LOG("Released SystemServices_Client"); } catch (...) {}
+                } catch (...) {
+                    try { TEST_LOG("Exception releasing SystemServices_Client"); } catch (...) {}
+                }
+            }
+        } catch (...) {}
+
+        try {
+            if (SystemServices_Engine.IsValid()) {
+                try {
+                    SystemServices_Engine.Release();
+                    try { TEST_LOG("Released SystemServices_Engine"); } catch (...) {}
+                } catch (...) {
+                    try { TEST_LOG("Exception releasing SystemServices_Engine"); } catch (...) {}
+                }
+            }
+        } catch (...) {}
+
         // Deactivate in reverse order of activation
         // First deactivate SystemServices
         try {
