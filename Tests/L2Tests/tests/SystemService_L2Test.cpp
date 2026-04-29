@@ -2099,83 +2099,6 @@ TEST_F(SystemService_L2Test, SetNetworkStandbyMode_JSONRPC)
 ** Coverage Enhancement Tests ************************
 ** Testing additional SystemServices APIs coverage
 *******************************************************/
-#if 0
-TEST_F(SystemService_L2Test, GetMigrationStatus_COMRPC)
-{
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("Invalid SystemServices_Client");
-    } else {
-        EXPECT_TRUE(m_controller_SystemServices != nullptr);
-        if (m_controller_SystemServices) {
-            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
-            if (m_SystemServicesPlugin) {
-                TEST_LOG("Testing GetMigrationStatus via COM-RPC");
-
-                // Declare output parameters
-                Exchange::ISystemServices::MigrationStatus migrationStatus;
-
-                // Call the API
-                uint32_t result = m_SystemServicesPlugin->GetMigrationStatus(migrationStatus);
-
-                // Validate result
-                EXPECT_EQ(result, Core::ERROR_NONE);
-                if (result == Core::ERROR_NONE) {
-                    TEST_LOG("Migration Status: %s", migrationStatus.migrationStatus.c_str());
-                    EXPECT_FALSE(migrationStatus.migrationStatus.empty());
-                } else {
-                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
-                    TEST_LOG("Err: %s", errorMsg.c_str());
-				}
-                
-                m_SystemServicesPlugin->Release();
-            } else {
-                TEST_LOG("m_SystemServicesPlugin is NULL");
-            }
-            m_controller_SystemServices->Release();
-        } else {
-            TEST_LOG("m_controller_SystemServices is NULL");
-        }
-    }
-}
-
-TEST_F(SystemService_L2Test, GetBootTypeInfo_COMRPC)
-{
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("Invalid SystemServices_Client");
-    } else {
-        EXPECT_TRUE(m_controller_SystemServices != nullptr);
-        if (m_controller_SystemServices) {
-            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
-            if (m_SystemServicesPlugin) {
-                TEST_LOG("Testing GetBootTypeInfo via COM-RPC");
-
-                // Declare output parameters
-                Exchange::ISystemServices::BootType bootInfo;
-
-                // Call the API
-                uint32_t result = m_SystemServicesPlugin->GetBootTypeInfo(bootInfo);
-
-                // Validate result
-                EXPECT_EQ(result, Core::ERROR_NONE);
-                if (result == Core::ERROR_NONE) {
-                    TEST_LOG("Boot Type: %s", bootInfo.bootType.c_str());
-                    EXPECT_FALSE(bootInfo.bootType.empty());
-                } else {
-                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
-                    TEST_LOG("Err: %s", errorMsg.c_str());
-                }
-                
-                m_SystemServicesPlugin->Release();
-            } else {
-                TEST_LOG("m_SystemServicesPlugin is NULL");
-            }
-            m_controller_SystemServices->Release();
-        } else {
-            TEST_LOG("m_controller_SystemServices is NULL");
-        }
-    }
-}
-#endif
 
 TEST_F(SystemService_L2Test, SetMode_NORMAL_COMRPC)
 {
@@ -2264,47 +2187,6 @@ TEST_F(SystemService_L2Test, SetMode_EAS_COMRPC)
         }
     }
 }
-#if 0
-TEST_F(SystemService_L2Test, GetMigrationStatus_JSONRPC)
-{
-    TEST_LOG("Testing getMigrationStatus via JSON-RPC");
-
-    JsonObject params;
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getMigrationStatus", params, result);
-
-    EXPECT_EQ(status, Core::ERROR_NONE);
-
-    // Validate status field
-    EXPECT_TRUE(result.HasLabel("status"));
-    if (result.HasLabel("status")) {
-        string migrationStatus = result["status"].String();
-        TEST_LOG("  status: %s", migrationStatus.c_str());
-        EXPECT_FALSE(migrationStatus.empty());
-    }
-}
-
-TEST_F(SystemService_L2Test, GetBootTypeInfo_JSONRPC)
-{
-    TEST_LOG("Testing getBootTypeInfo via JSON-RPC");
-
-    JsonObject params;
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getBootTypeInfo", params, result);
-
-    EXPECT_EQ(status, Core::ERROR_NONE);
-
-    // Validate boottype field
-    EXPECT_TRUE(result.HasLabel("boottype"));
-    if (result.HasLabel("boottype")) {
-        string bootType = result["boottype"].String();
-        TEST_LOG("  boottype: %s", bootType.c_str());
-        EXPECT_FALSE(bootType.empty());
-	}
-}
-#endif
 
 TEST_F(SystemService_L2Test, SetMode_NORMAL_JSONRPC)
 {
@@ -2982,36 +2864,6 @@ TEST_F(SystemService_L2Test, SetTimeZoneDST_InvalidTimezone_COMRPC_Negative)
         }
     }
 }
-#if 0
-// Corner Case: Multiple rapid calls to the same API
-TEST_F(SystemService_L2Test, GetSerialNumber_RapidCalls_COMRPC_Corner)
-{
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("Invalid SystemServices_Client");
-    } else {
-        EXPECT_TRUE(m_controller_SystemServices != nullptr);
-        if (m_controller_SystemServices) {
-            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
-            if (m_SystemServicesPlugin) {
-                TEST_LOG("Testing GetSerialNumber with rapid calls via COM-RPC (Corner Case)");
-
-                for (int i = 0; i < 10; i++) {
-                    string serialNumber;
-                    bool success = false;
-
-                    uint32_t result = m_SystemServicesPlugin->GetSerialNumber(serialNumber, success);
-
-                    EXPECT_EQ(result, Core::ERROR_NONE);
-                }
-                TEST_LOG("Rapid calls test completed");
-                
-                m_SystemServicesPlugin->Release();
-            }
-            m_controller_SystemServices->Release();
-        }
-    }
-}
-#endif
 
 // Negative Test: SetNetworkStandbyMode toggle
 TEST_F(SystemService_L2Test, SetNetworkStandbyMode_Toggle_COMRPC)
@@ -3043,73 +2895,7 @@ TEST_F(SystemService_L2Test, SetNetworkStandbyMode_Toggle_COMRPC)
         }
     }
 }
-#if 0
-// Negative Test: GetMigrationStatus without migration file
-TEST_F(SystemService_L2Test, GetMigrationStatus_NoFile_COMRPC_Negative)
-{
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("Invalid SystemServices_Client");
-    } else {
-        EXPECT_TRUE(m_controller_SystemServices != nullptr);
-        if (m_controller_SystemServices) {
-            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
-            if (m_SystemServicesPlugin) {
-                TEST_LOG("Testing GetMigrationStatus without migration file via COM-RPC (Negative Test)");
-
-                // Remove migration file if it exists
-                system("rm -f /opt/secure/persistent/MigrationStatus 2>/dev/null");
-
-                Exchange::ISystemServices::MigrationStatus migrationStatus;
-                uint32_t result = m_SystemServicesPlugin->GetMigrationStatus(migrationStatus);
-
-                // Should return success with default/empty status when file doesn't exist
-                EXPECT_EQ(result, Core::ERROR_NONE);
-                TEST_LOG("Migration Status (no file): %s", migrationStatus.migrationStatus.c_str());
-                
-                m_SystemServicesPlugin->Release();
-            }
-            m_controller_SystemServices->Release();
-        }
-    }
-}
-
-// Negative Test: GetBootTypeInfo verification
-TEST_F(SystemService_L2Test, GetBootTypeInfo_Verify_COMRPC_Negative)
-{
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("Invalid SystemServices_Client");
-    } else {
-        EXPECT_TRUE(m_controller_SystemServices != nullptr);
-        if (m_controller_SystemServices) {
-            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
-            if (m_SystemServicesPlugin) {
-                TEST_LOG("Testing GetBootTypeInfo verification via COM-RPC (Negative Test)");
-
-                Exchange::ISystemServices::BootType bootInfo;
-                uint32_t result = m_SystemServicesPlugin->GetBootTypeInfo(bootInfo);
-
-                // Validate the boot type value
-                EXPECT_EQ(result, Core::ERROR_NONE);
-                if (result == Core::ERROR_NONE) {
-                    TEST_LOG("Boot Type: %s", bootInfo.bootType.c_str());
-                    // Boot type should be one of valid values
-                    bool validBootType = (bootInfo.bootType == "COLD" || 
-                                        bootInfo.bootType == "WARM" || 
-                                        bootInfo.bootType == "UNKNOWN" ||
-                                        bootInfo.bootType.empty());
-                    if (!validBootType) {
-                        TEST_LOG("Warning: Unexpected boot type value: %s", bootInfo.bootType.c_str());
-                    }
-                }
-                
-                m_SystemServicesPlugin->Release();
-            }
-            m_controller_SystemServices->Release();
-        }
-    }
-}
-#endif
-
+																					
 // Negative Test: SetMigrationStatus with empty string
 TEST_F(SystemService_L2Test, SetMigrationStatus_EmptyString_JSONRPC_Negative)
 {
@@ -3152,59 +2938,6 @@ TEST_F(SystemService_L2Test, SetMigrationStatus_InvalidValue_JSONRPC_Negative)
 ** Missing API Coverage Tests
 ** Testing previously uncovered SystemServices APIs
 *******************************************************/
-#if 0
-// GetFirmwareDownloadPercent Tests
-TEST_F(SystemService_L2Test, GetFirmwareDownloadPercent_COMRPC)
-{
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("Invalid SystemServices_Client");
-    } else {
-        EXPECT_TRUE(m_controller_SystemServices != nullptr);
-        if (m_controller_SystemServices) {
-            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
-            if (m_SystemServicesPlugin) {
-                TEST_LOG("Testing GetFirmwareDownloadPercent via COM-RPC");
-
-                int32_t downloadPercent = -1;
-                bool success = false;
-
-                uint32_t result = m_SystemServicesPlugin->GetFirmwareDownloadPercent(downloadPercent, success);
-                EXPECT_EQ(result, Core::ERROR_NONE);
-                TEST_LOG("Download percent: %d, success: %s", downloadPercent, success ? "true" : "false");
-                
-                if (success) {
-                    EXPECT_GE(downloadPercent, 0);
-                    EXPECT_LE(downloadPercent, 100);
-                }
-                
-                m_SystemServicesPlugin->Release();
-            }
-            m_controller_SystemServices->Release();
-        }
-    }
-}
-
-TEST_F(SystemService_L2Test, GetFirmwareDownloadPercent_JSONRPC)
-{
-    TEST_LOG("Testing GetFirmwareDownloadPercent via JSON-RPC");
-
-    JsonObject params;
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getFirmwareDownloadPercent", params, result);
-
-    EXPECT_EQ(status, Core::ERROR_NONE);
-    EXPECT_TRUE(result.HasLabel("success"));
-    
-    if (result.HasLabel("downloadPercent")) {
-        int64_t percent = result["downloadPercent"].Number();
-        TEST_LOG("Download percent: %ld", (long)percent);
-        EXPECT_GE(percent, 0);
-        EXPECT_LE(percent, 100);
-    }
-}
-#endif
-
 // GetLastFirmwareFailureReason Tests
 TEST_F(SystemService_L2Test, GetLastFirmwareFailureReason_COMRPC)
 {
@@ -3293,55 +3026,6 @@ TEST_F(SystemService_L2Test, GetWakeupReason_JSONRPC)
     }
 }
 
-// GetPowerState Tests
-TEST_F(SystemService_L2Test, GetPowerState_COMRPC)
-{
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("Invalid SystemServices_Client");
-    } else {
-        EXPECT_TRUE(m_controller_SystemServices != nullptr);
-        if (m_controller_SystemServices) {
-            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
-            if (m_SystemServicesPlugin) {
-                TEST_LOG("Testing GetPowerState via COM-RPC");
-
-                string powerState;
-                bool success = false;
-
-                uint32_t result = m_SystemServicesPlugin->GetPowerState(powerState, success);
-                EXPECT_EQ(result, Core::ERROR_NONE);
-                TEST_LOG("Power state: %s, success: %s", powerState.c_str(), success ? "true" : "false");
-                
-                if (success) {
-                    EXPECT_FALSE(powerState.empty());
-                    // Expected values: STANDBY, DEEP_SLEEP, LIGHT_SLEEP, ON
-                }
-                
-                m_SystemServicesPlugin->Release();
-            }
-            m_controller_SystemServices->Release();
-        }
-    }
-}
-
-TEST_F(SystemService_L2Test, GetPowerState_JSONRPC)
-{
-    TEST_LOG("Testing GetPowerState via JSON-RPC");
-
-    JsonObject params;
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPowerState", params, result);
-
-    EXPECT_EQ(status, Core::ERROR_NONE);
-    EXPECT_TRUE(result.HasLabel("success"));
-    
-    if (result.HasLabel("powerState")) {
-        string state = result["powerState"].String();
-        TEST_LOG("Power state: %s", state.c_str());
-        EXPECT_FALSE(state.empty());
-    }
-}
 
 // SetDeepSleepTimer Tests
 TEST_F(SystemService_L2Test, SetDeepSleepTimer_COMRPC)
