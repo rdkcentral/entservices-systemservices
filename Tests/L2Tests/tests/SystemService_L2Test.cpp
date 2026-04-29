@@ -542,6 +542,19 @@ uint32_t SystemService_L2Test::CreateSystemServicesInterfaceObject()
 {
     uint32_t return_value = Core::ERROR_GENERAL;
 
+	// Release existing interfaces if they were already created (prevent memory leak)
+    if (m_SystemServicesPlugin != nullptr) {
+        TEST_LOG("Releasing existing m_SystemServicesPlugin before recreating");
+        m_SystemServicesPlugin->Release();
+        m_SystemServicesPlugin = nullptr;
+    }
+
+    if (m_controller_SystemServices != nullptr) {
+        TEST_LOG("Releasing existing m_controller_SystemServices before recreating");
+        m_controller_SystemServices->Release();
+        m_controller_SystemServices = nullptr;
+    }
+	
     TEST_LOG("Creating SystemServices_Engine");
     SystemServices_Engine = Core::ProxyType<RPC::InvokeServerType<1, 0, 4>>::Create();
     SystemServices_Client = Core::ProxyType<RPC::CommunicatorClient>::Create(
