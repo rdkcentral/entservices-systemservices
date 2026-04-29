@@ -312,26 +312,51 @@ bool getDownloadProgress(int& downloadPercent)
         retStatus = Utils::getLastLine(file_content, last_line);
         if (retStatus == true && (!last_line.empty()))
         {
-              retStatus = false;
-              // trim the leading spaces, which is equivalent to "sed 's/^ *//g'"
-              Utils::String::ltrim(last_line);
-              // filter lines which has 'M' or 'G'  sed '/^[^M/G]*$/d', which is equivalent to "sed '/^[^M/G]*$/d'"
-              std::size_t found_M = last_line.find_first_of("M");
-              std::size_t found_G = last_line.find_first_of("G");
-              if ((found_M != std::string::npos) | (found_G != std::string::npos))
-              {
-                  /* Remove extra whitespaces from given input string, which is equivalent to "tr -s ' '" */
-                  Utils::String::removeExtraWhitespaces(last_line, str);
+            retStatus = false;
+            // trim the leading spaces, which is equivalent to "sed 's/^ *//g'"
+            Utils::String::ltrim(last_line);
 
-                  /* Divide the input string into words with delimiter(space) and get the third word,
-                     which is equivalent to "cut -d ' ' -f3" */
-                  Utils::String::split(stringList, str, " ");
-                  if ((!stringList[2].empty()))
-                  {
-                      downloadprogress = stringList[2];
-                      retStatus = true;
-                  }
-              }
+            /* Remove extra whitespaces from given input string, which is equivalent to "tr -s ' '" */
+            if (Utils::String::removeExtraWhitespaces(last_line, str) == true) {
+                Utils::String::split(stringList, str, " ");
+            }
+
+            // Existing parser path kept for platforms that emit M/G style curl progress lines.
+            std::size_t found_M = last_line.find_first_of("M");
+            std::size_t found_G = last_line.find_first_of("G");
+            if ((found_M != std::string::npos) || (found_G != std::string::npos))
+            {
+                /* Divide the input string into words with delimiter(space) and get the third word,
+                   which is equivalent to "cut -d ' ' -f3" */
+                if (stringList.size() > 2 && (!stringList[2].empty()))
+                {
+                    downloadprogress = stringList[2];
+                    retStatus = true;
+                }
+            }
+
+            // Fallback parser for lines like: "UP: <x> of <y> DOWN: <current> of <total>"
+            if (retStatus == false && !stringList.empty()) {
+                for (size_t idx = 0; idx + 3 < stringList.size(); ++idx) {
+                    if (stringList[idx] == "DOWN:" && stringList[idx + 2] == "of") {
+                        char* endCurrent = nullptr;
+                        char* endTotal = nullptr;
+                        const unsigned long current = strtoul(stringList[idx + 1].c_str(), &endCurrent, 10);
+                        const unsigned long total = strtoul(stringList[idx + 3].c_str(), &endTotal, 10);
+
+                        if (endCurrent != nullptr && *endCurrent == '\0' &&
+                                endTotal != nullptr && *endTotal == '\0' && total > 0) {
+                            unsigned long percent = (current * 100UL) / total;
+                            if (percent > 100UL) {
+                                percent = 100UL;
+                            }
+                            downloadprogress = std::to_string(percent);
+                            retStatus = true;
+                        }
+                        break;
+                    }
+                }
+            }
         }
     }
 
