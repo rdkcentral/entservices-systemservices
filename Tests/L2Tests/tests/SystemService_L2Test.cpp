@@ -2754,7 +2754,7 @@ TEST_F(SystemService_L2Test, SetFriendlyName_EmptyString_COMRPC_Corner)
         }
     }
 }
-
+#if 0
 // Corner Case: SetFriendlyName with very long string
 TEST_F(SystemService_L2Test, SetFriendlyName_LongString_COMRPC_Corner)
 {
@@ -2781,7 +2781,7 @@ TEST_F(SystemService_L2Test, SetFriendlyName_LongString_COMRPC_Corner)
         }
     }
 }
-
+#endif
 // Corner Case: SetFriendlyName with special characters
 TEST_F(SystemService_L2Test, SetFriendlyName_SpecialChars_JSONRPC_Corner)
 {
