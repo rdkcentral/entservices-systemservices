@@ -494,85 +494,43 @@ SystemService_L2Test::SystemService_L2Test()
  */
 SystemService_L2Test::~SystemService_L2Test()
 {
-    try {
-        uint32_t status = Core::ERROR_GENERAL;
-        m_event_signalled = SYSTEMSERVICEL2TEST_STATE_INVALID;
+    uint32_t status = Core::ERROR_GENERAL;
+    m_event_signalled = SYSTEMSERVICEL2TEST_STATE_INVALID;
 
-        try { TEST_LOG("Cleaning up SystemServices L2 Test"); } catch (...) {}
+    TEST_LOG("Cleaning up SystemServices L2 Test");
 
-        // Clean up COM-RPC interface objects first (in reverse order of creation)
-        // Only release if they were actually created in CreateSystemServicesInterfaceObject()
-        
-        // Release SystemServices plugin interface
-        if (m_SystemServicesPlugin != nullptr) {
-            try {
-                TEST_LOG("Releasing m_SystemServicesPlugin");
-                m_SystemServicesPlugin->Release();
-                m_SystemServicesPlugin = nullptr;
-                TEST_LOG("Released m_SystemServicesPlugin");
-            } catch (const std::exception& e) {
-                TEST_LOG("Exception releasing m_SystemServicesPlugin: %s", e.what());
-            } catch (...) {
-                TEST_LOG("Unknown exception releasing m_SystemServicesPlugin");
-            }
-        }
+    // Release COM-RPC interfaces first (in reverse order of creation)
+    if (m_SystemServicesPlugin != nullptr) {
+        TEST_LOG("Releasing m_SystemServicesPlugin");
+        m_SystemServicesPlugin->Release();
+        m_SystemServicesPlugin = nullptr;
+    }
 
-        // Release controller shell interface
-        if (m_controller_SystemServices != nullptr) {
-            try {
-                TEST_LOG("Releasing m_controller_SystemServices");
-                m_controller_SystemServices->Release();
-                m_controller_SystemServices = nullptr;
-                TEST_LOG("Released m_controller_SystemServices");
-            } catch (const std::exception& e) {
-                TEST_LOG("Exception releasing m_controller_SystemServices: %s", e.what());
-            } catch (...) {
-                TEST_LOG("Unknown exception releasing m_controller_SystemServices");
-            }
-        }
+    if (m_controller_SystemServices != nullptr) {
+        TEST_LOG("Releasing m_controller_SystemServices");
+        m_controller_SystemServices->Release();
+        m_controller_SystemServices = nullptr;
+    }
 
-        // Release communicator client
-        try {
-            if (SystemServices_Client.IsValid()) {
-                TEST_LOG("Releasing SystemServices_Client");
-                SystemServices_Client.Release();
-                TEST_LOG("Released SystemServices_Client");
-            }
-        } catch (const std::exception& e) {
-            TEST_LOG("Exception releasing SystemServices_Client: %s", e.what());
-        } catch (...) {
-            TEST_LOG("Unknown exception releasing SystemServices_Client");
-        }
+    // Allow time for cleanup before deactivating services
+    usleep(CLEANUP_DELAY_MICROSECONDS);
 
-        // Release RPC engine
-        try {
-            if (SystemServices_Engine.IsValid()) {
-                TEST_LOG("Releasing SystemServices_Engine");
-                SystemServices_Engine.Release();
-                TEST_LOG("Released SystemServices_Engine");
-            }
-        } catch (const std::exception& e) {
-            TEST_LOG("Exception releasing SystemServices_Engine: %s", e.what());
-        } catch (...) {
-            TEST_LOG("Unknown exception releasing SystemServices_Engine");
-        }
+    // Deactivate services (in reverse order of activation)
+    status = DeactivateService("org.rdk.System");
+    if (status != Core::ERROR_NONE) {
+        TEST_LOG("SystemServices service deactivation failed with error: %d", status);
+    } else {
+        TEST_LOG("SystemServices service deactivated successfully");
+    }
 
-        // Deactivate services (in reverse order of activation)
-        status = DeactivateService("org.rdk.System");
-        if (status != Core::ERROR_NONE) {
-            TEST_LOG("SystemServices service deactivation failed with error: %d", status);
-        } else {
-            TEST_LOG("SystemServices service deactivated successfully");
-        }
-
-        status = DeactivateService("org.rdk.PowerManager");
-        if (status != Core::ERROR_NONE) {
-            TEST_LOG("PowerManager service deactivation failed with error: %d", status);
-        } else {
-            TEST_LOG("PowerManager service deactivated successfully");
-        }
+    status = DeactivateService("org.rdk.PowerManager");
+    if (status != Core::ERROR_NONE) {
+        TEST_LOG("PowerManager service deactivation failed with error: %d", status);
+    } else {
+        TEST_LOG("PowerManager service deactivated successfully");
     }
 }
+
 
 
 /**
