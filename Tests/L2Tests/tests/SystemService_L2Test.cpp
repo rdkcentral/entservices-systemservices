@@ -514,17 +514,6 @@ SystemService_L2Test::~SystemService_L2Test()
             TEST_LOG("Unknown exception during org.rdk.System deactivation");
         }
 
-        // Setup PowerManager HAL cleanup expectations
-        try {
-            EXPECT_CALL(*p_powerManagerHalMock, PLAT_TERM())
-                .WillOnce(::testing::Return(PWRMGR_SUCCESS));
-
-            EXPECT_CALL(*p_powerManagerHalMock, PLAT_DS_TERM())
-                .WillOnce(::testing::Return(DEEPSLEEPMGR_SUCCESS));
-        } catch (...) {
-            TEST_LOG("Exception setting up PowerManager HAL expectations");
-        }
-
         // Then deactivate PowerManager
         try {
             status = DeactivateService("org.rdk.PowerManager");
