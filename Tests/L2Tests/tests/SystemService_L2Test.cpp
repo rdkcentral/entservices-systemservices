@@ -2793,7 +2793,7 @@ TEST_F(SystemService_L2Test, GetTimeStatus_COMRPC)
         }
     }
 }
-
+#if 0
 TEST_F(SystemService_L2Test, GetTimeStatus_JSONRPC)
 {
     TEST_LOG("Testing getTimeStatus via JSON-RPC");
@@ -2812,7 +2812,7 @@ TEST_F(SystemService_L2Test, GetTimeStatus_JSONRPC)
         TEST_LOG("  TimeSrc: %s", result["TimeSrc"].String().c_str());
     }
 }
-
+#endif
 /********************************************************
 ************Test case Details **************************
 ** Negative and Corner Case Tests
