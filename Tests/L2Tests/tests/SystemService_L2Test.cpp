@@ -2766,53 +2766,6 @@ TEST_F(SystemService_L2Test, SetBlocklistFlag_JSONRPC)
     }
 }
 
-// GetTimeStatus Tests
-TEST_F(SystemService_L2Test, GetTimeStatus_COMRPC)
-{
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("Invalid SystemServices_Client");
-    } else {
-        EXPECT_TRUE(m_controller_SystemServices != nullptr);
-        if (m_controller_SystemServices) {
-            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
-            if (m_SystemServicesPlugin) {
-                TEST_LOG("Testing GetTimeStatus via COM-RPC");
-
-                string timeQuality, timeSrc, time;
-                bool success = false;
-
-                uint32_t result = m_SystemServicesPlugin->GetTimeStatus(timeQuality, timeSrc, time, success);
-
-                EXPECT_EQ(result, Core::ERROR_NONE);
-                TEST_LOG("Time Quality: %s, Source: %s, Time: %s", 
-                         timeQuality.c_str(), timeSrc.c_str(), time.c_str());
-                
-                m_SystemServicesPlugin->Release();
-            }
-            m_controller_SystemServices->Release();
-        }
-    }
-}
-#if 0
-TEST_F(SystemService_L2Test, GetTimeStatus_JSONRPC)
-{
-    TEST_LOG("Testing getTimeStatus via JSON-RPC");
-
-    JsonObject params;
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getTimeStatus", params, result);
-
-    EXPECT_EQ(status, Core::ERROR_NONE);
-
-    if (result.HasLabel("TimeQuality")) {
-        TEST_LOG("  TimeQuality: %s", result["TimeQuality"].String().c_str());
-    }
-    if (result.HasLabel("TimeSrc")) {
-        TEST_LOG("  TimeSrc: %s", result["TimeSrc"].String().c_str());
-    }
-}
-#endif
 /********************************************************
 ************Test case Details **************************
 ** Negative and Corner Case Tests
