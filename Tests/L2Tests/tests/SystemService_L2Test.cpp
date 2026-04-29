@@ -28,6 +28,10 @@
 #include "deepSleepMgr.h"
 #include "PowerManagerHalMock.h"
 #include "MfrMock.h"
+#include "SystemServicesHelper.h"
+#include "cTimer.h"
+#include "uploadlogs.h"
+#include "thermonitor.h"
 
 #define JSON_TIMEOUT   (1000)
 #define TEST_LOG(x, ...) fprintf(stderr, "\033[1;32m[%s:%d](%s)<PID:%d><TID:%d>" x "\n\033[0m", __FILE__, __LINE__, __FUNCTION__, getpid(), gettid(), ##__VA_ARGS__); fflush(stderr);
@@ -497,41 +501,40 @@ SystemService_L2Test::~SystemService_L2Test()
         uint32_t status = Core::ERROR_GENERAL;
         m_event_signalled = SYSTEMSERVICEL2TEST_STATE_INVALID;
 
-        TEST_LOG("Cleaning up SystemServices L2 Test");
+        try { TEST_LOG("Cleaning up SystemServices L2 Test"); } catch (...) {}
 
         // Deactivate in reverse order of activation
         // First deactivate SystemServices
         try {
             status = DeactivateService("org.rdk.System");
             if (status == Core::ERROR_NONE) {
-                TEST_LOG("Successfully deactivated org.rdk.System");
+                try { TEST_LOG("Successfully deactivated org.rdk.System"); } catch (...) {}
             } else {
-                TEST_LOG("Warning: DeactivateService org.rdk.System returned status: %u", status);
+                try { TEST_LOG("Warning: DeactivateService org.rdk.System returned status: %u", status); } catch (...) {}
             }
         } catch (const std::exception& e) {
-            TEST_LOG("Exception during org.rdk.System deactivation: %s", e.what());
+            try { TEST_LOG("Exception during org.rdk.System deactivation: %s", e.what()); } catch (...) {}
         } catch (...) {
-            TEST_LOG("Unknown exception during org.rdk.System deactivation");
+            try { TEST_LOG("Unknown exception during org.rdk.System deactivation"); } catch (...) {}
         }
 
         // Then deactivate PowerManager
         try {
             status = DeactivateService("org.rdk.PowerManager");
             if (status == Core::ERROR_NONE) {
-                TEST_LOG("Successfully deactivated org.rdk.PowerManager");
+                try { TEST_LOG("Successfully deactivated org.rdk.PowerManager"); } catch (...) {}
             } else {
-                TEST_LOG("Warning: DeactivateService org.rdk.PowerManager returned status: %u", status);
+                try { TEST_LOG("Warning: DeactivateService org.rdk.PowerManager returned status: %u", status); } catch (...) {}
             }
         } catch (const std::exception& e) {
-            TEST_LOG("Exception during org.rdk.PowerManager deactivation: %s", e.what());
+            try { TEST_LOG("Exception during org.rdk.PowerManager deactivation: %s", e.what()); } catch (...) {}
         } catch (...) {
-            TEST_LOG("Unknown exception during org.rdk.PowerManager deactivation");
+            try { TEST_LOG("Unknown exception during org.rdk.PowerManager deactivation"); } catch (...) {}
         }
 
-        TEST_LOG("Cleanup completed");
+        try { TEST_LOG("Cleanup completed"); } catch (...) {}
     } catch (...) {
         // Catch all exceptions in destructor to prevent std::terminate
-        TEST_LOG("Fatal: Exception caught in destructor - suppressing to prevent terminate");
         // Don't rethrow - destructors must not throw
     }
 }
