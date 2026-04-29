@@ -10371,19 +10371,18 @@ TEST_F(SystemServicesTest, Dispatch_OnMacAddressesRetrieved_ReachesNotification)
     m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
 
-    // Trigger via getMacAddresses API — the async callback fires
-    // Dispatch(SYSTEMSERVICES_EVT_ONMACADDRESSRETRIEVED) covering that switch case.
-    // Pass empty GUID so the mock script path is taken (may return empty macs).
+    // /lib/rdk/getDeviceDetails.sh must exist or GetMacAddresses returns early without
+    // starting the async thread. Create a dummy file so the thread is launched,
+    // which then calls pSs->dispatchEvent(ONMACADDRESSRETRIEVED) → Dispatch() L718-737.
+    system("mkdir -p /lib/rdk && touch /lib/rdk/getDeviceDetails.sh");
+
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getMacAddresses"),
               _T("{\"GUID\":\"\"}"), response));
 
-    // getMacAddressesAsync runs on a background thread: v_secure_popen returns null
-    // (NiceMock default), so params are filled with "00:00:00:00:00:00" and then
-    // pSs->dispatchEvent(ONMACADDRESSRETRIEVED) posts a worker-pool job that calls
-    // Dispatch(SYSTEMSERVICES_EVT_ONMACADDRESSRETRIEVED), covering lines 718-737.
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(3000, SystemServices_onMacAddressesRetreived))
         << "OnMacAddressesRetreived event not received within timeout";
 
+    std::remove("/lib/rdk/getDeviceDetails.sh");
     m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
     TEST_LOG("Dispatch_OnMacAddressesRetrieved PASSED - Response: %s", response.c_str());
