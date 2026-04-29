@@ -514,12 +514,12 @@ SystemService_L2Test::~SystemService_L2Test()
 	// Clear RPC client and engine to prevent shutdown crashes
     if (SystemServices_Client.IsValid()) {
         TEST_LOG("Clearing SystemServices_Client");
-        SystemServices_Client.Release();
+        SystemServices_Client = nullptr;
     }
 	
     if (SystemServices_Engine.IsValid()) {
         TEST_LOG("Clearing SystemServices_Engine");
-        SystemServices_Engine.Release();
+        SystemServices_Engine = nullptr;
     }
 	
     // Allow time for cleanup before deactivating services
