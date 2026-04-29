@@ -510,6 +510,17 @@ SystemService_L2Test::~SystemService_L2Test()
         TEST_LOG("Clearing m_SystemServicesPlugin pointer (no Release)");
         m_SystemServicesPlugin = nullptr;
     }
+
+	// Clear RPC client and engine to prevent shutdown crashes
+    if (SystemServices_Client.IsValid()) {
+        TEST_LOG("Clearing SystemServices_Client");
+        SystemServices_Client.Release();
+    }
+	
+    if (SystemServices_Engine.IsValid()) {
+        TEST_LOG("Clearing SystemServices_Engine");
+        SystemServices_Engine.Release();
+    }
 	
     // Allow time for cleanup before deactivating services
     usleep(CLEANUP_DELAY_MICROSECONDS);
