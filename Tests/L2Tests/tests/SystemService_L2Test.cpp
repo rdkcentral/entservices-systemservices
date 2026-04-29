@@ -500,19 +500,17 @@ SystemService_L2Test::~SystemService_L2Test()
 
     TEST_LOG("Cleaning up SystemServices L2 Test");
 
-    // Release COM-RPC interfaces first (in reverse order of creation)
-    if (m_SystemServicesPlugin != nullptr) {
-        TEST_LOG("Releasing m_SystemServicesPlugin");
-        m_SystemServicesPlugin->Release();
-        m_SystemServicesPlugin = nullptr;
-    }
-
     if (m_controller_SystemServices != nullptr) {
         TEST_LOG("Releasing m_controller_SystemServices");
         m_controller_SystemServices->Release();
         m_controller_SystemServices = nullptr;
     }
 
+	if (m_SystemServicesPlugin != nullptr) {
+        TEST_LOG("Clearing m_SystemServicesPlugin pointer (no Release)");
+        m_SystemServicesPlugin = nullptr;
+    }
+	
     // Allow time for cleanup before deactivating services
     usleep(CLEANUP_DELAY_MICROSECONDS);
 
