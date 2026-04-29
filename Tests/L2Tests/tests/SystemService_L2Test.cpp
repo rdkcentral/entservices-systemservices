@@ -510,17 +510,6 @@ SystemService_L2Test::~SystemService_L2Test()
         TEST_LOG("Clearing m_SystemServicesPlugin pointer (no Release)");
         m_SystemServicesPlugin = nullptr;
     }
-
-	// Clear RPC client and engine to prevent shutdown crashes
-    if (SystemServices_Client.IsValid()) {
-        TEST_LOG("Clearing SystemServices_Client");
-        SystemServices_Client = nullptr;
-    }
-	
-    if (SystemServices_Engine.IsValid()) {
-        TEST_LOG("Clearing SystemServices_Engine");
-        SystemServices_Engine = nullptr;
-    }
 	
     // Allow time for cleanup before deactivating services
     usleep(CLEANUP_DELAY_MICROSECONDS);
@@ -539,6 +528,9 @@ SystemService_L2Test::~SystemService_L2Test()
     } else {
         TEST_LOG("PowerManager service deactivated successfully");
     }
+
+	TEST_LOG("Waiting for WPEFramework to complete shutdown...");
+    usleep(CLEANUP_DELAY_MICROSECONDS);
 }
 
 
