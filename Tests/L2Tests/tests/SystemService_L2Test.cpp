@@ -485,7 +485,8 @@ SystemService_L2Test::SystemService_L2Test()
              } else {
                  TEST_LOG("ActivateService succeeded on attempt %d", retry_count + 1);
              }
-             EXPECT_EQ(Core::ERROR_NONE, status);
+		 }
+         EXPECT_EQ(Core::ERROR_NONE, status);
 }
 
 /**
