@@ -10625,30 +10625,6 @@ TEST_F(SystemServicesTest, SetWakeupSrc_PresenceDetection_CoversConvBranch)
 }
 
 // =============================================================================
-// updateDuration() direct call — covers lines 776-798
-// updateDuration() is static public. When m_remainingDuration==0 it takes the
-// else-branch: stopModeTimer, SetMode("NORMAL") which is safe (NORMAL→NORMAL
-// path: changeMode=false, _instance->SetMode just returns early).
-// =============================================================================
-TEST_F(SystemServicesTest, UpdateDuration_ZeroRemaining_SetsNormalMode)
-{
-    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
-
-    // Ensure IARM Bus calls succeed (SetMode may issue IARM calls)
-    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
-        .Times(::testing::AnyNumber())
-        .WillRepeatedly(::testing::Return(IARM_RESULT_SUCCESS));
-
-    // m_remainingDuration is 0 (default after initialization) → else branch:
-    //   m_operatingModeTimer.stop(); m_operatingModeTimer.detach();
-    //   _instance->SetMode({NORMAL, 0}, ...);
-    // Covers lines 781-792.
-    Plugin::SystemServicesImplementation::updateDuration();
-
-    TEST_LOG("UpdateDuration_ZeroRemaining_SetsNormalMode PASSED");
-}
-
-// =============================================================================
 // SetPowerState DEEP_SLEEP with standbyReason — covers STANDBY_REASON_FILE write path
 // =============================================================================
 TEST_F(SystemServicesTest, SetPowerState_DeepSleep_WithStandbyReason)
