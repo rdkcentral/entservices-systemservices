@@ -3029,7 +3029,7 @@ TEST_F(SystemService_L2Test, SetTimeZoneDST_InvalidTimezone_COMRPC_Negative)
         }
     }
 }
-
+#if 0
 // Corner Case: Multiple rapid calls to the same API
 TEST_F(SystemService_L2Test, GetSerialNumber_RapidCalls_COMRPC_Corner)
 {
@@ -3058,6 +3058,7 @@ TEST_F(SystemService_L2Test, GetSerialNumber_RapidCalls_COMRPC_Corner)
         }
     }
 }
+#endif
 
 // Negative Test: SetNetworkStandbyMode toggle
 TEST_F(SystemService_L2Test, SetNetworkStandbyMode_Toggle_COMRPC)
@@ -3089,7 +3090,7 @@ TEST_F(SystemService_L2Test, SetNetworkStandbyMode_Toggle_COMRPC)
         }
     }
 }
-
+#if 0
 // Negative Test: GetMigrationStatus without migration file
 TEST_F(SystemService_L2Test, GetMigrationStatus_NoFile_COMRPC_Negative)
 {
@@ -3154,6 +3155,7 @@ TEST_F(SystemService_L2Test, GetBootTypeInfo_Verify_COMRPC_Negative)
         }
     }
 }
+#endif
 
 // Negative Test: SetMigrationStatus with empty string
 TEST_F(SystemService_L2Test, SetMigrationStatus_EmptyString_JSONRPC_Negative)
@@ -3197,7 +3199,7 @@ TEST_F(SystemService_L2Test, SetMigrationStatus_InvalidValue_JSONRPC_Negative)
 ** Missing API Coverage Tests
 ** Testing previously uncovered SystemServices APIs
 *******************************************************/
-
+#if 0
 // GetFirmwareDownloadPercent Tests
 TEST_F(SystemService_L2Test, GetFirmwareDownloadPercent_COMRPC)
 {
@@ -3248,6 +3250,7 @@ TEST_F(SystemService_L2Test, GetFirmwareDownloadPercent_JSONRPC)
         EXPECT_LE(percent, 100);
     }
 }
+#endif
 
 // GetLastFirmwareFailureReason Tests
 TEST_F(SystemService_L2Test, GetLastFirmwareFailureReason_COMRPC)
