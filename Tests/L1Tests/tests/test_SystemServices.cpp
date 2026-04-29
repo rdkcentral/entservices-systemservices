@@ -10649,3 +10649,36 @@ TEST_F(SystemServicesTest, SetPowerState_DeepSleep_WithStandbyReason)
     TEST_LOG("SetPowerState_DeepSleep_WithStandbyReason - Response: %s", response.c_str());
 }
 
+
+// =============================================================================
+// UploadLogsAsync — covers uploadlogs.cpp L135-168 (logUploadAsync body)
+// Creates /usr/bin/logupload + config files so getUploadLogParameters succeeds
+// and fork()+execve() path is exercised (execve fails on empty binary)
+// =============================================================================
+TEST_F(SystemServicesTest, UploadLogsAsync_LoguploadBinaryExists_CoversAsyncBody)
+{
+    // Create /usr/bin/logupload (empty executable) so fileExists() → true
+    system("touch /usr/bin/logupload && chmod +x /usr/bin/logupload");
+
+    // Create /etc/device.properties with BUILD_TYPE=dev
+    // so parseConfigFile(DEVICE_PROPERTIES,"BUILD_TYPE") succeeds
+    // and OPT_DCM_PROPERTIES path is NOT used (only if non-prod)
+    system("echo 'BUILD_TYPE=dev' >> /etc/device.properties");
+
+    // Create /etc/dcm.properties with LOG_SERVER for tftp_server
+    system("echo 'LOG_SERVER=test-server' > /etc/dcm.properties");
+
+    // Create /tmp/DCMSettings.conf for getDCMconfigDetails()
+    // needs: UploadProtocol, URL, and UploadOnReboot patterns
+    system("printf 'LogUploadSettings:UploadRepository:uploadProtocol=https\nLogUploadSettings:UploadRepository:URL=https://test.log.server/upload\nLogUploadSettings:UploadOnReboot=false\n' > /tmp/DCMSettings.conf");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("uploadLogsAsync"),
+              _T("{\"url\":\"https://test.log.server/upload\"}"), response));
+
+    TEST_LOG("UploadLogsAsync_LoguploadBinaryExists - Response: %s", response.c_str());
+
+    // Cleanup
+    system("rm -f /usr/bin/logupload /tmp/DCMSettings.conf");
+    system("sed -i '/^BUILD_TYPE=dev$/d' /etc/device.properties 2>/dev/null || true");
+    system("rm -f /etc/dcm.properties");
+}
