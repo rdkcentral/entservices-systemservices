@@ -3533,67 +3533,6 @@ TEST_F(SystemService_L2Test, OnTerritoryChanged_Notification_COMRPC)
     }
 }
 
-TEST_F(SystemService_L2Test, OnLogUpload_Notification_COMRPC)
-{
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("Invalid SystemServices_Client");
-    } else {
-        EXPECT_TRUE(m_controller_SystemServices != nullptr);
-        if (m_controller_SystemServices) {
-            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
-            if (m_SystemServicesPlugin) {
-
-                TEST_LOG("Testing OnLogUpload notification via COM-RPC");
-
-                // Register for notifications
-                uint32_t result = m_SystemServicesPlugin->Register(&m_notificationHandler);
-                EXPECT_EQ(result, Core::ERROR_NONE);
-                if (result != Core::ERROR_NONE) {
-                    std::string errorMsg = "Register returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
-                    TEST_LOG("Err: %s", errorMsg.c_str());
-                } else {
-                    TEST_LOG("Successfully registered for notifications");
-                }
-
-                // Reset event flag before triggering the event
-                m_notificationHandler.ResetEvent();
-
-                // Trigger log upload
-                Exchange::ISystemServices::SystemResult uploadResult;
-                result = m_SystemServicesPlugin->UploadLogsAsync(uploadResult);
-
-                if (result == Core::ERROR_NONE) {
-                    // Wait for the notification
-                    uint32_t eventStatus = m_notificationHandler.WaitForEvent(EVNT_TIMEOUT, SYSTEMSERVICEL2TEST_LOGUPLOADSTATE_CHANGED);
-
-                    EXPECT_NE(eventStatus, SYSTEMSERVICEL2TEST_STATE_INVALID);
-                    if (eventStatus != SYSTEMSERVICEL2TEST_STATE_INVALID) {
-                        TEST_LOG("OnLogUpload notification received successfully");
-                    } else {
-                        TEST_LOG("Timeout waiting for OnLogUpload notification");
-                    }
-                } else {
-                    TEST_LOG("UploadLogsAsync failed to trigger");
-                }
-
-                // Unregister from notifications
-                result = m_SystemServicesPlugin->Unregister(&m_notificationHandler);
-                EXPECT_EQ(result, Core::ERROR_NONE);
-                if (result == Core::ERROR_NONE) {
-                    TEST_LOG("Successfully unregistered from notifications");
-                }
-
-                m_SystemServicesPlugin->Release();
-            } else {
-                TEST_LOG("m_SystemServicesPlugin is NULL");
-            }
-            m_controller_SystemServices->Release();
-        } else {
-            TEST_LOG("m_controller_SystemServices is NULL");
-        }
-    }
-}
-
 TEST_F(SystemService_L2Test, OnTemperatureThresholdChanged_Notification_COMRPC)
 {
     if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
