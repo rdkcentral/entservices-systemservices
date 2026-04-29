@@ -10682,3 +10682,49 @@ TEST_F(SystemServicesTest, UploadLogsAsync_LoguploadBinaryExists_CoversAsyncBody
     system("sed -i '/^BUILD_TYPE=dev$/d' /etc/device.properties 2>/dev/null || true");
     system("rm -f /etc/dcm.properties");
 }
+
+// =============================================================================
+// GetFirmwareDownloadPercent with M/G unit in curl progress file
+// Covers SystemServicesHelper.cpp L324 (removeExtraWhitespaces)
+//         L328 (split), L329 (stringList[2] check), L331 (downloadprogress assign)
+//         L341 (strtol), L342 (LOGINFO FirmwareDownloadPercent)
+// The M or G character in the progress line is required to enter the branch
+// =============================================================================
+TEST_F(SystemServicesTest, GetFirmwareDownloadPercent_WithMegabyteProgress_CoversBranch)
+{
+    // Create /opt/curl_progress with curl-style M (megabyte) progress line.
+    // Format: "100 512M 50 256M  0  0 100M  0"
+    // 'M' is found → enters branch at L321 → covers L324-342.
+    // Third space-separated token ("50") is the download percent.
+    {
+        std::ofstream f("/opt/curl_progress");
+        f << "100 512M 50 256M  0  0 100M  0\n";
+    }
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection,
+              _T("getFirmwareDownloadPercent"), _T("{}"), response));
+
+    TEST_LOG("GetFirmwareDownloadPercent_WithMegabyteProgress - Response: %s", response.c_str());
+    std::remove("/opt/curl_progress");
+}
+
+// =============================================================================
+// GetBlocklistFlag with invalid (non-boolean) value in devicestate.txt
+// Covers SystemServicesImplementation.cpp read_parameters L954 (LOGERR invalid)
+//         L955 (file.close), L956 (return false)
+// =============================================================================
+TEST_F(SystemServicesTest, GetBlocklistFlag_InvalidValueInFile_CoversReadParamsError)
+{
+    system("mkdir -p /opt/secure/persistent/opflashstore");
+    // Write an invalid (non true/false) value for "blocklist"
+    {
+        std::ofstream f("/opt/secure/persistent/opflashstore/devicestate.txt");
+        f << "blocklist=INVALID_VALUE\n";
+    }
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection,
+              _T("getBlocklistFlag"), _T("{}"), response));
+
+    TEST_LOG("GetBlocklistFlag_InvalidValueInFile - Response: %s", response.c_str());
+    std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
+}
