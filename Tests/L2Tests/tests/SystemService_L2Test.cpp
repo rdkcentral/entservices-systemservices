@@ -547,10 +547,9 @@ uint32_t SystemService_L2Test::CreateSystemServicesInterfaceObject()
         m_SystemServicesPlugin = nullptr;
     }
 
-    if (m_controller_SystemServices != nullptr) {
-        TEST_LOG("Releasing existing m_controller_SystemServices before recreating");
-        m_controller_SystemServices->Release();
-        m_controller_SystemServices = nullptr;
+	if (m_SystemServicesPlugin != nullptr) {
+        TEST_LOG("Clearing existing m_SystemServicesPlugin before recreating (no Release)");
+        m_SystemServicesPlugin = nullptr;
     }
 	
     TEST_LOG("Creating SystemServices_Engine");
