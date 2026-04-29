@@ -1327,6 +1327,7 @@ TEST_F(SystemServicesTest, SetBlocklist_ParamFalse)
     
     removeFile("/opt/secure/persistent/opflashstore/devicestate.txt");
 }
+#endif
 
 TEST_F(SystemServicesTest, SetBootLoaderSplashScreen_Success)
 {
