@@ -558,38 +558,20 @@ SystemService_L2Test::~SystemService_L2Test()
             TEST_LOG("Unknown exception releasing SystemServices_Engine");
         }
 
-        // Deactivate in reverse order of activation
-        // First deactivate SystemServices
-        try {
-            status = DeactivateService("org.rdk.System");
-            if (status == Core::ERROR_NONE) {
-                try { TEST_LOG("Successfully deactivated org.rdk.System"); } catch (...) {}
-            } else {
-                try { TEST_LOG("Warning: DeactivateService org.rdk.System returned status: %u", status); } catch (...) {}
-            }
-        } catch (const std::exception& e) {
-            try { TEST_LOG("Exception during org.rdk.System deactivation: %s", e.what()); } catch (...) {}
-        } catch (...) {
-            try { TEST_LOG("Unknown exception during org.rdk.System deactivation"); } catch (...) {}
+        // Deactivate services (in reverse order of activation)
+        status = DeactivateService("org.rdk.System");
+        if (status != Core::ERROR_NONE) {
+            TEST_LOG("SystemServices service deactivation failed with error: %d", status);
+        } else {
+            TEST_LOG("SystemServices service deactivated successfully");
         }
 
-        // Then deactivate PowerManager
-        try {
-            status = DeactivateService("org.rdk.PowerManager");
-            if (status == Core::ERROR_NONE) {
-                try { TEST_LOG("Successfully deactivated org.rdk.PowerManager"); } catch (...) {}
-            } else {
-                try { TEST_LOG("Warning: DeactivateService org.rdk.PowerManager returned status: %u", status); } catch (...) {}
-            }
-        } catch (const std::exception& e) {
-            try { TEST_LOG("Exception during org.rdk.PowerManager deactivation: %s", e.what()); } catch (...) {}
-        } catch (...) {
-            try { TEST_LOG("Unknown exception during org.rdk.PowerManager deactivation"); } catch (...) {}
+        status = DeactivateService("org.rdk.PowerManager");
+        if (status != Core::ERROR_NONE) {
+            TEST_LOG("PowerManager service deactivation failed with error: %d", status);
+        } else {
+            TEST_LOG("PowerManager service deactivated successfully");
         }
-
-        try { TEST_LOG("Cleanup completed"); } catch (...) {}
-    } catch (...) {
-        // Catch all exceptions in destructor to prevent std::terminate
     }
 }
 
