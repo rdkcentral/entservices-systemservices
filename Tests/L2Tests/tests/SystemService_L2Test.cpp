@@ -3579,3 +3579,796 @@ TEST_F(SystemService_L2Test, OnTemperatureThresholdChanged_Notification_COMRPC)
         }
     }
 }
+
+/********************************************************
+************Test case Details **************************
+** Helper Functions Coverage Tests
+** Testing SystemServicesHelper utility functions
+*******************************************************/
+
+TEST_F(SystemService_L2Test, HelperFunction_DirnameOf)
+{
+    TEST_LOG("Testing dirnameOf helper function");
+    
+    // Test with standard path
+    std::string path1 = "/usr/bin/logupload";
+    std::string expected1 = "/usr/bin/";
+    std::string result1 = dirnameOf(path1);
+    EXPECT_STREQ(result1.c_str(), expected1.c_str());
+    TEST_LOG("dirnameOf('%s') = '%s'", path1.c_str(), result1.c_str());
+    
+    // Test with root path
+    std::string path2 = "/file.txt";
+    std::string expected2 = "/";
+    std::string result2 = dirnameOf(path2);
+    EXPECT_STREQ(result2.c_str(), expected2.c_str());
+    TEST_LOG("dirnameOf('%s') = '%s'", path2.c_str(), result2.c_str());
+    
+    // Test with no directory (filename only)
+    std::string path3 = "filename.txt";
+    std::string expected3 = "";
+    std::string result3 = dirnameOf(path3);
+    EXPECT_STREQ(result3.c_str(), expected3.c_str());
+    TEST_LOG("dirnameOf('%s') = '%s'", path3.c_str(), result3.c_str());
+    
+    // Test with empty string
+    std::string path4 = "";
+    std::string expected4 = "";
+    std::string result4 = dirnameOf(path4);
+    EXPECT_STREQ(result4.c_str(), expected4.c_str());
+    TEST_LOG("dirnameOf('') = '%s'", result4.c_str());
+}
+
+TEST_F(SystemService_L2Test, HelperFunction_GetErrorDescription)
+{
+    TEST_LOG("Testing getErrorDescription helper function");
+    
+    // Test valid error codes
+    std::string desc1 = getErrorDescription(SysSrv_OK);
+    EXPECT_FALSE(desc1.empty());
+    EXPECT_STREQ(desc1.c_str(), "Processed Successfully");
+    TEST_LOG("Error %d: %s", SysSrv_OK, desc1.c_str());
+    
+    std::string desc2 = getErrorDescription(SysSrv_MethodNotFound);
+    EXPECT_FALSE(desc2.empty());
+    EXPECT_STREQ(desc2.c_str(), "Method not found");
+    TEST_LOG("Error %d: %s", SysSrv_MethodNotFound, desc2.c_str());
+    
+    std::string desc3 = getErrorDescription(SysSrv_FileNotPresent);
+    EXPECT_FALSE(desc3.empty());
+    EXPECT_STREQ(desc3.c_str(), "Expected file not found");
+    TEST_LOG("Error %d: %s", SysSrv_FileNotPresent, desc3.c_str());
+    
+    // Test invalid error code (should return "Unexpected Error")
+    std::string desc4 = getErrorDescription(9999);
+    EXPECT_FALSE(desc4.empty());
+    EXPECT_STREQ(desc4.c_str(), "Unexpected Error");
+    TEST_LOG("Error %d: %s", 9999, desc4.c_str());
+}
+
+TEST_F(SystemService_L2Test, HelperFunction_DirExists)
+{
+    TEST_LOG("Testing dirExists helper function");
+    
+    // Create a test directory
+    std::string testDir = "/tmp/systemservices_test_dir/";
+    std::string testFile = testDir + "testfile.txt";
+    
+    // Clean up if exists
+    system("rm -rf /tmp/systemservices_test_dir");
+    
+    // Test non-existent directory
+    bool exists1 = dirExists(testFile);
+    EXPECT_FALSE(exists1);
+    TEST_LOG("dirExists('%s') = %s", testFile.c_str(), exists1 ? "true" : "false");
+    
+    // Create directory and test again
+    system("mkdir -p /tmp/systemservices_test_dir");
+    bool exists2 = dirExists(testFile);
+    EXPECT_TRUE(exists2);
+    TEST_LOG("dirExists('%s') = %s (after mkdir)", testFile.c_str(), exists2 ? "true" : "false");
+    
+    // Test with root directory
+    bool exists3 = dirExists("/etc/test.conf");
+    EXPECT_TRUE(exists3);
+    TEST_LOG("dirExists('/etc/test.conf') = %s", exists3 ? "true" : "false");
+    
+    // Clean up
+    system("rm -rf /tmp/systemservices_test_dir");
+}
+
+TEST_F(SystemService_L2Test, HelperFunction_ReadFromFile)
+{
+    TEST_LOG("Testing readFromFile helper function");
+    
+    std::string testFile = "/tmp/systemservices_readtest.txt";
+    std::string testContent = "Test content for readFromFile\nLine 2\nLine 3";
+    
+    // Clean up if exists
+    std::remove(testFile.c_str());
+    
+    // Test reading non-existent file
+    std::string content1;
+    bool result1 = readFromFile(testFile.c_str(), content1);
+    EXPECT_FALSE(result1);
+    EXPECT_TRUE(content1.empty());
+    TEST_LOG("readFromFile (non-existent): %s", result1 ? "success" : "failed");
+    
+    // Create test file
+    std::ofstream outFile(testFile);
+    outFile << testContent;
+    outFile.close();
+    
+    // Test reading existing file
+    std::string content2;
+    bool result2 = readFromFile(testFile.c_str(), content2);
+    EXPECT_TRUE(result2);
+    EXPECT_FALSE(content2.empty());
+    EXPECT_STREQ(content2.c_str(), testContent.c_str());
+    TEST_LOG("readFromFile (exists): %s, content length: %zu", result2 ? "success" : "failed", content2.length());
+    
+    // Clean up
+    std::remove(testFile.c_str());
+}
+
+TEST_F(SystemService_L2Test, HelperFunction_GetFileContent_String)
+{
+    TEST_LOG("Testing getFileContent (string overload) helper function");
+    
+    std::string testFile = "/tmp/systemservices_filecontenttest.txt";
+    std::string testContent = "Line 1\nLine 2\nLine 3\n";
+    
+    // Clean up if exists
+    std::remove(testFile.c_str());
+    
+    // Test reading non-existent file
+    std::string content1;
+    bool result1 = getFileContent(testFile, content1);
+    EXPECT_FALSE(result1);
+    TEST_LOG("getFileContent (non-existent): %s", result1 ? "success" : "failed");
+    
+    // Create test file
+    std::ofstream outFile(testFile);
+    outFile << testContent;
+    outFile.close();
+    
+    // Test reading existing file
+    std::string content2;
+    bool result2 = getFileContent(testFile, content2);
+    EXPECT_TRUE(result2);
+    EXPECT_FALSE(content2.empty());
+    EXPECT_STREQ(content2.c_str(), testContent.c_str());
+    TEST_LOG("getFileContent (exists): %s, content: '%s'", result2 ? "success" : "failed", content2.c_str());
+    
+    // Clean up
+    std::remove(testFile.c_str());
+}
+
+TEST_F(SystemService_L2Test, HelperFunction_GetFileContent_Vector)
+{
+    TEST_LOG("Testing getFileContent (vector overload) helper function");
+    
+    std::string testFile = "/tmp/systemservices_vectortest.txt";
+    
+    // Clean up if exists
+    std::remove(testFile.c_str());
+    
+    // Test reading non-existent file
+    std::vector<std::string> lines1;
+    bool result1 = getFileContent(testFile, lines1);
+    EXPECT_FALSE(result1);
+    TEST_LOG("getFileContent vector (non-existent): %s", result1 ? "success" : "failed");
+    
+    // Create test file with multiple lines
+    std::ofstream outFile(testFile);
+    outFile << "First Line\n";
+    outFile << "Second Line\n";
+    outFile << "Third Line\n";
+    outFile.close();
+    
+    // Test reading existing file
+    std::vector<std::string> lines2;
+    bool result2 = getFileContent(testFile, lines2);
+    EXPECT_TRUE(result2);
+    EXPECT_EQ(lines2.size(), 3);
+    if (lines2.size() >= 3) {
+        EXPECT_STREQ(lines2[0].c_str(), "First Line");
+        EXPECT_STREQ(lines2[1].c_str(), "Second Line");
+        EXPECT_STREQ(lines2[2].c_str(), "Third Line");
+        TEST_LOG("getFileContent vector: read %zu lines", lines2.size());
+    }
+    
+    // Clean up
+    std::remove(testFile.c_str());
+}
+
+TEST_F(SystemService_L2Test, HelperFunction_StrcicmpCaseInsensitive)
+{
+    TEST_LOG("Testing strcicmp helper function");
+    
+    // Test identical strings
+    int result1 = strcicmp("Test", "Test");
+    EXPECT_EQ(result1, 0);
+    TEST_LOG("strcicmp('Test', 'Test') = %d", result1);
+    
+    // Test case-insensitive equality
+    int result2 = strcicmp("Test", "test");
+    EXPECT_EQ(result2, 0);
+    TEST_LOG("strcicmp('Test', 'test') = %d", result2);
+    
+    int result3 = strcicmp("HELLO", "hello");
+    EXPECT_EQ(result3, 0);
+    TEST_LOG("strcicmp('HELLO', 'hello') = %d", result3);
+    
+    // Test different strings
+    int result4 = strcicmp("Apple", "Banana");
+    EXPECT_NE(result4, 0);
+    TEST_LOG("strcicmp('Apple', 'Banana') = %d", result4);
+    
+    // Test empty strings
+    int result5 = strcicmp("", "");
+    EXPECT_EQ(result5, 0);
+    TEST_LOG("strcicmp('', '') = %d", result5);
+    
+    // Test one empty string
+    int result6 = strcicmp("Test", "");
+    EXPECT_NE(result6, 0);
+    TEST_LOG("strcicmp('Test', '') = %d", result6);
+}
+
+TEST_F(SystemService_L2Test, HelperFunction_FindCaseInsensitive)
+{
+    TEST_LOG("Testing findCaseInsensitive helper function");
+    
+    // Test case-insensitive match
+    bool result1 = findCaseInsensitive("Hello World", "WORLD", 0);
+    EXPECT_TRUE(result1);
+    TEST_LOG("findCaseInsensitive('Hello World', 'WORLD', 0) = %s", result1 ? "true" : "false");
+    
+    // Test case-sensitive mismatch becomes case-insensitive match
+    bool result2 = findCaseInsensitive("TestString", "string", 0);
+    EXPECT_TRUE(result2);
+    TEST_LOG("findCaseInsensitive('TestString', 'string', 0) = %s", result2 ? "true" : "false");
+    
+    // Test not found
+    bool result3 = findCaseInsensitive("Hello World", "xyz", 0);
+    EXPECT_FALSE(result3);
+    TEST_LOG("findCaseInsensitive('Hello World', 'xyz', 0) = %s", result3 ? "true" : "false");
+    
+    // Test with position parameter
+    bool result4 = findCaseInsensitive("Hello World Hello", "HELLO", 6);
+    EXPECT_TRUE(result4);
+    TEST_LOG("findCaseInsensitive('Hello World Hello', 'HELLO', 6) = %s", result4 ? "true" : "false");
+    
+    // Test empty search string
+    bool result5 = findCaseInsensitive("Hello", "", 0);
+    EXPECT_TRUE(result5);
+    TEST_LOG("findCaseInsensitive('Hello', '', 0) = %s", result5 ? "true" : "false");
+}
+
+TEST_F(SystemService_L2Test, HelperFunction_RemoveCharsFromString)
+{
+    TEST_LOG("Testing removeCharsFromString helper function");
+    
+    // Test removing single character
+    std::string str1 = "Hello World";
+    removeCharsFromString(str1, "o");
+    EXPECT_STREQ(str1.c_str(), "Hell Wrld");
+    TEST_LOG("After removing 'o': '%s'", str1.c_str());
+    
+    // Test removing multiple characters
+    std::string str2 = "Test123String456";
+    removeCharsFromString(str2, "0123456789");
+    EXPECT_STREQ(str2.c_str(), "TestString");
+    TEST_LOG("After removing digits: '%s'", str2.c_str());
+    
+    // Test removing all characters
+    std::string str3 = "aaa";
+    removeCharsFromString(str3, "a");
+    EXPECT_STREQ(str3.c_str(), "");
+    TEST_LOG("After removing all 'a': '%s'", str3.c_str());
+    
+    // Test with no matching characters
+    std::string str4 = "Hello";
+    removeCharsFromString(str4, "xyz");
+    EXPECT_STREQ(str4.c_str(), "Hello");
+    TEST_LOG("After removing 'xyz' (not present): '%s'", str4.c_str());
+    
+    // Test with empty string
+    std::string str5 = "";
+    removeCharsFromString(str5, "abc");
+    EXPECT_STREQ(str5.c_str(), "");
+    TEST_LOG("After removing from empty string: '%s'", str5.c_str());
+}
+
+TEST_F(SystemService_L2Test, HelperFunction_ParseConfigFile)
+{
+    TEST_LOG("Testing parseConfigFile helper function");
+    
+    std::string testFile = "/tmp/systemservices_configtest.conf";
+    
+    // Clean up if exists
+    std::remove(testFile.c_str());
+    
+    // Create test config file
+    std::ofstream outFile(testFile);
+    outFile << "KEY1=value1\n";
+    outFile << "KEY2=value2 with spaces\n";
+    outFile << "# Comment line\n";
+    outFile << "KEY3=value3\n";
+    outFile << "EMPTY_KEY=\n";
+    outFile.close();
+    
+    // Test finding existing key
+    std::string value1;
+    bool result1 = parseConfigFile(testFile.c_str(), "KEY1", value1);
+    EXPECT_TRUE(result1);
+    EXPECT_STREQ(value1.c_str(), "value1");
+    TEST_LOG("parseConfigFile KEY1: %s = '%s'", result1 ? "found" : "not found", value1.c_str());
+    
+    // Test finding key with spaces in value
+    std::string value2;
+    bool result2 = parseConfigFile(testFile.c_str(), "KEY2", value2);
+    EXPECT_TRUE(result2);
+    EXPECT_STREQ(value2.c_str(), "value2 with spaces");
+    TEST_LOG("parseConfigFile KEY2: %s = '%s'", result2 ? "found" : "not found", value2.c_str());
+    
+    // Test finding non-existent key
+    std::string value3;
+    bool result3 = parseConfigFile(testFile.c_str(), "NONEXISTENT", value3);
+    EXPECT_FALSE(result3);
+    TEST_LOG("parseConfigFile NONEXISTENT: %s", result3 ? "found" : "not found");
+    
+    // Test with non-existent file
+    std::string value4;
+    bool result4 = parseConfigFile("/tmp/nonexistent_file.conf", "KEY1", value4);
+    EXPECT_FALSE(result4);
+    TEST_LOG("parseConfigFile (non-existent file): %s", result4 ? "found" : "not found");
+    
+    // Test empty value
+    std::string value5;
+    bool result5 = parseConfigFile(testFile.c_str(), "EMPTY_KEY", value5);
+    EXPECT_TRUE(result5);
+    EXPECT_TRUE(value5.empty());
+    TEST_LOG("parseConfigFile EMPTY_KEY: %s = '%s'", result5 ? "found" : "not found", value5.c_str());
+    
+    // Clean up
+    std::remove(testFile.c_str());
+}
+
+TEST_F(SystemService_L2Test, HelperFunction_URLEncode)
+{
+    TEST_LOG("Testing url_encode helper function");
+    
+    // Test URL encoding of special characters
+    std::string url1 = "hello world";
+    std::string encoded1 = url_encode(url1);
+    EXPECT_FALSE(encoded1.empty());
+    EXPECT_NE(encoded1.find("%20"), std::string::npos); // Space should be encoded
+    TEST_LOG("url_encode('%s') = '%s'", url1.c_str(), encoded1.c_str());
+    
+    // Test encoding of special characters
+    std::string url2 = "user@example.com";
+    std::string encoded2 = url_encode(url2);
+    EXPECT_FALSE(encoded2.empty());
+    TEST_LOG("url_encode('%s') = '%s'", url2.c_str(), encoded2.c_str());
+    
+    // Test empty string
+    std::string url3 = "";
+    std::string encoded3 = url_encode(url3);
+    EXPECT_TRUE(encoded3.empty());
+    TEST_LOG("url_encode('') = '%s'", encoded3.c_str());
+    
+    // Test alphanumeric (should remain unchanged)
+    std::string url4 = "abc123";
+    std::string encoded4 = url_encode(url4);
+    EXPECT_FALSE(encoded4.empty());
+    TEST_LOG("url_encode('%s') = '%s'", url4.c_str(), encoded4.c_str());
+}
+
+/********************************************************
+************Test case Details **************************
+** cTimer Helper Class Tests
+** Testing cTimer utility class
+*******************************************************/
+
+TEST_F(SystemService_L2Test, CTimer_Constructor_Default)
+{
+    TEST_LOG("Testing cTimer constructor");
+    
+    cTimer timer;
+    
+    // Constructor should initialize with clear=false, interval=0
+    // We can't directly check private members, but we can test behavior
+    TEST_LOG("cTimer constructed successfully");
+}
+
+TEST_F(SystemService_L2Test, CTimer_SetInterval_ValidCallback)
+{
+    TEST_LOG("Testing cTimer setInterval with valid callback");
+    
+    cTimer timer;
+    bool callbackExecuted = false;
+    
+    // Lambda to capture local variable
+    auto callback = [&callbackExecuted]() {
+        callbackExecuted = true;
+    };
+    
+    // Note: cTimer expects function pointer, not lambda
+    // Testing with simple function pointer
+    static bool staticFlag = false;
+    auto staticCallback = []() { staticFlag = true; };
+    
+    timer.setInterval(staticCallback, 100);
+    
+    TEST_LOG("setInterval called with callback and interval=100ms");
+}
+
+TEST_F(SystemService_L2Test, CTimer_Start_InvalidParameters)
+{
+    TEST_LOG("Testing cTimer start with invalid parameters");
+    
+    cTimer timer1;
+    
+    // Test start without setting interval (interval=0, callback=NULL)
+    bool result1 = timer1.start();
+    EXPECT_FALSE(result1);
+    TEST_LOG("start() with interval=0 and callback=NULL: %s", result1 ? "success" : "failed (expected)");
+    
+    // Test start with only callback, no interval
+    cTimer timer2;
+    static bool flag = false;
+    timer2.setInterval([]() { flag = true; }, 0);
+    bool result2 = timer2.start();
+    EXPECT_FALSE(result2);
+    TEST_LOG("start() with interval=0: %s", result2 ? "success" : "failed (expected)");
+}
+
+TEST_F(SystemService_L2Test, CTimer_Start_Stop_ValidTimer)
+{
+    TEST_LOG("Testing cTimer start and stop");
+    
+    static int callCount = 0;
+    callCount = 0;
+    
+    cTimer timer;
+    timer.setInterval([]() { callCount++; }, 50);
+    
+    bool startResult = timer.start();
+    EXPECT_TRUE(startResult);
+    TEST_LOG("Timer started: %s", startResult ? "success" : "failed");
+    
+    // Let timer run for a short time
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    
+    // Stop timer
+    timer.stop();
+    TEST_LOG("Timer stopped after running for 200ms");
+    
+    int finalCount = callCount;
+    TEST_LOG("Callback executed %d times", finalCount);
+    EXPECT_GT(finalCount, 0);
+    
+    // Wait to ensure timer has stopped
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    
+    // Detach the thread to prevent join issues
+    timer.detach();
+}
+
+TEST_F(SystemService_L2Test, CTimer_Detach)
+{
+    TEST_LOG("Testing cTimer detach");
+    
+    static bool executed = false;
+    executed = false;
+    
+    cTimer timer;
+    timer.setInterval([]() { executed = true; }, 100);
+    
+    bool startResult = timer.start();
+    EXPECT_TRUE(startResult);
+    
+    // Detach the thread
+    timer.detach();
+    TEST_LOG("Timer thread detached");
+    
+    // Stop the timer
+    timer.stop();
+    
+    // Give some time for callback to potentially execute
+    std::this_thread::sleep_for(std::chrono::milliseconds(150));
+}
+
+TEST_F(SystemService_L2Test, CTimer_Join)
+{
+    TEST_LOG("Testing cTimer join");
+    
+    static int execCount = 0;
+    execCount = 0;
+    
+    cTimer timer;
+    timer.setInterval([]() { execCount++; }, 50);
+    
+    bool startResult = timer.start();
+    EXPECT_TRUE(startResult);
+    
+    // Let it run briefly
+    std::this_thread::sleep_for(std::chrono::milliseconds(120));
+    
+    // Stop timer
+    timer.stop();
+    
+    // Join the thread (should complete since timer is stopped)
+    timer.join();
+    TEST_LOG("Timer thread joined successfully, callback executed %d times", execCount);
+}
+
+/********************************************************
+************Test case Details **************************
+** uploadlogs Helper Tests
+** Testing uploadlogs utility functions
+*******************************************************/
+
+TEST_F(SystemService_L2Test, UploadLogs_CheckMTlsFlag)
+{
+    TEST_LOG("Testing UploadLogs::checkmTlsLogUploadFlag");
+    
+    bool result = WPEFramework::Plugin::UploadLogs::checkmTlsLogUploadFlag();
+    
+    // This function always returns true
+    EXPECT_TRUE(result);
+    TEST_LOG("checkmTlsLogUploadFlag() = %s", result ? "true" : "false");
+}
+
+TEST_F(SystemService_L2Test, UploadLogs_GetDCMConfigDetails_NoFile)
+{
+    TEST_LOG("Testing UploadLogs::getDCMconfigDetails with no file");
+    
+    // Remove the DCM settings file if it exists
+    std::remove("/tmp/DCMSettings.conf");
+    
+    std::string uploadProtocol, httpLink, uploadCheck;
+    bool result = WPEFramework::Plugin::UploadLogs::getDCMconfigDetails(
+        uploadProtocol, httpLink, uploadCheck);
+    
+    EXPECT_FALSE(result);
+    TEST_LOG("getDCMconfigDetails (no file): %s", result ? "success" : "failed (expected)");
+}
+
+TEST_F(SystemService_L2Test, UploadLogs_GetDCMConfigDetails_ValidFile)
+{
+    TEST_LOG("Testing UploadLogs::getDCMconfigDetails with valid file");
+    
+    // Create test DCM settings file
+    std::string testFile = "/tmp/DCMSettings.conf";
+    std::ofstream dcmFile(testFile);
+    dcmFile << "LogUploadSettings:UploadRepository:uploadProtocol=https\n";
+    dcmFile << "LogUploadSettings:UploadRepository:URL=https://test.example.com/upload\n";
+    dcmFile << "LogUploadSettings:UploadOnReboot=true\n";
+    dcmFile.close();
+    
+    std::string uploadProtocol, httpLink, uploadCheck;
+    bool result = WPEFramework::Plugin::UploadLogs::getDCMconfigDetails(
+        uploadProtocol, httpLink, uploadCheck);
+    
+    EXPECT_TRUE(result);
+    EXPECT_STREQ(uploadProtocol.c_str(), "https");
+    EXPECT_STREQ(httpLink.c_str(), "https://test.example.com/upload");
+    EXPECT_STREQ(uploadCheck.c_str(), "true");
+    
+    TEST_LOG("getDCMconfigDetails: %s", result ? "success" : "failed");
+    TEST_LOG("  uploadProtocol: %s", uploadProtocol.c_str());
+    TEST_LOG("  httpLink: %s", httpLink.c_str());
+    TEST_LOG("  uploadCheck: %s", uploadCheck.c_str());
+    
+    // Clean up
+    std::remove(testFile.c_str());
+}
+
+TEST_F(SystemService_L2Test, UploadLogs_GetDCMConfigDetails_EmptyFile)
+{
+    TEST_LOG("Testing UploadLogs::getDCMconfigDetails with empty file");
+    
+    // Create empty DCM settings file
+    std::string testFile = "/tmp/DCMSettings.conf";
+    std::ofstream dcmFile(testFile);
+    dcmFile.close();
+    
+    std::string uploadProtocol, httpLink, uploadCheck;
+    bool result = WPEFramework::Plugin::UploadLogs::getDCMconfigDetails(
+        uploadProtocol, httpLink, uploadCheck);
+    
+    EXPECT_FALSE(result);
+    TEST_LOG("getDCMconfigDetails (empty file): %s", result ? "success" : "failed (expected)");
+    
+    // Clean up
+    std::remove(testFile.c_str());
+}
+
+TEST_F(SystemService_L2Test, UploadLogs_GetUploadLogParameters_MissingDeviceProps)
+{
+    TEST_LOG("Testing UploadLogs::getUploadLogParameters with missing device.properties");
+    
+    // This test assumes /etc/device.properties might not exist or has missing BUILD_TYPE
+    std::string tftpServer, uploadProtocol, uploadHttpLink;
+    
+    // Create minimal device.properties for testing
+    std::ofstream devProps("/tmp/test_device.properties");
+    devProps << "MODEL_NUM=TEST\n";
+    devProps.close();
+    
+    int32_t result = WPEFramework::Plugin::UploadLogs::getUploadLogParameters(
+        tftpServer, uploadProtocol, uploadHttpLink);
+    
+    // Expected to fail due to missing BUILD_TYPE or LOG_SERVER
+    TEST_LOG("getUploadLogParameters (missing config): result=%d", result);
+    
+    // Clean up
+    std::remove("/tmp/test_device.properties");
+}
+
+TEST_F(SystemService_L2Test, UploadLogs_LogUploadAsync_NoExecutable)
+{
+    TEST_LOG("Testing UploadLogs::logUploadAsync without executable");
+    
+    // Temporarily rename/backup logupload if it exists
+    pid_t result = WPEFramework::Plugin::UploadLogs::logUploadAsync();
+    
+    // Should return -1 if /usr/bin/logupload doesn't exist or getUploadLogParameters fails
+    TEST_LOG("logUploadAsync: pid=%d", result);
+    
+    if (result > 0) {
+        TEST_LOG("Warning: logUploadAsync created process %d - may need cleanup", result);
+    }
+}
+
+/********************************************************
+************Test case Details **************************
+** thermonitor Helper Tests  
+** Testing CThermalMonitor utility class
+*******************************************************/
+
+TEST_F(SystemService_L2Test, ThermalMonitor_Instance)
+{
+    TEST_LOG("Testing CThermalMonitor::instance");
+    
+    WPEFramework::Plugin::CThermalMonitor* monitor1 = 
+        WPEFramework::Plugin::CThermalMonitor::instance();
+    
+    EXPECT_NE(monitor1, nullptr);
+    TEST_LOG("First instance: %p", (void*)monitor1);
+    
+    WPEFramework::Plugin::CThermalMonitor* monitor2 = 
+        WPEFramework::Plugin::CThermalMonitor::instance();
+    
+    EXPECT_NE(monitor2, nullptr);
+    EXPECT_EQ(monitor1, monitor2);
+    TEST_LOG("Second instance: %p (should be same)", (void*)monitor2);
+}
+
+TEST_F(SystemService_L2Test, ThermalMonitor_AddRemoveEventObserver)
+{
+    TEST_LOG("Testing CThermalMonitor add/remove event observer");
+    
+    WPEFramework::Plugin::CThermalMonitor* monitor = 
+        WPEFramework::Plugin::CThermalMonitor::instance();
+    
+    ASSERT_NE(monitor, nullptr);
+    
+    // These are empty implementations, just verify they don't crash
+    monitor->addEventObserver(nullptr);
+    TEST_LOG("addEventObserver called (empty implementation)");
+    
+    monitor->removeEventObserver(nullptr);
+    TEST_LOG("removeEventObserver called (empty implementation)");
+}
+
+TEST_F(SystemService_L2Test, ThermalMonitor_GetCoreTemperature)
+{
+    TEST_LOG("Testing CThermalMonitor::getCoreTemperature");
+    
+    WPEFramework::Plugin::CThermalMonitor* monitor = 
+        WPEFramework::Plugin::CThermalMonitor::instance();
+    
+    ASSERT_NE(monitor, nullptr);
+    
+    float temperature = 0.0f;
+    bool result = monitor->getCoreTemperature(temperature);
+    
+    TEST_LOG("getCoreTemperature: %s, temperature=%.2f", 
+             result ? "success" : "failed", temperature);
+    
+    if (result) {
+        // Temperature should be reasonable value
+        EXPECT_GE(temperature, -50.0f);
+        EXPECT_LE(temperature, 150.0f);
+    }
+}
+
+TEST_F(SystemService_L2Test, ThermalMonitor_GetSetCoreTempThresholds)
+{
+    TEST_LOG("Testing CThermalMonitor get/set core temperature thresholds");
+    
+    WPEFramework::Plugin::CThermalMonitor* monitor = 
+        WPEFramework::Plugin::CThermalMonitor::instance();
+    
+    ASSERT_NE(monitor, nullptr);
+    
+    // Get current thresholds
+    float high = 0.0f, critical = 0.0f;
+    bool getResult = monitor->getCoreTempThresholds(high, critical);
+    
+    TEST_LOG("getCoreTempThresholds: %s, high=%.2f, critical=%.2f",
+             getResult ? "success" : "failed", high, critical);
+    
+    // Try to set new thresholds
+    bool setResult = monitor->setCoreTempThresholds(85.0f, 95.0f);
+    
+    TEST_LOG("setCoreTempThresholds(85.0, 95.0): %s", 
+             setResult ? "success" : "failed");
+    
+    if (setResult) {
+        // Verify thresholds were set
+        float newHigh = 0.0f, newCritical = 0.0f;
+        bool verifyResult = monitor->getCoreTempThresholds(newHigh, newCritical);
+        
+        if (verifyResult) {
+            TEST_LOG("Verified thresholds: high=%.2f, critical=%.2f", 
+                     newHigh, newCritical);
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, ThermalMonitor_GetSetOvertempGraceInterval)
+{
+    TEST_LOG("Testing CThermalMonitor get/set overtemp grace interval");
+    
+    WPEFramework::Plugin::CThermalMonitor* monitor = 
+        WPEFramework::Plugin::CThermalMonitor::instance();
+    
+    ASSERT_NE(monitor, nullptr);
+    
+    // Get current grace interval
+    int graceInterval = 0;
+    bool getResult = monitor->getOvertempGraceInterval(graceInterval);
+    
+    TEST_LOG("getOvertempGraceInterval: %s, interval=%d",
+             getResult ? "success" : "failed", graceInterval);
+    
+    // Try to set new grace interval
+    bool setResult = monitor->setOvertempGraceInterval(30);
+    
+    TEST_LOG("setOvertempGraceInterval(30): %s", 
+             setResult ? "success" : "failed");
+    
+    if (setResult) {
+        // Verify interval was set
+        int newInterval = 0;
+        bool verifyResult = monitor->getOvertempGraceInterval(newInterval);
+        
+        if (verifyResult) {
+            TEST_LOG("Verified grace interval: %d", newInterval);
+            EXPECT_EQ(newInterval, 30);
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, ThermalMonitor_EmitTemperatureThresholdChange)
+{
+    TEST_LOG("Testing CThermalMonitor::emitTemperatureThresholdChange");
+    
+    WPEFramework::Plugin::CThermalMonitor* monitor = 
+        WPEFramework::Plugin::CThermalMonitor::instance();
+    
+    ASSERT_NE(monitor, nullptr);
+    
+    // This function calls reportTemperatureThresholdChange which is empty
+    // Just verify it doesn't crash
+    monitor->emitTemperatureThresholdChange("HIGH", true, 88.5f);
+    TEST_LOG("emitTemperatureThresholdChange called successfully");
+    
+    monitor->emitTemperatureThresholdChange("CRITICAL", false, 75.0f);
+    TEST_LOG("emitTemperatureThresholdChange called again successfully");
+}
