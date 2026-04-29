@@ -3240,3 +3240,414 @@ TEST_F(SystemService_L2Test, SetPowerState_JSONRPC_Negative)
         TEST_LOG("SetPowerState call: %s", result["success"].Boolean() ? "success" : "failed");
     }
 }
+
+//Notifications 
+TEST_F(SystemService_L2Test, OnFriendlyNameChanged_Notification_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+
+                TEST_LOG("Testing OnFriendlyNameChanged notification via COM-RPC");
+
+                // Register for notifications
+                uint32_t result = m_SystemServicesPlugin->Register(&m_notificationHandler);
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "Register returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                } else {
+                    TEST_LOG("Successfully registered for notifications");
+                }
+
+                // Reset event flag before triggering the event
+                m_notificationHandler.ResetEvent();
+
+                // Trigger friendly name change via SetFriendlyName
+                Exchange::ISystemServices::SystemResult setResult;
+                result = m_SystemServicesPlugin->SetFriendlyName("TestDeviceName", setResult);
+                EXPECT_EQ(result, Core::ERROR_NONE);
+
+                if (result == Core::ERROR_NONE) {
+                    // Wait for the notification
+                    uint32_t eventStatus = m_notificationHandler.WaitForEvent(EVNT_TIMEOUT, SYSTEMSERVICEL2TEST_FRIENDLY_NAME_CHANGED);
+
+                    EXPECT_NE(eventStatus, SYSTEMSERVICEL2TEST_STATE_INVALID);
+                    if (eventStatus != SYSTEMSERVICEL2TEST_STATE_INVALID) {
+                        TEST_LOG("OnFriendlyNameChanged notification received successfully");
+
+                        // Validate received data
+                        string receivedName = m_notificationHandler.GetLastFriendlyName();
+                        TEST_LOG("Received FriendlyName: %s", receivedName.c_str());
+                        EXPECT_STREQ(receivedName.c_str(), "TestDeviceName");
+                    } else {
+                        TEST_LOG("Timeout waiting for OnFriendlyNameChanged notification");
+                    }
+                }
+
+                // Unregister from notifications
+                result = m_SystemServicesPlugin->Unregister(&m_notificationHandler);
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result == Core::ERROR_NONE) {
+                    TEST_LOG("Successfully unregistered from notifications");
+                }
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, OnNetworkStandbyModeChanged_Notification_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+
+                TEST_LOG("Testing OnNetworkStandbyModeChanged notification via COM-RPC");
+
+                // Register for notifications
+                uint32_t result = m_SystemServicesPlugin->Register(&m_notificationHandler);
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "Register returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                } else {
+                    TEST_LOG("Successfully registered for notifications");
+                }
+
+                // Reset event flag before triggering the event
+                m_notificationHandler.ResetEvent();
+
+                // Trigger network standby mode change via SetNetworkStandbyMode
+                Exchange::ISystemServices::SystemResult setResult;
+                result = m_SystemServicesPlugin->SetNetworkStandbyMode(true, setResult);
+                EXPECT_EQ(result, Core::ERROR_NONE);
+
+                if (result == Core::ERROR_NONE) {
+                    // Wait for the notification
+                    uint32_t eventStatus = m_notificationHandler.WaitForEvent(EVNT_TIMEOUT, SYSTEMSERVICEL2TEST_NETWORK_STANDBY_CHANGED);
+
+                    EXPECT_NE(eventStatus, SYSTEMSERVICEL2TEST_STATE_INVALID);
+                    if (eventStatus != SYSTEMSERVICEL2TEST_STATE_INVALID) {
+                        TEST_LOG("OnNetworkStandbyModeChanged notification received successfully");
+
+                        // Validate received data
+                        bool receivedStandby = m_notificationHandler.GetLastNwStandby();
+                        TEST_LOG("Received nwStandby: %s", receivedStandby ? "true" : "false");
+                        EXPECT_TRUE(receivedStandby);
+                    } else {
+                        TEST_LOG("Timeout waiting for OnNetworkStandbyModeChanged notification");
+                    }
+                }
+
+                // Unregister from notifications
+                result = m_SystemServicesPlugin->Unregister(&m_notificationHandler);
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result == Core::ERROR_NONE) {
+                    TEST_LOG("Successfully unregistered from notifications");
+                }
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, OnFirmwareUpdateInfoReceived_Notification_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+
+                TEST_LOG("Testing OnFirmwareUpdateInfoReceived notification via COM-RPC");
+
+                // Register for notifications
+                uint32_t result = m_SystemServicesPlugin->Register(&m_notificationHandler);
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "Register returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                } else {
+                    TEST_LOG("Successfully registered for notifications");
+                }
+
+                // Reset event flag before triggering the event
+                m_notificationHandler.ResetEvent();
+
+                // Trigger firmware update info request
+                bool asyncResponse = false;
+                bool success = false;
+                result = m_SystemServicesPlugin->GetFirmwareUpdateInfo("test-guid-123", asyncResponse, success);
+
+                if (result == Core::ERROR_NONE && asyncResponse) {
+                    // Wait for the notification
+                    uint32_t eventStatus = m_notificationHandler.WaitForEvent(EVNT_TIMEOUT, SYSTEMSERVICEL2TEST_FIRMWARE_UPDATE_INFO);
+
+                    EXPECT_NE(eventStatus, SYSTEMSERVICEL2TEST_STATE_INVALID);
+                    if (eventStatus != SYSTEMSERVICEL2TEST_STATE_INVALID) {
+                        TEST_LOG("OnFirmwareUpdateInfoReceived notification received successfully");
+                    } else {
+                        TEST_LOG("Timeout waiting for OnFirmwareUpdateInfoReceived notification");
+                    }
+                } else {
+                    TEST_LOG("GetFirmwareUpdateInfo did not trigger async response");
+                }
+
+                // Unregister from notifications
+                result = m_SystemServicesPlugin->Unregister(&m_notificationHandler);
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result == Core::ERROR_NONE) {
+                    TEST_LOG("Successfully unregistered from notifications");
+                }
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, OnRebootRequest_Notification_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+
+                TEST_LOG("Testing OnRebootRequest notification via COM-RPC");
+
+                // Register for notifications
+                uint32_t result = m_SystemServicesPlugin->Register(&m_notificationHandler);
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "Register returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                } else {
+                    TEST_LOG("Successfully registered for notifications");
+                }
+
+                // Reset event flag before triggering the event
+                m_notificationHandler.ResetEvent();
+
+                // Note: Triggering actual reboot would interrupt the test
+                // This test validates the registration and handler setup
+                // In a real scenario, the notification would come from IARM or system event
+                TEST_LOG("OnRebootRequest notification handler registered and ready");
+
+                // Unregister from notifications
+                result = m_SystemServicesPlugin->Unregister(&m_notificationHandler);
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result == Core::ERROR_NONE) {
+                    TEST_LOG("Successfully unregistered from notifications");
+                }
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, OnTerritoryChanged_Notification_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+
+                TEST_LOG("Testing OnTerritoryChanged notification via COM-RPC");
+
+                // Register for notifications
+                uint32_t result = m_SystemServicesPlugin->Register(&m_notificationHandler);
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "Register returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                } else {
+                    TEST_LOG("Successfully registered for notifications");
+                }
+
+                // Reset event flag before triggering the event
+                m_notificationHandler.ResetEvent();
+
+                // Trigger territory change via SetTerritory
+                Exchange::ISystemServices::SystemError error;
+                bool success = false;
+                result = m_SystemServicesPlugin->SetTerritory("USA", "US", error, success);
+
+                if (result == Core::ERROR_NONE && success) {
+                    // Wait for the notification
+                    uint32_t eventStatus = m_notificationHandler.WaitForEvent(EVNT_TIMEOUT, SYSTEMSERVICEL2TEST_TERRITORY_CHANGED);
+
+                    EXPECT_NE(eventStatus, SYSTEMSERVICEL2TEST_STATE_INVALID);
+                    if (eventStatus != SYSTEMSERVICEL2TEST_STATE_INVALID) {
+                        TEST_LOG("OnTerritoryChanged notification received successfully");
+                    } else {
+                        TEST_LOG("Timeout waiting for OnTerritoryChanged notification");
+                    }
+                } else {
+                    TEST_LOG("SetTerritory did not succeed, notification may not trigger");
+                }
+
+                // Unregister from notifications
+                result = m_SystemServicesPlugin->Unregister(&m_notificationHandler);
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result == Core::ERROR_NONE) {
+                    TEST_LOG("Successfully unregistered from notifications");
+                }
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, OnLogUpload_Notification_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+
+                TEST_LOG("Testing OnLogUpload notification via COM-RPC");
+
+                // Register for notifications
+                uint32_t result = m_SystemServicesPlugin->Register(&m_notificationHandler);
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "Register returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                } else {
+                    TEST_LOG("Successfully registered for notifications");
+                }
+
+                // Reset event flag before triggering the event
+                m_notificationHandler.ResetEvent();
+
+                // Trigger log upload
+                Exchange::ISystemServices::SystemResult uploadResult;
+                result = m_SystemServicesPlugin->UploadLogsAsync(uploadResult);
+
+                if (result == Core::ERROR_NONE) {
+                    // Wait for the notification
+                    uint32_t eventStatus = m_notificationHandler.WaitForEvent(EVNT_TIMEOUT, SYSTEMSERVICEL2TEST_LOGUPLOADSTATE_CHANGED);
+
+                    EXPECT_NE(eventStatus, SYSTEMSERVICEL2TEST_STATE_INVALID);
+                    if (eventStatus != SYSTEMSERVICEL2TEST_STATE_INVALID) {
+                        TEST_LOG("OnLogUpload notification received successfully");
+                    } else {
+                        TEST_LOG("Timeout waiting for OnLogUpload notification");
+                    }
+                } else {
+                    TEST_LOG("UploadLogsAsync failed to trigger");
+                }
+
+                // Unregister from notifications
+                result = m_SystemServicesPlugin->Unregister(&m_notificationHandler);
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result == Core::ERROR_NONE) {
+                    TEST_LOG("Successfully unregistered from notifications");
+                }
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, OnTemperatureThresholdChanged_Notification_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+
+                TEST_LOG("Testing OnTemperatureThresholdChanged notification via COM-RPC");
+
+                // Register for notifications
+                uint32_t result = m_SystemServicesPlugin->Register(&m_notificationHandler);
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "Register returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                } else {
+                    TEST_LOG("Successfully registered for notifications");
+                }
+
+                // Reset event flag before triggering the event
+                m_notificationHandler.ResetEvent();
+
+                // Note: This notification is typically triggered by hardware/thermal events
+                // Test validates the registration and handler setup
+                TEST_LOG("OnTemperatureThresholdChanged notification handler registered and ready");
+
+                // Unregister from notifications
+                result = m_SystemServicesPlugin->Unregister(&m_notificationHandler);
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result == Core::ERROR_NONE) {
+                    TEST_LOG("Successfully unregistered from notifications");
+                }
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
