@@ -3776,9 +3776,11 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_FileReadError)
     
     TEST_LOG("GetDownloadedFirmwareInfo no file test - Response: %s", response.c_str());
 }
-#if 0
 TEST_F(SystemServicesTest, SetPowerState_DEEP_SLEEP_Success)
 {
+    // Covers lines 1518-1531: DEEP_SLEEP branch calls getPreferredSleepMode,
+    // convert("DEEP_SLEEP", sleepMode) is true → setPowerStateConversion(sleepMode),
+    // then writes STANDBY_REASON_FILE.
     device::SleepMode mode;
     string sleepModeString(_T("DEEP_SLEEP"));
 
@@ -3788,16 +3790,17 @@ TEST_F(SystemServicesTest, SetPowerState_DEEP_SLEEP_Success)
         .WillByDefault(::testing::ReturnRef(sleepModeString));
 
     EXPECT_CALL(PowerManagerMock::Mock(), SetPowerState(::testing::_, ::testing::_, ::testing::_))
-        .WillOnce(::testing::Return(Core::ERROR_NONE));
+        .Times(::testing::AnyNumber())
+        .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setPowerState"), _T("{\"powerState\":\"DEEP_SLEEP\"}"), response));
-    
+
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
     EXPECT_TRUE(jsonResponse["success"].Boolean()) << "SetPowerState DEEP_SLEEP should succeed: " << response;
+    TEST_LOG("SetPowerState_DEEP_SLEEP_Success - Response: %s", response.c_str());
 }
-#endif
 TEST_F(SystemServicesTest, SetPowerState_WithStandbyReason)
 {
     EXPECT_CALL(PowerManagerMock::Mock(), SetPowerState(::testing::_, ::testing::_, ::testing::_))
@@ -3811,9 +3814,10 @@ TEST_F(SystemServicesTest, SetPowerState_WithStandbyReason)
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
     EXPECT_TRUE(jsonResponse["success"].Boolean()) << "SetPowerState with reason should succeed: " << response;
 }
-#if 0
 TEST_F(SystemServicesTest, SetPowerState_LIGHT_SLEEP_Success)
 {
+    // Covers lines 1518-1531: LIGHT_SLEEP branch hits getPreferredSleepMode,
+    // convert("DEEP_SLEEP", "LIGHT_SLEEP") is false → setPowerStateConversion(powerState).
     device::SleepMode mode;
     string sleepModeString(_T("LIGHT_SLEEP"));
 
@@ -3823,14 +3827,16 @@ TEST_F(SystemServicesTest, SetPowerState_LIGHT_SLEEP_Success)
         .WillByDefault(::testing::ReturnRef(sleepModeString));
 
     EXPECT_CALL(PowerManagerMock::Mock(), SetPowerState(::testing::_, ::testing::_, ::testing::_))
-        .WillOnce(::testing::Return(Core::ERROR_NONE));
+        .Times(::testing::AnyNumber())
+        .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setPowerState"), _T("{\"powerState\":\"LIGHT_SLEEP\"}"), response));
-    
+
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
     EXPECT_TRUE(jsonResponse["success"].Boolean()) << "SetPowerState LIGHT_SLEEP should succeed: " << response;
+    TEST_LOG("SetPowerState_LIGHT_SLEEP_Success - Response: %s", response.c_str());
 }
 
 TEST_F(SystemServicesTest, GetPowerState_DEEP_SLEEP_Success)
@@ -3868,7 +3874,7 @@ TEST_F(SystemServicesTest, GetPowerState_LIGHT_SLEEP_Success)
     // Implementation returns "STANDBY" for POWER_STATE_STANDBY_LIGHT_SLEEP
     EXPECT_EQ(jsonResponse["powerState"].String(), "STANDBY") << "Power state should be STANDBY: " << response;
 }
-#endif
+
 TEST_F(SystemServicesTest, GetMacAddresses_WithCallback)
 {
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getMacAddresses"), _T("{\"GUID\":\"test-guid-123\"}"), response));
@@ -10371,9 +10377,12 @@ TEST_F(SystemServicesTest, Dispatch_OnMacAddressesRetrieved_ReachesNotification)
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getMacAddresses"),
               _T("{\"GUID\":\"\"}"), response));
 
-    // The event may or may not fire depending on mock script; either outcome
-    // exercises the switch-case. Simply wait briefly.
-    notificationHandler->WaitForRequestStatus(500, SystemServices_onMacAddressesRetreived);
+    // getMacAddressesAsync runs on a background thread: v_secure_popen returns null
+    // (NiceMock default), so params are filled with "00:00:00:00:00:00" and then
+    // pSs->dispatchEvent(ONMACADDRESSRETRIEVED) posts a worker-pool job that calls
+    // Dispatch(SYSTEMSERVICES_EVT_ONMACADDRESSRETRIEVED), covering lines 718-737.
+    EXPECT_TRUE(notificationHandler->WaitForRequestStatus(3000, SystemServices_onMacAddressesRetreived))
+        << "OnMacAddressesRetreived event not received within timeout";
 
     m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
@@ -10613,5 +10622,55 @@ TEST_F(SystemServicesTest, SetWakeupSrc_PresenceDetection_CoversConvBranch)
         _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[{\"presenceDetection\":true,\"cec\":true}]}"),
         response));
     TEST_LOG("SetWakeupSrc_PresenceDetectionCec - Response: %s", response.c_str());
+}
+
+// =============================================================================
+// updateDuration() direct call — covers lines 776-798
+// updateDuration() is static public. When m_remainingDuration==0 it takes the
+// else-branch: stopModeTimer, SetMode("NORMAL") which is safe (NORMAL→NORMAL
+// path: changeMode=false, _instance->SetMode just returns early).
+// =============================================================================
+TEST_F(SystemServicesTest, UpdateDuration_ZeroRemaining_SetsNormalMode)
+{
+    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+
+    // Ensure IARM Bus calls succeed (SetMode may issue IARM calls)
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .Times(::testing::AnyNumber())
+        .WillRepeatedly(::testing::Return(IARM_RESULT_SUCCESS));
+
+    // m_remainingDuration is 0 (default after initialization) → else branch:
+    //   m_operatingModeTimer.stop(); m_operatingModeTimer.detach();
+    //   _instance->SetMode({NORMAL, 0}, ...);
+    // Covers lines 781-792.
+    Plugin::SystemServicesImplementation::updateDuration();
+
+    TEST_LOG("UpdateDuration_ZeroRemaining_SetsNormalMode PASSED");
+}
+
+// =============================================================================
+// SetPowerState DEEP_SLEEP with standbyReason — covers STANDBY_REASON_FILE write path
+// =============================================================================
+TEST_F(SystemServicesTest, SetPowerState_DeepSleep_WithStandbyReason)
+{
+    device::SleepMode mode;
+    string sleepModeString(_T("DEEP_SLEEP"));
+
+    ON_CALL(*p_hostMock, getPreferredSleepMode)
+        .WillByDefault(::testing::Return(mode));
+    ON_CALL(*p_sleepModeMock, toString)
+        .WillByDefault(::testing::ReturnRef(sleepModeString));
+
+    EXPECT_CALL(PowerManagerMock::Mock(), SetPowerState(::testing::_, ::testing::_, ::testing::_))
+        .Times(::testing::AnyNumber())
+        .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setPowerState"),
+        _T("{\"powerState\":\"DEEP_SLEEP\",\"standbyReason\":\"VOICE_COMMAND\"}"), response));
+
+    JsonObject jr;
+    ASSERT_TRUE(jr.FromString(response)) << "Response: " << response;
+    EXPECT_TRUE(jr["success"].Boolean()) << "Response: " << response;
+    TEST_LOG("SetPowerState_DeepSleep_WithStandbyReason - Response: %s", response.c_str());
 }
 
