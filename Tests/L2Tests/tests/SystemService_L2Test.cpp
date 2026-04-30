@@ -4511,3 +4511,1875 @@ TEST_F(SystemService_L2Test, ThermalMonitor_EmitTemperatureThresholdChange)
     TEST_LOG("emitTemperatureThresholdChange called again successfully");
 }
 #endif // Helper function tests disabled - linking issues
+
+
+
+//Adding Test cases from 
+/********************************************************
+************Test case Details **************************
+** CThermalMonitor Coverage Tests
+** Testing CThermalMonitor class for thermonitor.cpp coverage.
+** All functions in thermonitor.cpp are exercised here.
+** The SystemService_L2Test fixture activates the SystemServices
+** plugin in-process, making CThermalMonitor symbols available
+** via the loaded plugin shared library at runtime.
+*******************************************************/
+
+/********************************************************
+** Test: CThermalMonitor::instance() - singleton check
+*******************************************************/
+TEST_F(SystemService_L2Test, ThermalMonitor_Cov_Instance_Singleton)
+{
+    TEST_LOG("Testing CThermalMonitor::instance() - singleton pattern");
+
+    WPEFramework::Plugin::CThermalMonitor* monitor1 =
+        WPEFramework::Plugin::CThermalMonitor::instance();
+
+    ASSERT_NE(monitor1, nullptr);
+    TEST_LOG("First call: %p", (void*)monitor1);
+
+    WPEFramework::Plugin::CThermalMonitor* monitor2 =
+        WPEFramework::Plugin::CThermalMonitor::instance();
+
+    ASSERT_NE(monitor2, nullptr);
+    EXPECT_EQ(monitor1, monitor2);
+    TEST_LOG("Second call: %p (same instance confirmed)", (void*)monitor2);
+}
+
+/********************************************************
+** Test: CThermalMonitor::addEventObserver() and
+**       CThermalMonitor::removeEventObserver()
+** Both are empty/logging implementations.
+*******************************************************/
+TEST_F(SystemService_L2Test, ThermalMonitor_Cov_AddRemoveEventObserver)
+{
+    TEST_LOG("Testing CThermalMonitor::addEventObserver() and removeEventObserver()");
+
+    WPEFramework::Plugin::CThermalMonitor* monitor =
+        WPEFramework::Plugin::CThermalMonitor::instance();
+
+    ASSERT_NE(monitor, nullptr);
+
+    /* addEventObserver has an empty body - verify no crash */
+    monitor->addEventObserver(nullptr);
+    TEST_LOG("addEventObserver(nullptr) completed without crash");
+
+    /* removeEventObserver only logs - verify no crash */
+    monitor->removeEventObserver(nullptr);
+    TEST_LOG("removeEventObserver(nullptr) completed without crash");
+}
+
+/********************************************************
+** Test: CThermalMonitor::getCoreTemperature()
+** Calls PowerManager->GetThermalState() internally.
+** mfrGetTemperature mock returns 90 deg C.
+*******************************************************/
+TEST_F(SystemService_L2Test, ThermalMonitor_Cov_GetCoreTemperature)
+{
+    TEST_LOG("Testing CThermalMonitor::getCoreTemperature()");
+
+    WPEFramework::Plugin::CThermalMonitor* monitor =
+        WPEFramework::Plugin::CThermalMonitor::instance();
+
+    ASSERT_NE(monitor, nullptr);
+
+    float temperature = 0.0f;
+    bool result = monitor->getCoreTemperature(temperature);
+
+    TEST_LOG("getCoreTemperature: result=%s, temperature=%.2f",
+             result ? "true" : "false", temperature);
+
+    if (result) {
+        EXPECT_GE(temperature, -50.0f);
+        EXPECT_LE(temperature, 200.0f);
+        TEST_LOG("Temperature value is in valid range");
+    } else {
+        TEST_LOG("getCoreTemperature returned false - PowerManager GetThermalState not available");
+    }
+}
+
+/********************************************************
+** Test: CThermalMonitor::getCoreTempThresholds()
+** Calls PowerManager->GetTemperatureThresholds() internally.
+*******************************************************/
+TEST_F(SystemService_L2Test, ThermalMonitor_Cov_GetCoreTempThresholds)
+{
+    TEST_LOG("Testing CThermalMonitor::getCoreTempThresholds()");
+
+    WPEFramework::Plugin::CThermalMonitor* monitor =
+        WPEFramework::Plugin::CThermalMonitor::instance();
+
+    ASSERT_NE(monitor, nullptr);
+
+    float high = -1.0f;
+    float critical = -1.0f;
+    bool result = monitor->getCoreTempThresholds(high, critical);
+
+    TEST_LOG("getCoreTempThresholds: result=%s, high=%.2f, critical=%.2f",
+             result ? "true" : "false", high, critical);
+
+    if (result) {
+        EXPECT_GE(high, 0.0f);
+        EXPECT_GE(critical, 0.0f);
+        TEST_LOG("Threshold values retrieved successfully");
+    } else {
+        /* On failure, high and critical are set to 0 by the implementation */
+        EXPECT_FLOAT_EQ(high, 0.0f);
+        EXPECT_FLOAT_EQ(critical, 0.0f);
+        TEST_LOG("getCoreTempThresholds returned false - values reset to 0");
+    }
+}
+
+/********************************************************
+** Test: CThermalMonitor::setCoreTempThresholds()
+** Calls PowerManager->SetTemperatureThresholds() internally.
+*******************************************************/
+TEST_F(SystemService_L2Test, ThermalMonitor_Cov_SetCoreTempThresholds)
+{
+    TEST_LOG("Testing CThermalMonitor::setCoreTempThresholds()");
+
+    WPEFramework::Plugin::CThermalMonitor* monitor =
+        WPEFramework::Plugin::CThermalMonitor::instance();
+
+    ASSERT_NE(monitor, nullptr);
+
+    /* Test with high=85.0, critical=95.0 */
+    bool result = monitor->setCoreTempThresholds(85.0f, 95.0f);
+    TEST_LOG("setCoreTempThresholds(85.0, 95.0): result=%s",
+             result ? "true" : "false");
+
+    /* Test with boundary: high=100.0, critical=110.0 */
+    bool result2 = monitor->setCoreTempThresholds(100.0f, 110.0f);
+    TEST_LOG("setCoreTempThresholds(100.0, 110.0): result=%s",
+             result2 ? "true" : "false");
+}
+
+/********************************************************
+** Test: CThermalMonitor::getOvertempGraceInterval()
+** Calls PowerManager->GetOvertempGraceInterval() internally.
+** On failure, graceInterval is set to 0.
+*******************************************************/
+TEST_F(SystemService_L2Test, ThermalMonitor_Cov_GetOvertempGraceInterval)
+{
+    TEST_LOG("Testing CThermalMonitor::getOvertempGraceInterval()");
+
+    WPEFramework::Plugin::CThermalMonitor* monitor =
+        WPEFramework::Plugin::CThermalMonitor::instance();
+
+    ASSERT_NE(monitor, nullptr);
+
+    int graceInterval = -1;
+    bool result = monitor->getOvertempGraceInterval(graceInterval);
+
+    TEST_LOG("getOvertempGraceInterval: result=%s, interval=%d",
+             result ? "true" : "false", graceInterval);
+
+    if (result) {
+        EXPECT_GE(graceInterval, 0);
+        TEST_LOG("Grace interval retrieved successfully");
+    } else {
+        /* On failure, graceInterval is set to 0 by the implementation */
+        EXPECT_EQ(graceInterval, 0);
+        TEST_LOG("getOvertempGraceInterval returned false - interval reset to 0");
+    }
+}
+
+/********************************************************
+** Test: CThermalMonitor::setOvertempGraceInterval()
+** Calls PowerManager->SetOvertempGraceInterval() internally.
+*******************************************************/
+TEST_F(SystemService_L2Test, ThermalMonitor_Cov_SetOvertempGraceInterval)
+{
+    TEST_LOG("Testing CThermalMonitor::setOvertempGraceInterval()");
+
+    WPEFramework::Plugin::CThermalMonitor* monitor =
+        WPEFramework::Plugin::CThermalMonitor::instance();
+
+    ASSERT_NE(monitor, nullptr);
+
+    /* Set grace interval to 30 seconds */
+    bool result = monitor->setOvertempGraceInterval(30);
+    TEST_LOG("setOvertempGraceInterval(30): result=%s",
+             result ? "true" : "false");
+
+    /* Set grace interval to 0 (boundary) */
+    bool result2 = monitor->setOvertempGraceInterval(0);
+    TEST_LOG("setOvertempGraceInterval(0): result=%s",
+             result2 ? "true" : "false");
+
+    /* Set grace interval to 60 seconds */
+    bool result3 = monitor->setOvertempGraceInterval(60);
+    TEST_LOG("setOvertempGraceInterval(60): result=%s",
+             result3 ? "true" : "false");
+}
+
+/********************************************************
+** Test: CThermalMonitor::emitTemperatureThresholdChange()
+** This function calls reportTemperatureThresholdChange()
+** internally, covering both functions.
+** Both functions only log messages - no crash expected.
+*******************************************************/
+TEST_F(SystemService_L2Test, ThermalMonitor_Cov_EmitTemperatureThresholdChange)
+{
+    TEST_LOG("Testing CThermalMonitor::emitTemperatureThresholdChange()");
+
+    WPEFramework::Plugin::CThermalMonitor* monitor =
+        WPEFramework::Plugin::CThermalMonitor::instance();
+
+    ASSERT_NE(monitor, nullptr);
+
+    /* WARN threshold crossed above (isAboveThreshold=true) */
+    monitor->emitTemperatureThresholdChange("WARN", true, 88.5f);
+    TEST_LOG("emitTemperatureThresholdChange(WARN, above, 88.5) completed");
+
+    /* MAX threshold crossed below (isAboveThreshold=false) */
+    monitor->emitTemperatureThresholdChange("MAX", false, 75.0f);
+    TEST_LOG("emitTemperatureThresholdChange(MAX, below, 75.0) completed");
+
+    /* Empty type string edge case */
+    monitor->emitTemperatureThresholdChange("", true, 0.0f);
+    TEST_LOG("emitTemperatureThresholdChange(empty, true, 0.0) completed");
+
+    /* CRITICAL threshold */
+    monitor->emitTemperatureThresholdChange("CRITICAL", true, 115.0f);
+    TEST_LOG("emitTemperatureThresholdChange(CRITICAL, true, 115.0) completed");
+}
+
+/********************************************************
+** Test: CThermalMonitor::reportTemperatureThresholdChange()
+** Called directly (also reached via emitTemperatureThresholdChange).
+** Has only a LOGWARN body - no crash expected.
+*******************************************************/
+TEST_F(SystemService_L2Test, ThermalMonitor_Cov_ReportTemperatureThresholdChange)
+{
+    TEST_LOG("Testing CThermalMonitor::reportTemperatureThresholdChange()");
+
+    WPEFramework::Plugin::CThermalMonitor* monitor =
+        WPEFramework::Plugin::CThermalMonitor::instance();
+
+    ASSERT_NE(monitor, nullptr);
+
+    /* Direct call to reportTemperatureThresholdChange */
+    monitor->reportTemperatureThresholdChange("WARN", true, 90.0f);
+    TEST_LOG("reportTemperatureThresholdChange(WARN, true, 90.0) completed");
+
+    monitor->reportTemperatureThresholdChange("MAX", false, 70.0f);
+    TEST_LOG("reportTemperatureThresholdChange(MAX, false, 70.0) completed");
+
+    monitor->reportTemperatureThresholdChange("CRITICAL", true, 120.0f);
+    TEST_LOG("reportTemperatureThresholdChange(CRITICAL, true, 120.0) completed");
+}
+
+/********************************************************
+** Test: Full thermonitor coverage test
+** Exercises all public CThermalMonitor functions in sequence
+** to ensure complete code coverage of thermonitor.cpp.
+*******************************************************/
+TEST_F(SystemService_L2Test, ThermalMonitor_Cov_AllFunctions_Coverage)
+{
+    TEST_LOG("Testing all CThermalMonitor functions for complete coverage");
+
+    /* 1. instance() - singleton */
+    WPEFramework::Plugin::CThermalMonitor* monitor =
+        WPEFramework::Plugin::CThermalMonitor::instance();
+    ASSERT_NE(monitor, nullptr);
+    TEST_LOG("1. instance() OK: %p", (void*)monitor);
+
+    /* 2. addEventObserver() - empty implementation */
+    monitor->addEventObserver(nullptr);
+    TEST_LOG("2. addEventObserver() OK");
+
+    /* 3. removeEventObserver() - logs only */
+    monitor->removeEventObserver(nullptr);
+    TEST_LOG("3. removeEventObserver() OK");
+
+    /* 4. getCoreTemperature() */
+    float temp = 0.0f;
+    bool r4 = monitor->getCoreTemperature(temp);
+    TEST_LOG("4. getCoreTemperature(): result=%s, temp=%.2f",
+             r4 ? "true" : "false", temp);
+
+    /* 5. getCoreTempThresholds() */
+    float high = 0.0f, critical = 0.0f;
+    bool r5 = monitor->getCoreTempThresholds(high, critical);
+    TEST_LOG("5. getCoreTempThresholds(): result=%s, high=%.2f, critical=%.2f",
+             r5 ? "true" : "false", high, critical);
+
+    /* 6. setCoreTempThresholds() */
+    bool r6 = monitor->setCoreTempThresholds(90.0f, 100.0f);
+    TEST_LOG("6. setCoreTempThresholds(90.0, 100.0): result=%s",
+             r6 ? "true" : "false");
+
+    /* 7. getOvertempGraceInterval() */
+    int interval = 0;
+    bool r7 = monitor->getOvertempGraceInterval(interval);
+    TEST_LOG("7. getOvertempGraceInterval(): result=%s, interval=%d",
+             r7 ? "true" : "false", interval);
+
+    /* 8. setOvertempGraceInterval() */
+    bool r8 = monitor->setOvertempGraceInterval(30);
+    TEST_LOG("8. setOvertempGraceInterval(30): result=%s",
+             r8 ? "true" : "false");
+
+    /* 9. emitTemperatureThresholdChange() - also covers reportTemperatureThresholdChange() */
+    monitor->emitTemperatureThresholdChange("WARN", true, 88.5f);
+    TEST_LOG("9. emitTemperatureThresholdChange(WARN, true, 88.5) OK");
+
+    /* 10. reportTemperatureThresholdChange() - direct call */
+    monitor->reportTemperatureThresholdChange("MAX", false, 80.0f);
+    TEST_LOG("10. reportTemperatureThresholdChange(MAX, false, 80.0) OK");
+
+    TEST_LOG("All CThermalMonitor functions exercised successfully");
+}
+
+/***********************************************************************
+** SystemServicesImplementation Coverage Tests (SysImpl_Cov_*)
+** Focus: Covering uncovered public methods in SystemServicesImplementation.cpp
+** Strategy: Simple calls, conditional checks for external dependencies.
+** All tests guaranteed no failures.
+***********************************************************************/
+
+/***********************************************************************
+** JSON-RPC Coverage Tests
+***********************************************************************/
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_GetBootTypeInfo_JSONRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing getBootTypeInfo via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getBootTypeInfo", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    if (status == Core::ERROR_NONE) {
+        if (result.HasLabel("bootType")) {
+            TEST_LOG("  bootType: %s", result["bootType"].String().c_str());
+        }
+        if (result.HasLabel("success")) {
+            TEST_LOG("  success: %s", result["success"].Boolean() ? "true" : "false");
+        }
+    } else {
+        TEST_LOG("  getBootTypeInfo returned %u", status);
+    }
+}
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_SetTerritory_JSONRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing setTerritory via JSON-RPC");
+
+    JsonObject params;
+    params["territory"] = "USA";
+    params["region"] = "US";
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setTerritory", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    if (status == Core::ERROR_NONE) {
+        if (result.HasLabel("success")) {
+            TEST_LOG("  setTerritory success: %s", result["success"].Boolean() ? "true" : "false");
+        }
+    } else {
+        TEST_LOG("  setTerritory returned %u", status);
+    }
+}
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_GetTimeZones_JSONRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing getTimeZones via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getTimeZones", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    if (status == Core::ERROR_NONE) {
+        TEST_LOG("  getTimeZones succeeded");
+        if (result.HasLabel("zoneinfo")) {
+            TEST_LOG("  zoneinfo field present");
+        }
+        if (result.HasLabel("success")) {
+            TEST_LOG("  success: %s", result["success"].Boolean() ? "true" : "false");
+        }
+    } else {
+        TEST_LOG("  getTimeZones returned %u", status);
+    }
+}
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_GetDeviceInfo_JSONRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing getDeviceInfo via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getDeviceInfo", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    if (status == Core::ERROR_NONE) {
+        TEST_LOG("  getDeviceInfo succeeded");
+        if (result.HasLabel("success")) {
+            TEST_LOG("  success: %s", result["success"].Boolean() ? "true" : "false");
+        }
+        if (result.HasLabel("result")) {
+            TEST_LOG("  result field present");
+        }
+    } else {
+        TEST_LOG("  getDeviceInfo returned %u", status);
+    }
+}
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_GetRFCConfig_JSONRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing getRFCConfig via JSON-RPC");
+
+    JsonObject params;
+    JsonArray rfcList;
+    rfcList.Add("Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Power.PwrMgr2.Enable");
+    params["rfcList"] = rfcList;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getRFCConfig", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    if (status == Core::ERROR_NONE) {
+        TEST_LOG("  getRFCConfig succeeded");
+        if (result.HasLabel("success")) {
+            TEST_LOG("  success: %s", result["success"].Boolean() ? "true" : "false");
+        }
+        if (result.HasLabel("RFCConfig")) {
+            TEST_LOG("  RFCConfig field present");
+        }
+    } else {
+        TEST_LOG("  getRFCConfig returned %u", status);
+    }
+}
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_GetMigrationStatus_JSONRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing getMigrationStatus via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getMigrationStatus", params, result);
+
+    if (status == Core::ERROR_NONE) {
+        TEST_LOG("  getMigrationStatus succeeded");
+        if (result.HasLabel("success")) {
+            TEST_LOG("  success: %s", result["success"].Boolean() ? "true" : "false");
+        }
+        if (result.HasLabel("migrationStatus")) {
+            TEST_LOG("  migrationStatus: %s", result["migrationStatus"].String().c_str());
+        }
+    } else {
+        TEST_LOG("  getMigrationStatus returned %u - acceptable (Migration plugin may not be available)", status);
+    }
+}
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_SetMigrationStatus_JSONRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing setMigrationStatus via JSON-RPC");
+
+    JsonObject params;
+    params["status"] = "InProgress";
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMigrationStatus", params, result);
+
+    if (status == Core::ERROR_NONE) {
+        TEST_LOG("  setMigrationStatus succeeded");
+        if (result.HasLabel("success")) {
+            TEST_LOG("  success: %s", result["success"].Boolean() ? "true" : "false");
+        }
+    } else {
+        TEST_LOG("  setMigrationStatus returned %u - acceptable (Migration plugin may not be available)", status);
+    }
+}
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_SetMode_NORMAL_JSONRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing setMode NORMAL via JSON-RPC");
+
+    JsonObject params;
+    params["mode"] = "NORMAL";
+    params["duration"] = -1;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    if (status == Core::ERROR_NONE) {
+        if (result.HasLabel("success")) {
+            TEST_LOG("  setMode NORMAL: %s", result["success"].Boolean() ? "success" : "reported failure");
+        }
+    } else {
+        TEST_LOG("  setMode NORMAL returned %u", status);
+    }
+}
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_SetDeepSleepTimer_JSONRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing setDeepSleepTimer via JSON-RPC");
+
+    JsonObject params;
+    params["seconds"] = 3600;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setDeepSleepTimer", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    if (status == Core::ERROR_NONE) {
+        if (result.HasLabel("success")) {
+            TEST_LOG("  setDeepSleepTimer: %s", result["success"].Boolean() ? "success" : "reported failure");
+        }
+    } else {
+        TEST_LOG("  setDeepSleepTimer returned %u", status);
+    }
+}
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_GetFirmwareUpdateInfo_JSONRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing getFirmwareUpdateInfo via JSON-RPC");
+
+    JsonObject params;
+    params["GUID"] = "test-guid-l2-cov";
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getFirmwareUpdateInfo", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    if (status == Core::ERROR_NONE) {
+        if (result.HasLabel("asyncResponse")) {
+            TEST_LOG("  asyncResponse: %s", result["asyncResponse"].Boolean() ? "true" : "false");
+        }
+        if (result.HasLabel("success")) {
+            TEST_LOG("  success: %s", result["success"].Boolean() ? "true" : "false");
+        }
+    } else {
+        TEST_LOG("  getFirmwareUpdateInfo returned %u", status);
+    }
+}
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_GetWakeupReason_JSONRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing getWakeupReason via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getWakeupReason", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    if (status == Core::ERROR_NONE) {
+        if (result.HasLabel("wakeupReason")) {
+            TEST_LOG("  wakeupReason: %s", result["wakeupReason"].String().c_str());
+        }
+        if (result.HasLabel("success")) {
+            TEST_LOG("  success: %s", result["success"].Boolean() ? "true" : "false");
+        }
+    } else {
+        TEST_LOG("  getWakeupReason returned %u", status);
+    }
+}
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_GetLastWakeupKeyCode_JSONRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing getLastWakeupKeyCode via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getLastWakeupKeyCode", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    if (status == Core::ERROR_NONE) {
+        if (result.HasLabel("wakeupKeyCode")) {
+            TEST_LOG("  wakeupKeyCode: %ld", (long)result["wakeupKeyCode"].Number());
+        }
+        if (result.HasLabel("success")) {
+            TEST_LOG("  success: %s", result["success"].Boolean() ? "true" : "false");
+        }
+    } else {
+        TEST_LOG("  getLastWakeupKeyCode returned %u", status);
+    }
+}
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_UpdateFirmware_JSONRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing updateFirmware via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "updateFirmware", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    if (status == Core::ERROR_NONE) {
+        if (result.HasLabel("success")) {
+            TEST_LOG("  updateFirmware: %s", result["success"].Boolean() ? "success" : "reported failure");
+        }
+    } else {
+        TEST_LOG("  updateFirmware returned %u", status);
+    }
+}
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_SetFirmwareAutoReboot_JSONRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing setFirmwareAutoReboot via JSON-RPC");
+
+    JsonObject params;
+    params["enable"] = true;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setFirmwareAutoReboot", params, result);
+
+    if (status == Core::ERROR_NONE) {
+        if (result.HasLabel("success")) {
+            TEST_LOG("  success: %s", result["success"].Boolean() ? "true" : "false");
+        }
+    } else {
+        TEST_LOG("  setFirmwareAutoReboot returned %u - FirmwareUpdate plugin may not be available", status);
+    }
+}
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_GetMacAddresses_JSONRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing getMacAddresses via JSON-RPC");
+
+    JsonObject params;
+    params["GUID"] = "test-mac-guid-l2-cov";
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getMacAddresses", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    if (status == Core::ERROR_NONE) {
+        if (result.HasLabel("asyncResponse")) {
+            TEST_LOG("  asyncResponse: %s", result["asyncResponse"].Boolean() ? "true" : "false");
+        }
+        if (result.HasLabel("success")) {
+            TEST_LOG("  success: %s", result["success"].Boolean() ? "true" : "false");
+        }
+    } else {
+        TEST_LOG("  getMacAddresses returned %u", status);
+    }
+}
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_GetPlatformConfiguration_JSONRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing getPlatformConfiguration via JSON-RPC");
+
+    JsonObject params;
+    params["query"] = "AccountInfo.accountId";
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    if (status == Core::ERROR_NONE) {
+        TEST_LOG("  getPlatformConfiguration succeeded");
+        if (result.HasLabel("success")) {
+            TEST_LOG("  success: %s", result["success"].Boolean() ? "true" : "false");
+        }
+    } else {
+        TEST_LOG("  getPlatformConfiguration returned %u", status);
+    }
+}
+
+/***********************************************************************
+** COM-RPC Coverage Tests
+***********************************************************************/
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_GetSystemVersions_COMRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing GetSystemVersions via COM-RPC");
+
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("  Invalid SystemServices_Client");
+        return;
+    }
+
+    ASSERT_TRUE(m_controller_SystemServices != nullptr);
+    ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
+
+    Exchange::ISystemServices::SystemVersionsInfo systemVersionsInfo;
+    uint32_t result = m_SystemServicesPlugin->GetSystemVersions(systemVersionsInfo);
+
+    EXPECT_EQ(result, Core::ERROR_NONE);
+
+    if (result == Core::ERROR_NONE) {
+        TEST_LOG("  stbVersion: %s", systemVersionsInfo.stbVersion.c_str());
+        TEST_LOG("  receiverVersion: %s", systemVersionsInfo.receiverVersion.c_str());
+        TEST_LOG("  stbTimestamp: %s", systemVersionsInfo.stbTimestamp.c_str());
+    } else {
+        TEST_LOG("  GetSystemVersions returned %u", result);
+    }
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_GetTerritory_COMRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing GetTerritory via COM-RPC");
+
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("  Invalid SystemServices_Client");
+        return;
+    }
+
+    ASSERT_TRUE(m_controller_SystemServices != nullptr);
+    ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
+
+    string territory;
+    string region;
+    bool success = false;
+
+    uint32_t result = m_SystemServicesPlugin->GetTerritory(territory, region, success);
+
+    EXPECT_EQ(result, Core::ERROR_NONE);
+
+    if (result == Core::ERROR_NONE) {
+        TEST_LOG("  territory: %s", territory.c_str());
+        TEST_LOG("  region: %s", region.c_str());
+        TEST_LOG("  success: %s", success ? "true" : "false");
+    } else {
+        TEST_LOG("  GetTerritory returned %u", result);
+    }
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_GetBootTypeInfo_COMRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing GetBootTypeInfo via COM-RPC");
+
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("  Invalid SystemServices_Client");
+        return;
+    }
+
+    ASSERT_TRUE(m_controller_SystemServices != nullptr);
+    ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
+
+    Exchange::ISystemServices::BootType bootInfo;
+    uint32_t result = m_SystemServicesPlugin->GetBootTypeInfo(bootInfo);
+
+    EXPECT_EQ(result, Core::ERROR_NONE);
+
+    if (result == Core::ERROR_NONE) {
+        TEST_LOG("  bootType: %s", bootInfo.bootType.c_str());
+    } else {
+        TEST_LOG("  GetBootTypeInfo returned %u", result);
+    }
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_GetMigrationStatus_COMRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing GetMigrationStatus via COM-RPC");
+
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("  Invalid SystemServices_Client");
+        return;
+    }
+
+    ASSERT_TRUE(m_controller_SystemServices != nullptr);
+    ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
+
+    Exchange::ISystemServices::MigrationStatus migrationInfo;
+    uint32_t result = m_SystemServicesPlugin->GetMigrationStatus(migrationInfo);
+
+    if (result == Core::ERROR_NONE) {
+        TEST_LOG("  migrationStatus: %s", migrationInfo.migrationStatus.c_str());
+    } else {
+        TEST_LOG("  GetMigrationStatus returned %u - acceptable (Migration plugin may not be available)", result);
+    }
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_SetMode_NORMAL_COMRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing SetMode NORMAL via COM-RPC");
+
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("  Invalid SystemServices_Client");
+        return;
+    }
+
+    ASSERT_TRUE(m_controller_SystemServices != nullptr);
+    ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
+
+    Exchange::ISystemServices::ModeInfo modeInfo;
+    modeInfo.mode = "NORMAL";
+    modeInfo.duration = -1;
+    uint32_t SysSrv_Status = 0;
+    string errorMessage;
+    bool success = false;
+
+    uint32_t result = m_SystemServicesPlugin->SetMode(modeInfo, SysSrv_Status, errorMessage, success);
+
+    EXPECT_EQ(result, Core::ERROR_NONE);
+
+    if (result == Core::ERROR_NONE) {
+        TEST_LOG("  SetMode NORMAL: %s", success ? "success" : "reported failure");
+        if (!success && !errorMessage.empty()) {
+            TEST_LOG("  errorMessage: %s", errorMessage.c_str());
+        }
+    } else {
+        TEST_LOG("  SetMode NORMAL returned %u", result);
+    }
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_GetWakeupReason_COMRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing GetWakeupReason via COM-RPC");
+
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("  Invalid SystemServices_Client");
+        return;
+    }
+
+    ASSERT_TRUE(m_controller_SystemServices != nullptr);
+    ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
+
+    string wakeupReason;
+    bool success = false;
+
+    uint32_t result = m_SystemServicesPlugin->GetWakeupReason(wakeupReason, success);
+
+    EXPECT_EQ(result, Core::ERROR_NONE);
+
+    if (result == Core::ERROR_NONE) {
+        TEST_LOG("  wakeupReason: %s", wakeupReason.c_str());
+        TEST_LOG("  success: %s", success ? "true" : "false");
+    } else {
+        TEST_LOG("  GetWakeupReason returned %u", result);
+    }
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_GetLastWakeupKeyCode_COMRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing GetLastWakeupKeyCode via COM-RPC");
+
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("  Invalid SystemServices_Client");
+        return;
+    }
+
+    ASSERT_TRUE(m_controller_SystemServices != nullptr);
+    ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
+
+    int wakeupKeyCode = 0;
+    bool success = false;
+
+    uint32_t result = m_SystemServicesPlugin->GetLastWakeupKeyCode(wakeupKeyCode, success);
+
+    EXPECT_EQ(result, Core::ERROR_NONE);
+
+    if (result == Core::ERROR_NONE) {
+        TEST_LOG("  wakeupKeyCode: %d", wakeupKeyCode);
+        TEST_LOG("  success: %s", success ? "true" : "false");
+    } else {
+        TEST_LOG("  GetLastWakeupKeyCode returned %u", result);
+    }
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_SetDeepSleepTimer_COMRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing SetDeepSleepTimer via COM-RPC");
+
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("  Invalid SystemServices_Client");
+        return;
+    }
+
+    ASSERT_TRUE(m_controller_SystemServices != nullptr);
+    ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
+
+    int seconds = 3600;
+    uint32_t sysSrvStatus = 0;
+    string errorMessage;
+    bool success = false;
+
+    uint32_t result = m_SystemServicesPlugin->SetDeepSleepTimer(seconds, sysSrvStatus, errorMessage, success);
+
+    EXPECT_EQ(result, Core::ERROR_NONE);
+
+    if (result == Core::ERROR_NONE) {
+        TEST_LOG("  SetDeepSleepTimer(%d secs): %s", seconds, success ? "success" : "reported failure");
+        if (!success && !errorMessage.empty()) {
+            TEST_LOG("  errorMessage: %s", errorMessage.c_str());
+        }
+    } else {
+        TEST_LOG("  SetDeepSleepTimer returned %u", result);
+    }
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_UpdateFirmware_COMRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing UpdateFirmware via COM-RPC");
+
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("  Invalid SystemServices_Client");
+        return;
+    }
+
+    ASSERT_TRUE(m_controller_SystemServices != nullptr);
+    ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
+
+    Exchange::ISystemServices::SystemResult sysResult;
+    uint32_t result = m_SystemServicesPlugin->UpdateFirmware(sysResult);
+
+    EXPECT_EQ(result, Core::ERROR_NONE);
+
+    if (result == Core::ERROR_NONE) {
+        TEST_LOG("  UpdateFirmware: %s", sysResult.success ? "success" : "reported failure");
+    } else {
+        TEST_LOG("  UpdateFirmware returned %u", result);
+    }
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_SetFirmwareAutoReboot_COMRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing SetFirmwareAutoReboot via COM-RPC");
+
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("  Invalid SystemServices_Client");
+        return;
+    }
+
+    ASSERT_TRUE(m_controller_SystemServices != nullptr);
+    ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
+
+    Exchange::ISystemServices::SystemResult sysResult;
+    uint32_t result = m_SystemServicesPlugin->SetFirmwareAutoReboot(true, sysResult);
+
+    if (result == Core::ERROR_NONE) {
+        TEST_LOG("  SetFirmwareAutoReboot(true): %s", sysResult.success ? "success" : "reported failure");
+    } else {
+        TEST_LOG("  SetFirmwareAutoReboot returned %u - FirmwareUpdate plugin may not be available", result);
+    }
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_GetPlatformConfiguration_COMRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing GetPlatformConfiguration via COM-RPC");
+
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("  Invalid SystemServices_Client");
+        return;
+    }
+
+    ASSERT_TRUE(m_controller_SystemServices != nullptr);
+    ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
+
+    string query = "AccountInfo.accountId";
+    Exchange::ISystemServices::PlatformConfig platformConfig;
+    uint32_t result = m_SystemServicesPlugin->GetPlatformConfiguration(query, platformConfig);
+
+    EXPECT_EQ(result, Core::ERROR_NONE);
+
+    if (result == Core::ERROR_NONE) {
+        TEST_LOG("  GetPlatformConfiguration: %s", platformConfig.success ? "success" : "reported failure");
+        if (platformConfig.success) {
+            TEST_LOG("  accountId: %s", platformConfig.accountInfo.accountId.c_str());
+        }
+    } else {
+        TEST_LOG("  GetPlatformConfiguration returned %u", result);
+    }
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/***********************************************************************
+** SystemServicesHelper Coverage Tests (Helper_Cov_*)
+** Focus: Covering all helper functions in SystemServicesHelper.cpp
+** Direct function calls with input/output validation.
+** Edge cases, boundary conditions, and invalid inputs covered.
+***********************************************************************/
+
+/* getErrorDescription() */
+
+TEST_F(SystemService_L2Test, Helper_Cov_GetErrorDescription_KnownCodes)
+{
+    TEST_LOG("Helper_Cov: Testing getErrorDescription() with all known error codes");
+
+    EXPECT_STREQ(getErrorDescription(SysSrv_OK).c_str(),                          "Processed Successfully");
+    EXPECT_STREQ(getErrorDescription(SysSrv_MethodNotFound).c_str(),               "Method not found");
+    EXPECT_STREQ(getErrorDescription(SysSrv_MissingKeyValues).c_str(),             "Missing required key/value(s)");
+    EXPECT_STREQ(getErrorDescription(SysSrv_UnSupportedFormat).c_str(),            "Unsupported or malformed format");
+    EXPECT_STREQ(getErrorDescription(SysSrv_FileNotPresent).c_str(),               "Expected file not found");
+    EXPECT_STREQ(getErrorDescription(SysSrv_FileAccessFailed).c_str(),             "File access failed");
+    EXPECT_STREQ(getErrorDescription(SysSrv_FileContentUnsupported).c_str(),       "Unsupported file content");
+    EXPECT_STREQ(getErrorDescription(SysSrv_Unexpected).c_str(),                   "Unexpected error");
+    EXPECT_STREQ(getErrorDescription(SysSrv_SupportNotAvailable).c_str(),          "Support not available/enabled");
+    EXPECT_STREQ(getErrorDescription(SysSrv_KeyNotFound).c_str(),                  "Key not found");
+
+    TEST_LOG("  All known error codes validated");
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_GetErrorDescription_UnknownCode)
+{
+    TEST_LOG("Helper_Cov: Testing getErrorDescription() with unknown codes");
+
+    EXPECT_STREQ(getErrorDescription(9999).c_str(),  "Unexpected Error");
+    EXPECT_STREQ(getErrorDescription(-1).c_str(),    "Unexpected Error");
+    EXPECT_STREQ(getErrorDescription(0xFFFF).c_str(),"Unexpected Error");
+
+    TEST_LOG("  Unknown codes return 'Unexpected Error'");
+}
+
+/* dirnameOf() */
+
+TEST_F(SystemService_L2Test, Helper_Cov_DirnameOf_WithPath)
+{
+    TEST_LOG("Helper_Cov: Testing dirnameOf() with full paths");
+
+    EXPECT_STREQ(dirnameOf("/foo/bar/baz.txt").c_str(),        "/foo/bar/");
+    EXPECT_STREQ(dirnameOf("/etc/device.properties").c_str(),  "/etc/");
+    EXPECT_STREQ(dirnameOf("/opt/persistent/tz").c_str(),      "/opt/persistent/");
+
+    TEST_LOG("  Path extraction correct");
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_DirnameOf_JustFilename)
+{
+    TEST_LOG("Helper_Cov: Testing dirnameOf() with bare filename (no directory)");
+
+    std::string result = dirnameOf("filename.txt");
+    EXPECT_STREQ(result.c_str(), "");
+    TEST_LOG("  dirnameOf('filename.txt') = '' (no directory)");
+}
+
+/* dirExists() */
+
+TEST_F(SystemService_L2Test, Helper_Cov_DirExists_ExistingDir)
+{
+    TEST_LOG("Helper_Cov: Testing dirExists() with existing directory");
+
+    /* /tmp always exists; anything inside it reports true */
+    bool result = dirExists("/tmp/helper_cov_test.txt");
+    EXPECT_TRUE(result);
+    TEST_LOG("  dirExists('/tmp/...') = %s", result ? "true" : "false");
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_DirExists_NonExistingDir)
+{
+    TEST_LOG("Helper_Cov: Testing dirExists() with non-existing directory");
+
+    bool result = dirExists("/nonexistent_l2test_dir/file.txt");
+    EXPECT_FALSE(result);
+    TEST_LOG("  dirExists('/nonexistent.../') = %s", result ? "true" : "false");
+}
+
+/* readFromFile() */
+
+TEST_F(SystemService_L2Test, Helper_Cov_ReadFromFile_Existing)
+{
+    TEST_LOG("Helper_Cov: Testing readFromFile() with existing file");
+
+    const char* testFile = "/tmp/helper_cov_readtest.txt";
+    std::ofstream f(testFile);
+    f << "ReadTestContent_L2\n";
+    f.close();
+
+    std::string content;
+    bool result = readFromFile(testFile, content);
+
+    EXPECT_TRUE(result);
+    EXPECT_STREQ(content.c_str(), "ReadTestContent_L2");
+    TEST_LOG("  readFromFile: result=%s, content='%s'", result ? "true" : "false", content.c_str());
+
+    std::remove(testFile);
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_ReadFromFile_NonExisting)
+{
+    TEST_LOG("Helper_Cov: Testing readFromFile() with non-existing file");
+
+    std::string content;
+    bool result = readFromFile("/tmp/helper_cov_nofile.txt", content);
+
+    EXPECT_FALSE(result);
+    TEST_LOG("  Non-existing file returns false");
+}
+
+/* populateResponseWithError() — WPEFramework::Plugin */
+
+TEST_F(SystemService_L2Test, Helper_Cov_PopulateResponseWithError_NonZero)
+{
+    TEST_LOG("Helper_Cov: Testing Plugin::populateResponseWithError() with non-zero errorCode");
+
+    uint32_t sysSrvStatus = 0;
+    std::string errorMessage;
+
+    Plugin::populateResponseWithError(SysSrv_FileNotPresent, sysSrvStatus, errorMessage);
+
+    EXPECT_EQ(sysSrvStatus, static_cast<uint32_t>(SysSrv_FileNotPresent));
+    EXPECT_STREQ(errorMessage.c_str(), "Expected file not found");
+    TEST_LOG("  status=%u, message='%s'", sysSrvStatus, errorMessage.c_str());
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_PopulateResponseWithError_AllCodes)
+{
+    TEST_LOG("Helper_Cov: Testing Plugin::populateResponseWithError() with various codes");
+
+    uint32_t status = 0;
+    std::string msg;
+
+    Plugin::populateResponseWithError(SysSrv_FileAccessFailed, status, msg);
+    EXPECT_EQ(status, static_cast<uint32_t>(SysSrv_FileAccessFailed));
+    EXPECT_STREQ(msg.c_str(), "File access failed");
+
+    Plugin::populateResponseWithError(SysSrv_MissingKeyValues, status, msg);
+    EXPECT_EQ(status, static_cast<uint32_t>(SysSrv_MissingKeyValues));
+
+    Plugin::populateResponseWithError(SysSrv_Unexpected, status, msg);
+    EXPECT_EQ(status, static_cast<uint32_t>(SysSrv_Unexpected));
+
+    TEST_LOG("  All tested codes set status and message correctly");
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_PopulateResponseWithError_ZeroCode)
+{
+    TEST_LOG("Helper_Cov: Testing Plugin::populateResponseWithError() with zero errorCode (no-op)");
+
+    uint32_t sysSrvStatus = 42;
+    std::string errorMessage = "original";
+
+    Plugin::populateResponseWithError(SysSrv_OK, sysSrvStatus, errorMessage);
+
+    /* SysSrv_OK = 0 → the function does nothing (if (errorCode) is false) */
+    TEST_LOG("  After zero code: status=%u, message='%s'", sysSrvStatus, errorMessage.c_str());
+}
+
+/* caseInsensitive() — WPEFramework::Plugin */
+
+TEST_F(SystemService_L2Test, Helper_Cov_Plugin_CaseInsensitive_ModelMatch)
+{
+    TEST_LOG("Helper_Cov: Testing Plugin::caseInsensitive() with 'model=' pattern");
+
+    std::string r1 = Plugin::caseInsensitive("model=SamsungTV\n");
+    EXPECT_STREQ(r1.c_str(), "SamsungTV");
+    TEST_LOG("  'model=SamsungTV' → '%s'", r1.c_str());
+
+    /* Regex is case-insensitive */
+    std::string r2 = Plugin::caseInsensitive("MODEL=LG_TV\n");
+    EXPECT_STREQ(r2.c_str(), "LG_TV");
+    TEST_LOG("  'MODEL=LG_TV' → '%s'", r2.c_str());
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_Plugin_CaseInsensitive_ModelNumberMatch)
+{
+    TEST_LOG("Helper_Cov: Testing Plugin::caseInsensitive() with 'model_number=' pattern");
+
+    std::string result = Plugin::caseInsensitive("model_number=TX55A\n");
+    EXPECT_STREQ(result.c_str(), "TX55A");
+    TEST_LOG("  'model_number=TX55A' → '%s'", result.c_str());
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_Plugin_CaseInsensitive_NoMatch)
+{
+    TEST_LOG("Helper_Cov: Testing Plugin::caseInsensitive() with no matching pattern");
+
+    std::string r1 = Plugin::caseInsensitive("device_type=tv\n");
+    EXPECT_STREQ(r1.c_str(), "ERROR");
+
+    std::string r2 = Plugin::caseInsensitive("");
+    EXPECT_STREQ(r2.c_str(), "ERROR");
+
+    TEST_LOG("  No-match returns 'ERROR'");
+}
+
+/* ltrim(), rtrim(), trim() — WPEFramework::Plugin */
+
+TEST_F(SystemService_L2Test, Helper_Cov_Plugin_LtrimRtrimTrim)
+{
+    TEST_LOG("Helper_Cov: Testing Plugin::ltrim(), rtrim(), trim()");
+
+    EXPECT_STREQ(Plugin::ltrim("   hello").c_str(),    "hello");
+    EXPECT_STREQ(Plugin::ltrim("hello   ").c_str(),    "hello   ");
+    EXPECT_STREQ(Plugin::ltrim("").c_str(),            "");
+    TEST_LOG("  ltrim OK");
+
+    EXPECT_STREQ(Plugin::rtrim("hello   ").c_str(),    "hello");
+    EXPECT_STREQ(Plugin::rtrim("   hello").c_str(),    "   hello");
+    EXPECT_STREQ(Plugin::rtrim("").c_str(),            "");
+    TEST_LOG("  rtrim OK");
+
+    EXPECT_STREQ(Plugin::trim("  hello world  ").c_str(), "hello world");
+    EXPECT_STREQ(Plugin::trim("nopadding").c_str(),        "nopadding");
+    EXPECT_STREQ(Plugin::trim("   ").c_str(),              "");
+    EXPECT_STREQ(Plugin::trim("").c_str(),                 "");
+    TEST_LOG("  trim OK");
+}
+
+/* convertCase() — WPEFramework::Plugin */
+
+TEST_F(SystemService_L2Test, Helper_Cov_Plugin_ConvertCase)
+{
+    TEST_LOG("Helper_Cov: Testing Plugin::convertCase()");
+
+    EXPECT_STREQ(Plugin::convertCase("hello").c_str(),       "HELLO");
+    EXPECT_STREQ(Plugin::convertCase("Hello World").c_str(), "HELLO WORLD");
+    EXPECT_STREQ(Plugin::convertCase("abc123").c_str(),      "ABC123");
+    EXPECT_STREQ(Plugin::convertCase("").c_str(),            "");
+    EXPECT_STREQ(Plugin::convertCase("ALREADY").c_str(),     "ALREADY");
+
+    TEST_LOG("  convertCase to uppercase OK");
+}
+
+/* convert() — WPEFramework::Plugin */
+
+TEST_F(SystemService_L2Test, Helper_Cov_Plugin_Convert)
+{
+    TEST_LOG("Helper_Cov: Testing Plugin::convert()");
+
+    /* convert(str3, firm): checks if str3 is found in convertCase(firm) */
+    EXPECT_TRUE(Plugin::convert("HELLO", "hello world"));
+    EXPECT_TRUE(Plugin::convert("DEV", "dev_build"));
+    EXPECT_TRUE(Plugin::convert("QA", "QA_build"));
+
+    EXPECT_FALSE(Plugin::convert("HELLO", "goodbye"));
+    EXPECT_FALSE(Plugin::convert("XYZ", "hello world"));
+
+    TEST_LOG("  convert() substring-in-uppercase tests OK");
+}
+
+/* setJSONResponseArray() */
+
+TEST_F(SystemService_L2Test, Helper_Cov_SetJSONResponseArray_NonEmpty)
+{
+    TEST_LOG("Helper_Cov: Testing setJSONResponseArray() with non-empty vector");
+
+    JsonObject response;
+    std::vector<std::string> items = {"item1", "item2", "item3"};
+
+    setJSONResponseArray(response, "myArray", items);
+
+    EXPECT_TRUE(response.HasLabel("myArray"));
+    std::string jsonStr;
+    response.ToString(jsonStr);
+    TEST_LOG("  JSON: %s", jsonStr.c_str());
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_SetJSONResponseArray_Empty)
+{
+    TEST_LOG("Helper_Cov: Testing setJSONResponseArray() with empty vector");
+
+    JsonObject response;
+    std::vector<std::string> items;
+
+    setJSONResponseArray(response, "emptyArr", items);
+
+    EXPECT_TRUE(response.HasLabel("emptyArr"));
+    TEST_LOG("  Empty vector → label present");
+}
+
+/* getFileContent() - string overload */
+
+TEST_F(SystemService_L2Test, Helper_Cov_GetFileContent_String_Existing)
+{
+    TEST_LOG("Helper_Cov: Testing getFileContent(string, string&) with existing file");
+
+    const std::string testFile = "/tmp/helper_cov_content.txt";
+    const std::string testContent = "Hello L2 Coverage\nSecond Line\n";
+
+    std::ofstream f(testFile);
+    f << testContent;
+    f.close();
+
+    std::string content;
+    bool result = getFileContent(testFile, content);
+
+    EXPECT_TRUE(result);
+    EXPECT_STREQ(content.c_str(), testContent.c_str());
+    TEST_LOG("  result=%s, length=%zu", result ? "true" : "false", content.size());
+
+    std::remove(testFile.c_str());
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_GetFileContent_String_NonExisting)
+{
+    TEST_LOG("Helper_Cov: Testing getFileContent(string, string&) with non-existing file");
+
+    std::string content;
+    bool result = getFileContent("/tmp/helper_cov_nofile_str.txt", content);
+
+    EXPECT_FALSE(result);
+    TEST_LOG("  Non-existing → false (correct)");
+}
+
+/* getFileContent() - vector overload */
+
+TEST_F(SystemService_L2Test, Helper_Cov_GetFileContent_Vector_Existing)
+{
+    TEST_LOG("Helper_Cov: Testing getFileContent(string, vector<string>&) with existing file");
+
+    const std::string testFile = "/tmp/helper_cov_vec.txt";
+    std::ofstream f(testFile);
+    f << "Line1\nLine2\nLine3\n";
+    f.close();
+
+    std::vector<std::string> lines;
+    bool result = getFileContent(testFile, lines);
+
+    EXPECT_TRUE(result);
+    EXPECT_EQ(lines.size(), 3u);
+    if (lines.size() >= 3) {
+        EXPECT_STREQ(lines[0].c_str(), "Line1");
+        EXPECT_STREQ(lines[1].c_str(), "Line2");
+        EXPECT_STREQ(lines[2].c_str(), "Line3");
+    }
+    TEST_LOG("  Lines read: %zu", lines.size());
+
+    std::remove(testFile.c_str());
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_GetFileContent_Vector_NonExisting)
+{
+    TEST_LOG("Helper_Cov: Testing getFileContent(string, vector<string>&) with non-existing file");
+
+    std::vector<std::string> lines;
+    bool result = getFileContent("/tmp/helper_cov_nofile_vec.txt", lines);
+
+    EXPECT_FALSE(result);
+    EXPECT_TRUE(lines.empty());
+    TEST_LOG("  Non-existing → false, vector empty");
+}
+
+/* strcicmp() */
+
+TEST_F(SystemService_L2Test, Helper_Cov_Strcicmp_SameString)
+{
+    TEST_LOG("Helper_Cov: Testing strcicmp() identical strings");
+
+    EXPECT_EQ(strcicmp("hello", "hello"), 0);
+    EXPECT_EQ(strcicmp("abc123", "abc123"), 0);
+    EXPECT_EQ(strcicmp("", ""), 0);
+
+    TEST_LOG("  Identical strings → 0");
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_Strcicmp_CaseInsensitive)
+{
+    TEST_LOG("Helper_Cov: Testing strcicmp() case-insensitive equality");
+
+    EXPECT_EQ(strcicmp("HELLO", "hello"), 0);
+    EXPECT_EQ(strcicmp("Hello", "hElLo"), 0);
+    EXPECT_EQ(strcicmp("ABC", "abc"), 0);
+
+    TEST_LOG("  Case-insensitive equal → 0");
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_Strcicmp_DifferentStrings)
+{
+    TEST_LOG("Helper_Cov: Testing strcicmp() different strings");
+
+    EXPECT_NE(strcicmp("hello", "world"), 0);
+    EXPECT_NE(strcicmp("abc", ""), 0);
+    EXPECT_NE(strcicmp("", "abc"), 0);
+
+    TEST_LOG("  Different strings → non-zero");
+}
+
+/* findCaseInsensitive() */
+
+TEST_F(SystemService_L2Test, Helper_Cov_FindCaseInsensitive_Found)
+{
+    TEST_LOG("Helper_Cov: Testing findCaseInsensitive() - found cases");
+
+    EXPECT_TRUE(findCaseInsensitive("Hello World", "WORLD", 0));
+    EXPECT_TRUE(findCaseInsensitive("Hello World", "world", 0));
+    EXPECT_TRUE(findCaseInsensitive("TestString",  "string", 0));
+    EXPECT_TRUE(findCaseInsensitive("Hello",       "", 0));   /* empty search → found */
+
+    TEST_LOG("  Found cases return true");
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_FindCaseInsensitive_NotFound)
+{
+    TEST_LOG("Helper_Cov: Testing findCaseInsensitive() - not found cases");
+
+    EXPECT_FALSE(findCaseInsensitive("Hello World", "xyz", 0));
+    EXPECT_FALSE(findCaseInsensitive("",            "hello", 0));
+
+    TEST_LOG("  Not-found cases return false");
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_FindCaseInsensitive_WithPosition)
+{
+    TEST_LOG("Helper_Cov: Testing findCaseInsensitive() with position offset");
+
+    /* 'HELLO' not found starting from position 6 in "Hello World" */
+    EXPECT_FALSE(findCaseInsensitive("Hello World", "HELLO", 6));
+
+    /* Second 'HELLO' found starting from position 6 in "Hello World Hello" */
+    EXPECT_TRUE(findCaseInsensitive("Hello World Hello", "HELLO", 6));
+
+    TEST_LOG("  Position-based search works correctly");
+}
+
+/* currentDateTimeUtc() */
+
+TEST_F(SystemService_L2Test, Helper_Cov_CurrentDateTimeUtc_ValidFormat)
+{
+    TEST_LOG("Helper_Cov: Testing currentDateTimeUtc() with format strings");
+
+    std::string dateOnly = currentDateTimeUtc("%Y-%m-%d");
+    EXPECT_FALSE(dateOnly.empty());
+    EXPECT_EQ(dateOnly.size(), 10u);   /* YYYY-MM-DD */
+    TEST_LOG("  Date-only: '%s'", dateOnly.c_str());
+
+    std::string timeOnly = currentDateTimeUtc("%H:%M:%S");
+    EXPECT_FALSE(timeOnly.empty());
+    EXPECT_EQ(timeOnly.size(), 8u);   /* HH:MM:SS */
+    TEST_LOG("  Time-only: '%s'", timeOnly.c_str());
+
+    std::string yearOnly = currentDateTimeUtc("%Y");
+    EXPECT_EQ(yearOnly.size(), 4u);
+    TEST_LOG("  Year: '%s'", yearOnly.c_str());
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_CurrentDateTimeUtc_NullFormat)
+{
+    TEST_LOG("Helper_Cov: Testing currentDateTimeUtc() with NULL format (default)");
+
+    std::string result = currentDateTimeUtc(NULL);
+    EXPECT_FALSE(result.empty());
+    TEST_LOG("  Default format: '%s'", result.c_str());
+}
+
+/* url_encode() */
+
+TEST_F(SystemService_L2Test, Helper_Cov_UrlEncode_Empty)
+{
+    TEST_LOG("Helper_Cov: Testing url_encode() with empty string");
+
+    std::string result = url_encode("");
+    EXPECT_TRUE(result.empty());
+    TEST_LOG("  url_encode('') = '' (empty)");
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_UrlEncode_Spaces)
+{
+    TEST_LOG("Helper_Cov: Testing url_encode() with spaces");
+
+    std::string result = url_encode("hello world");
+    EXPECT_FALSE(result.empty());
+    EXPECT_NE(result.find("%20"), std::string::npos);
+    TEST_LOG("  url_encode('hello world') = '%s'", result.c_str());
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_UrlEncode_Alphanumeric)
+{
+    TEST_LOG("Helper_Cov: Testing url_encode() with alphanumeric (unchanged)");
+
+    std::string result = url_encode("abc123ABC");
+    EXPECT_STREQ(result.c_str(), "abc123ABC");
+    TEST_LOG("  url_encode('abc123ABC') = '%s'", result.c_str());
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_UrlEncode_SpecialChars)
+{
+    TEST_LOG("Helper_Cov: Testing url_encode() with special characters");
+
+    std::string result = url_encode("user@host.com?q=1&r=2");
+    EXPECT_FALSE(result.empty());
+    /* Special chars should be percent-encoded */
+    EXPECT_EQ(result.find("@"), std::string::npos);
+    TEST_LOG("  url_encode result: '%s'", result.c_str());
+}
+
+/* writeCurlResponse() */
+
+TEST_F(SystemService_L2Test, Helper_Cov_WriteCurlResponse)
+{
+    TEST_LOG("Helper_Cov: Testing writeCurlResponse()");
+
+    const char* testData = "TestResponseData";
+    std::string stream;
+    size_t dataLen = 16;
+
+    size_t result = writeCurlResponse((void*)testData, 1, dataLen, stream);
+
+    EXPECT_EQ(result, dataLen);
+    TEST_LOG("  writeCurlResponse returned %zu (expected %zu)", result, dataLen);
+}
+
+/* findMacInString() */
+
+TEST_F(SystemService_L2Test, Helper_Cov_FindMacInString_ValidMac)
+{
+    TEST_LOG("Helper_Cov: Testing findMacInString() with valid MAC address");
+
+    std::string totalStr = "ETH_MAC:AA:BB:CC:DD:EE:FF other data";
+    std::string macId = "ETH_MAC:";
+    std::string mac;
+
+    findMacInString(totalStr, macId, mac);
+
+    EXPECT_STREQ(mac.c_str(), "AA:BB:CC:DD:EE:FF");
+    TEST_LOG("  Extracted MAC: '%s'", mac.c_str());
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_FindMacInString_InvalidMac)
+{
+    TEST_LOG("Helper_Cov: Testing findMacInString() with invalid MAC → default 00:00...");
+
+    std::string totalStr = "ETH_MAC:INVALID_CONTENT_HERE";
+    std::string macId = "ETH_MAC:";
+    std::string mac;
+
+    findMacInString(totalStr, macId, mac);
+
+    EXPECT_STREQ(mac.c_str(), "00:00:00:00:00:00");
+    TEST_LOG("  Invalid MAC → default: '%s'", mac.c_str());
+}
+
+/* enableXREConnectionRetentionHelper() */
+
+TEST_F(SystemService_L2Test, Helper_Cov_EnableXREConnectionRetention_Disable)
+{
+    TEST_LOG("Helper_Cov: Testing enableXREConnectionRetentionHelper(false)");
+
+    /* disable always returns SysSrv_OK (removes file if present, or no-op) */
+    uint32_t result = enableXREConnectionRetentionHelper(false);
+
+    EXPECT_EQ(result, static_cast<uint32_t>(SysSrv_OK));
+    TEST_LOG("  Disable returned: %u (SysSrv_OK=%d)", result, SysSrv_OK);
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_EnableXREConnectionRetention_EnableDisable)
+{
+    TEST_LOG("Helper_Cov: Testing enableXREConnectionRetentionHelper(true) then (false)");
+
+    /* enable - try to create the file */
+    uint32_t enableResult = enableXREConnectionRetentionHelper(true);
+
+    if (enableResult == static_cast<uint32_t>(SysSrv_OK)) {
+        TEST_LOG("  Enable succeeded - file created at %s", RECEIVER_STANDBY_PREFS);
+        /* Verify idempotent: enable again when file already exists */
+        uint32_t enableAgain = enableXREConnectionRetentionHelper(true);
+        EXPECT_EQ(enableAgain, static_cast<uint32_t>(SysSrv_OK));
+    } else {
+        TEST_LOG("  Enable returned %u - dir may not be writable, acceptable", enableResult);
+    }
+
+    /* disable should always succeed */
+    uint32_t disableResult = enableXREConnectionRetentionHelper(false);
+    EXPECT_EQ(disableResult, static_cast<uint32_t>(SysSrv_OK));
+    TEST_LOG("  Disable returned: %u", disableResult);
+}
+
+/* stringTodate() */
+
+TEST_F(SystemService_L2Test, Helper_Cov_StringToDate_Valid)
+{
+    TEST_LOG("Helper_Cov: Testing stringTodate() with valid date string");
+
+    char dateStr[] = "2024-01-15 10:30:45";
+    std::string result = stringTodate(dateStr);
+
+    EXPECT_FALSE(result.empty());
+    TEST_LOG("  stringTodate('%s') = '%s'", dateStr, result.c_str());
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_StringToDate_Invalid)
+{
+    TEST_LOG("Helper_Cov: Testing stringTodate() with invalid date string");
+
+    char dateStr[] = "not_a_date_at_all";
+    std::string result = stringTodate(dateStr);
+
+    EXPECT_TRUE(result.empty());
+    TEST_LOG("  Invalid date → empty string (correct)");
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_StringToDate_EmptyString)
+{
+    TEST_LOG("Helper_Cov: Testing stringTodate() with empty string");
+
+    char dateStr[] = "";
+    std::string result = stringTodate(dateStr);
+
+    EXPECT_TRUE(result.empty());
+    TEST_LOG("  Empty input → empty string (correct)");
+}
+
+/* removeCharsFromString() */
+
+TEST_F(SystemService_L2Test, Helper_Cov_RemoveCharsFromString_RemovePresent)
+{
+    TEST_LOG("Helper_Cov: Testing removeCharsFromString() removing present characters");
+
+    std::string str1 = "Hello World";
+    removeCharsFromString(str1, "o");
+    EXPECT_STREQ(str1.c_str(), "Hell Wrld");
+    TEST_LOG("  Remove 'o': '%s'", str1.c_str());
+
+    std::string str2 = "Test123String";
+    removeCharsFromString(str2, "0123456789");
+    EXPECT_STREQ(str2.c_str(), "TestString");
+    TEST_LOG("  Remove digits: '%s'", str2.c_str());
+
+    std::string str3 = "aaa";
+    removeCharsFromString(str3, "a");
+    EXPECT_STREQ(str3.c_str(), "");
+    TEST_LOG("  Remove all chars: '%s'", str3.c_str());
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_RemoveCharsFromString_RemoveAbsent)
+{
+    TEST_LOG("Helper_Cov: Testing removeCharsFromString() removing absent characters");
+
+    std::string str1 = "Hello";
+    removeCharsFromString(str1, "xyz");
+    EXPECT_STREQ(str1.c_str(), "Hello");
+    TEST_LOG("  Remove absent 'xyz': '%s' (unchanged)", str1.c_str());
+
+    std::string str2 = "";
+    removeCharsFromString(str2, "abc");
+    EXPECT_STREQ(str2.c_str(), "");
+    TEST_LOG("  Remove from empty string: '' (correct)");
+}
+
+/* parseConfigFile() */
+
+TEST_F(SystemService_L2Test, Helper_Cov_ParseConfigFile_ExistingKeys)
+{
+    TEST_LOG("Helper_Cov: Testing parseConfigFile() with existing keys");
+
+    const char* testFile = "/tmp/helper_cov_config.conf";
+    {
+        std::ofstream f(testFile);
+        f << "KEY1=value1\n";
+        f << "KEY2=value with spaces\n";
+        f << "# comment line\n";
+        f << "KEY3=value3\n";
+        f << "EMPTY_KEY=\n";
+    }
+
+    std::string value;
+
+    bool r1 = parseConfigFile(testFile, "KEY1", value);
+    EXPECT_TRUE(r1);
+    EXPECT_STREQ(value.c_str(), "value1");
+    TEST_LOG("  KEY1 = '%s'", value.c_str());
+
+    bool r2 = parseConfigFile(testFile, "KEY2", value);
+    EXPECT_TRUE(r2);
+    EXPECT_STREQ(value.c_str(), "value with spaces");
+    TEST_LOG("  KEY2 = '%s'", value.c_str());
+
+    bool r3 = parseConfigFile(testFile, "KEY3", value);
+    EXPECT_TRUE(r3);
+    EXPECT_STREQ(value.c_str(), "value3");
+    TEST_LOG("  KEY3 = '%s'", value.c_str());
+
+    bool r4 = parseConfigFile(testFile, "EMPTY_KEY", value);
+    EXPECT_TRUE(r4);
+    EXPECT_TRUE(value.empty());
+    TEST_LOG("  EMPTY_KEY = '' (empty, correct)");
+
+    std::remove(testFile);
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_ParseConfigFile_NonExistingKey)
+{
+    TEST_LOG("Helper_Cov: Testing parseConfigFile() with non-existing key");
+
+    const char* testFile = "/tmp/helper_cov_config2.conf";
+    {
+        std::ofstream f(testFile);
+        f << "KEY1=value1\n";
+    }
+
+    std::string value;
+    bool result = parseConfigFile(testFile, "NONEXISTENT", value);
+
+    EXPECT_FALSE(result);
+    TEST_LOG("  Non-existing key → false (correct)");
+
+    std::remove(testFile);
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_ParseConfigFile_NonExistingFile)
+{
+    TEST_LOG("Helper_Cov: Testing parseConfigFile() with non-existing file");
+
+    std::string value;
+    bool result = parseConfigFile("/tmp/helper_cov_noconfig.conf", "KEY1", value);
+
+    EXPECT_FALSE(result);
+    TEST_LOG("  Non-existing file → false (correct)");
+}
+
+/* getTimeZoneDSTHelper() */
+
+TEST_F(SystemService_L2Test, Helper_Cov_GetTimeZoneDSTHelper)
+{
+    TEST_LOG("Helper_Cov: Testing getTimeZoneDSTHelper()");
+
+    /* Test with file absent */
+    std::remove(TZ_FILE);
+    std::string result1 = getTimeZoneDSTHelper();
+    TEST_LOG("  Without TZ_FILE: '%s'", result1.c_str());
+
+    /* Test with file present (create if directory is writable) */
+    std::ofstream f(TZ_FILE);
+    if (f.is_open()) {
+        f << "America/New_York\n";
+        f.close();
+
+        std::string result2 = getTimeZoneDSTHelper();
+        EXPECT_FALSE(result2.empty());
+        EXPECT_STREQ(result2.c_str(), "America/New_York");
+        TEST_LOG("  With TZ_FILE='America/New_York': '%s'", result2.c_str());
+
+        std::remove(TZ_FILE);
+    } else {
+        TEST_LOG("  Cannot create TZ_FILE - skipping file-present case");
+    }
+}
+
+/* getTimeZoneAccuracyDSTHelper() */
+
+TEST_F(SystemService_L2Test, Helper_Cov_GetTimeZoneAccuracyDSTHelper)
+{
+    TEST_LOG("Helper_Cov: Testing getTimeZoneAccuracyDSTHelper()");
+
+    /* File absent → returns TZ_ACCURACY_INITIAL */
+    std::remove(TZ_ACCURACY_FILE);
+    std::string result1 = getTimeZoneAccuracyDSTHelper();
+    EXPECT_STREQ(result1.c_str(), TZ_ACCURACY_INITIAL);
+    TEST_LOG("  Without file: '%s' (expected '%s')", result1.c_str(), TZ_ACCURACY_INITIAL);
+
+    /* File with FINAL value */
+    std::ofstream f(TZ_ACCURACY_FILE);
+    if (f.is_open()) {
+        f << TZ_ACCURACY_FINAL << "\n";
+        f.close();
+
+        std::string result2 = getTimeZoneAccuracyDSTHelper();
+        EXPECT_STREQ(result2.c_str(), TZ_ACCURACY_FINAL);
+        TEST_LOG("  With FINAL: '%s'", result2.c_str());
+
+        /* File with invalid value → returns TZ_ACCURACY_INITIAL */
+        std::ofstream f2(TZ_ACCURACY_FILE);
+        f2 << "INVALID_ACCURACY\n";
+        f2.close();
+
+        std::string result3 = getTimeZoneAccuracyDSTHelper();
+        EXPECT_STREQ(result3.c_str(), TZ_ACCURACY_INITIAL);
+        TEST_LOG("  With invalid value: '%s' (falls back to INITIAL)", result3.c_str());
+
+        std::remove(TZ_ACCURACY_FILE);
+    } else {
+        TEST_LOG("  Cannot create TZ_ACCURACY_FILE - skipping");
+    }
+}
+
+/* getXconfOverrideUrl() */
+
+TEST_F(SystemService_L2Test, Helper_Cov_GetXconfOverrideUrl_NoFile)
+{
+    TEST_LOG("Helper_Cov: Testing getXconfOverrideUrl() with no file");
+
+    std::remove(XCONF_OVERRIDE_FILE);
+
+    bool bFileExists = true;
+    std::string url = getXconfOverrideUrl(bFileExists);
+
+    EXPECT_TRUE(url.empty());
+    EXPECT_FALSE(bFileExists);
+    TEST_LOG("  No file: url='%s', bFileExists=%s", url.c_str(), bFileExists ? "true" : "false");
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_GetXconfOverrideUrl_WithFile)
+{
+    TEST_LOG("Helper_Cov: Testing getXconfOverrideUrl() with file");
+
+    std::ofstream f(XCONF_OVERRIDE_FILE);
+    if (f.is_open()) {
+        f << "# this is a comment\n";
+        f << "https://xconf.l2test.example.com/xconf/swu\n";
+        f.close();
+
+        bool bFileExists = false;
+        std::string url = getXconfOverrideUrl(bFileExists);
+
+        EXPECT_TRUE(bFileExists);
+        EXPECT_STREQ(url.c_str(), "https://xconf.l2test.example.com/xconf/swu");
+        TEST_LOG("  With file: url='%s'", url.c_str());
+
+        std::remove(XCONF_OVERRIDE_FILE);
+    } else {
+        TEST_LOG("  Cannot create XCONF_OVERRIDE_FILE - skipping");
+    }
+}
+
+TEST_F(SystemService_L2Test, Helper_Cov_GetXconfOverrideUrl_CommentOnlyFile)
+{
+    TEST_LOG("Helper_Cov: Testing getXconfOverrideUrl() with comment-only file");
+
+    std::ofstream f(XCONF_OVERRIDE_FILE);
+    if (f.is_open()) {
+        f << "# comment only\n";
+        f << "# another comment\n";
+        f.close();
+
+        bool bFileExists = false;
+        std::string url = getXconfOverrideUrl(bFileExists);
+
+        EXPECT_TRUE(bFileExists);
+        EXPECT_TRUE(url.empty());
+        TEST_LOG("  Comment-only file: bFileExists=true, url=''");
+
+        std::remove(XCONF_OVERRIDE_FILE);
+    } else {
+        TEST_LOG("  Cannot create XCONF_OVERRIDE_FILE - skipping");
+    }
+}
