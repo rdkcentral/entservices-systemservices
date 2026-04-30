@@ -4360,7 +4360,7 @@ TEST_F(SystemService_L2Test, HelperFunction_URLEncode)
     EXPECT_FALSE(encoded4.empty());
     TEST_LOG("url_encode('%s') = '%s'", url4.c_str(), encoded4.c_str());
 }
-#endif // Helper function tests disabled - linking issues
+
 
 /********************************************************
 ************Test case Details **************************
@@ -4510,3 +4510,4 @@ TEST_F(SystemService_L2Test, ThermalMonitor_EmitTemperatureThresholdChange)
     monitor->emitTemperatureThresholdChange("CRITICAL", false, 75.0f);
     TEST_LOG("emitTemperatureThresholdChange called again successfully");
 }
+#endif // Helper function tests disabled - linking issues
