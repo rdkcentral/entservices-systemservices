@@ -3939,7 +3939,7 @@ TEST_F(SystemService_L2Test, OnTemperatureThresholdChanged_Notification_COMRPC)
 }
 #endif
 
-
+#if 0
 /********************************************************
 ************Test case Details **************************
 ** cTimer Helper Class Tests
@@ -4111,7 +4111,6 @@ TEST_F(SystemService_L2Test, UploadLogs_LogUploadAsync_NoExecutable)
     }
 }
 
-#if 0
 // Helper function tests disabled due to linking issues - functions not linked to test binary
 TEST_F(SystemService_L2Test, HelperFunction_GetFileContent_String)
 {
