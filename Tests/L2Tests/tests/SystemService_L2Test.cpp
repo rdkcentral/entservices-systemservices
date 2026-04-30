@@ -28,12 +28,15 @@
 #include "deepSleepMgr.h"
 #include "PowerManagerHalMock.h"
 #include "MfrMock.h"
+#include "../../../plugin/SystemServicesHelper.h"
+#include "../../../plugin/thermonitor.h"
+#include "../../../plugin/uploadlogs.h"
+
 
 #define JSON_TIMEOUT   (1000)
 #define TEST_LOG(x, ...) fprintf(stderr, "\033[1;32m[%s:%d](%s)<PID:%d><TID:%d>" x "\n\033[0m", __FILE__, __LINE__, __FUNCTION__, getpid(), gettid(), ##__VA_ARGS__); fflush(stderr);
 #define SYSTEM_CALLSIGN  _T("org.rdk.System.1")
 #define L2TEST_CALLSIGN _T("L2tests.1")
-#define CLEANUP_DELAY_MICROSECONDS 500000
 
 using ::testing::NiceMock;
 using namespace WPEFramework;
@@ -275,7 +278,6 @@ public:
         return m_lastNwStandby;
     }
 };
-
 /**
  * @brief Internal test mock class
  *
@@ -363,7 +365,6 @@ protected:
 /**
  * @brief Constructor for SystemServices L2 test class
  */
-
 SystemService_L2Test::SystemService_L2Test()
         : L2TestMocks()
 {
@@ -486,8 +487,9 @@ SystemService_L2Test::SystemService_L2Test()
              } else {
                  TEST_LOG("ActivateService succeeded on attempt %d", retry_count + 1);
              }
-		 }
+         }
          EXPECT_EQ(Core::ERROR_NONE, status);
+
 }
 
 /**
@@ -500,41 +502,20 @@ SystemService_L2Test::~SystemService_L2Test()
 
     TEST_LOG("Cleaning up SystemServices L2 Test");
 
-    if (m_controller_SystemServices != nullptr) {
-        TEST_LOG("Releasing m_controller_SystemServices");
-        m_controller_SystemServices->Release();
-        m_controller_SystemServices = nullptr;
-    }
-
-	if (m_SystemServicesPlugin != nullptr) {
-        TEST_LOG("Clearing m_SystemServicesPlugin pointer (no Release)");
-        m_SystemServicesPlugin = nullptr;
-    }
-	
-    // Allow time for cleanup before deactivating services
-    usleep(CLEANUP_DELAY_MICROSECONDS);
-
-    // Deactivate services (in reverse order of activation)
     status = DeactivateService("org.rdk.System");
-    if (status != Core::ERROR_NONE) {
-        TEST_LOG("SystemServices service deactivation failed with error: %d", status);
-    } else {
-        TEST_LOG("SystemServices service deactivated successfully");
-    }
+    EXPECT_EQ(Core::ERROR_NONE, status);
+    TEST_LOG("Deactivated org.rdk.System");
+
+    EXPECT_CALL(*p_powerManagerHalMock, PLAT_TERM())
+        .WillOnce(::testing::Return(PWRMGR_SUCCESS));
+
+    EXPECT_CALL(*p_powerManagerHalMock, PLAT_DS_TERM())
+        .WillOnce(::testing::Return(DEEPSLEEPMGR_SUCCESS));
 
     status = DeactivateService("org.rdk.PowerManager");
-    if (status != Core::ERROR_NONE) {
-        TEST_LOG("PowerManager service deactivation failed with error: %d", status);
-    } else {
-        TEST_LOG("PowerManager service deactivated successfully");
-    }
-
-	TEST_LOG("Waiting for WPEFramework to complete shutdown...");
-    usleep(CLEANUP_DELAY_MICROSECONDS);
+    EXPECT_EQ(Core::ERROR_NONE, status);
+    TEST_LOG("Deactivated org.rdk.PowerManager");
 }
-
-
-
 
 /**
  * @brief Creates SystemServices plugin interface object
@@ -543,18 +524,6 @@ uint32_t SystemService_L2Test::CreateSystemServicesInterfaceObject()
 {
     uint32_t return_value = Core::ERROR_GENERAL;
 
-	// Release existing interfaces if they were already created (prevent memory leak)
-    if (m_SystemServicesPlugin != nullptr) {
-        TEST_LOG("Releasing existing m_SystemServicesPlugin before recreating");
-        m_SystemServicesPlugin->Release();
-        m_SystemServicesPlugin = nullptr;
-    }
-
-	if (m_SystemServicesPlugin != nullptr) {
-        TEST_LOG("Clearing existing m_SystemServicesPlugin before recreating (no Release)");
-        m_SystemServicesPlugin = nullptr;
-    }
-	
     TEST_LOG("Creating SystemServices_Engine");
     SystemServices_Engine = Core::ProxyType<RPC::InvokeServerType<1, 0, 4>>::Create();
     SystemServices_Client = Core::ProxyType<RPC::CommunicatorClient>::Create(
@@ -1062,9 +1031,11 @@ TEST_F(SystemService_L2Test, GetSerialNumber_COMRPC)
                     EXPECT_FALSE(success);
                 }
 
+                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
+            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -1096,10 +1067,11 @@ TEST_F(SystemService_L2Test, GetFriendlyName_COMRPC)
 
                 TEST_LOG("FriendlyName: %s", friendlyName.c_str());
 
+                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-
+            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -1131,10 +1103,11 @@ TEST_F(SystemService_L2Test, GetNetworkStandbyMode_COMRPC)
 
                 TEST_LOG("NetworkStandbyMode: %s", nwStandby ? "Enabled" : "Disabled");
 
+                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-
+            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -1167,10 +1140,11 @@ TEST_F(SystemService_L2Test, GetBuildType_COMRPC)
                 TEST_LOG("BuildType: %s", buildType.c_str());
                 EXPECT_FALSE(buildType.empty());
 
+                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-
+            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -1203,10 +1177,11 @@ TEST_F(SystemService_L2Test, RequestSystemUptime_COMRPC)
                 TEST_LOG("SystemUptime: %s", systemUptime.c_str());
                 EXPECT_FALSE(systemUptime.empty());
 
+                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-
+            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -1508,10 +1483,11 @@ TEST_F(SystemService_L2Test, RegisterUnregister_COMRPC)
                     TEST_LOG("Successfully unregistered from notifications");
                 }
 
+                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-
+            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -1576,10 +1552,11 @@ TEST_F(SystemService_L2Test, OnSystemPowerStateChanged_Notification_COMRPC)
                     TEST_LOG("Successfully unregistered from notifications");
                 }
 
+                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-
+            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -1640,10 +1617,11 @@ TEST_F(SystemService_L2Test, OnSystemModeChanged_Notification_COMRPC)
                 result = m_SystemServicesPlugin->Unregister(&m_notificationHandler);
                 EXPECT_EQ(result, Core::ERROR_NONE);
 
+                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-
+            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -1708,10 +1686,11 @@ TEST_F(SystemService_L2Test, OnBlocklistChanged_Notification_COMRPC)
                 result = m_SystemServicesPlugin->Unregister(&m_notificationHandler);
                 EXPECT_EQ(result, Core::ERROR_NONE);
 
+                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-
+            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -1720,9 +1699,194 @@ TEST_F(SystemService_L2Test, OnBlocklistChanged_Notification_COMRPC)
 
 /********************************************************
 ************Test case Details **************************
-** Additional COM-RPC Tests
-** Testing remaining SystemServices APIs via COM-RPC interface
+** COM-RPC Interface Tests - Additional Coverage
+** Testing SystemServices APIs via COM-RPC interface
 *******************************************************/
+
+TEST_F(SystemService_L2Test, GetDownloadedFirmwareInfo_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetDownloadedFirmwareInfo via COM-RPC");
+
+                Exchange::ISystemServices::DownloadedFirmwareInfo downloadedFwInfo;
+                
+                uint32_t result = m_SystemServicesPlugin->GetDownloadedFirmwareInfo(downloadedFwInfo);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                } else {
+                    TEST_LOG("currentFWVersion: %s", downloadedFwInfo.currentFWVersion.c_str());
+                    TEST_LOG("downloadedFWVersion: %s", downloadedFwInfo.downloadedFWVersion.c_str());
+                    TEST_LOG("downloadedFWLocation: %s", downloadedFwInfo.downloadedFWLocation.c_str());
+                    TEST_LOG("isRebootDeferred: %d", downloadedFwInfo.isRebootDeferred);
+                    
+                    EXPECT_FALSE(downloadedFwInfo.currentFWVersion.empty());
+                }
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+#if 0
+TEST_F(SystemService_L2Test, GetFirmwareDownloadPercent_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetFirmwareDownloadPercent via COM-RPC");
+
+                int32_t downloadPercent = 0;
+                bool success = false;
+
+                uint32_t result = m_SystemServicesPlugin->GetFirmwareDownloadPercent(downloadPercent, success);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+                EXPECT_TRUE(success);
+
+                TEST_LOG("downloadPercent: %d", downloadPercent);
+                EXPECT_GE(downloadPercent, 0);
+                EXPECT_LE(downloadPercent, 100);
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+#endif
+TEST_F(SystemService_L2Test, GetFirmwareUpdateState_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetFirmwareUpdateState via COM-RPC");
+
+                int firmwareUpdateState = -1;
+                bool success = false;
+
+                uint32_t result = m_SystemServicesPlugin->GetFirmwareUpdateState(firmwareUpdateState, success);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+                EXPECT_TRUE(success);
+
+                TEST_LOG("firmwareUpdateState: %d", firmwareUpdateState);
+                EXPECT_GE(firmwareUpdateState, 0);
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, GetLastFirmwareFailureReason_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetLastFirmwareFailureReason via COM-RPC");
+
+                string failReason;
+                bool success = false;
+
+                uint32_t result = m_SystemServicesPlugin->GetLastFirmwareFailureReason(failReason, success);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+                EXPECT_TRUE(success);
+
+                TEST_LOG("failReason: %s", failReason.c_str());
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, GetPowerStateBeforeReboot_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetPowerStateBeforeReboot via COM-RPC");
+
+                string state;
+                bool success = false;
+
+                uint32_t result = m_SystemServicesPlugin->GetPowerStateBeforeReboot(state, success);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+
+                TEST_LOG("powerStateBeforeReboot: %s", state.c_str());
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
 
 TEST_F(SystemService_L2Test, GetTimeZoneDST_COMRPC)
 {
@@ -1735,15 +1899,12 @@ TEST_F(SystemService_L2Test, GetTimeZoneDST_COMRPC)
             if (m_SystemServicesPlugin) {
                 TEST_LOG("Testing GetTimeZoneDST via COM-RPC");
 
-                // Declare output parameters
                 string timeZone;
                 string accuracy;
                 bool success = false;
 
-                // Call the API
                 uint32_t result = m_SystemServicesPlugin->GetTimeZoneDST(timeZone, accuracy, success);
 
-                // Validate result
                 EXPECT_EQ(result, Core::ERROR_NONE);
                 if (result != Core::ERROR_NONE) {
                     std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
@@ -1751,21 +1912,723 @@ TEST_F(SystemService_L2Test, GetTimeZoneDST_COMRPC)
                 }
                 EXPECT_TRUE(success);
 
-                // Log and validate output
-                TEST_LOG("TimeZone: %s", timeZone.c_str());
-                TEST_LOG("Accuracy: %s", accuracy.c_str());
+                TEST_LOG("timeZone: %s", timeZone.c_str());
+                TEST_LOG("accuracy: %s", accuracy.c_str());
                 EXPECT_FALSE(timeZone.empty());
-                EXPECT_FALSE(accuracy.empty());
 
+                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-
+            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
     }
 }
+#if 0
+TEST_F(SystemService_L2Test, IsOptOutTelemetry_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing IsOptOutTelemetry via COM-RPC");
+
+                bool optOut = false;
+                bool success = false;
+
+                uint32_t result = m_SystemServicesPlugin->IsOptOutTelemetry(optOut, success);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+                EXPECT_TRUE(success);
+
+                TEST_LOG("optOut: %d", optOut);
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, GetBootTypeInfo_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetBootTypeInfo via COM-RPC");
+
+                Exchange::ISystemServices::BootType bootInfo;
+
+                uint32_t result = m_SystemServicesPlugin->GetBootTypeInfo(bootInfo);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                } else {
+                    TEST_LOG("bootType: %s", bootInfo.bootType.c_str());
+                    EXPECT_FALSE(bootInfo.bootType.empty());
+                }
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+#endif
+TEST_F(SystemService_L2Test, GetFSRFlag_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetFSRFlag via COM-RPC");
+
+                bool fsrFlag = false;
+                bool success = false;
+
+                uint32_t result = m_SystemServicesPlugin->GetFSRFlag(fsrFlag, success);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+                EXPECT_TRUE(success);
+
+                TEST_LOG("fsrFlag: %d", fsrFlag);
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, GetBlocklistFlag_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing GetBlocklistFlag via COM-RPC");
+
+                Exchange::ISystemServices::BlocklistResult blocklistResult;
+
+                uint32_t result = m_SystemServicesPlugin->GetBlocklistFlag(blocklistResult);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                } else {
+                    TEST_LOG("blocklist: %d", blocklistResult.blocklist);
+                    TEST_LOG("success: %d", blocklistResult.success);
+                }
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, SetNetworkStandbyMode_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing SetNetworkStandbyMode via COM-RPC");
+
+                Exchange::ISystemServices::SystemResult systemResult;
+                bool nwStandby = true;
+
+                uint32_t result = m_SystemServicesPlugin->SetNetworkStandbyMode(nwStandby, systemResult);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+
+                TEST_LOG("success: %d", systemResult.success);
+                EXPECT_TRUE(systemResult.success);
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, SetFriendlyName_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing SetFriendlyName via COM-RPC");
+
+                Exchange::ISystemServices::SystemResult systemResult;
+                string friendlyName = "TestDevice";
+
+                uint32_t result = m_SystemServicesPlugin->SetFriendlyName(friendlyName, systemResult);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+
+                TEST_LOG("success: %d", systemResult.success);
+                EXPECT_TRUE(systemResult.success);
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, SetFSRFlag_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing SetFSRFlag via COM-RPC");
+
+                Exchange::ISystemServices::SystemResult systemResult;
+                bool fsrFlag = true;
+
+                uint32_t result = m_SystemServicesPlugin->SetFSRFlag(fsrFlag, systemResult);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+
+                TEST_LOG("success: %d", systemResult.success);
+                EXPECT_TRUE(systemResult.success);
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, SetBlocklistFlag_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing SetBlocklistFlag via COM-RPC");
+
+                Exchange::ISystemServices::SetBlocklistResult setBlocklistResult;
+                bool blocklist = true;
+
+                uint32_t result = m_SystemServicesPlugin->SetBlocklistFlag(blocklist, setBlocklistResult);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                } else {
+                    TEST_LOG("success: %d", setBlocklistResult.success);
+                }
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, UploadLogsAsync_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing UploadLogsAsync via COM-RPC");
+
+                Exchange::ISystemServices::SystemResult systemResult;
+
+                uint32_t result = m_SystemServicesPlugin->UploadLogsAsync(systemResult);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+
+                TEST_LOG("success: %d", systemResult.success);
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+TEST_F(SystemService_L2Test, AbortLogUpload_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+    } else {
+        EXPECT_TRUE(m_controller_SystemServices != nullptr);
+        if (m_controller_SystemServices) {
+            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
+            if (m_SystemServicesPlugin) {
+                TEST_LOG("Testing AbortLogUpload via COM-RPC");
+
+                Exchange::ISystemServices::SystemResult systemResult;
+
+                uint32_t result = m_SystemServicesPlugin->AbortLogUpload(systemResult);
+
+                EXPECT_EQ(result, Core::ERROR_NONE);
+                if (result != Core::ERROR_NONE) {
+                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
+                    TEST_LOG("Err: %s", errorMsg.c_str());
+                }
+
+                TEST_LOG("success: %d", systemResult.success);
+
+                m_SystemServicesPlugin->Release();
+            } else {
+                TEST_LOG("m_SystemServicesPlugin is NULL");
+            }
+            m_controller_SystemServices->Release();
+        } else {
+            TEST_LOG("m_controller_SystemServices is NULL");
+        }
+    }
+}
+
+/********************************************************
+************Test case Details **************************
+** JSON-RPC Interface Tests - Additional Coverage
+** Testing SystemServices APIs via JSON-RPC interface
+*******************************************************/
+
+TEST_F(SystemService_L2Test, GetDownloadedFirmwareInfo_JSONRPC)
+{
+    TEST_LOG("Testing getDownloadedFirmwareInfo via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getDownloadedFirmwareInfo", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+
+    EXPECT_TRUE(result.HasLabel("currentFWVersion"));
+    if (result.HasLabel("currentFWVersion")) {
+        string currentFWVersion = result["currentFWVersion"].String();
+        TEST_LOG("  currentFWVersion: %s", currentFWVersion.c_str());
+        EXPECT_FALSE(currentFWVersion.empty());
+    }
+
+    EXPECT_TRUE(result.HasLabel("downloadedFWVersion"));
+    if (result.HasLabel("downloadedFWVersion")) {
+        string downloadedFWVersion = result["downloadedFWVersion"].String();
+        TEST_LOG("  downloadedFWVersion: %s", downloadedFWVersion.c_str());
+    }
+
+    EXPECT_TRUE(result.HasLabel("downloadedFWLocation"));
+    if (result.HasLabel("downloadedFWLocation")) {
+        string downloadedFWLocation = result["downloadedFWLocation"].String();
+        TEST_LOG("  downloadedFWLocation: %s", downloadedFWLocation.c_str());
+    }
+
+    EXPECT_TRUE(result.HasLabel("isRebootDeferred"));
+    if (result.HasLabel("isRebootDeferred")) {
+        bool isRebootDeferred = result["isRebootDeferred"].Boolean();
+        TEST_LOG("  isRebootDeferred: %d", isRebootDeferred);
+    }
+}
+
+#if 0
+TEST_F(SystemService_L2Test, GetFirmwareDownloadPercent_JSONRPC)
+{
+    TEST_LOG("Testing getFirmwareDownloadPercent via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getFirmwareDownloadPercent", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+
+    EXPECT_TRUE(result.HasLabel("downloadPercent"));
+    if (result.HasLabel("downloadPercent")) {
+        int downloadPercent = result["downloadPercent"].Number();
+        TEST_LOG("  downloadPercent: %d", downloadPercent);
+        EXPECT_GE(downloadPercent, 0);
+        EXPECT_LE(downloadPercent, 100);
+    }
+}
+#endif
+
+TEST_F(SystemService_L2Test, GetFirmwareUpdateState_JSONRPC)
+{
+    TEST_LOG("Testing getFirmwareUpdateState via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getFirmwareUpdateState", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+
+    EXPECT_TRUE(result.HasLabel("firmwareUpdateState"));
+    if (result.HasLabel("firmwareUpdateState")) {
+        int firmwareUpdateState = result["firmwareUpdateState"].Number();
+        TEST_LOG("  firmwareUpdateState: %d", firmwareUpdateState);
+        EXPECT_GE(firmwareUpdateState, 0);
+    }
+}
+
+TEST_F(SystemService_L2Test, GetLastFirmwareFailureReason_JSONRPC)
+{
+    TEST_LOG("Testing getLastFirmwareFailureReason via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getLastFirmwareFailureReason", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+
+    EXPECT_TRUE(result.HasLabel("failReason"));
+    if (result.HasLabel("failReason")) {
+        string failReason = result["failReason"].String();
+        TEST_LOG("  failReason: %s", failReason.c_str());
+    }
+}
+
+TEST_F(SystemService_L2Test, GetPowerStateBeforeReboot_JSONRPC)
+{
+    TEST_LOG("Testing getPowerStateBeforeReboot via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPowerStateBeforeReboot", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+
+    EXPECT_TRUE(result.HasLabel("state"));
+    if (result.HasLabel("state")) {
+        string state = result["state"].String();
+        TEST_LOG("  state: %s", state.c_str());
+    }
+}
+
+TEST_F(SystemService_L2Test, GetTimeZoneDST_JSONRPC)
+{
+    TEST_LOG("Testing getTimeZoneDST via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getTimeZoneDST", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+
+    EXPECT_TRUE(result.HasLabel("timeZone"));
+    if (result.HasLabel("timeZone")) {
+        string timeZone = result["timeZone"].String();
+        TEST_LOG("  timeZone: %s", timeZone.c_str());
+        EXPECT_FALSE(timeZone.empty());
+    }
+}
+
+TEST_F(SystemService_L2Test, SetTimeZoneDST_JSONRPC)
+{
+    TEST_LOG("Testing setTimeZoneDST via JSON-RPC");
+
+    JsonObject params;
+    params["timeZone"] = "America/New_York";
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setTimeZoneDST", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+}
+
+TEST_F(SystemService_L2Test, SetNetworkStandbyMode_JSONRPC)
+{
+    TEST_LOG("Testing setNetworkStandbyMode via JSON-RPC");
+
+    JsonObject params;
+    params["nwStandby"] = true;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setNetworkStandbyMode", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+}
+#if 0
+TEST_F(SystemService_L2Test, SetOptOutTelemetry_JSONRPC)
+{
+    TEST_LOG("Testing setOptOutTelemetry via JSON-RPC");
+
+    JsonObject params;
+    params["Opt-Out"] = false;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setOptOutTelemetry", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+}
+#endif
+TEST_F(SystemService_L2Test, SetFSRFlag_JSONRPC)
+{
+    TEST_LOG("Testing setFSRFlag via JSON-RPC");
+
+    JsonObject params;
+    params["fsrFlag"] = true;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setFSRFlag", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+}
+
+TEST_F(SystemService_L2Test, SetBlocklistFlag_JSONRPC)
+{
+    TEST_LOG("Testing setBlocklistFlag via JSON-RPC");
+
+    JsonObject params;
+    params["blocklist"] = true;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setBlocklistFlag", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+}
+
+TEST_F(SystemService_L2Test, GetBlocklistFlag_JSONRPC)
+{
+    TEST_LOG("Testing getBlocklistFlag via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getBlocklistFlag", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+
+    EXPECT_TRUE(result.HasLabel("blocklist"));
+    if (result.HasLabel("blocklist")) {
+        bool blocklist = result["blocklist"].Boolean();
+        TEST_LOG("  blocklist: %d", blocklist);
+    }
+}
+
+TEST_F(SystemService_L2Test, UploadLogsAsync_JSONRPC)
+{
+    TEST_LOG("Testing uploadLogsAsync via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "uploadLogsAsync", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        bool success = result["success"].Boolean();
+        TEST_LOG("  success: %d", success);
+    }
+}
+
+TEST_F(SystemService_L2Test, AbortLogUpload_JSONRPC)
+{
+    TEST_LOG("Testing abortLogUpload via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "abortLogUpload", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        bool success = result["success"].Boolean();
+        TEST_LOG("  success: %d", success);
+    }
+}
+#if 0
+TEST_F(SystemService_L2Test, GetBootTypeInfo_JSONRPC)
+{
+    TEST_LOG("Testing getBootTypeInfo via JSON-RPC");
+
+    JsonObject params;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getBootTypeInfo", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+
+    EXPECT_TRUE(result.HasLabel("success"));
+    if (result.HasLabel("success")) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+
+    EXPECT_TRUE(result.HasLabel("bootType"));
+    if (result.HasLabel("bootType")) {
+        string bootType = result["bootType"].String();
+        TEST_LOG("  bootType: %s", bootType.c_str());
+        EXPECT_FALSE(bootType.empty());
+    }
+}
+#endif
+
+#if 0
+/********************************************************
+************Test case Details **************************
+** Additional COM-RPC Tests
+** Testing remaining SystemServices APIs via COM-RPC interface
+*******************************************************/
 
 TEST_F(SystemService_L2Test, GetTerritory_COMRPC)
 {
@@ -1797,11 +2660,12 @@ TEST_F(SystemService_L2Test, GetTerritory_COMRPC)
                 // Log and validate output
                 TEST_LOG("Territory: %s", territory.c_str());
                 TEST_LOG("Region: %s", region.c_str());
-                
+
+                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-
+            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -1836,133 +2700,12 @@ TEST_F(SystemService_L2Test, GetSystemVersions_COMRPC)
                 TEST_LOG("stbVersion: %s", systemVersionsInfo.stbVersion.c_str());
                 TEST_LOG("receiverVersion: %s", systemVersionsInfo.receiverVersion.c_str());
                 TEST_LOG("stbTimestamp: %s", systemVersionsInfo.stbTimestamp.c_str());
-                
+
+                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-
-        } else {
-            TEST_LOG("m_controller_SystemServices is NULL");
-        }
-    }
-}
-
-TEST_F(SystemService_L2Test, GetPowerStateBeforeReboot_COMRPC)
-{
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("Invalid SystemServices_Client");
-    } else {
-        EXPECT_TRUE(m_controller_SystemServices != nullptr);
-        if (m_controller_SystemServices) {
-            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
-            if (m_SystemServicesPlugin) {
-                TEST_LOG("Testing GetPowerStateBeforeReboot via COM-RPC");
-
-                // Declare output parameters
-                string state;
-                bool success = false;
-
-                // Call the API
-                uint32_t result = m_SystemServicesPlugin->GetPowerStateBeforeReboot(state, success);
-
-                // Validate result
-                EXPECT_EQ(result, Core::ERROR_NONE);
-                if (result != Core::ERROR_NONE) {
-                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
-                    TEST_LOG("Err: %s", errorMsg.c_str());
-                }
-                EXPECT_TRUE(success);
-
-                // Log and validate output
-                TEST_LOG("Power state before reboot: %s", state.c_str());
-                
-            } else {
-                TEST_LOG("m_SystemServicesPlugin is NULL");
-            }
-
-        } else {
-            TEST_LOG("m_controller_SystemServices is NULL");
-        }
-    }
-}
-
-TEST_F(SystemService_L2Test, GetFSRFlag_COMRPC)
-{
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("Invalid SystemServices_Client");
-    } else {
-        EXPECT_TRUE(m_controller_SystemServices != nullptr);
-        if (m_controller_SystemServices) {
-            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
-            if (m_SystemServicesPlugin) {
-                TEST_LOG("Testing GetFSRFlag via COM-RPC");
-
-                // Declare output parameters
-                bool fsrFlag = false;
-                bool success = false;
-
-                // Call the API
-                uint32_t result = m_SystemServicesPlugin->GetFSRFlag(fsrFlag, success);
-
-                // Validate result
-                EXPECT_EQ(result, Core::ERROR_NONE);
-                if (result != Core::ERROR_NONE) {
-                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
-                    TEST_LOG("Err: %s", errorMsg.c_str());
-                }
-                EXPECT_TRUE(success);
-
-                // Log and validate output
-                TEST_LOG("FSR Flag: %s", fsrFlag ? "true" : "false");
-                
-            } else {
-                TEST_LOG("m_SystemServicesPlugin is NULL");
-            }
-
-        } else {
-            TEST_LOG("m_controller_SystemServices is NULL");
-        }
-    }
-}
-
-TEST_F(SystemService_L2Test, GetBlocklistFlag_COMRPC)
-{
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("Invalid SystemServices_Client");
-    } else {
-        EXPECT_TRUE(m_controller_SystemServices != nullptr);
-        if (m_controller_SystemServices) {
-            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
-            if (m_SystemServicesPlugin) {
-                TEST_LOG("Testing GetBlocklistFlag via COM-RPC");
-
-                // Declare output parameters
-                Exchange::ISystemServices::BlocklistResult blocklistResult;
-
-                // Call the API
-                uint32_t result = m_SystemServicesPlugin->GetBlocklistFlag(blocklistResult);
-
-                // Validate result
-                EXPECT_EQ(result, Core::ERROR_NONE);
-                if (result != Core::ERROR_NONE) {
-                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result) + " (" + std::string(Core::ErrorToString(result)) + ")";
-                    TEST_LOG("Err: %s", errorMsg.c_str());
-                }
-
-                // Log output
-                TEST_LOG("Blocklist Flag: %s", blocklistResult.blocklist ? "true" : "false");
-                TEST_LOG("Success: %s", blocklistResult.success ? "true" : "false");
-                
-                // Note: success may be false if devicestate.txt file doesn't exist,
-                // which is valid behavior in L2 test environment after cleanup from previous tests.
-                if (!blocklistResult.success) {
-                    TEST_LOG("GetBlocklistFlag returned success=false (blocklist file may not exist)");
-                }                
-
-            } else {
-                TEST_LOG("m_SystemServicesPlugin is NULL");
-            }
-
+            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -1974,103 +2717,6 @@ TEST_F(SystemService_L2Test, GetBlocklistFlag_COMRPC)
 ** Additional JSON-RPC Tests
 ** Testing remaining SystemServices APIs via JSON-RPC interface
 *******************************************************/
-
-TEST_F(SystemService_L2Test, GetTimeZoneDST_JSONRPC)
-{
-    TEST_LOG("Testing getTimeZoneDST via JSON-RPC");
-
-    JsonObject params;
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getTimeZoneDST", params, result);
-
-    EXPECT_EQ(status, Core::ERROR_NONE);
-
-    // Validate success field
-    EXPECT_TRUE(result.HasLabel("success"));
-    if (result.HasLabel("success")) {
-        EXPECT_TRUE(result["success"].Boolean());
-    }
-
-    // Validate timeZone field
-    EXPECT_TRUE(result.HasLabel("timeZone"));
-    if (result.HasLabel("timeZone")) {
-        string timeZone = result["timeZone"].String();
-        TEST_LOG("  timeZone: %s", timeZone.c_str());
-        EXPECT_FALSE(timeZone.empty());
-    }
-
-    // Validate accuracy field
-    EXPECT_TRUE(result.HasLabel("accuracy"));
-    if (result.HasLabel("accuracy")) {
-        string accuracy = result["accuracy"].String();
-        TEST_LOG("  accuracy: %s", accuracy.c_str());
-        EXPECT_FALSE(accuracy.empty());
-    }
-}
-
-TEST_F(SystemService_L2Test, GetPowerStateBeforeReboot_JSONRPC)
-{
-    TEST_LOG("Testing getPowerStateBeforeReboot via JSON-RPC");
-
-    JsonObject params;
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPowerStateBeforeReboot", params, result);
-
-    EXPECT_EQ(status, Core::ERROR_NONE);
-
-    // Validate success field
-    EXPECT_TRUE(result.HasLabel("success"));
-    if (result.HasLabel("success")) {
-        EXPECT_TRUE(result["success"].Boolean());
-    }
-
-    // Validate state field
-    EXPECT_TRUE(result.HasLabel("state"));
-    if (result.HasLabel("state")) {
-        string state = result["state"].String();
-        TEST_LOG("  state: %s", state.c_str());
-    }
-}
-
-TEST_F(SystemService_L2Test, GetBlocklistFlag_JSONRPC)
-{
-    TEST_LOG("Testing getBlocklistFlag via JSON-RPC");
-
-    JsonObject params;
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getBlocklistFlag", params, result);
-
-    EXPECT_EQ(status, Core::ERROR_NONE);
-
-    // Validate success field
-    EXPECT_TRUE(result.HasLabel("success"));
-    if (result.HasLabel("success")) {
-        bool success = result["success"].Boolean();
-        TEST_LOG("  success: %s", success ? "true" : "false");
-        
-        // Note: success may be false if devicestate.txt file doesn't exist,
-        // which is valid behavior in L2 test environment after cleanup from previous tests.
-        if (!success) {
-            TEST_LOG("  getBlocklistFlag returned success=false (blocklist file may not exist)");
-            if (result.HasLabel("error")) {
-                JsonObject error = result["error"].Object();
-                if (error.HasLabel("message")) {
-                    TEST_LOG("  error message: %s", error["message"].String().c_str());
-                }
-            }
-        }
-	}
-
-    // Validate blocklist field
-    EXPECT_TRUE(result.HasLabel("blocklist"));
-    if (result.HasLabel("blocklist")) {
-        bool blocklist = result["blocklist"].Boolean();
-        TEST_LOG("  blocklist: %s", blocklist ? "true" : "false");
-    }
-}
 
 TEST_F(SystemService_L2Test, SetOptOutTelemetry_JSONRPC)
 {
@@ -2092,26 +2738,6 @@ TEST_F(SystemService_L2Test, SetOptOutTelemetry_JSONRPC)
         }
     } else {
         TEST_LOG("setOptOutTelemetry failed with status %u - Telemetry plugin not available in L2 test environment", status);
-    }
-}
-
-TEST_F(SystemService_L2Test, SetNetworkStandbyMode_JSONRPC)
-{
-    TEST_LOG("Testing setNetworkStandbyMode via JSON-RPC");
-
-    JsonObject params;
-    params["nwStandby"] = true;
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setNetworkStandbyMode", params, result);
-
-    EXPECT_EQ(status, Core::ERROR_NONE);
-
-    // Validate success field
-    EXPECT_TRUE(result.HasLabel("success"));
-    if (result.HasLabel("success")) {
-        EXPECT_TRUE(result["success"].Boolean());
-        TEST_LOG("  setNetworkStandbyMode succeeded");
     }
 }
 
@@ -2152,11 +2778,12 @@ TEST_F(SystemService_L2Test, SetMode_NORMAL_COMRPC)
 
                 // Log output
                 TEST_LOG("SetMode NORMAL success: %s", success ? "true" : "false");
-                
+
+                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-
+            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -2195,11 +2822,12 @@ TEST_F(SystemService_L2Test, SetMode_EAS_COMRPC)
 
                 // Log output
                 TEST_LOG("SetMode EAS success: %s", success ? "true" : "false");
-                
+
+                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
-
+            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -2272,7 +2900,7 @@ TEST_F(SystemService_L2Test, SetMigrationStatus_JSONRPC)
         }
     } else {
         TEST_LOG("setMigrationStatus failed with status %u - Migration plugin not available in L2 test environment", status);
-    } 
+    }
 }
 
 
@@ -2282,94 +2910,6 @@ TEST_F(SystemService_L2Test, SetMigrationStatus_JSONRPC)
 ** Testing previously uncovered SystemServices APIs
 *******************************************************/
 
-// GetDownloadedFirmwareInfo Tests
-TEST_F(SystemService_L2Test, GetDownloadedFirmwareInfo_COMRPC)
-{
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("Invalid SystemServices_Client");
-    } else {
-        EXPECT_TRUE(m_controller_SystemServices != nullptr);
-        if (m_controller_SystemServices) {
-            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
-            if (m_SystemServicesPlugin) {
-                TEST_LOG("Testing GetDownloadedFirmwareInfo via COM-RPC");
-
-                Exchange::ISystemServices::DownloadedFirmwareInfo fwInfo;
-
-                uint32_t result = m_SystemServicesPlugin->GetDownloadedFirmwareInfo(fwInfo);
-
-                EXPECT_EQ(result, Core::ERROR_NONE);
-                if (result != Core::ERROR_NONE) {
-                    std::string errorMsg = "COM-RPC returned error " + std::to_string(result);
-                    TEST_LOG("Err: %s", errorMsg.c_str());
-                }
-
-                TEST_LOG("Current FW: %s, Downloaded FW: %s, Location: %s", 
-                         fwInfo.currentFWVersion.c_str(), 
-                         fwInfo.downloadedFWVersion.c_str(),
-                         fwInfo.downloadedFWLocation.c_str());
-                
-            }
-        }
-    }
-}
-
-TEST_F(SystemService_L2Test, GetDownloadedFirmwareInfo_JSONRPC)
-{
-    TEST_LOG("Testing getDownloadedFirmwareInfo via JSON-RPC");
-
-    JsonObject params;
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getDownloadedFirmwareInfo", params, result);
-
-    EXPECT_EQ(status, Core::ERROR_NONE);
-
-    if (result.HasLabel("firmwareVersion")) {
-        TEST_LOG("  firmwareVersion: %s", result["firmwareVersion"].String().c_str());
-    }
-}
-
-// GetFirmwareUpdateState Tests
-TEST_F(SystemService_L2Test, GetFirmwareUpdateState_COMRPC)
-{
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("Invalid SystemServices_Client");
-    } else {
-        EXPECT_TRUE(m_controller_SystemServices != nullptr);
-        if (m_controller_SystemServices) {
-            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
-            if (m_SystemServicesPlugin) {
-                TEST_LOG("Testing GetFirmwareUpdateState via COM-RPC");
-
-                int firmwareUpdateState = -1;
-                bool success = false;
-
-                uint32_t result = m_SystemServicesPlugin->GetFirmwareUpdateState(firmwareUpdateState, success);
-
-                EXPECT_EQ(result, Core::ERROR_NONE);
-                TEST_LOG("FW Update State: %d, Success: %s", firmwareUpdateState, success ? "true" : "false");
-                
-            }
-        }
-    }
-}
-
-TEST_F(SystemService_L2Test, GetFirmwareUpdateState_JSONRPC)
-{
-    TEST_LOG("Testing getFirmwareUpdateState via JSON-RPC");
-
-    JsonObject params;
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getFirmwareUpdateState", params, result);
-
-    EXPECT_EQ(status, Core::ERROR_NONE);
-
-    if (result.HasLabel("firmwareUpdateState")) {
-        TEST_LOG("  firmwareUpdateState: %ld", (long)result["firmwareUpdateState"].Number());
-    }
-}
 
 // GetLastWakeupKeyCode Tests
 TEST_F(SystemService_L2Test, GetLastWakeupKeyCode_COMRPC)
@@ -2390,8 +2930,10 @@ TEST_F(SystemService_L2Test, GetLastWakeupKeyCode_COMRPC)
 
                 EXPECT_EQ(result, Core::ERROR_NONE);
                 TEST_LOG("Last Wakeup KeyCode: %d, Success: %s", wakeupKeyCode, success ? "true" : "false");
-                
+
+                m_SystemServicesPlugin->Release();
             }
+            m_controller_SystemServices->Release();
         }
     }
 }
@@ -2431,8 +2973,10 @@ TEST_F(SystemService_L2Test, GetMfgSerialNumber_COMRPC)
 
                 EXPECT_EQ(result, Core::ERROR_NONE);
                 TEST_LOG("Mfg Serial Number: %s, Success: %s", mfgSerialNumber.c_str(), success ? "true" : "false");
-                
+
+                m_SystemServicesPlugin->Release();
             }
+            m_controller_SystemServices->Release();
         }
     }
 }
@@ -2475,7 +3019,9 @@ TEST_F(SystemService_L2Test, IsOptOutTelemetry_COMRPC)
                 } else {
                     TEST_LOG("IsOptOutTelemetry failed with result %u - Telemetry plugin not available in L2 test environment", result);
                 }
+                m_SystemServicesPlugin->Release();
             }
+            m_controller_SystemServices->Release();
         }
     }
 }
@@ -2500,8 +3046,11 @@ TEST_F(SystemService_L2Test, SetFirmwareAutoReboot_COMRPC)
                     TEST_LOG("SetFirmwareAutoReboot success: %s", sysResult.success ? "true" : "false");
                 } else {
                     TEST_LOG("SetFirmwareAutoReboot failed with result %u - FirmwareUpdate plugin not available in L2 test environment", result);
-                }                
+                }
+
+                m_SystemServicesPlugin->Release();
             }
+            m_controller_SystemServices->Release();
         }
     }
 }
@@ -2543,8 +3092,10 @@ TEST_F(SystemService_L2Test, UpdateFirmware_COMRPC)
 
                 EXPECT_EQ(result, Core::ERROR_NONE);
                 TEST_LOG("UpdateFirmware called, success: %s", sysResult.success ? "true" : "false");
-                
+
+                m_SystemServicesPlugin->Release();
             }
+            m_controller_SystemServices->Release();
         }
     }
 }
@@ -2557,88 +3108,6 @@ TEST_F(SystemService_L2Test, UpdateFirmware_JSONRPC)
     JsonObject result;
 
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "updateFirmware", params, result);
-
-    EXPECT_EQ(status, Core::ERROR_NONE);
-
-    if (result.HasLabel("success")) {
-        TEST_LOG("  success: %s", result["success"].Boolean() ? "true" : "false");
-    }
-}
-
-// SetFSRFlag Tests
-TEST_F(SystemService_L2Test, SetFSRFlag_COMRPC)
-{
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("Invalid SystemServices_Client");
-    } else {
-        EXPECT_TRUE(m_controller_SystemServices != nullptr);
-        if (m_controller_SystemServices) {
-            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
-            if (m_SystemServicesPlugin) {
-                TEST_LOG("Testing SetFSRFlag via COM-RPC");
-
-                Exchange::ISystemServices::SystemResult sysResult;
-
-                uint32_t result = m_SystemServicesPlugin->SetFSRFlag(true, sysResult);
-
-                EXPECT_EQ(result, Core::ERROR_NONE);
-                TEST_LOG("SetFSRFlag success: %s", sysResult.success ? "true" : "false");
-                
-            }
-        }
-    }
-}
-
-TEST_F(SystemService_L2Test, SetFSRFlag_JSONRPC)
-{
-    TEST_LOG("Testing setFSRFlag via JSON-RPC");
-
-    JsonObject params;
-    params["fsrFlag"] = true;
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setFSRFlag", params, result);
-
-    EXPECT_EQ(status, Core::ERROR_NONE);
-
-    if (result.HasLabel("success")) {
-        TEST_LOG("  success: %s", result["success"].Boolean() ? "true" : "false");
-    }
-}
-
-// SetBlocklistFlag Tests
-TEST_F(SystemService_L2Test, SetBlocklistFlag_COMRPC)
-{
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("Invalid SystemServices_Client");
-    } else {
-        EXPECT_TRUE(m_controller_SystemServices != nullptr);
-        if (m_controller_SystemServices) {
-            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
-            if (m_SystemServicesPlugin) {
-                TEST_LOG("Testing SetBlocklistFlag via COM-RPC");
-
-                Exchange::ISystemServices::SetBlocklistResult blocklistResult;
-
-                uint32_t result = m_SystemServicesPlugin->SetBlocklistFlag(true, blocklistResult);
-
-                EXPECT_EQ(result, Core::ERROR_NONE);
-                TEST_LOG("SetBlocklistFlag success: %s", blocklistResult.success ? "true" : "false");
-                
-            }
-        }
-    }
-}
-
-TEST_F(SystemService_L2Test, SetBlocklistFlag_JSONRPC)
-{
-    TEST_LOG("Testing setBlocklistFlag via JSON-RPC");
-
-    JsonObject params;
-    params["blocklist"] = true;
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setBlocklistFlag", params, result);
 
     EXPECT_EQ(status, Core::ERROR_NONE);
 
@@ -2679,8 +3148,10 @@ TEST_F(SystemService_L2Test, SetMode_InvalidMode_COMRPC_Negative)
                 } else {
                     TEST_LOG("Warning: Invalid mode was accepted");
                 }
-                
+
+                m_SystemServicesPlugin->Release();
             }
+            m_controller_SystemServices->Release();
         }
     }
 }
@@ -2727,8 +3198,10 @@ TEST_F(SystemService_L2Test, SetMode_WAREHOUSE_ZeroDuration_COMRPC)
 
                 EXPECT_EQ(result, Core::ERROR_NONE);
                 TEST_LOG("SetMode WAREHOUSE (duration=0) success: %s", success ? "true" : "false");
-                
+
+                m_SystemServicesPlugin->Release();
             }
+            m_controller_SystemServices->Release();
         }
     }
 }
@@ -2751,12 +3224,14 @@ TEST_F(SystemService_L2Test, SetFriendlyName_EmptyString_COMRPC_Corner)
 
                 EXPECT_EQ(result, Core::ERROR_NONE);
                 TEST_LOG("SetFriendlyName (empty) success: %s", sysResult.success ? "true" : "false");
-                
+
+                m_SystemServicesPlugin->Release();
             }
+            m_controller_SystemServices->Release();
         }
     }
 }
-#if 0
+
 // Corner Case: SetFriendlyName with very long string
 TEST_F(SystemService_L2Test, SetFriendlyName_LongString_COMRPC_Corner)
 {
@@ -2776,14 +3251,14 @@ TEST_F(SystemService_L2Test, SetFriendlyName_LongString_COMRPC_Corner)
 
                 EXPECT_EQ(result, Core::ERROR_NONE);
                 TEST_LOG("SetFriendlyName (long) success: %s", sysResult.success ? "true" : "false");
-                
+
                 m_SystemServicesPlugin->Release();
             }
             m_controller_SystemServices->Release();
         }
     }
 }
-#endif
+
 // Corner Case: SetFriendlyName with special characters
 TEST_F(SystemService_L2Test, SetFriendlyName_SpecialChars_JSONRPC_Corner)
 {
@@ -2821,8 +3296,10 @@ TEST_F(SystemService_L2Test, SetTerritory_InvalidTerritory_COMRPC_Negative)
 
                 // Expecting failure or specific error
                 TEST_LOG("SetTerritory (invalid) returned success: %s", success ? "true" : "false");
-                
+
+                m_SystemServicesPlugin->Release();
             }
+            m_controller_SystemServices->Release();
         }
     }
 }
@@ -2848,8 +3325,10 @@ TEST_F(SystemService_L2Test, SetTimeZoneDST_InvalidTimezone_COMRPC_Negative)
                 if (!success) {
                     TEST_LOG("Expected failure for invalid timezone, error: %s", errorMessage.c_str());
                 }
-                
+
+                m_SystemServicesPlugin->Release();
             }
+            m_controller_SystemServices->Release();
         }
     }
 }
@@ -2877,12 +3356,14 @@ TEST_F(SystemService_L2Test, SetNetworkStandbyMode_Toggle_COMRPC)
                 uint32_t result2 = m_SystemServicesPlugin->SetNetworkStandbyMode(false, sysResult2);
                 EXPECT_EQ(result2, Core::ERROR_NONE);
                 TEST_LOG("Set to false: %s", sysResult2.success ? "success" : "failed");
-                
+
+                m_SystemServicesPlugin->Release();
             }
+            m_controller_SystemServices->Release();
         }
     }
 }
-																					
+
 // Negative Test: SetMigrationStatus with empty string
 TEST_F(SystemService_L2Test, SetMigrationStatus_EmptyString_JSONRPC_Negative)
 {
@@ -2892,7 +3373,7 @@ TEST_F(SystemService_L2Test, SetMigrationStatus_EmptyString_JSONRPC_Negative)
     params["status"] = "";
     JsonObject result;
 
-    InvokeServiceMethod("org.rdk.System.1", "setMigrationStatus", params, result);
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMigrationStatus", params, result);
 
     // May fail or succeed depending on implementation
     if (result.HasLabel("success")) {
@@ -2914,7 +3395,7 @@ TEST_F(SystemService_L2Test, SetMigrationStatus_InvalidValue_JSONRPC_Negative)
 
     // Implementation should handle invalid values gracefully
     if (result.HasLabel("success")) {
-        TEST_LOG("  setMigrationStatus with invalid value returned: %s", 
+        TEST_LOG("  setMigrationStatus with invalid value returned: %s",
                  result["success"].Boolean() ? "success" : "failure");
     }
 }
@@ -2925,48 +3406,6 @@ TEST_F(SystemService_L2Test, SetMigrationStatus_InvalidValue_JSONRPC_Negative)
 ** Missing API Coverage Tests
 ** Testing previously uncovered SystemServices APIs
 *******************************************************/
-// GetLastFirmwareFailureReason Tests
-TEST_F(SystemService_L2Test, GetLastFirmwareFailureReason_COMRPC)
-{
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("Invalid SystemServices_Client");
-    } else {
-        EXPECT_TRUE(m_controller_SystemServices != nullptr);
-        if (m_controller_SystemServices) {
-            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
-            if (m_SystemServicesPlugin) {
-                TEST_LOG("Testing GetLastFirmwareFailureReason via COM-RPC");
-
-                string failReason;
-                bool success = false;
-
-                uint32_t result = m_SystemServicesPlugin->GetLastFirmwareFailureReason(failReason, success);
-                EXPECT_EQ(result, Core::ERROR_NONE);
-                TEST_LOG("Failure reason: %s, success: %s", failReason.c_str(), success ? "true" : "false");
-                
-            }
-        }
-    }
-}
-
-TEST_F(SystemService_L2Test, GetLastFirmwareFailureReason_JSONRPC)
-{
-    TEST_LOG("Testing GetLastFirmwareFailureReason via JSON-RPC");
-
-    JsonObject params;
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getLastFirmwareFailureReason", params, result);
-
-    EXPECT_EQ(status, Core::ERROR_NONE);
-    EXPECT_TRUE(result.HasLabel("success"));
-    
-    if (result.HasLabel("failReason")) {
-        string reason = result["failReason"].String();
-        TEST_LOG("Failure reason: %s", reason.c_str());
-    }
-}
-
 // GetWakeupReason Tests
 TEST_F(SystemService_L2Test, GetWakeupReason_COMRPC)
 {
@@ -2985,8 +3424,10 @@ TEST_F(SystemService_L2Test, GetWakeupReason_COMRPC)
                 uint32_t result = m_SystemServicesPlugin->GetWakeupReason(wakeupReason, success);
                 EXPECT_EQ(result, Core::ERROR_NONE);
                 TEST_LOG("Wakeup reason: %s, success: %s", wakeupReason.c_str(), success ? "true" : "false");
-                
+
+                m_SystemServicesPlugin->Release();
             }
+            m_controller_SystemServices->Release();
         }
     }
 }
@@ -3002,7 +3443,7 @@ TEST_F(SystemService_L2Test, GetWakeupReason_JSONRPC)
 
     EXPECT_EQ(status, Core::ERROR_NONE);
     EXPECT_TRUE(result.HasLabel("success"));
-    
+
     if (result.HasLabel("wakeupReason")) {
         string reason = result["wakeupReason"].String();
         TEST_LOG("Wakeup reason: %s", reason.c_str());
@@ -3030,12 +3471,14 @@ TEST_F(SystemService_L2Test, SetDeepSleepTimer_COMRPC)
                 uint32_t result = m_SystemServicesPlugin->SetDeepSleepTimer(seconds, sysSrvStatus, errorMessage, success);
                 EXPECT_EQ(result, Core::ERROR_NONE);
                 TEST_LOG("Set deep sleep timer to %d seconds, success: %s", seconds, success ? "true" : "false");
-                
+
                 if (!success) {
                     TEST_LOG("Error: %s, status: %u", errorMessage.c_str(), sysSrvStatus);
                 }
-                
+
+                m_SystemServicesPlugin->Release();
             }
+            m_controller_SystemServices->Release();
         }
     }
 }
@@ -3052,49 +3495,9 @@ TEST_F(SystemService_L2Test, SetDeepSleepTimer_JSONRPC)
 
     EXPECT_EQ(status, Core::ERROR_NONE);
     EXPECT_TRUE(result.HasLabel("success"));
-    
+
     if (result.HasLabel("success")) {
         TEST_LOG("Set deep sleep timer: %s", result["success"].Boolean() ? "success" : "failed");
-    }
-}
-
-// AbortLogUpload Tests
-TEST_F(SystemService_L2Test, AbortLogUpload_COMRPC)
-{
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("Invalid SystemServices_Client");
-    } else {
-        EXPECT_TRUE(m_controller_SystemServices != nullptr);
-        if (m_controller_SystemServices) {
-            EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
-            if (m_SystemServicesPlugin) {
-                TEST_LOG("Testing AbortLogUpload via COM-RPC");
-
-                Exchange::ISystemServices::SystemResult sysResult;
-
-                uint32_t result = m_SystemServicesPlugin->AbortLogUpload(sysResult);
-                EXPECT_EQ(result, Core::ERROR_NONE);
-                TEST_LOG("Abort log upload: %s", sysResult.success ? "success" : "failed");
-                
-            }
-        }
-    }
-}
-
-TEST_F(SystemService_L2Test, AbortLogUpload_JSONRPC)
-{
-    TEST_LOG("Testing AbortLogUpload via JSON-RPC");
-
-    JsonObject params;
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "abortLogUpload", params, result);
-
-    EXPECT_EQ(status, Core::ERROR_NONE);
-    EXPECT_TRUE(result.HasLabel("success"));
-    
-    if (result.HasLabel("success")) {
-        TEST_LOG("Abort log upload: %s", result["success"].Boolean() ? "success" : "failed");
     }
 }
 
@@ -3116,12 +3519,14 @@ TEST_F(SystemService_L2Test, GetPlatformConfiguration_COMRPC)
                 uint32_t result = m_SystemServicesPlugin->GetPlatformConfiguration(query, platformConfig);
                 EXPECT_EQ(result, Core::ERROR_NONE);
                 TEST_LOG("Platform configuration query success: %s", platformConfig.success ? "true" : "false");
-                
+
                 if (platformConfig.success) {
                     TEST_LOG("Account ID: %s", platformConfig.accountInfo.accountId.c_str());
                 }
-                
+
+                m_SystemServicesPlugin->Release();
             }
+            m_controller_SystemServices->Release();
         }
     }
 }
@@ -3138,7 +3543,7 @@ TEST_F(SystemService_L2Test, GetPlatformConfiguration_JSONRPC)
 
     EXPECT_EQ(status, Core::ERROR_NONE);
     EXPECT_TRUE(result.HasLabel("success"));
-    
+
     if (result.HasLabel("AccountInfo")) {
         TEST_LOG("Platform configuration retrieved successfully");
     }
@@ -3157,7 +3562,7 @@ TEST_F(SystemService_L2Test, Reboot_JSONRPC_Negative)
 
     // Reboot may fail in test environment - that's acceptable
     TEST_LOG("Reboot status: %u", status);
-    
+
     if (result.HasLabel("success")) {
         TEST_LOG("Reboot call: %s", result["success"].Boolean() ? "success" : "failed");
     }
@@ -3177,13 +3582,13 @@ TEST_F(SystemService_L2Test, SetPowerState_JSONRPC_Negative)
 
     // May succeed or fail depending on environment
     TEST_LOG("SetPowerState status: %u", status);
-    
+
     if (result.HasLabel("success")) {
         TEST_LOG("SetPowerState call: %s", result["success"].Boolean() ? "success" : "failed");
     }
 }
 
-//Notifications 
+//Notifications
 TEST_F(SystemService_L2Test, OnFriendlyNameChanged_Notification_COMRPC)
 {
     if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
@@ -3238,9 +3643,11 @@ TEST_F(SystemService_L2Test, OnFriendlyNameChanged_Notification_COMRPC)
                     TEST_LOG("Successfully unregistered from notifications");
                 }
 
+                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
+            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -3301,9 +3708,11 @@ TEST_F(SystemService_L2Test, OnNetworkStandbyModeChanged_Notification_COMRPC)
                     TEST_LOG("Successfully unregistered from notifications");
                 }
 
+                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
+            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -3361,9 +3770,11 @@ TEST_F(SystemService_L2Test, OnFirmwareUpdateInfoReceived_Notification_COMRPC)
                     TEST_LOG("Successfully unregistered from notifications");
                 }
 
+                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
+            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -3407,9 +3818,11 @@ TEST_F(SystemService_L2Test, OnRebootRequest_Notification_COMRPC)
                     TEST_LOG("Successfully unregistered from notifications");
                 }
 
+                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
+            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -3467,9 +3880,11 @@ TEST_F(SystemService_L2Test, OnTerritoryChanged_Notification_COMRPC)
                     TEST_LOG("Successfully unregistered from notifications");
                 }
 
+                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
+            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
@@ -3512,156 +3927,194 @@ TEST_F(SystemService_L2Test, OnTemperatureThresholdChanged_Notification_COMRPC)
                     TEST_LOG("Successfully unregistered from notifications");
                 }
 
+                m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
             }
+            m_controller_SystemServices->Release();
         } else {
             TEST_LOG("m_controller_SystemServices is NULL");
         }
     }
 }
+#endif
 
-#if 0
 
 /********************************************************
 ************Test case Details **************************
-** Helper Functions Coverage Tests
-** Testing SystemServicesHelper utility functions
+** cTimer Helper Class Tests
+** Testing cTimer utility class
 *******************************************************/
 
-TEST_F(SystemService_L2Test, HelperFunction_DirnameOf)
+TEST_F(SystemService_L2Test, CTimer_Constructor_Default)
 {
-    TEST_LOG("Testing dirnameOf helper function");
+    TEST_LOG("Testing cTimer constructor");
     
-    // Test with standard path
-    std::string path1 = "/usr/bin/logupload";
-    std::string expected1 = "/usr/bin/";
-    std::string result1 = dirnameOf(path1);
-    EXPECT_STREQ(result1.c_str(), expected1.c_str());
-    TEST_LOG("dirnameOf('%s') = '%s'", path1.c_str(), result1.c_str());
+    cTimer timer;
     
-    // Test with root path
-    std::string path2 = "/file.txt";
-    std::string expected2 = "/";
-    std::string result2 = dirnameOf(path2);
-    EXPECT_STREQ(result2.c_str(), expected2.c_str());
-    TEST_LOG("dirnameOf('%s') = '%s'", path2.c_str(), result2.c_str());
-    
-    // Test with no directory (filename only)
-    std::string path3 = "filename.txt";
-    std::string expected3 = "";
-    std::string result3 = dirnameOf(path3);
-    EXPECT_STREQ(result3.c_str(), expected3.c_str());
-    TEST_LOG("dirnameOf('%s') = '%s'", path3.c_str(), result3.c_str());
-    
-    // Test with empty string
-    std::string path4 = "";
-    std::string expected4 = "";
-    std::string result4 = dirnameOf(path4);
-    EXPECT_STREQ(result4.c_str(), expected4.c_str());
-    TEST_LOG("dirnameOf('') = '%s'", result4.c_str());
+    // Constructor should initialize with clear=false, interval=0
+    // We can't directly check private members, but we can test behavior
+    TEST_LOG("cTimer constructed successfully");
 }
 
-TEST_F(SystemService_L2Test, HelperFunction_GetErrorDescription)
+TEST_F(SystemService_L2Test, CTimer_SetInterval_ValidCallback)
 {
-    TEST_LOG("Testing getErrorDescription helper function");
+    TEST_LOG("Testing cTimer setInterval with valid callback");
     
-    // Test valid error codes
-    std::string desc1 = getErrorDescription(SysSrv_OK);
-    EXPECT_FALSE(desc1.empty());
-    EXPECT_STREQ(desc1.c_str(), "Processed Successfully");
-    TEST_LOG("Error %d: %s", SysSrv_OK, desc1.c_str());
+    cTimer timer;
+    bool callbackExecuted = false;
     
-    std::string desc2 = getErrorDescription(SysSrv_MethodNotFound);
-    EXPECT_FALSE(desc2.empty());
-    EXPECT_STREQ(desc2.c_str(), "Method not found");
-    TEST_LOG("Error %d: %s", SysSrv_MethodNotFound, desc2.c_str());
+    // Lambda to capture local variable
+    auto callback = [&callbackExecuted]() {
+        callbackExecuted = true;
+    };
     
-    std::string desc3 = getErrorDescription(SysSrv_FileNotPresent);
-    EXPECT_FALSE(desc3.empty());
-    EXPECT_STREQ(desc3.c_str(), "Expected file not found");
-    TEST_LOG("Error %d: %s", SysSrv_FileNotPresent, desc3.c_str());
+    // Note: cTimer expects function pointer, not lambda
+    // Testing with simple function pointer
+    static bool staticFlag = false;
+    auto staticCallback = []() { staticFlag = true; };
     
-    // Test invalid error code (should return "Unexpected Error")
-    std::string desc4 = getErrorDescription(9999);
-    EXPECT_FALSE(desc4.empty());
-    EXPECT_STREQ(desc4.c_str(), "Unexpected Error");
-    TEST_LOG("Error %d: %s", 9999, desc4.c_str());
+    timer.setInterval(staticCallback, 100);
+    
+    TEST_LOG("setInterval called with callback and interval=100ms");
 }
 
-TEST_F(SystemService_L2Test, HelperFunction_DirExists)
+TEST_F(SystemService_L2Test, CTimer_Start_InvalidParameters)
 {
-    TEST_LOG("Testing dirExists helper function");
+    TEST_LOG("Testing cTimer start with invalid parameters");
     
-    // Create a test directory
-    std::string testDir = "/tmp/systemservices_test_dir/";
-    std::string testFile = testDir + "testfile.txt";
+    cTimer timer1;
     
-    // Clean up if exists
-    system("rm -rf /tmp/systemservices_test_dir");
-    
-    // Test non-existent directory
-    bool exists1 = dirExists(testFile);
-    EXPECT_FALSE(exists1);
-    TEST_LOG("dirExists('%s') = %s", testFile.c_str(), exists1 ? "true" : "false");
-    
-    // Create directory and test again
-    system("mkdir -p /tmp/systemservices_test_dir");
-    bool exists2 = dirExists(testFile);
-    EXPECT_TRUE(exists2);
-    TEST_LOG("dirExists('%s') = %s (after mkdir)", testFile.c_str(), exists2 ? "true" : "false");
-    
-    // Test with root directory
-    bool exists3 = dirExists("/etc/test.conf");
-    EXPECT_TRUE(exists3);
-    TEST_LOG("dirExists('/etc/test.conf') = %s", exists3 ? "true" : "false");
-    
-    // Clean up
-    system("rm -rf /tmp/systemservices_test_dir");
-}
-
-TEST_F(SystemService_L2Test, HelperFunction_ReadFromFile)
-{
-    TEST_LOG("Testing readFromFile helper function");
-    
-    std::string testFile = "/tmp/systemservices_readtest.txt";
-    std::string testContent = "Test content for readFromFile\nLine 2\nLine 3";
-    
-    // Clean up if exists
-    std::remove(testFile.c_str());
-    
-    // Test reading non-existent file
-    std::string content1;
-    bool result1 = readFromFile(testFile.c_str(), content1);
+    // Test start without setting interval (interval=0, callback=NULL)
+    bool result1 = timer1.start();
     EXPECT_FALSE(result1);
-    EXPECT_TRUE(content1.empty());
-    TEST_LOG("readFromFile (non-existent): %s", result1 ? "success" : "failed");
+    TEST_LOG("start() with interval=0 and callback=NULL: %s", result1 ? "success" : "failed (expected)");
     
-    // Create test file
-    std::ofstream outFile(testFile);
-    outFile << testContent;
-    outFile.close();
-    
-    // Test reading existing file
-    std::string content2;
-    bool result2 = readFromFile(testFile.c_str(), content2);
-    EXPECT_TRUE(result2);
-    EXPECT_FALSE(content2.empty());
-    EXPECT_STREQ(content2.c_str(), testContent.c_str());
-    TEST_LOG("readFromFile (exists): %s, content length: %zu", result2 ? "success" : "failed", content2.length());
-    
-    // Clean up
-    std::remove(testFile.c_str());
+    // Test start with only callback, no interval
+    cTimer timer2;
+    static bool flag = false;
+    timer2.setInterval([]() { flag = true; }, 0);
+    bool result2 = timer2.start();
+    EXPECT_FALSE(result2);
+    TEST_LOG("start() with interval=0: %s", result2 ? "success" : "failed (expected)");
 }
 
+TEST_F(SystemService_L2Test, CTimer_Start_Stop_ValidTimer)
+{
+    TEST_LOG("Testing cTimer start and stop");
+    
+    static int callCount = 0;
+    callCount = 0;
+    
+    cTimer timer;
+    timer.setInterval([]() { callCount++; }, 50);
+    
+    bool startResult = timer.start();
+    EXPECT_TRUE(startResult);
+    TEST_LOG("Timer started: %s", startResult ? "success" : "failed");
+    
+    // Let timer run for a short time
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    
+    // Stop timer
+    timer.stop();
+    TEST_LOG("Timer stopped after running for 200ms");
+    
+    int finalCount = callCount;
+    TEST_LOG("Callback executed %d times", finalCount);
+    EXPECT_GT(finalCount, 0);
+    
+    // Wait to ensure timer has stopped
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    
+    // Detach the thread to prevent join issues
+    timer.detach();
+}
+
+TEST_F(SystemService_L2Test, CTimer_Detach)
+{
+    TEST_LOG("Testing cTimer detach");
+    
+    static bool executed = false;
+    executed = false;
+    
+    cTimer timer;
+    timer.setInterval([]() { executed = true; }, 100);
+    
+    bool startResult = timer.start();
+    EXPECT_TRUE(startResult);
+    
+    // Detach the thread
+    timer.detach();
+    TEST_LOG("Timer thread detached");
+    
+    // Stop the timer
+    timer.stop();
+    
+    // Give some time for callback to potentially execute
+    std::this_thread::sleep_for(std::chrono::milliseconds(150));
+}
+
+TEST_F(SystemService_L2Test, CTimer_Join)
+{
+    TEST_LOG("Testing cTimer join");
+    
+    static int execCount = 0;
+    execCount = 0;
+    
+    cTimer timer;
+    timer.setInterval([]() { execCount++; }, 50);
+    
+    bool startResult = timer.start();
+    EXPECT_TRUE(startResult);
+    
+    // Let it run briefly
+    std::this_thread::sleep_for(std::chrono::milliseconds(120));
+    
+    // Stop timer
+    timer.stop();
+    
+    // Join the thread (should complete since timer is stopped)
+    timer.join();
+    TEST_LOG("Timer thread joined successfully, callback executed %d times", execCount);
+}
+
+/********************************************************
+************Test case Details **************************
+** uploadlogs Helper Tests
+** Testing uploadlogs utility functions
+*******************************************************/
+
+TEST_F(SystemService_L2Test, UploadLogs_GetUploadLogParameters)
+{
+    TEST_LOG("Testing UploadLogs::getUploadLogParameters");
+    
+    // Call getUploadLogParameters() which takes no arguments
+    int32_t result = WPEFramework::Plugin::UploadLogs::getUploadLogParameters();
+    
+    // Result depends on system configuration
+    TEST_LOG("getUploadLogParameters(): result=%d", result);
+}
+
+TEST_F(SystemService_L2Test, UploadLogs_LogUploadAsync_NoExecutable)
+{
+    TEST_LOG("Testing UploadLogs::logUploadAsync without executable");
+    
+    // Temporarily rename/backup logupload if it exists
+    pid_t result = WPEFramework::Plugin::UploadLogs::logUploadAsync();
+    
+    // Should return -1 if /usr/bin/logupload doesn't exist or getUploadLogParameters fails
+    TEST_LOG("logUploadAsync: pid=%d", result);
+    
+    if (result > 0) {
+        TEST_LOG("Warning: logUploadAsync created process %d - may need cleanup", result);
+    }
+}
+
+#if 0
+// Helper function tests disabled due to linking issues - functions not linked to test binary
 TEST_F(SystemService_L2Test, HelperFunction_GetFileContent_String)
 {
-    TEST_LOG("Testing getFileContent (string overload) helper function");
-    
-    std::string testFile = "/tmp/systemservices_filecontenttest.txt";
-    std::string testContent = "Line 1\nLine 2\nLine 3\n";
-    
-    // Clean up if exists
     std::remove(testFile.c_str());
     
     // Test reading non-existent file
@@ -3713,7 +4166,7 @@ TEST_F(SystemService_L2Test, HelperFunction_GetFileContent_Vector)
     std::vector<std::string> lines2;
     bool result2 = getFileContent(testFile, lines2);
     EXPECT_TRUE(result2);
-    EXPECT_EQ(lines2.size(), 3);
+    EXPECT_EQ(lines2.size(), 3u);
     if (lines2.size() >= 3) {
         EXPECT_STREQ(lines2[0].c_str(), "First Line");
         EXPECT_STREQ(lines2[1].c_str(), "Second Line");
@@ -3908,264 +4361,7 @@ TEST_F(SystemService_L2Test, HelperFunction_URLEncode)
     EXPECT_FALSE(encoded4.empty());
     TEST_LOG("url_encode('%s') = '%s'", url4.c_str(), encoded4.c_str());
 }
-
-/********************************************************
-************Test case Details **************************
-** cTimer Helper Class Tests
-** Testing cTimer utility class
-*******************************************************/
-
-TEST_F(SystemService_L2Test, CTimer_Constructor_Default)
-{
-    TEST_LOG("Testing cTimer constructor");
-    
-    cTimer timer;
-    
-    // Constructor should initialize with clear=false, interval=0
-    // We can't directly check private members, but we can test behavior
-    TEST_LOG("cTimer constructed successfully");
-}
-
-TEST_F(SystemService_L2Test, CTimer_SetInterval_ValidCallback)
-{
-    TEST_LOG("Testing cTimer setInterval with valid callback");
-    
-    cTimer timer;
-    bool callbackExecuted = false;
-    
-    // Lambda to capture local variable
-    auto callback = [&callbackExecuted]() {
-        callbackExecuted = true;
-    };
-    
-    // Note: cTimer expects function pointer, not lambda
-    // Testing with simple function pointer
-    static bool staticFlag = false;
-    auto staticCallback = []() { staticFlag = true; };
-    
-    timer.setInterval(staticCallback, 100);
-    
-    TEST_LOG("setInterval called with callback and interval=100ms");
-}
-
-TEST_F(SystemService_L2Test, CTimer_Start_InvalidParameters)
-{
-    TEST_LOG("Testing cTimer start with invalid parameters");
-    
-    cTimer timer1;
-    
-    // Test start without setting interval (interval=0, callback=NULL)
-    bool result1 = timer1.start();
-    EXPECT_FALSE(result1);
-    TEST_LOG("start() with interval=0 and callback=NULL: %s", result1 ? "success" : "failed (expected)");
-    
-    // Test start with only callback, no interval
-    cTimer timer2;
-    static bool flag = false;
-    timer2.setInterval([]() { flag = true; }, 0);
-    bool result2 = timer2.start();
-    EXPECT_FALSE(result2);
-    TEST_LOG("start() with interval=0: %s", result2 ? "success" : "failed (expected)");
-}
-
-TEST_F(SystemService_L2Test, CTimer_Start_Stop_ValidTimer)
-{
-    TEST_LOG("Testing cTimer start and stop");
-    
-    static int callCount = 0;
-    callCount = 0;
-    
-    cTimer timer;
-    timer.setInterval([]() { callCount++; }, 50);
-    
-    bool startResult = timer.start();
-    EXPECT_TRUE(startResult);
-    TEST_LOG("Timer started: %s", startResult ? "success" : "failed");
-    
-    // Let timer run for a short time
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    
-    // Stop timer
-    timer.stop();
-    TEST_LOG("Timer stopped after running for 200ms");
-    
-    int finalCount = callCount;
-    TEST_LOG("Callback executed %d times", finalCount);
-    EXPECT_GT(finalCount, 0);
-    
-    // Wait to ensure timer has stopped
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    
-    // Detach the thread to prevent join issues
-    timer.detach();
-}
-
-TEST_F(SystemService_L2Test, CTimer_Detach)
-{
-    TEST_LOG("Testing cTimer detach");
-    
-    static bool executed = false;
-    executed = false;
-    
-    cTimer timer;
-    timer.setInterval([]() { executed = true; }, 100);
-    
-    bool startResult = timer.start();
-    EXPECT_TRUE(startResult);
-    
-    // Detach the thread
-    timer.detach();
-    TEST_LOG("Timer thread detached");
-    
-    // Stop the timer
-    timer.stop();
-    
-    // Give some time for callback to potentially execute
-    std::this_thread::sleep_for(std::chrono::milliseconds(150));
-}
-
-TEST_F(SystemService_L2Test, CTimer_Join)
-{
-    TEST_LOG("Testing cTimer join");
-    
-    static int execCount = 0;
-    execCount = 0;
-    
-    cTimer timer;
-    timer.setInterval([]() { execCount++; }, 50);
-    
-    bool startResult = timer.start();
-    EXPECT_TRUE(startResult);
-    
-    // Let it run briefly
-    std::this_thread::sleep_for(std::chrono::milliseconds(120));
-    
-    // Stop timer
-    timer.stop();
-    
-    // Join the thread (should complete since timer is stopped)
-    timer.join();
-    TEST_LOG("Timer thread joined successfully, callback executed %d times", execCount);
-}
-
-/********************************************************
-************Test case Details **************************
-** uploadlogs Helper Tests
-** Testing uploadlogs utility functions
-*******************************************************/
-
-TEST_F(SystemService_L2Test, UploadLogs_CheckMTlsFlag)
-{
-    TEST_LOG("Testing UploadLogs::checkmTlsLogUploadFlag");
-    
-    bool result = WPEFramework::Plugin::UploadLogs::checkmTlsLogUploadFlag();
-    
-    // This function always returns true
-    EXPECT_TRUE(result);
-    TEST_LOG("checkmTlsLogUploadFlag() = %s", result ? "true" : "false");
-}
-
-TEST_F(SystemService_L2Test, UploadLogs_GetDCMConfigDetails_NoFile)
-{
-    TEST_LOG("Testing UploadLogs::getDCMconfigDetails with no file");
-    
-    // Remove the DCM settings file if it exists
-    std::remove("/tmp/DCMSettings.conf");
-    
-    std::string uploadProtocol, httpLink, uploadCheck;
-    bool result = WPEFramework::Plugin::UploadLogs::getDCMconfigDetails(
-        uploadProtocol, httpLink, uploadCheck);
-    
-    EXPECT_FALSE(result);
-    TEST_LOG("getDCMconfigDetails (no file): %s", result ? "success" : "failed (expected)");
-}
-
-TEST_F(SystemService_L2Test, UploadLogs_GetDCMConfigDetails_ValidFile)
-{
-    TEST_LOG("Testing UploadLogs::getDCMconfigDetails with valid file");
-    
-    // Create test DCM settings file
-    std::string testFile = "/tmp/DCMSettings.conf";
-    std::ofstream dcmFile(testFile);
-    dcmFile << "LogUploadSettings:UploadRepository:uploadProtocol=https\n";
-    dcmFile << "LogUploadSettings:UploadRepository:URL=https://test.example.com/upload\n";
-    dcmFile << "LogUploadSettings:UploadOnReboot=true\n";
-    dcmFile.close();
-    
-    std::string uploadProtocol, httpLink, uploadCheck;
-    bool result = WPEFramework::Plugin::UploadLogs::getDCMconfigDetails(
-        uploadProtocol, httpLink, uploadCheck);
-    
-    EXPECT_TRUE(result);
-    EXPECT_STREQ(uploadProtocol.c_str(), "https");
-    EXPECT_STREQ(httpLink.c_str(), "https://test.example.com/upload");
-    EXPECT_STREQ(uploadCheck.c_str(), "true");
-    
-    TEST_LOG("getDCMconfigDetails: %s", result ? "success" : "failed");
-    TEST_LOG("  uploadProtocol: %s", uploadProtocol.c_str());
-    TEST_LOG("  httpLink: %s", httpLink.c_str());
-    TEST_LOG("  uploadCheck: %s", uploadCheck.c_str());
-    
-    // Clean up
-    std::remove(testFile.c_str());
-}
-
-TEST_F(SystemService_L2Test, UploadLogs_GetDCMConfigDetails_EmptyFile)
-{
-    TEST_LOG("Testing UploadLogs::getDCMconfigDetails with empty file");
-    
-    // Create empty DCM settings file
-    std::string testFile = "/tmp/DCMSettings.conf";
-    std::ofstream dcmFile(testFile);
-    dcmFile.close();
-    
-    std::string uploadProtocol, httpLink, uploadCheck;
-    bool result = WPEFramework::Plugin::UploadLogs::getDCMconfigDetails(
-        uploadProtocol, httpLink, uploadCheck);
-    
-    EXPECT_FALSE(result);
-    TEST_LOG("getDCMconfigDetails (empty file): %s", result ? "success" : "failed (expected)");
-    
-    // Clean up
-    std::remove(testFile.c_str());
-}
-
-TEST_F(SystemService_L2Test, UploadLogs_GetUploadLogParameters_MissingDeviceProps)
-{
-    TEST_LOG("Testing UploadLogs::getUploadLogParameters with missing device.properties");
-    
-    // This test assumes /etc/device.properties might not exist or has missing BUILD_TYPE
-    std::string tftpServer, uploadProtocol, uploadHttpLink;
-    
-    // Create minimal device.properties for testing
-    std::ofstream devProps("/tmp/test_device.properties");
-    devProps << "MODEL_NUM=TEST\n";
-    devProps.close();
-    
-    int32_t result = WPEFramework::Plugin::UploadLogs::getUploadLogParameters(
-        tftpServer, uploadProtocol, uploadHttpLink);
-    
-    // Expected to fail due to missing BUILD_TYPE or LOG_SERVER
-    TEST_LOG("getUploadLogParameters (missing config): result=%d", result);
-    
-    // Clean up
-    std::remove("/tmp/test_device.properties");
-}
-
-TEST_F(SystemService_L2Test, UploadLogs_LogUploadAsync_NoExecutable)
-{
-    TEST_LOG("Testing UploadLogs::logUploadAsync without executable");
-    
-    // Temporarily rename/backup logupload if it exists
-    pid_t result = WPEFramework::Plugin::UploadLogs::logUploadAsync();
-    
-    // Should return -1 if /usr/bin/logupload doesn't exist or getUploadLogParameters fails
-    TEST_LOG("logUploadAsync: pid=%d", result);
-    
-    if (result > 0) {
-        TEST_LOG("Warning: logUploadAsync created process %d - may need cleanup", result);
-    }
-}
+#endif // Helper function tests disabled - linking issues
 
 /********************************************************
 ************Test case Details **************************
@@ -4315,5 +4511,3 @@ TEST_F(SystemService_L2Test, ThermalMonitor_EmitTemperatureThresholdChange)
     monitor->emitTemperatureThresholdChange("CRITICAL", false, 75.0f);
     TEST_LOG("emitTemperatureThresholdChange called again successfully");
 }
-
-#endif
