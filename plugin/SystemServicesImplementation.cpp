@@ -239,6 +239,7 @@ namespace WPEFramework
         static void _deviceMgtUpdateReceived(const char *owner,
                 IARM_EventId_t eventId, void *data, size_t len);	
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
+	static std::string extractMacAddress(const std::string& raw);
 
         SERVICE_REGISTRATION(SystemServicesImplementation, 1, 0);
         SystemServicesImplementation* SystemServicesImplementation::_instance = nullptr;
@@ -3498,6 +3499,18 @@ namespace WPEFramework
             return Core::ERROR_NONE;
         }
 
+        static std::string extractMacAddress(const std::string& raw)
+        {
+            static const std::regex kMacPattern("([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5})");
+            std::smatch macMatch;
+
+            if (std::regex_search(raw, macMatch, kMacPattern)) {
+                return macMatch[1].str();
+            }
+
+            return "";
+        }
+
         Core::hresult SystemServicesImplementation::GetDeviceInfo( IStringIterator* const& params, DeviceInfo& deviceInfo)
         {
             string queryParam;
@@ -3731,12 +3744,13 @@ namespace WPEFramework
                 }
                 v_secure_pclose(fp);
 
-                deviceInfo.bluetoothMac = oss.str();
+                deviceInfo.bluetoothMac = extractMacAddress(oss.str());
 
                 // Remove trailing newline if present
                 if (!deviceInfo.bluetoothMac.empty() && deviceInfo.bluetoothMac.back() == '\n') {
                     deviceInfo.bluetoothMac.pop_back();
                 }
+
             }
             
             if (queryParam.empty() || queryParam == "boxIP")
