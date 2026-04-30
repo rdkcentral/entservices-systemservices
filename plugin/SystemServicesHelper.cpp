@@ -124,13 +124,13 @@ namespace WPEFramework {
          * @param2[out]: "response" JSON Object which is returned by the API
          with updated module error status.
          */
-        void populateResponseWithError(int errorCode, JsonObject& response)
+        void populateResponseWithError(int errorCode, uint32_t &SysSrv_Status , std::string &errorMessage)
         {
             if (errorCode) {
                 LOGWARN("Method %s failed; reason : %s\n", __FUNCTION__,
                         getErrorDescription(errorCode).c_str());
-                response["SysSrv_Status"] = static_cast<uint32_t>(errorCode);
-                response["errorMessage"] = getErrorDescription(errorCode);
+                SysSrv_Status = static_cast<uint32_t>(errorCode);
+                errorMessage = getErrorDescription(errorCode);
             }
         }
 
