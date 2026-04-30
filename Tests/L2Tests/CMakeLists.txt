@@ -24,10 +24,6 @@ find_package(${NAMESPACE}Plugins REQUIRED)
 
 if(PLUGIN_SYSTEMSERVICES)
     set(SRC_FILES ${SRC_FILES} tests/SystemService_L2Test.cpp)
-    set(SRC_FILES ${SRC_FILES} ../../plugin/cTimer.cpp)
-    set(SRC_FILES ${SRC_FILES} ../../plugin/uploadlogs.cpp)
-    set(SRC_FILES ${SRC_FILES} ../../plugin/SystemServicesHelper.cpp)
-    set(SRC_FILES ${SRC_FILES} ../../plugin/thermonitor.cpp)
 endif()
 
 add_library(${MODULE_NAME} SHARED ${SRC_FILES})
