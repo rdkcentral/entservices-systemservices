@@ -20,6 +20,7 @@
 #include "platformcapsdata.h"
 
 #include <regex>
+#include <unordered_map>
 
 namespace {
   string stringFromHex(const string &hex) {
@@ -43,13 +44,29 @@ namespace Plugin {
  */
  
 string PlatformCapsData::GetModel() {
-  return jsonRpc.invoke(_T("org.rdk.System"),
-                        _T("getDeviceInfo"), 5000)
-      .Get(_T("model_number")).String();
+  string model;
+
+  Exchange::IDeviceInfo* deviceInfoPlugin = _service->QueryInterfaceByCallsign<Exchange::IDeviceInfo>("DeviceInfo");
+
+  if (deviceInfoPlugin != nullptr) {
+    Exchange::IDeviceInfo::DeviceModelNo modelNo;
+    uint32_t result = deviceInfoPlugin->Sku(modelNo);
+
+    if (result == Core::ERROR_NONE) {
+      model = modelNo.sku;
+    } else {
+      TRACE(Trace::Error, (_T("DeviceInfo Sku() failed with error code: %u\n"), result));
+    }
+
+    deviceInfoPlugin->Release();
+  } else {
+    TRACE(Trace::Error, (_T("Failed to get IDeviceInfo interface for DeviceInfo plugin\n")));
+  }
+
+  return model;
 }
 
 string PlatformCapsData::GetDeviceType() {
-  const char* device_type;
   string deviceType;
 
   if (authservicePlugin != nullptr)
@@ -74,14 +91,37 @@ string PlatformCapsData::GetDeviceType() {
   else
   {
     TRACE(Trace::Error, (_T("AuthService plugin is not available.\n")));
-    deviceType = jsonRpc.invoke(_T("org.rdk.System"),
-                        _T("getDeviceInfo"), 10000)
-    .Get(_T("device_type")).String();
-    // Perform the conversion logic if we found the deviceType in device.properties
-    // as it doesnt comply with plugin spec. See RDKEMW-276
-    device_type = deviceType.c_str();
-    deviceType = (strcmp("mediaclient", device_type) == 0) ? "IpStb" :
-        (strcmp("hybrid", device_type) == 0) ? "QamIpStb" : "TV";
+
+    Exchange::IDeviceInfo* deviceInfoPlugin = _service->QueryInterfaceByCallsign<Exchange::IDeviceInfo>("DeviceInfo");
+
+    if (deviceInfoPlugin != nullptr) {
+      Exchange::IDeviceInfo::DeviceTypeInfos deviceTypeInfos;
+      uint32_t result = deviceInfoPlugin->DeviceType(deviceTypeInfos);
+
+      if (result == Core::ERROR_NONE) {
+        // Map enum to string values
+        static const std::unordered_map<Exchange::IDeviceInfo::DeviceTypeInfo, std::string> typeToString = {
+          {Exchange::IDeviceInfo::DEVICE_TYPE_IPTV,     "IpTv"},
+          {Exchange::IDeviceInfo::DEVICE_TYPE_IPSTB,    "IpStb"},
+          {Exchange::IDeviceInfo::DEVICE_TYPE_QAMIPSTB, "QamIpStb"},
+        };
+
+        auto it = typeToString.find(deviceTypeInfos.devicetype);
+        if (it != typeToString.end()) {
+          deviceType = it->second;
+        } else {
+          deviceType = "TV"; // Default fallback
+        }
+      } else {
+        TRACE(Trace::Error, (_T("DeviceInfo DeviceType() failed with error code: %u\n"), result));
+        deviceType = "TV"; // Default fallback on error
+      }
+
+      deviceInfoPlugin->Release();
+    } else {
+      TRACE(Trace::Error, (_T("Failed to get IDeviceInfo interface for DeviceInfo plugin\n")));
+      deviceType = "TV"; // Default fallback if plugin not available
+    }
   }
   return deviceType;
 }
@@ -171,9 +211,26 @@ string PlatformCapsData::GetExperience() {
 }
 
 string PlatformCapsData::GetDdeviceMACAddress() {
-  return jsonRpc.invoke(_T("org.rdk.System"),
-                        _T("getDeviceInfo"), 5000)
-      .Get(_T("estb_mac")).String();
+  string macAddress;
+
+  Exchange::IDeviceInfo* deviceInfoPlugin = _service->QueryInterfaceByCallsign<Exchange::IDeviceInfo>("DeviceInfo");
+
+  if (deviceInfoPlugin != nullptr) {
+    Exchange::IDeviceInfo::StbMac stbMac;
+    uint32_t result = deviceInfoPlugin->EstbMac(stbMac);
+
+    if (result == Core::ERROR_NONE) {
+      macAddress = stbMac.estbMac;
+    } else {
+      TRACE(Trace::Error, (_T("DeviceInfo EstbMac() failed with error code: %u\n"), result));
+    }
+
+    deviceInfoPlugin->Release();
+  } else {
+    TRACE(Trace::Error, (_T("Failed to get IDeviceInfo interface for DeviceInfo plugin\n")));
+  }
+
+  return macAddress;
 }
 
 string PlatformCapsData::GetPublicIP() {

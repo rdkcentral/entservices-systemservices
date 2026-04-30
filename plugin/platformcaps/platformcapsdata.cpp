@@ -117,8 +117,11 @@ namespace {
 namespace WPEFramework {
 namespace Plugin {
 
-PlatformCapsData::PlatformCapsData(PluginHost::IShell* service) : jsonRpc(service)
+PlatformCapsData::PlatformCapsData(PluginHost::IShell* service) : jsonRpc(service), _service(service)
 {
+  ASSERT(_service != nullptr);
+  _service->AddRef();
+
   authservicePlugin = service->QueryInterfaceByCallsign<Exchange::IAuthService>("org.rdk.AuthService");
   if (authservicePlugin)
   {
@@ -134,6 +137,11 @@ PlatformCapsData::~PlatformCapsData()
 {
   if (authservicePlugin)
     authservicePlugin->Release();
+
+  if (_service != nullptr) {
+    _service->Release();
+    _service = nullptr;
+  }
 }
 
 /**
