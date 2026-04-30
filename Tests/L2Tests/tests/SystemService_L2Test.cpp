@@ -4518,11 +4518,9 @@ TEST_F(SystemService_L2Test, ThermalMonitor_EmitTemperatureThresholdChange)
 /********************************************************
 ************Test case Details **************************
 ** CThermalMonitor Coverage Tests
-** Testing CThermalMonitor class for thermonitor.cpp coverage.
-** All functions in thermonitor.cpp are exercised here.
-** The SystemService_L2Test fixture activates the SystemServices
-** plugin in-process, making CThermalMonitor symbols available
-** via the loaded plugin shared library at runtime.
+** NOTE: CThermalMonitor is compiled under #ifdef ENABLE_THERMAL_PROTECTION
+** which is not set in the L2 test build. CThermalMonitor::instance() is
+** not exported by the plugin → undefined symbol at dlopen time → disabled.
 *******************************************************/
 
 /********************************************************
