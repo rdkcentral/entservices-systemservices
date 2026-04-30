@@ -671,37 +671,28 @@ jobs:
           $GITHUB_WORKSPACE/entservices-testframework/Tests/L2Tests/pact/install-verifier-cli.sh
 
       - name: Run unit tests without valgrind
-        run: |
-          export PATH=$GITHUB_WORKSPACE/install/usr/bin:${PATH}
-          export LD_LIBRARY_PATH=$GITHUB_WORKSPACE/install/usr/lib:$GITHUB_WORKSPACE/install/usr/lib/wpeframework/plugins:${LD_LIBRARY_PATH}
-          RdkServicesL2Test
-          TEST_EXIT=$?
-          JSON_FILE=$(find "$GITHUB_WORKSPACE" /tmp /root -maxdepth 5 -name "rdkL2TestResults.json" 2>/dev/null | head -1)
-          if [ -n "$JSON_FILE" ]; then
-            cp -rf "$JSON_FILE" $GITHUB_WORKSPACE/rdkL2TestResultsWithoutValgrind.json
-            rm -rf "$JSON_FILE"
-          else
-            echo "WARNING: rdkL2TestResults.json not found, generating empty report"
-            echo '{"tests":0,"failures":0,"errors":0,"disabled":0,"timestamp":"","time":"","name":"AllTests","testsuites":[]}' > $GITHUB_WORKSPACE/rdkL2TestResultsWithoutValgrind.json
-          fi
-          exit $TEST_EXIT
+        run: >
+          PATH=$GITHUB_WORKSPACE/install/usr/bin:${PATH}
+          LD_LIBRARY_PATH=$GITHUB_WORKSPACE/install/usr/lib:$GITHUB_WORKSPACE/install/usr/lib/wpeframework/plugins:${LD_LIBRARY_PATH}
+          RdkServicesL2Test &&
+          cp -rf $(pwd)/rdkL2TestResults.json $GITHUB_WORKSPACE/rdkL2TestResultsWithoutValgrind.json &&
+          rm -rf $(pwd)/rdkL2TestResults.json
 
       - name: Run unit tests with valgrind
         if: ${{ !env.ACT && inputs.caller_source != 'testframework' }}
-        run: |
-          export PATH=$GITHUB_WORKSPACE/install/usr/bin:${PATH}
-          export LD_LIBRARY_PATH=$GITHUB_WORKSPACE/install/usr/lib:$GITHUB_WORKSPACE/install/usr/lib/wpeframework/plugins:${LD_LIBRARY_PATH}
-          valgrind --tool=memcheck --log-file=valgrind_log --leak-check=yes --show-reachable=yes --track-fds=yes --fair-sched=try RdkServicesL2Test
-          TEST_EXIT=$?
-          JSON_FILE=$(find "$GITHUB_WORKSPACE" /tmp /root -maxdepth 5 -name "rdkL2TestResults.json" 2>/dev/null | head -1)
-          if [ -n "$JSON_FILE" ]; then
-            cp -rf "$JSON_FILE" $GITHUB_WORKSPACE/rdkL2TestResultsWithValgrind.json
-            rm -rf "$JSON_FILE"
-          else
-            echo "WARNING: rdkL2TestResults.json not found, generating empty report"
-            echo '{"tests":0,"failures":0,"errors":0,"disabled":0,"timestamp":"","time":"","name":"AllTests","testsuites":[]}' > $GITHUB_WORKSPACE/rdkL2TestResultsWithValgrind.json
-          fi
-          exit $TEST_EXIT
+        run: >
+          PATH=$GITHUB_WORKSPACE/install/usr/bin:${PATH}
+          LD_LIBRARY_PATH=$GITHUB_WORKSPACE/install/usr/lib:$GITHUB_WORKSPACE/install/usr/lib/wpeframework/plugins:${LD_LIBRARY_PATH}
+          valgrind
+          --tool=memcheck
+          --log-file=valgrind_log
+          --leak-check=yes
+          --show-reachable=yes
+          --track-fds=yes
+          --fair-sched=try
+          RdkServicesL2Test &&
+          cp -rf $(pwd)/rdkL2TestResults.json $GITHUB_WORKSPACE/rdkL2TestResultsWithValgrind.json &&
+          rm -rf $(pwd)/rdkL2TestResults.json
 
       - name: Generate coverage
         if: ${{ matrix.coverage == 'with-coverage' && !env.ACT && inputs.caller_source != 'testframework' }}
