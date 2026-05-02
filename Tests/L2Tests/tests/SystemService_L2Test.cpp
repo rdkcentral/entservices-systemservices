@@ -31,6 +31,7 @@
 #include "../../../plugin/SystemServicesHelper.h"
 #include "../../../plugin/thermonitor.h"
 #include "../../../plugin/uploadlogs.h"
+#include "../../../plugin/cTimer.h"
 
 
 #define JSON_TIMEOUT   (1000)
