@@ -6964,6 +6964,7 @@ TEST_F(SystemService_L2Test, CTimer_Cov_Start_ZeroIntervalWithCallback)
     cTimer timer;
     /* Use a real interval so the timer thread sleeps rather than spinning at 100% CPU */
     timer.setInterval([]() { dummy = true; }, 50);
+    (void)dummy;
     bool result = timer.start();
     TEST_LOG("  result=%s", result ? "true" : "false");
     if (result) {
