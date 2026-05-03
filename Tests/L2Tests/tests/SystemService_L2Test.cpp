@@ -4116,6 +4116,8 @@ TEST_F(SystemService_L2Test, UploadLogs_LogUploadAsync_NoExecutable)
 // Helper function tests disabled due to linking issues - functions not linked to test binary
 TEST_F(SystemService_L2Test, HelperFunction_GetFileContent_String)
 {
+    std::string testFile = "/tmp/systemservices_stringtest.txt";
+    std::string testContent = "Hello SystemServices Test\n";
     std::remove(testFile.c_str());
     
     // Test reading non-existent file
