@@ -3372,7 +3372,7 @@ TEST_F(SystemService_L2Test, SetMigrationStatus_EmptyString_JSONRPC_Negative)
     params["status"] = "";
     JsonObject result;
 
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMigrationStatus", params, result);
+    InvokeServiceMethod("org.rdk.System.1", "setMigrationStatus", params, result);
 
     // May fail or succeed depending on implementation
     if (result.HasLabel("success")) {
@@ -3959,19 +3959,13 @@ TEST_F(SystemService_L2Test, CTimer_SetInterval_ValidCallback)
     TEST_LOG("Testing cTimer setInterval with valid callback");
     
     cTimer timer;
-    bool callbackExecuted = false;
-    
-    // Lambda to capture local variable
-    auto callback = [&callbackExecuted]() {
-        callbackExecuted = true;
-    };
     
     // Note: cTimer expects function pointer, not lambda
-    // Testing with simple function pointer
     static bool staticFlag = false;
     auto staticCallback = []() { staticFlag = true; };
     
     timer.setInterval(staticCallback, 100);
+    (void)staticFlag;
     
     TEST_LOG("setInterval called with callback and interval=100ms");
 }
@@ -3999,6 +3993,7 @@ TEST_F(SystemService_L2Test, CTimer_Start_InvalidParameters)
         timer2.stop();
         timer2.join();
     }
+    (void)flag;
 }
 
 TEST_F(SystemService_L2Test, CTimer_Start_Stop_ValidTimer)
@@ -4055,6 +4050,7 @@ TEST_F(SystemService_L2Test, CTimer_Detach)
     
     // Give some time for callback to potentially execute
     std::this_thread::sleep_for(std::chrono::milliseconds(150));
+    (void)executed;
 }
 
 TEST_F(SystemService_L2Test, CTimer_Join)
