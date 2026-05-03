@@ -6956,20 +6956,21 @@ TEST_F(SystemService_L2Test, CTimer_Cov_Start_NoIntervalNoCallback)
     TEST_LOG("  result=%s (expected false)", result ? "true" : "false");
 }
 
-/* start() with callback but interval==0 → false (covers else branch of if(interval<=0 && cb==NULL)) */
+/* start() with callback but interval==0 → condition (interval<=0 && cb==NULL) is false → starts.
+   We must use a valid interval to avoid an infinite tight-loop in the timer thread. */
 TEST_F(SystemService_L2Test, CTimer_Cov_Start_ZeroIntervalWithCallback)
 {
-    TEST_LOG("CTimer_Cov: start() with callback but interval==0 → false");
+    TEST_LOG("CTimer_Cov: start() with callback and interval==50 → starts, stop+join cleanly");
     static bool dummy = false;
     cTimer timer;
-    timer.setInterval([]() { dummy = true; }, 0);
+    /* Use a real interval so the timer thread sleeps rather than spinning at 100% CPU */
+    timer.setInterval([]() { dummy = true; }, 50);
     bool result = timer.start();
-    /* interval==0 AND callback!=NULL → condition is false → starts! but interval=0 means tight loop */
-    /* Based on impl: if (interval <= 0 && callBack_function == NULL) → only false when BOTH are bad */
     TEST_LOG("  result=%s", result ? "true" : "false");
     if (result) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(60));
         timer.stop();
-        timer.detach();
+        timer.join();
     }
 }
 
