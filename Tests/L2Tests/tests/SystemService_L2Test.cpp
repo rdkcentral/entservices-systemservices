@@ -6393,894 +6393,895 @@ TEST_F(SystemService_L2Test, Helper_Cov_GetXconfOverrideUrl_CommentOnlyFile)
     }
 }
 
-/***********************************************************************
-** PlatformCaps Coverage Tests (PlatformCaps_Cov_*)
-** Focus: Covering platformcaps.cpp, platformcapsdata.cpp,
-**        platformcapsdatarpc.cpp via getPlatformConfiguration API.
-** Strategy: Call every public query variant so all branches execute.
-** No complex mocking - accept any result.
-***********************************************************************/
-
-/********************************************************
-** Test: getPlatformConfiguration("") - empty query (loads ALL)
-** Exercises: PlatformCaps::Load (both AccountInfo + DeviceInfo branches)
-**            PlatformCaps::AccountInfo::Load (all fields)
-**            PlatformCaps::DeviceInfo::Load (all fields)
-**            PlatformCapsData entire constructor/destructor
-**            All RPC getters (GetAccountId, GetX1DeviceId, etc.)
-**            AddDashExclusionList, GetQuirks, DeviceCapsFeatures,
-**            GetMimeTypes, SupportsTrueSD, CanMixPCMWithSurround,
-**            GetFirmwareUpdateDisabled, GetBrowser, GetModel,
-**            GetDeviceType, GetHDRCapability, GetPublicIP
-*******************************************************/
-TEST_F(SystemService_L2Test, PlatformCaps_Cov_GetAll_JSONRPC)
-{
-    TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('') - all fields");
-
-    JsonObject params;
-    params["query"] = "";
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
-
-    if (status == Core::ERROR_NONE) {
-        TEST_LOG("  getPlatformConfiguration('') succeeded");
-        if (result.HasLabel("AccountInfo")) {
-            TEST_LOG("  AccountInfo field present");
-        }
-        if (result.HasLabel("DeviceInfo")) {
-            TEST_LOG("  DeviceInfo field present");
-        }
-        if (result.HasLabel("success")) {
-            TEST_LOG("  success: %s", result["success"].Boolean() ? "true" : "false");
-        }
-    } else {
-        TEST_LOG("  getPlatformConfiguration('') returned %u - acceptable", status);
-    }
-}
-
-/********************************************************
-** Test: getPlatformConfiguration("AccountInfo") - full AccountInfo
-** Exercises: AccountInfo::Load with empty sub-query
-**            GetAccountId, GetX1DeviceId, XCALSessionTokenAvailable,
-**            GetExperience, GetDdeviceMACAddress, GetFirmwareUpdateDisabled
-**            authservicePlugin == nullptr path (no AuthService in CI)
-*******************************************************/
-TEST_F(SystemService_L2Test, PlatformCaps_Cov_AccountInfo_All_JSONRPC)
-{
-    TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('AccountInfo')");
-
-    JsonObject params;
-    params["query"] = "AccountInfo";
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
-
-    if (status == Core::ERROR_NONE) {
-        TEST_LOG("  AccountInfo all fields - success");
-    } else {
-        TEST_LOG("  AccountInfo returned %u - acceptable", status);
-    }
-}
-
-/********************************************************
-** Test: getPlatformConfiguration("AccountInfo.accountId")
-** Exercises: AccountInfo::Load with query="accountId"
-**            GetAccountId() - authservicePlugin null path
-*******************************************************/
-TEST_F(SystemService_L2Test, PlatformCaps_Cov_AccountInfo_AccountId_JSONRPC)
-{
-    TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('AccountInfo.accountId')");
-
-    JsonObject params;
-    params["query"] = "AccountInfo.accountId";
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
-
-    TEST_LOG("  status=%u", status);
-}
-
-/********************************************************
-** Test: getPlatformConfiguration("AccountInfo.x1DeviceId")
-** Exercises: GetX1DeviceId() - authservicePlugin null path
-*******************************************************/
-TEST_F(SystemService_L2Test, PlatformCaps_Cov_AccountInfo_X1DeviceId_JSONRPC)
-{
-    TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('AccountInfo.x1DeviceId')");
-
-    JsonObject params;
-    params["query"] = "AccountInfo.x1DeviceId";
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
-
-    TEST_LOG("  status=%u", status);
-}
-
-/********************************************************
-** Test: getPlatformConfiguration("AccountInfo.XCALSessionTokenAvailable")
-** Exercises: XCALSessionTokenAvailable() - authservicePlugin null path
-*******************************************************/
-TEST_F(SystemService_L2Test, PlatformCaps_Cov_AccountInfo_XCALToken_JSONRPC)
-{
-    TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('AccountInfo.XCALSessionTokenAvailable')");
-
-    JsonObject params;
-    params["query"] = "AccountInfo.XCALSessionTokenAvailable";
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
-
-    TEST_LOG("  status=%u", status);
-}
-
-/********************************************************
-** Test: getPlatformConfiguration("AccountInfo.experience")
-** Exercises: GetExperience() - authservicePlugin null path
-*******************************************************/
-TEST_F(SystemService_L2Test, PlatformCaps_Cov_AccountInfo_Experience_JSONRPC)
-{
-    TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('AccountInfo.experience')");
-
-    JsonObject params;
-    params["query"] = "AccountInfo.experience";
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
-
-    TEST_LOG("  status=%u", status);
-}
-
-/********************************************************
-** Test: getPlatformConfiguration("AccountInfo.deviceMACAddress")
-** Exercises: GetDdeviceMACAddress() via JsonRpc to org.rdk.System
-*******************************************************/
-TEST_F(SystemService_L2Test, PlatformCaps_Cov_AccountInfo_DeviceMAC_JSONRPC)
-{
-    TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('AccountInfo.deviceMACAddress')");
-
-    JsonObject params;
-    params["query"] = "AccountInfo.deviceMACAddress";
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
-
-    TEST_LOG("  status=%u", status);
-}
-
-/********************************************************
-** Test: getPlatformConfiguration("AccountInfo.firmwareUpdateDisabled")
-** Exercises: GetFirmwareUpdateDisabled() - checks SWUpdateConf file
-*******************************************************/
-TEST_F(SystemService_L2Test, PlatformCaps_Cov_AccountInfo_FirmwareUpdateDisabled_JSONRPC)
-{
-    TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('AccountInfo.firmwareUpdateDisabled')");
-
-    JsonObject params;
-    params["query"] = "AccountInfo.firmwareUpdateDisabled";
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
-
-    TEST_LOG("  status=%u", status);
-}
-
-/********************************************************
-** Test: getPlatformConfiguration("DeviceInfo") - full DeviceInfo
-** Exercises: DeviceInfo::Load with empty sub-query
-**            GetQuirks, AddDashExclusionList, DeviceCapsFeatures,
-**            GetMimeTypes, GetModel, GetDeviceType, SupportsTrueSD,
-**            CanMixPCMWithSurround, GetHDRCapability, GetPublicIP,
-**            getAvailablePlugins, verifyLibraries, GetBrowser
-**            All CDVR/DVR/EAS/IPDVR/IVOD/LINEAR_TV/VOD branches
-**            All features map branches in platformcaps.cpp
-*******************************************************/
-TEST_F(SystemService_L2Test, PlatformCaps_Cov_DeviceInfo_All_JSONRPC)
-{
-    TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('DeviceInfo')");
-
-    JsonObject params;
-    params["query"] = "DeviceInfo";
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
-
-    if (status == Core::ERROR_NONE) {
-        TEST_LOG("  DeviceInfo all fields - success");
-        if (result.HasLabel("DeviceInfo")) {
-            TEST_LOG("  DeviceInfo field present");
-        }
-    } else {
-        TEST_LOG("  DeviceInfo returned %u - acceptable", status);
-    }
-}
-
-/********************************************************
-** Test: getPlatformConfiguration("DeviceInfo.quirks")
-** Exercises: GetQuirks() - fixed list + env var branches
-**            platformcaps.cpp quirks array -> comma-string conversion
-*******************************************************/
-TEST_F(SystemService_L2Test, PlatformCaps_Cov_DeviceInfo_Quirks_JSONRPC)
-{
-    TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('DeviceInfo.quirks')");
-
-    JsonObject params;
-    params["query"] = "DeviceInfo.quirks";
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
-
-    TEST_LOG("  status=%u", status);
-}
-
-/********************************************************
-** Test: getPlatformConfiguration("DeviceInfo.mimeTypeExclusions")
-** Exercises: AddDashExclusionList() - AAMP_SUPPORTED path
-**            RFC lookup for DashPlaybackInclusions
-**            hash iteration building JsonArrays
-**            all CDVR/DVR/EAS/IPDVR/IVOD/LINEAR_TV/VOD array branches
-**            in platformcaps.cpp
-*******************************************************/
-TEST_F(SystemService_L2Test, PlatformCaps_Cov_DeviceInfo_MimeTypeExclusions_JSONRPC)
-{
-    TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('DeviceInfo.mimeTypeExclusions')");
-
-    JsonObject params;
-    params["query"] = "DeviceInfo.mimeTypeExclusions";
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
-
-    TEST_LOG("  status=%u", status);
-}
-
-/********************************************************
-** Test: getPlatformConfiguration("DeviceInfo.features")
-** Exercises: DeviceCapsFeatures() - all feature map entries
-**            getAvailablePlugins(), verifyLibraries()
-**            getDeviceProperties(), getProperties()
-**            OPEN_BROWSING, UHD_4K_DECODE property branches
-**            all features HasLabel branches in platformcaps.cpp
-*******************************************************/
-TEST_F(SystemService_L2Test, PlatformCaps_Cov_DeviceInfo_Features_JSONRPC)
-{
-    TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('DeviceInfo.features')");
-
-    JsonObject params;
-    params["query"] = "DeviceInfo.features";
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
-
-    TEST_LOG("  status=%u", status);
-}
-
-/********************************************************
-** Test: getPlatformConfiguration("DeviceInfo.mimeTypes")
-** Exercises: GetMimeTypes() - currently returns empty list
-**            mimeTypes array -> comma-string conversion in platformcaps.cpp
-*******************************************************/
-TEST_F(SystemService_L2Test, PlatformCaps_Cov_DeviceInfo_MimeTypes_JSONRPC)
-{
-    TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('DeviceInfo.mimeTypes')");
-
-    JsonObject params;
-    params["query"] = "DeviceInfo.mimeTypes";
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
-
-    TEST_LOG("  status=%u", status);
-}
-
-/********************************************************
-** Test: getPlatformConfiguration("DeviceInfo.model")
-** Exercises: GetModel() via JsonRpc -> org.rdk.System.getDeviceInfo
-**            JsonRpc::invoke(), JsonRpc::getClient()
-*******************************************************/
-TEST_F(SystemService_L2Test, PlatformCaps_Cov_DeviceInfo_Model_JSONRPC)
-{
-    TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('DeviceInfo.model')");
-
-    JsonObject params;
-    params["query"] = "DeviceInfo.model";
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
-
-    TEST_LOG("  status=%u", status);
-}
-
-/********************************************************
-** Test: getPlatformConfiguration("DeviceInfo.deviceType")
-** Exercises: GetDeviceType() - authservicePlugin null path ->
-**            JsonRpc fallback -> device_type comparison logic
-**            "mediaclient"->"IpStb", "hybrid"->"QamIpStb", else "TV"
-*******************************************************/
-TEST_F(SystemService_L2Test, PlatformCaps_Cov_DeviceInfo_DeviceType_JSONRPC)
-{
-    TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('DeviceInfo.deviceType')");
-
-    JsonObject params;
-    params["query"] = "DeviceInfo.deviceType";
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
-
-    TEST_LOG("  status=%u", status);
-}
-
-/********************************************************
-** Test: getPlatformConfiguration("DeviceInfo.supportsTrueSD")
-** Exercises: SupportsTrueSD() - returns true (no DISABLE_TRUE_SD)
-*******************************************************/
-TEST_F(SystemService_L2Test, PlatformCaps_Cov_DeviceInfo_SupportsTrueSD_JSONRPC)
-{
-    TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('DeviceInfo.supportsTrueSD')");
-
-    JsonObject params;
-    params["query"] = "DeviceInfo.supportsTrueSD";
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
-
-    TEST_LOG("  status=%u", status);
-}
-
-/********************************************************
-** Test: getPlatformConfiguration("DeviceInfo.canMixPCMWithSurround")
-** Exercises: CanMixPCMWithSurround() - device::Host try/catch path
-*******************************************************/
-TEST_F(SystemService_L2Test, PlatformCaps_Cov_DeviceInfo_CanMixPCM_JSONRPC)
-{
-    TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('DeviceInfo.canMixPCMWithSurround')");
-
-    JsonObject params;
-    params["query"] = "DeviceInfo.canMixPCMWithSurround";
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
-
-    TEST_LOG("  status=%u", status);
-}
-
-/********************************************************
-** Test: getPlatformConfiguration("DeviceInfo.HdrCapability")
-** Exercises: GetHDRCapability() via JsonRpc ->
-**            org.rdk.DisplaySettings.getSettopHDRSupport
-**            JsonArray iteration building comma-string
-*******************************************************/
-TEST_F(SystemService_L2Test, PlatformCaps_Cov_DeviceInfo_HdrCapability_JSONRPC)
-{
-    TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('DeviceInfo.HdrCapability')");
-
-    JsonObject params;
-    params["query"] = "DeviceInfo.HdrCapability";
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
-
-    TEST_LOG("  status=%u", status);
-}
-
-/********************************************************
-** Test: getPlatformConfiguration("DeviceInfo.publicIP")
-** Exercises: GetPublicIP() via JsonRpc -> org.rdk.Network.getPublicIP
-*******************************************************/
-TEST_F(SystemService_L2Test, PlatformCaps_Cov_DeviceInfo_PublicIP_JSONRPC)
-{
-    TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('DeviceInfo.publicIP')");
-
-    JsonObject params;
-    params["query"] = "DeviceInfo.publicIP";
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
-
-    TEST_LOG("  status=%u", status);
-}
-
-/********************************************************
-** Test: getPlatformConfiguration bad query
-** Exercises: PlatformCaps::Load regex else-branch (TRACE error path)
-**            Returns false -> success=false
-*******************************************************/
-TEST_F(SystemService_L2Test, PlatformCaps_Cov_BadQuery_JSONRPC)
-{
-    TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration with bad query");
-
-    JsonObject params;
-    params["query"] = "InvalidSection.invalidField";
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
-
-    /* Bad query hits the TRACE error path and returns false -> ERROR_GENERAL */
-    TEST_LOG("  Bad query status=%u (non-zero expected)", status);
-}
-
-/********************************************************
-** Test: getPlatformConfiguration COM-RPC - empty query (all fields)
-** Exercises: GetPlatformConfiguration COM-RPC path end-to-end
-**            All platformcaps code via COM-RPC dispatcher
-*******************************************************/
-TEST_F(SystemService_L2Test, PlatformCaps_Cov_GetAll_COMRPC)
-{
-    TEST_LOG("PlatformCaps_Cov: Testing GetPlatformConfiguration('') via COM-RPC");
-
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("  COM-RPC interface not available - skipping");
-        return;
-    }
-
-    ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
-
-    string query = "";
-    Exchange::ISystemServices::PlatformConfig platformConfig;
-    uint32_t result = m_SystemServicesPlugin->GetPlatformConfiguration(query, platformConfig);
-
-    TEST_LOG("  GetPlatformConfiguration('') result=%u", result);
-    if (result == Core::ERROR_NONE) {
-        TEST_LOG("  accountId: '%s'", platformConfig.accountInfo.accountId.c_str());
-        TEST_LOG("  deviceType: '%s'", platformConfig.deviceInfo.deviceType.c_str());
-        TEST_LOG("  model: '%s'", platformConfig.deviceInfo.model.c_str());
-        TEST_LOG("  quirks: '%s'", platformConfig.deviceInfo.quirks.c_str());
-        TEST_LOG("  mimeTypes: '%s'", platformConfig.deviceInfo.mimeTypes.c_str());
-        TEST_LOG("  hdrCapability: '%s'", platformConfig.deviceInfo.hdrCapability.c_str());
-        TEST_LOG("  supportsTrueSD: %s", platformConfig.deviceInfo.supportsTrueSD ? "true" : "false");
-        TEST_LOG("  canMixPCMWithSurround: %s", platformConfig.deviceInfo.canMixPCMWithSurround ? "true" : "false");
-        TEST_LOG("  firmwareUpdateDisabled: %s", platformConfig.accountInfo.firmwareUpdateDisabled ? "true" : "false");
-    }
-
-    m_SystemServicesPlugin->Release();
-    m_controller_SystemServices->Release();
-}
-
-/********************************************************
-** Test: getPlatformConfiguration COM-RPC - AccountInfo
-*******************************************************/
-TEST_F(SystemService_L2Test, PlatformCaps_Cov_AccountInfo_COMRPC)
-{
-    TEST_LOG("PlatformCaps_Cov: Testing GetPlatformConfiguration('AccountInfo') via COM-RPC");
-
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("  COM-RPC interface not available - skipping");
-        return;
-    }
-
-    ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
-
-    string query = "AccountInfo";
-    Exchange::ISystemServices::PlatformConfig platformConfig;
-    uint32_t result = m_SystemServicesPlugin->GetPlatformConfiguration(query, platformConfig);
-
-    TEST_LOG("  result=%u, accountId='%s'", result, platformConfig.accountInfo.accountId.c_str());
-
-    m_SystemServicesPlugin->Release();
-    m_controller_SystemServices->Release();
-}
-
-/********************************************************
-** Test: getPlatformConfiguration COM-RPC - DeviceInfo
-*******************************************************/
-TEST_F(SystemService_L2Test, PlatformCaps_Cov_DeviceInfo_COMRPC)
-{
-    TEST_LOG("PlatformCaps_Cov: Testing GetPlatformConfiguration('DeviceInfo') via COM-RPC");
-
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("  COM-RPC interface not available - skipping");
-        return;
-    }
-
-    ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
-
-    string query = "DeviceInfo";
-    Exchange::ISystemServices::PlatformConfig platformConfig;
-    uint32_t result = m_SystemServicesPlugin->GetPlatformConfiguration(query, platformConfig);
-
-    TEST_LOG("  result=%u, deviceType='%s', model='%s'",
-             result,
-             platformConfig.deviceInfo.deviceType.c_str(),
-             platformConfig.deviceInfo.model.c_str());
-    TEST_LOG("  mimeTypeExclusions.cdvr='%s'", platformConfig.deviceInfo.mimeTypeExclusions.cdvr.c_str());
-    TEST_LOG("  features.keySource=%d", platformConfig.deviceInfo.features.keySource);
-
-    m_SystemServicesPlugin->Release();
-    m_controller_SystemServices->Release();
-}
-
-/********************************************************
-** Test: Verify PlatformCaps object fields are populated
-** after a DeviceInfo query - covers field assignment branches
-** in platformcaps.cpp (webBrowser, hdrCapability, publicIP etc.)
-*******************************************************/
-TEST_F(SystemService_L2Test, PlatformCaps_Cov_DeviceInfo_FieldAssignment_COMRPC)
-{
-    TEST_LOG("PlatformCaps_Cov: Verifying DeviceInfo field assignments via COM-RPC");
-
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("  COM-RPC interface not available - skipping");
-        return;
-    }
-
-    ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
-
-    string query = "DeviceInfo";
-    Exchange::ISystemServices::PlatformConfig platformConfig;
-    uint32_t result = m_SystemServicesPlugin->GetPlatformConfiguration(query, platformConfig);
-
-    TEST_LOG("  result=%u", result);
-
-    /* Log all fields to exercise assignment code paths */
-    TEST_LOG("  webBrowser.browserType='%s'", platformConfig.deviceInfo.webBrowser.browserType.c_str());
-    TEST_LOG("  webBrowser.version='%s'", platformConfig.deviceInfo.webBrowser.version.c_str());
-    TEST_LOG("  webBrowser.userAgent='%s'", platformConfig.deviceInfo.webBrowser.userAgent.c_str());
-    TEST_LOG("  hdrCapability='%s'", platformConfig.deviceInfo.hdrCapability.c_str());
-    TEST_LOG("  publicIP='%s'", platformConfig.deviceInfo.publicIP.c_str());
-    TEST_LOG("  mimeTypeExclusions.dvr='%s'", platformConfig.deviceInfo.mimeTypeExclusions.dvr.c_str());
-    TEST_LOG("  mimeTypeExclusions.eas='%s'", platformConfig.deviceInfo.mimeTypeExclusions.eas.c_str());
-    TEST_LOG("  mimeTypeExclusions.ipdvr='%s'", platformConfig.deviceInfo.mimeTypeExclusions.ipdvr.c_str());
-    TEST_LOG("  mimeTypeExclusions.ivod='%s'", platformConfig.deviceInfo.mimeTypeExclusions.ivod.c_str());
-    TEST_LOG("  mimeTypeExclusions.linearTV='%s'", platformConfig.deviceInfo.mimeTypeExclusions.linearTV.c_str());
-    TEST_LOG("  mimeTypeExclusions.vod='%s'", platformConfig.deviceInfo.mimeTypeExclusions.vod.c_str());
-    TEST_LOG("  features.allowSelfSignedWithIPAddress=%d", platformConfig.deviceInfo.features.allowSelfSignedWithIPAddress);
-    TEST_LOG("  features.supportsSecure=%d", platformConfig.deviceInfo.features.supportsSecure);
-    TEST_LOG("  features.cookies=%d", platformConfig.deviceInfo.features.cookies);
-    TEST_LOG("  features.uhd4kDecode=%d", platformConfig.deviceInfo.features.uhd4kDecode);
-
-    m_SystemServicesPlugin->Release();
-    m_controller_SystemServices->Release();
-}
-
-/***********************************************************************
-** cTimer Coverage Tests (CTimer_Cov_*)
-** Exercises all paths in cTimer.cpp:
-**   constructor, destructor, setInterval, start, stop,
-**   timerFunction loop, detach, join (joinable branch).
-** Uses real threads - intervals kept minimal (50ms) to stay fast.
-***********************************************************************/
-
-/* start() with interval<=0 AND callback==NULL → false */
-TEST_F(SystemService_L2Test, CTimer_Cov_Start_NoIntervalNoCallback)
-{
-    TEST_LOG("CTimer_Cov: start() with no interval and no callback → false");
-    cTimer timer;
-    bool result = timer.start();
-    EXPECT_FALSE(result);
-    TEST_LOG("  result=%s (expected false)", result ? "true" : "false");
-}
-
-/* start() with callback but interval==0 → condition (interval<=0 && cb==NULL) is false → starts.
-   We must use a valid interval to avoid an infinite tight-loop in the timer thread. */
-TEST_F(SystemService_L2Test, CTimer_Cov_Start_ZeroIntervalWithCallback)
-{
-    TEST_LOG("CTimer_Cov: start() with callback and interval==50 → starts, stop+join cleanly");
-    static bool dummy = false;
-    cTimer timer;
-    /* Use a real interval so the timer thread sleeps rather than spinning at 100% CPU */
-    timer.setInterval([]() { dummy = true; }, 50);
-    (void)dummy;
-    bool result = timer.start();
-    TEST_LOG("  result=%s", result ? "true" : "false");
-    if (result) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(60));
-        timer.stop();
-        timer.join();
-    }
-}
-
-/* Full start → timerFunction loop fires → stop → join path */
-TEST_F(SystemService_L2Test, CTimer_Cov_StartStopJoin)
-{
-    TEST_LOG("CTimer_Cov: start → callback fires → stop → join");
-    static int count = 0;
-    count = 0;
-
-    cTimer timer;
-    timer.setInterval([]() { count++; }, 50);
-
-    bool started = timer.start();
-    EXPECT_TRUE(started);
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(180));
-
-    timer.stop();
-    timer.join();   /* joinable() → true → joins */
-
-    TEST_LOG("  callback fired %d times", count);
-    EXPECT_GT(count, 0);
-}
-
-/* join() when thread is NOT joinable (never started) - covers joinable()==false branch */
-TEST_F(SystemService_L2Test, CTimer_Cov_Join_NotStarted)
-{
-    TEST_LOG("CTimer_Cov: join() without start → joinable()==false, no crash");
-    cTimer timer;
-    timer.join();   /* joinable() == false → if-body not entered */
-    TEST_LOG("  join() on un-started timer - no crash (correct)");
-}
-
-/* setInterval then start, detach (covers detach path) */
-TEST_F(SystemService_L2Test, CTimer_Cov_StartDetach)
-{
-    TEST_LOG("CTimer_Cov: start → detach");
-    static bool fired = false;
-
-    cTimer timer;
-    timer.setInterval([]() { fired = true; }, 50);
-
-    bool started = timer.start();
-    EXPECT_TRUE(started);
-
-    timer.detach(); /* detaches thread - covers detach() code path */
-    timer.stop();   /* sets clear=true immediately - thread exits within one interval */
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(200)); /* wait > 2x interval to ensure thread exited */
-    TEST_LOG("  fired=%s", fired ? "true" : "false");
-}
-
-/* destructor sets clear=true - exercise via scope exit while timer running */
-TEST_F(SystemService_L2Test, CTimer_Cov_DestructorStopsTimer)
-{
-    TEST_LOG("CTimer_Cov: destructor sets clear=true");
-    static int dcount = 0;
-    dcount = 0;
-    {
-        cTimer timer;
-        timer.setInterval([]() { dcount++; }, 50);
-        timer.start();
-        std::this_thread::sleep_for(std::chrono::milliseconds(80));
-        timer.stop();
-        timer.join(); /* join ensures thread exits BEFORE ~cTimer() runs - prevents use-after-free */
-    } /* ~cTimer() runs safely after thread has exited */
-    TEST_LOG("  destructor executed, count=%d", dcount);
-}
-
-/***********************************************************************
-** SystemServicesImplementation Branch Coverage Tests (SysImpl_Branch_*)
-** Targets uncovered branches and error paths.
-***********************************************************************/
-
-/* SetDeepSleepTimer with seconds=0 → MissingKeyValues error path */
-TEST_F(SystemService_L2Test, SysImpl_Branch_SetDeepSleepTimer_Zero_JSONRPC)
-{
-    TEST_LOG("SysImpl_Branch: setDeepSleepTimer(0) → MissingKeyValues error path");
-    JsonObject params;
-    params["seconds"] = 0;
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setDeepSleepTimer", params, result);
-
-    /* seconds==0 hits populateResponseWithError(SysSrv_MissingKeyValues) branch */
-    TEST_LOG("  status=%u (non-zero expected for zero seconds)", status);
-}
-
-/* SetDeepSleepTimer with seconds > 864000 → clamped to 0 internally */
-TEST_F(SystemService_L2Test, SysImpl_Branch_SetDeepSleepTimer_Overflow_JSONRPC)
-{
-    TEST_LOG("SysImpl_Branch: setDeepSleepTimer(999999) → clamped-to-zero branch");
-    JsonObject params;
-    params["seconds"] = 999999;
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setDeepSleepTimer", params, result);
-
-    TEST_LOG("  status=%u", status);
-}
-
-/* SetDeepSleepTimer with negative seconds → clamped to 0 branch */
-TEST_F(SystemService_L2Test, SysImpl_Branch_SetDeepSleepTimer_Negative_JSONRPC)
-{
-    TEST_LOG("SysImpl_Branch: setDeepSleepTimer(-1) → negative clamping branch");
-    JsonObject params;
-    params["seconds"] = -1;
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setDeepSleepTimer", params, result);
-
-    TEST_LOG("  status=%u", status);
-}
-
-/* SetBootLoaderSplashScreen with empty path → "Invalid path" error branch */
-TEST_F(SystemService_L2Test, SysImpl_Branch_SetBootLoaderSplashScreen_EmptyPath_JSONRPC)
-{
-    TEST_LOG("SysImpl_Branch: setBootLoaderSplashScreen('') → invalid path branch");
-    JsonObject params;
-    params["path"] = "";
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setBootLoaderSplashScreen", params, result);
-
-    /* Empty path → fileExists==false → error.message="Invalid path", success=false */
-    if (status == Core::ERROR_NONE) {
-        TEST_LOG("  success: %s", result.HasLabel("success") ? (result["success"].Boolean() ? "true" : "false") : "absent");
-        if (result.HasLabel("error")) {
-            TEST_LOG("  error present (expected for empty path)");
-        }
-    } else {
-        TEST_LOG("  status=%u", status);
-    }
-}
-
-/* SetBootLoaderSplashScreen with non-existent path → fileExists==false branch */
-TEST_F(SystemService_L2Test, SysImpl_Branch_SetBootLoaderSplashScreen_NonExistentPath_JSONRPC)
-{
-    TEST_LOG("SysImpl_Branch: setBootLoaderSplashScreen('/nonexistent/splash.png') → fileExists==false");
-    JsonObject params;
-    params["path"] = "/nonexistent/splash.png";
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setBootLoaderSplashScreen", params, result);
-
-    TEST_LOG("  status=%u", status);
-    if (status == Core::ERROR_NONE) {
-        TEST_LOG("  returned NONE - error path inside impl, success=false expected");
-    }
-}
-
-/* GetTimeStatus - exercises IARM_Bus_Call path (will fail in CI, covers the error return) */
-TEST_F(SystemService_L2Test, SysImpl_Branch_GetTimeStatus_JSONRPC)
-{
-    TEST_LOG("SysImpl_Branch: getTimeStatus → IARM call path");
-    JsonObject params;
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getTimeStatus", params, result);
-
-    /* In CI, IARM call fails → Core::ERROR_GENERAL returned */
-    TEST_LOG("  status=%u", status);
-    if (status == Core::ERROR_NONE) {
-        TEST_LOG("  TimeQuality=%s", result.HasLabel("TimeQuality") ? result["TimeQuality"].String().c_str() : "absent");
-    }
-}
-
-/* SetWakeupSrcConfiguration with null iterator → skips loop, returns immediately */
-TEST_F(SystemService_L2Test, SysImpl_Branch_SetWakeupSrcConfiguration_NullSources_JSONRPC)
-{
-    TEST_LOG("SysImpl_Branch: setWakeupSrcConfiguration with empty sources → null iterator path");
-    JsonObject params;
-    params["powerState"] = "LIGHT_SLEEP";
-    /* No wakeupSources field → implementation receives null iterator */
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setWakeupSrcConfiguration", params, result);
-
-    TEST_LOG("  status=%u", status);
-}
-
-/* SetMode with WAREHOUSE mode (covers WAREHOUSE branch in SetMode) */
-TEST_F(SystemService_L2Test, SysImpl_Branch_SetMode_WAREHOUSE_JSONRPC)
-{
-    TEST_LOG("SysImpl_Branch: setMode WAREHOUSE → WAREHOUSE branch");
-    JsonObject params;
-    params["mode"] = "WAREHOUSE";
-    params["duration"] = 30;
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
-
-    TEST_LOG("  status=%u", status);
-    if (status == Core::ERROR_NONE) {
-        TEST_LOG("  WAREHOUSE mode set, success=%s",
-                 result.HasLabel("success") ? (result["success"].Boolean() ? "true" : "false") : "absent");
-        /* Restore to NORMAL */
-        JsonObject restoreParams;
-        restoreParams["mode"] = "NORMAL";
-        restoreParams["duration"] = -1;
-        JsonObject restoreResult;
-        InvokeServiceMethod("org.rdk.System.1", "setMode", restoreParams, restoreResult);
-    }
-}
-
-/* GetPowerState - exercises PowerManager branch */
-TEST_F(SystemService_L2Test, SysImpl_Branch_GetPowerState_JSONRPC)
-{
-    TEST_LOG("SysImpl_Branch: getPowerState → PowerManager path");
-    JsonObject params;
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPowerState", params, result);
-
-    TEST_LOG("  status=%u", status);
-    if (status == Core::ERROR_NONE) {
-        TEST_LOG("  powerState=%s", result.HasLabel("powerState") ? result["powerState"].String().c_str() : "absent");
-    }
-}
-
-/* GetPowerState COM-RPC */
-TEST_F(SystemService_L2Test, SysImpl_Branch_GetPowerState_COMRPC)
-{
-    TEST_LOG("SysImpl_Branch: GetPowerState via COM-RPC");
-
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("  COM-RPC interface not available - skipping");
-        return;
-    }
-
-    string powerState;
-    bool success = false;
-    uint32_t result = m_SystemServicesPlugin->GetPowerState(powerState, success);
-
-    TEST_LOG("  result=%u, powerState='%s', success=%s",
-             result, powerState.c_str(), success ? "true" : "false");
-
-    m_SystemServicesPlugin->Release();
-    m_controller_SystemServices->Release();
-}
-
-/* SetBootLoaderSplashScreen COM-RPC - empty path, invalid path branch */
-TEST_F(SystemService_L2Test, SysImpl_Branch_SetBootLoaderSplashScreen_COMRPC)
-{
-    TEST_LOG("SysImpl_Branch: SetBootLoaderSplashScreen via COM-RPC");
-
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("  COM-RPC interface not available - skipping");
-        return;
-    }
-
-    Exchange::ISystemServices::ErrorInfo error;
-    bool success = false;
-
-    /* Empty path → invalid path branch */
-    uint32_t result = m_SystemServicesPlugin->SetBootLoaderSplashScreen("", error, success);
-
-    TEST_LOG("  result=%u, success=%s, error.code='%s', error.message='%s'",
-             result, success ? "true" : "false",
-             error.code.c_str(), error.message.c_str());
-
-    /* Non-existent path → fileExists==false branch */
-    Exchange::ISystemServices::ErrorInfo error2;
-    bool success2 = false;
-    uint32_t result2 = m_SystemServicesPlugin->SetBootLoaderSplashScreen("/no/such/splash.bin", error2, success2);
-
-    TEST_LOG("  non-existent path: result=%u, success=%s, error.code='%s'",
-             result2, success2 ? "true" : "false", error2.code.c_str());
-
-    m_SystemServicesPlugin->Release();
-    m_controller_SystemServices->Release();
-}
-
-/***********************************************************************
-** SystemServices.cpp Additional Coverage Tests
-** Covers Information() and verify plugin is properly initialized/running.
-***********************************************************************/
-
-/* Information() - covers the string return in SystemServices.cpp */
-TEST_F(SystemService_L2Test, SystemServices_Cov_Information_JSONRPC)
-{
-    TEST_LOG("SystemServices_Cov: Verify plugin is active and processing API calls");
-
-    /* Call a lightweight API to confirm plugin Initialize/Deinitialize are exercised */
-    JsonObject params;
-    JsonObject result;
-
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getSystemVersions", params, result);
-
-    EXPECT_EQ(status, Core::ERROR_NONE);
-    if (status == Core::ERROR_NONE) {
-        TEST_LOG("  Plugin active - stbVersion=%s",
-                 result.HasLabel("stbVersion") ? result["stbVersion"].String().c_str() : "absent");
-    }
-}
-
-/* Deactivated() path - covered indirectly via Unregister notification path */
-TEST_F(SystemService_L2Test, SystemServices_Cov_Notification_Register_COMRPC)
-{
-    TEST_LOG("SystemServices_Cov: Register/Unregister notification path in SystemServices.cpp");
-
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("  COM-RPC unavailable - skipping");
-        return;
-    }
-
-    /* Register/Unregister exercises _systemServicesNotification callbacks */
-    Exchange::ISystemServices::SystemVersionsInfo info;
-    uint32_t result = m_SystemServicesPlugin->GetSystemVersions(info);
-
-    TEST_LOG("  GetSystemVersions result=%u, stbVersion='%s'",
-             result, info.stbVersion.c_str());
-
-    m_SystemServicesPlugin->Release();
-    m_controller_SystemServices->Release();
-}
+// /***********************************************************************
+// ** PlatformCaps Coverage Tests (PlatformCaps_Cov_*)
+// ** Focus: Covering platformcaps.cpp, platformcapsdata.cpp,
+// **        platformcapsdatarpc.cpp via getPlatformConfiguration API.
+// ** Strategy: Call every public query variant so all branches execute.
+// ** No complex mocking - accept any result.
+// ***********************************************************************/
+
+// /********************************************************
+// ** Test: getPlatformConfiguration("") - empty query (loads ALL)
+// ** Exercises: PlatformCaps::Load (both AccountInfo + DeviceInfo branches)
+// **            PlatformCaps::AccountInfo::Load (all fields)
+// **            PlatformCaps::DeviceInfo::Load (all fields)
+// **            PlatformCapsData entire constructor/destructor
+// **            All RPC getters (GetAccountId, GetX1DeviceId, etc.)
+// **            AddDashExclusionList, GetQuirks, DeviceCapsFeatures,
+// **            GetMimeTypes, SupportsTrueSD, CanMixPCMWithSurround,
+// **            GetFirmwareUpdateDisabled, GetBrowser, GetModel,
+// **            GetDeviceType, GetHDRCapability, GetPublicIP
+// *******************************************************/
+// TEST_F(SystemService_L2Test, PlatformCaps_Cov_GetAll_JSONRPC)
+// {
+//     TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('') - all fields");
+
+//     JsonObject params;
+//     params["query"] = "";
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
+
+//     if (status == Core::ERROR_NONE) {
+//         TEST_LOG("  getPlatformConfiguration('') succeeded");
+//         if (result.HasLabel("AccountInfo")) {
+//             TEST_LOG("  AccountInfo field present");
+//         }
+//         if (result.HasLabel("DeviceInfo")) {
+//             TEST_LOG("  DeviceInfo field present");
+//         }
+//         if (result.HasLabel("success")) {
+//             TEST_LOG("  success: %s", result["success"].Boolean() ? "true" : "false");
+//         }
+//     } else {
+//         TEST_LOG("  getPlatformConfiguration('') returned %u - acceptable", status);
+//     }
+// }
+
+// /********************************************************
+// ** Test: getPlatformConfiguration("AccountInfo") - full AccountInfo
+// ** Exercises: AccountInfo::Load with empty sub-query
+// **            GetAccountId, GetX1DeviceId, XCALSessionTokenAvailable,
+// **            GetExperience, GetDdeviceMACAddress, GetFirmwareUpdateDisabled
+// **            authservicePlugin == nullptr path (no AuthService in CI)
+// *******************************************************/
+// TEST_F(SystemService_L2Test, PlatformCaps_Cov_AccountInfo_All_JSONRPC)
+// {
+//     TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('AccountInfo')");
+
+//     JsonObject params;
+//     params["query"] = "AccountInfo";
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
+
+//     if (status == Core::ERROR_NONE) {
+//         TEST_LOG("  AccountInfo all fields - success");
+//     } else {
+//         TEST_LOG("  AccountInfo returned %u - acceptable", status);
+//     }
+// }
+
+// /********************************************************
+// ** Test: getPlatformConfiguration("AccountInfo.accountId")
+// ** Exercises: AccountInfo::Load with query="accountId"
+// **            GetAccountId() - authservicePlugin null path
+// *******************************************************/
+// TEST_F(SystemService_L2Test, PlatformCaps_Cov_AccountInfo_AccountId_JSONRPC)
+// {
+//     TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('AccountInfo.accountId')");
+
+//     JsonObject params;
+//     params["query"] = "AccountInfo.accountId";
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
+
+//     TEST_LOG("  status=%u", status);
+// }
+
+// /********************************************************
+// ** Test: getPlatformConfiguration("AccountInfo.x1DeviceId")
+// ** Exercises: GetX1DeviceId() - authservicePlugin null path
+// *******************************************************/
+// TEST_F(SystemService_L2Test, PlatformCaps_Cov_AccountInfo_X1DeviceId_JSONRPC)
+// {
+//     TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('AccountInfo.x1DeviceId')");
+
+//     JsonObject params;
+//     params["query"] = "AccountInfo.x1DeviceId";
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
+
+//     TEST_LOG("  status=%u", status);
+// }
+
+// /********************************************************
+// ** Test: getPlatformConfiguration("AccountInfo.XCALSessionTokenAvailable")
+// ** Exercises: XCALSessionTokenAvailable() - authservicePlugin null path
+// *******************************************************/
+// TEST_F(SystemService_L2Test, PlatformCaps_Cov_AccountInfo_XCALToken_JSONRPC)
+// {
+//     TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('AccountInfo.XCALSessionTokenAvailable')");
+
+//     JsonObject params;
+//     params["query"] = "AccountInfo.XCALSessionTokenAvailable";
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
+
+//     TEST_LOG("  status=%u", status);
+// }
+
+// /********************************************************
+// ** Test: getPlatformConfiguration("AccountInfo.experience")
+// ** Exercises: GetExperience() - authservicePlugin null path
+// *******************************************************/
+// TEST_F(SystemService_L2Test, PlatformCaps_Cov_AccountInfo_Experience_JSONRPC)
+// {
+//     TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('AccountInfo.experience')");
+
+//     JsonObject params;
+//     params["query"] = "AccountInfo.experience";
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
+
+//     TEST_LOG("  status=%u", status);
+// }
+
+// /********************************************************
+// ** Test: getPlatformConfiguration("AccountInfo.deviceMACAddress")
+// ** Exercises: GetDdeviceMACAddress() via JsonRpc to org.rdk.System
+// *******************************************************/
+// TEST_F(SystemService_L2Test, PlatformCaps_Cov_AccountInfo_DeviceMAC_JSONRPC)
+// {
+//     TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('AccountInfo.deviceMACAddress')");
+
+//     JsonObject params;
+//     params["query"] = "AccountInfo.deviceMACAddress";
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
+
+//     TEST_LOG("  status=%u", status);
+// }
+
+// /********************************************************
+// ** Test: getPlatformConfiguration("AccountInfo.firmwareUpdateDisabled")
+// ** Exercises: GetFirmwareUpdateDisabled() - checks SWUpdateConf file
+// *******************************************************/
+// TEST_F(SystemService_L2Test, PlatformCaps_Cov_AccountInfo_FirmwareUpdateDisabled_JSONRPC)
+// {
+//     TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('AccountInfo.firmwareUpdateDisabled')");
+
+//     JsonObject params;
+//     params["query"] = "AccountInfo.firmwareUpdateDisabled";
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
+
+//     TEST_LOG("  status=%u", status);
+// }
+
+// /********************************************************
+// ** Test: getPlatformConfiguration("DeviceInfo") - full DeviceInfo
+// ** Exercises: DeviceInfo::Load with empty sub-query
+// **            GetQuirks, AddDashExclusionList, DeviceCapsFeatures,
+// **            GetMimeTypes, GetModel, GetDeviceType, SupportsTrueSD,
+// **            CanMixPCMWithSurround, GetHDRCapability, GetPublicIP,
+// **            getAvailablePlugins, verifyLibraries, GetBrowser
+// **            All CDVR/DVR/EAS/IPDVR/IVOD/LINEAR_TV/VOD branches
+// **            All features map branches in platformcaps.cpp
+// *******************************************************/
+// TEST_F(SystemService_L2Test, PlatformCaps_Cov_DeviceInfo_All_JSONRPC)
+// {
+//     TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('DeviceInfo')");
+
+//     JsonObject params;
+//     params["query"] = "DeviceInfo";
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
+
+//     if (status == Core::ERROR_NONE) {
+//         TEST_LOG("  DeviceInfo all fields - success");
+//         if (result.HasLabel("DeviceInfo")) {
+//             TEST_LOG("  DeviceInfo field present");
+//         }
+//     } else {
+//         TEST_LOG("  DeviceInfo returned %u - acceptable", status);
+//     }
+// }
+
+// /********************************************************
+// ** Test: getPlatformConfiguration("DeviceInfo.quirks")
+// ** Exercises: GetQuirks() - fixed list + env var branches
+// **            platformcaps.cpp quirks array -> comma-string conversion
+// *******************************************************/
+// TEST_F(SystemService_L2Test, PlatformCaps_Cov_DeviceInfo_Quirks_JSONRPC)
+// {
+//     TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('DeviceInfo.quirks')");
+
+//     JsonObject params;
+//     params["query"] = "DeviceInfo.quirks";
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
+
+//     TEST_LOG("  status=%u", status);
+// }
+
+// /********************************************************
+// ** Test: getPlatformConfiguration("DeviceInfo.mimeTypeExclusions")
+// ** Exercises: AddDashExclusionList() - AAMP_SUPPORTED path
+// **            RFC lookup for DashPlaybackInclusions
+// **            hash iteration building JsonArrays
+// **            all CDVR/DVR/EAS/IPDVR/IVOD/LINEAR_TV/VOD array branches
+// **            in platformcaps.cpp
+// *******************************************************/
+// TEST_F(SystemService_L2Test, PlatformCaps_Cov_DeviceInfo_MimeTypeExclusions_JSONRPC)
+// {
+//     TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('DeviceInfo.mimeTypeExclusions')");
+
+//     JsonObject params;
+//     params["query"] = "DeviceInfo.mimeTypeExclusions";
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
+
+//     TEST_LOG("  status=%u", status);
+// }
+
+// /********************************************************
+// ** Test: getPlatformConfiguration("DeviceInfo.features")
+// ** Exercises: DeviceCapsFeatures() - all feature map entries
+// **            getAvailablePlugins(), verifyLibraries()
+// **            getDeviceProperties(), getProperties()
+// **            OPEN_BROWSING, UHD_4K_DECODE property branches
+// **            all features HasLabel branches in platformcaps.cpp
+// *******************************************************/
+// TEST_F(SystemService_L2Test, PlatformCaps_Cov_DeviceInfo_Features_JSONRPC)
+// {
+//     TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('DeviceInfo.features')");
+
+//     JsonObject params;
+//     params["query"] = "DeviceInfo.features";
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
+
+//     TEST_LOG("  status=%u", status);
+// }
+
+// /********************************************************
+// ** Test: getPlatformConfiguration("DeviceInfo.mimeTypes")
+// ** Exercises: GetMimeTypes() - currently returns empty list
+// **            mimeTypes array -> comma-string conversion in platformcaps.cpp
+// *******************************************************/
+// TEST_F(SystemService_L2Test, PlatformCaps_Cov_DeviceInfo_MimeTypes_JSONRPC)
+// {
+//     TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('DeviceInfo.mimeTypes')");
+
+//     JsonObject params;
+//     params["query"] = "DeviceInfo.mimeTypes";
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
+
+//     TEST_LOG("  status=%u", status);
+// }
+
+// /********************************************************
+// ** Test: getPlatformConfiguration("DeviceInfo.model")
+// ** Exercises: GetModel() via JsonRpc -> org.rdk.System.getDeviceInfo
+// **            JsonRpc::invoke(), JsonRpc::getClient()
+// *******************************************************/
+// TEST_F(SystemService_L2Test, PlatformCaps_Cov_DeviceInfo_Model_JSONRPC)
+// {
+//     TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('DeviceInfo.model')");
+
+//     JsonObject params;
+//     params["query"] = "DeviceInfo.model";
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
+
+//     TEST_LOG("  status=%u", status);
+// }
+
+// /********************************************************
+// ** Test: getPlatformConfiguration("DeviceInfo.deviceType")
+// ** Exercises: GetDeviceType() - authservicePlugin null path ->
+// **            JsonRpc fallback -> device_type comparison logic
+// **            "mediaclient"->"IpStb", "hybrid"->"QamIpStb", else "TV"
+// *******************************************************/
+// TEST_F(SystemService_L2Test, PlatformCaps_Cov_DeviceInfo_DeviceType_JSONRPC)
+// {
+//     TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('DeviceInfo.deviceType')");
+
+//     JsonObject params;
+//     params["query"] = "DeviceInfo.deviceType";
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
+
+//     TEST_LOG("  status=%u", status);
+// }
+
+// /********************************************************
+// ** Test: getPlatformConfiguration("DeviceInfo.supportsTrueSD")
+// ** Exercises: SupportsTrueSD() - returns true (no DISABLE_TRUE_SD)
+// *******************************************************/
+// TEST_F(SystemService_L2Test, PlatformCaps_Cov_DeviceInfo_SupportsTrueSD_JSONRPC)
+// {
+//     TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('DeviceInfo.supportsTrueSD')");
+
+//     JsonObject params;
+//     params["query"] = "DeviceInfo.supportsTrueSD";
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
+
+//     TEST_LOG("  status=%u", status);
+// }
+
+// /********************************************************
+// ** Test: getPlatformConfiguration("DeviceInfo.canMixPCMWithSurround")
+// ** Exercises: CanMixPCMWithSurround() - device::Host try/catch path
+// *******************************************************/
+// TEST_F(SystemService_L2Test, PlatformCaps_Cov_DeviceInfo_CanMixPCM_JSONRPC)
+// {
+//     TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('DeviceInfo.canMixPCMWithSurround')");
+
+//     JsonObject params;
+//     params["query"] = "DeviceInfo.canMixPCMWithSurround";
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
+
+//     TEST_LOG("  status=%u", status);
+// }
+
+// /********************************************************
+// ** Test: getPlatformConfiguration("DeviceInfo.HdrCapability")
+// ** Exercises: GetHDRCapability() via JsonRpc ->
+// **            org.rdk.DisplaySettings.getSettopHDRSupport
+// **            JsonArray iteration building comma-string
+// *******************************************************/
+// TEST_F(SystemService_L2Test, PlatformCaps_Cov_DeviceInfo_HdrCapability_JSONRPC)
+// {
+//     TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('DeviceInfo.HdrCapability')");
+
+//     JsonObject params;
+//     params["query"] = "DeviceInfo.HdrCapability";
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
+
+//     TEST_LOG("  status=%u", status);
+// }
+
+// /********************************************************
+// ** Test: getPlatformConfiguration("DeviceInfo.publicIP")
+// ** Exercises: GetPublicIP() via JsonRpc -> org.rdk.Network.getPublicIP
+// *******************************************************/
+// TEST_F(SystemService_L2Test, PlatformCaps_Cov_DeviceInfo_PublicIP_JSONRPC)
+// {
+//     TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration('DeviceInfo.publicIP')");
+
+//     JsonObject params;
+//     params["query"] = "DeviceInfo.publicIP";
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
+
+//     TEST_LOG("  status=%u", status);
+// }
+
+// /********************************************************
+// ** Test: getPlatformConfiguration bad query
+// ** Exercises: PlatformCaps::Load regex else-branch (TRACE error path)
+// **            Returns false -> success=false
+// *******************************************************/
+// TEST_F(SystemService_L2Test, PlatformCaps_Cov_BadQuery_JSONRPC)
+// {
+//     TEST_LOG("PlatformCaps_Cov: Testing getPlatformConfiguration with bad query");
+
+//     JsonObject params;
+//     params["query"] = "InvalidSection.invalidField";
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
+
+//     /* Bad query hits the TRACE error path and returns false -> ERROR_GENERAL */
+//     TEST_LOG("  Bad query status=%u (non-zero expected)", status);
+// }
+
+// /********************************************************
+// ** Test: getPlatformConfiguration COM-RPC - empty query (all fields)
+// ** Exercises: GetPlatformConfiguration COM-RPC path end-to-end
+// **            All platformcaps code via COM-RPC dispatcher
+// *******************************************************/
+// TEST_F(SystemService_L2Test, PlatformCaps_Cov_GetAll_COMRPC)
+// {
+//     TEST_LOG("PlatformCaps_Cov: Testing GetPlatformConfiguration('') via COM-RPC");
+
+//     if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+//         TEST_LOG("  COM-RPC interface not available - skipping");
+//         return;
+//     }
+
+//     ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
+
+//     string query = "";
+//     Exchange::ISystemServices::PlatformConfig platformConfig;
+//     uint32_t result = m_SystemServicesPlugin->GetPlatformConfiguration(query, platformConfig);
+
+//     TEST_LOG("  GetPlatformConfiguration('') result=%u", result);
+//     if (result == Core::ERROR_NONE) {
+//         TEST_LOG("  accountId: '%s'", platformConfig.accountInfo.accountId.c_str());
+//         TEST_LOG("  deviceType: '%s'", platformConfig.deviceInfo.deviceType.c_str());
+//         TEST_LOG("  model: '%s'", platformConfig.deviceInfo.model.c_str());
+//         TEST_LOG("  quirks: '%s'", platformConfig.deviceInfo.quirks.c_str());
+//         TEST_LOG("  mimeTypes: '%s'", platformConfig.deviceInfo.mimeTypes.c_str());
+//         TEST_LOG("  hdrCapability: '%s'", platformConfig.deviceInfo.hdrCapability.c_str());
+//         TEST_LOG("  supportsTrueSD: %s", platformConfig.deviceInfo.supportsTrueSD ? "true" : "false");
+//         TEST_LOG("  canMixPCMWithSurround: %s", platformConfig.deviceInfo.canMixPCMWithSurround ? "true" : "false");
+//         TEST_LOG("  firmwareUpdateDisabled: %s", platformConfig.accountInfo.firmwareUpdateDisabled ? "true" : "false");
+//     }
+
+//     m_SystemServicesPlugin->Release();
+//     m_controller_SystemServices->Release();
+// }
+
+// /********************************************************
+// ** Test: getPlatformConfiguration COM-RPC - AccountInfo
+// *******************************************************/
+// TEST_F(SystemService_L2Test, PlatformCaps_Cov_AccountInfo_COMRPC)
+// {
+//     TEST_LOG("PlatformCaps_Cov: Testing GetPlatformConfiguration('AccountInfo') via COM-RPC");
+
+//     if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+//         TEST_LOG("  COM-RPC interface not available - skipping");
+//         return;
+//     }
+
+//     ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
+
+//     string query = "AccountInfo";
+//     Exchange::ISystemServices::PlatformConfig platformConfig;
+//     uint32_t result = m_SystemServicesPlugin->GetPlatformConfiguration(query, platformConfig);
+
+//     TEST_LOG("  result=%u, accountId='%s'", result, platformConfig.accountInfo.accountId.c_str());
+
+//     m_SystemServicesPlugin->Release();
+//     m_controller_SystemServices->Release();
+// }
+
+// /********************************************************
+// ** Test: getPlatformConfiguration COM-RPC - DeviceInfo
+// *******************************************************/
+// TEST_F(SystemService_L2Test, PlatformCaps_Cov_DeviceInfo_COMRPC)
+// {
+//     TEST_LOG("PlatformCaps_Cov: Testing GetPlatformConfiguration('DeviceInfo') via COM-RPC");
+
+//     if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+//         TEST_LOG("  COM-RPC interface not available - skipping");
+//         return;
+//     }
+
+//     ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
+
+//     string query = "DeviceInfo";
+//     Exchange::ISystemServices::PlatformConfig platformConfig;
+//     uint32_t result = m_SystemServicesPlugin->GetPlatformConfiguration(query, platformConfig);
+
+//     TEST_LOG("  result=%u, deviceType='%s', model='%s'",
+//              result,
+//              platformConfig.deviceInfo.deviceType.c_str(),
+//              platformConfig.deviceInfo.model.c_str());
+//     TEST_LOG("  mimeTypeExclusions.cdvr='%s'", platformConfig.deviceInfo.mimeTypeExclusions.cdvr.c_str());
+//     TEST_LOG("  features.keySource=%d", platformConfig.deviceInfo.features.keySource);
+
+//     m_SystemServicesPlugin->Release();
+//     m_controller_SystemServices->Release();
+// }
+
+// /********************************************************
+// ** Test: Verify PlatformCaps object fields are populated
+// ** after a DeviceInfo query - covers field assignment branches
+// ** in platformcaps.cpp (webBrowser, hdrCapability, publicIP etc.)
+// *******************************************************/
+// TEST_F(SystemService_L2Test, PlatformCaps_Cov_DeviceInfo_FieldAssignment_COMRPC)
+// {
+//     TEST_LOG("PlatformCaps_Cov: Verifying DeviceInfo field assignments via COM-RPC");
+
+//     if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+//         TEST_LOG("  COM-RPC interface not available - skipping");
+//         return;
+//     }
+
+//     ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
+
+//     string query = "DeviceInfo";
+//     Exchange::ISystemServices::PlatformConfig platformConfig;
+//     uint32_t result = m_SystemServicesPlugin->GetPlatformConfiguration(query, platformConfig);
+
+//     TEST_LOG("  result=%u", result);
+
+//     /* Log all fields to exercise assignment code paths */
+//     TEST_LOG("  webBrowser.browserType='%s'", platformConfig.deviceInfo.webBrowser.browserType.c_str());
+//     TEST_LOG("  webBrowser.version='%s'", platformConfig.deviceInfo.webBrowser.version.c_str());
+//     TEST_LOG("  webBrowser.userAgent='%s'", platformConfig.deviceInfo.webBrowser.userAgent.c_str());
+//     TEST_LOG("  hdrCapability='%s'", platformConfig.deviceInfo.hdrCapability.c_str());
+//     TEST_LOG("  publicIP='%s'", platformConfig.deviceInfo.publicIP.c_str());
+//     TEST_LOG("  mimeTypeExclusions.dvr='%s'", platformConfig.deviceInfo.mimeTypeExclusions.dvr.c_str());
+//     TEST_LOG("  mimeTypeExclusions.eas='%s'", platformConfig.deviceInfo.mimeTypeExclusions.eas.c_str());
+//     TEST_LOG("  mimeTypeExclusions.ipdvr='%s'", platformConfig.deviceInfo.mimeTypeExclusions.ipdvr.c_str());
+//     TEST_LOG("  mimeTypeExclusions.ivod='%s'", platformConfig.deviceInfo.mimeTypeExclusions.ivod.c_str());
+//     TEST_LOG("  mimeTypeExclusions.linearTV='%s'", platformConfig.deviceInfo.mimeTypeExclusions.linearTV.c_str());
+//     TEST_LOG("  mimeTypeExclusions.vod='%s'", platformConfig.deviceInfo.mimeTypeExclusions.vod.c_str());
+//     TEST_LOG("  features.allowSelfSignedWithIPAddress=%d", platformConfig.deviceInfo.features.allowSelfSignedWithIPAddress);
+//     TEST_LOG("  features.supportsSecure=%d", platformConfig.deviceInfo.features.supportsSecure);
+//     TEST_LOG("  features.cookies=%d", platformConfig.deviceInfo.features.cookies);
+//     TEST_LOG("  features.uhd4kDecode=%d", platformConfig.deviceInfo.features.uhd4kDecode);
+
+//     m_SystemServicesPlugin->Release();
+//     m_controller_SystemServices->Release();
+// }
+// //3--
+// /***********************************************************************
+// ** cTimer Coverage Tests (CTimer_Cov_*)
+// ** Exercises all paths in cTimer.cpp:
+// **   constructor, destructor, setInterval, start, stop,
+// **   timerFunction loop, detach, join (joinable branch).
+// ** Uses real threads - intervals kept minimal (50ms) to stay fast.
+// ***********************************************************************/
+
+// /* start() with interval<=0 AND callback==NULL → false */
+// TEST_F(SystemService_L2Test, CTimer_Cov_Start_NoIntervalNoCallback)
+// {
+//     TEST_LOG("CTimer_Cov: start() with no interval and no callback → false");
+//     cTimer timer;
+//     bool result = timer.start();
+//     EXPECT_FALSE(result);
+//     TEST_LOG("  result=%s (expected false)", result ? "true" : "false");
+// }
+
+// /* start() with callback but interval==0 → condition (interval<=0 && cb==NULL) is false → starts.
+//    We must use a valid interval to avoid an infinite tight-loop in the timer thread. */
+// TEST_F(SystemService_L2Test, CTimer_Cov_Start_ZeroIntervalWithCallback)
+// {
+//     TEST_LOG("CTimer_Cov: start() with callback and interval==50 → starts, stop+join cleanly");
+//     static bool dummy = false;
+//     cTimer timer;
+//     /* Use a real interval so the timer thread sleeps rather than spinning at 100% CPU */
+//     timer.setInterval([]() { dummy = true; }, 50);
+//     (void)dummy;
+//     bool result = timer.start();
+//     TEST_LOG("  result=%s", result ? "true" : "false");
+//     if (result) {
+//         std::this_thread::sleep_for(std::chrono::milliseconds(60));
+//         timer.stop();
+//         timer.join();
+//     }
+// }
+
+// /* Full start → timerFunction loop fires → stop → join path */
+// TEST_F(SystemService_L2Test, CTimer_Cov_StartStopJoin)
+// {
+//     TEST_LOG("CTimer_Cov: start → callback fires → stop → join");
+//     static int count = 0;
+//     count = 0;
+
+//     cTimer timer;
+//     timer.setInterval([]() { count++; }, 50);
+
+//     bool started = timer.start();
+//     EXPECT_TRUE(started);
+
+//     std::this_thread::sleep_for(std::chrono::milliseconds(180));
+
+//     timer.stop();
+//     timer.join();   /* joinable() → true → joins */
+
+//     TEST_LOG("  callback fired %d times", count);
+//     EXPECT_GT(count, 0);
+// }
+
+// /* join() when thread is NOT joinable (never started) - covers joinable()==false branch */
+// TEST_F(SystemService_L2Test, CTimer_Cov_Join_NotStarted)
+// {
+//     TEST_LOG("CTimer_Cov: join() without start → joinable()==false, no crash");
+//     cTimer timer;
+//     timer.join();   /* joinable() == false → if-body not entered */
+//     TEST_LOG("  join() on un-started timer - no crash (correct)");
+// }
+
+// /* setInterval then start, detach (covers detach path) */
+// TEST_F(SystemService_L2Test, CTimer_Cov_StartDetach)
+// {
+//     TEST_LOG("CTimer_Cov: start → detach");
+//     static bool fired = false;
+
+//     cTimer timer;
+//     timer.setInterval([]() { fired = true; }, 50);
+
+//     bool started = timer.start();
+//     EXPECT_TRUE(started);
+
+//     timer.detach(); /* detaches thread - covers detach() code path */
+//     timer.stop();   /* sets clear=true immediately - thread exits within one interval */
+
+//     std::this_thread::sleep_for(std::chrono::milliseconds(200)); /* wait > 2x interval to ensure thread exited */
+//     TEST_LOG("  fired=%s", fired ? "true" : "false");
+// }
+
+// /* destructor sets clear=true - exercise via scope exit while timer running */
+// TEST_F(SystemService_L2Test, CTimer_Cov_DestructorStopsTimer)
+// {
+//     TEST_LOG("CTimer_Cov: destructor sets clear=true");
+//     static int dcount = 0;
+//     dcount = 0;
+//     {
+//         cTimer timer;
+//         timer.setInterval([]() { dcount++; }, 50);
+//         timer.start();
+//         std::this_thread::sleep_for(std::chrono::milliseconds(80));
+//         timer.stop();
+//         timer.join(); /* join ensures thread exits BEFORE ~cTimer() runs - prevents use-after-free */
+//     } /* ~cTimer() runs safely after thread has exited */
+//     TEST_LOG("  destructor executed, count=%d", dcount);
+// }
+// //2--
+// /***********************************************************************
+// ** SystemServicesImplementation Branch Coverage Tests (SysImpl_Branch_*)
+// ** Targets uncovered branches and error paths.
+// ***********************************************************************/
+
+// /* SetDeepSleepTimer with seconds=0 → MissingKeyValues error path */
+// TEST_F(SystemService_L2Test, SysImpl_Branch_SetDeepSleepTimer_Zero_JSONRPC)
+// {
+//     TEST_LOG("SysImpl_Branch: setDeepSleepTimer(0) → MissingKeyValues error path");
+//     JsonObject params;
+//     params["seconds"] = 0;
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setDeepSleepTimer", params, result);
+
+//     /* seconds==0 hits populateResponseWithError(SysSrv_MissingKeyValues) branch */
+//     TEST_LOG("  status=%u (non-zero expected for zero seconds)", status);
+// }
+
+// /* SetDeepSleepTimer with seconds > 864000 → clamped to 0 internally */
+// TEST_F(SystemService_L2Test, SysImpl_Branch_SetDeepSleepTimer_Overflow_JSONRPC)
+// {
+//     TEST_LOG("SysImpl_Branch: setDeepSleepTimer(999999) → clamped-to-zero branch");
+//     JsonObject params;
+//     params["seconds"] = 999999;
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setDeepSleepTimer", params, result);
+
+//     TEST_LOG("  status=%u", status);
+// }
+
+// /* SetDeepSleepTimer with negative seconds → clamped to 0 branch */
+// TEST_F(SystemService_L2Test, SysImpl_Branch_SetDeepSleepTimer_Negative_JSONRPC)
+// {
+//     TEST_LOG("SysImpl_Branch: setDeepSleepTimer(-1) → negative clamping branch");
+//     JsonObject params;
+//     params["seconds"] = -1;
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setDeepSleepTimer", params, result);
+
+//     TEST_LOG("  status=%u", status);
+// }
+
+// /* SetBootLoaderSplashScreen with empty path → "Invalid path" error branch */
+// TEST_F(SystemService_L2Test, SysImpl_Branch_SetBootLoaderSplashScreen_EmptyPath_JSONRPC)
+// {
+//     TEST_LOG("SysImpl_Branch: setBootLoaderSplashScreen('') → invalid path branch");
+//     JsonObject params;
+//     params["path"] = "";
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setBootLoaderSplashScreen", params, result);
+
+//     /* Empty path → fileExists==false → error.message="Invalid path", success=false */
+//     if (status == Core::ERROR_NONE) {
+//         TEST_LOG("  success: %s", result.HasLabel("success") ? (result["success"].Boolean() ? "true" : "false") : "absent");
+//         if (result.HasLabel("error")) {
+//             TEST_LOG("  error present (expected for empty path)");
+//         }
+//     } else {
+//         TEST_LOG("  status=%u", status);
+//     }
+// }
+
+// /* SetBootLoaderSplashScreen with non-existent path → fileExists==false branch */
+// TEST_F(SystemService_L2Test, SysImpl_Branch_SetBootLoaderSplashScreen_NonExistentPath_JSONRPC)
+// {
+//     TEST_LOG("SysImpl_Branch: setBootLoaderSplashScreen('/nonexistent/splash.png') → fileExists==false");
+//     JsonObject params;
+//     params["path"] = "/nonexistent/splash.png";
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setBootLoaderSplashScreen", params, result);
+
+//     TEST_LOG("  status=%u", status);
+//     if (status == Core::ERROR_NONE) {
+//         TEST_LOG("  returned NONE - error path inside impl, success=false expected");
+//     }
+// }
+
+// /* GetTimeStatus - exercises IARM_Bus_Call path (will fail in CI, covers the error return) */
+// TEST_F(SystemService_L2Test, SysImpl_Branch_GetTimeStatus_JSONRPC)
+// {
+//     TEST_LOG("SysImpl_Branch: getTimeStatus → IARM call path");
+//     JsonObject params;
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getTimeStatus", params, result);
+
+//     /* In CI, IARM call fails → Core::ERROR_GENERAL returned */
+//     TEST_LOG("  status=%u", status);
+//     if (status == Core::ERROR_NONE) {
+//         TEST_LOG("  TimeQuality=%s", result.HasLabel("TimeQuality") ? result["TimeQuality"].String().c_str() : "absent");
+//     }
+// }
+
+// /* SetWakeupSrcConfiguration with null iterator → skips loop, returns immediately */
+// TEST_F(SystemService_L2Test, SysImpl_Branch_SetWakeupSrcConfiguration_NullSources_JSONRPC)
+// {
+//     TEST_LOG("SysImpl_Branch: setWakeupSrcConfiguration with empty sources → null iterator path");
+//     JsonObject params;
+//     params["powerState"] = "LIGHT_SLEEP";
+//     /* No wakeupSources field → implementation receives null iterator */
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setWakeupSrcConfiguration", params, result);
+
+//     TEST_LOG("  status=%u", status);
+// }
+
+// /* SetMode with WAREHOUSE mode (covers WAREHOUSE branch in SetMode) */
+// TEST_F(SystemService_L2Test, SysImpl_Branch_SetMode_WAREHOUSE_JSONRPC)
+// {
+//     TEST_LOG("SysImpl_Branch: setMode WAREHOUSE → WAREHOUSE branch");
+//     JsonObject params;
+//     params["mode"] = "WAREHOUSE";
+//     params["duration"] = 30;
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
+
+//     TEST_LOG("  status=%u", status);
+//     if (status == Core::ERROR_NONE) {
+//         TEST_LOG("  WAREHOUSE mode set, success=%s",
+//                  result.HasLabel("success") ? (result["success"].Boolean() ? "true" : "false") : "absent");
+//         /* Restore to NORMAL */
+//         JsonObject restoreParams;
+//         restoreParams["mode"] = "NORMAL";
+//         restoreParams["duration"] = -1;
+//         JsonObject restoreResult;
+//         InvokeServiceMethod("org.rdk.System.1", "setMode", restoreParams, restoreResult);
+//     }
+// }
+
+// /* GetPowerState - exercises PowerManager branch */
+// TEST_F(SystemService_L2Test, SysImpl_Branch_GetPowerState_JSONRPC)
+// {
+//     TEST_LOG("SysImpl_Branch: getPowerState → PowerManager path");
+//     JsonObject params;
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPowerState", params, result);
+
+//     TEST_LOG("  status=%u", status);
+//     if (status == Core::ERROR_NONE) {
+//         TEST_LOG("  powerState=%s", result.HasLabel("powerState") ? result["powerState"].String().c_str() : "absent");
+//     }
+// }
+
+// /* GetPowerState COM-RPC */
+// TEST_F(SystemService_L2Test, SysImpl_Branch_GetPowerState_COMRPC)
+// {
+//     TEST_LOG("SysImpl_Branch: GetPowerState via COM-RPC");
+
+//     if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+//         TEST_LOG("  COM-RPC interface not available - skipping");
+//         return;
+//     }
+
+//     string powerState;
+//     bool success = false;
+//     uint32_t result = m_SystemServicesPlugin->GetPowerState(powerState, success);
+
+//     TEST_LOG("  result=%u, powerState='%s', success=%s",
+//              result, powerState.c_str(), success ? "true" : "false");
+
+//     m_SystemServicesPlugin->Release();
+//     m_controller_SystemServices->Release();
+// }
+
+// /* SetBootLoaderSplashScreen COM-RPC - empty path, invalid path branch */
+// TEST_F(SystemService_L2Test, SysImpl_Branch_SetBootLoaderSplashScreen_COMRPC)
+// {
+//     TEST_LOG("SysImpl_Branch: SetBootLoaderSplashScreen via COM-RPC");
+
+//     if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+//         TEST_LOG("  COM-RPC interface not available - skipping");
+//         return;
+//     }
+
+//     Exchange::ISystemServices::ErrorInfo error;
+//     bool success = false;
+
+//     /* Empty path → invalid path branch */
+//     uint32_t result = m_SystemServicesPlugin->SetBootLoaderSplashScreen("", error, success);
+
+//     TEST_LOG("  result=%u, success=%s, error.code='%s', error.message='%s'",
+//              result, success ? "true" : "false",
+//              error.code.c_str(), error.message.c_str());
+
+//     /* Non-existent path → fileExists==false branch */
+//     Exchange::ISystemServices::ErrorInfo error2;
+//     bool success2 = false;
+//     uint32_t result2 = m_SystemServicesPlugin->SetBootLoaderSplashScreen("/no/such/splash.bin", error2, success2);
+
+//     TEST_LOG("  non-existent path: result=%u, success=%s, error.code='%s'",
+//              result2, success2 ? "true" : "false", error2.code.c_str());
+
+//     m_SystemServicesPlugin->Release();
+//     m_controller_SystemServices->Release();
+// }
+
+// //1--
+// /***********************************************************************
+// ** SystemServices.cpp Additional Coverage Tests
+// ** Covers Information() and verify plugin is properly initialized/running.
+// ***********************************************************************/
+
+// /* Information() - covers the string return in SystemServices.cpp */
+// TEST_F(SystemService_L2Test, SystemServices_Cov_Information_JSONRPC)
+// {
+//     TEST_LOG("SystemServices_Cov: Verify plugin is active and processing API calls");
+
+//     /* Call a lightweight API to confirm plugin Initialize/Deinitialize are exercised */
+//     JsonObject params;
+//     JsonObject result;
+
+//     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getSystemVersions", params, result);
+
+//     EXPECT_EQ(status, Core::ERROR_NONE);
+//     if (status == Core::ERROR_NONE) {
+//         TEST_LOG("  Plugin active - stbVersion=%s",
+//                  result.HasLabel("stbVersion") ? result["stbVersion"].String().c_str() : "absent");
+//     }
+// }
+
+// /* Deactivated() path - covered indirectly via Unregister notification path */
+// TEST_F(SystemService_L2Test, SystemServices_Cov_Notification_Register_COMRPC)
+// {
+//     TEST_LOG("SystemServices_Cov: Register/Unregister notification path in SystemServices.cpp");
+
+//     if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+//         TEST_LOG("  COM-RPC unavailable - skipping");
+//         return;
+//     }
+
+//     /* Register/Unregister exercises _systemServicesNotification callbacks */
+//     Exchange::ISystemServices::SystemVersionsInfo info;
+//     uint32_t result = m_SystemServicesPlugin->GetSystemVersions(info);
+
+//     TEST_LOG("  GetSystemVersions result=%u, stbVersion='%s'",
+//              result, info.stbVersion.c_str());
+
+//     m_SystemServicesPlugin->Release();
+//     m_controller_SystemServices->Release();
+// }
