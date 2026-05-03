@@ -7036,8 +7036,8 @@ TEST_F(SystemService_L2Test, CTimer_Cov_DestructorStopsTimer)
         timer.start();
         std::this_thread::sleep_for(std::chrono::milliseconds(80));
         timer.stop();
-        timer.detach();
-    } /* ~cTimer() sets clear=true */
+        timer.join(); /* join ensures thread exits BEFORE ~cTimer() runs - prevents use-after-free */
+    } /* ~cTimer() runs safely after thread has exited */
     TEST_LOG("  destructor executed, count=%d", dcount);
 }
 
