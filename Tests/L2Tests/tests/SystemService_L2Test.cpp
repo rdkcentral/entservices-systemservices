@@ -2717,7 +2717,7 @@ TEST_F(SystemService_L2Test, GetSystemVersions_COMRPC)
 ** Testing remaining SystemServices APIs via JSON-RPC interface
 *******************************************************/
 
-TEST_F(SystemService_L2Test, SetOptOutTelemetry_JSONRPC)
+TEST_F(SystemService_L2Test, SetOptOutTelemetry_JSONRPC_2)
 {
     TEST_LOG("Testing setOptOutTelemetry via JSON-RPC");
 
@@ -2997,7 +2997,7 @@ TEST_F(SystemService_L2Test, GetMfgSerialNumber_JSONRPC)
 }
 
 // IsOptOutTelemetry Tests
-TEST_F(SystemService_L2Test, IsOptOutTelemetry_COMRPC)
+TEST_F(SystemService_L2Test, IsOptOutTelemetry_COMRPC_2)
 {
     if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
         TEST_LOG("Invalid SystemServices_Client");
