@@ -408,7 +408,7 @@ SystemService_L2Test::SystemService_L2Test()
 
         // Mock PowerManager HAL
         EXPECT_CALL(*p_powerManagerHalMock, PLAT_DS_INIT())
-        .WillOnce(::testing::Return(DEEPSLEEPMGR_SUCCESS));
+        .WillRepeatedly(::testing::Return(DEEPSLEEPMGR_SUCCESS));
 
         EXPECT_CALL(*p_powerManagerHalMock, PLAT_INIT())
         .WillRepeatedly(::testing::Return(PWRMGR_SUCCESS));
@@ -507,10 +507,10 @@ SystemService_L2Test::~SystemService_L2Test()
     TEST_LOG("Deactivated org.rdk.System");
 
     EXPECT_CALL(*p_powerManagerHalMock, PLAT_TERM())
-        .WillOnce(::testing::Return(PWRMGR_SUCCESS));
+        .WillRepeatedly(::testing::Return(PWRMGR_SUCCESS));
 
     EXPECT_CALL(*p_powerManagerHalMock, PLAT_DS_TERM())
-        .WillOnce(::testing::Return(DEEPSLEEPMGR_SUCCESS));
+        .WillRepeatedly(::testing::Return(DEEPSLEEPMGR_SUCCESS));
 
     status = DeactivateService("org.rdk.PowerManager");
     EXPECT_EQ(Core::ERROR_NONE, status);
@@ -4509,7 +4509,7 @@ TEST_F(SystemService_L2Test, ThermalMonitor_EmitTemperatureThresholdChange)
 
 
 
-//Adding Test cases from 
+//Adding Test cases from my test cases
 /********************************************************
 ************Test case Details **************************
 ** CThermalMonitor Coverage Tests
