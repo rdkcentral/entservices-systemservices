@@ -701,6 +701,21 @@ jobs:
           fi
           exit $TEST_EXIT
 
+      - name: Debug toolchain and coverage flags
+        if: ${{ matrix.coverage == 'with-coverage' && !env.ACT }}
+        run: |
+          echo "TOOLCHAIN_FILE=$TOOLCHAIN_FILE"
+          echo "--- gcda files generated (coverage instrumentation check) ---"
+          GCDA_COUNT=$(find build/entservices-systemservices -name "*.gcda" 2>/dev/null | wc -l)
+          echo "gcda file count: $GCDA_COUNT"
+          if [ "$GCDA_COUNT" -eq 0 ]; then
+            echo "WARNING: No gcda files found - coverage instrumentation may not have been applied"
+          else
+            find build/entservices-systemservices -name "*.gcda" | head -20
+          fi
+          echo "--- Test results summary ---"
+          cat $GITHUB_WORKSPACE/rdkL2TestResultsWithoutValgrind.json 2>/dev/null || echo "No results file"
+
       - name: Generate coverage
         if: ${{ matrix.coverage == 'with-coverage' && !env.ACT && inputs.caller_source != 'testframework' }}
         run: >
