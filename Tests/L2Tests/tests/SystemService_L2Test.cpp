@@ -4021,11 +4021,9 @@ TEST_F(SystemService_L2Test, CTimer_Start_Stop_ValidTimer)
     TEST_LOG("Callback executed %d times", finalCount);
     EXPECT_GT(finalCount, 0);
     
-    // Wait to ensure timer has stopped
+    // Wait then join cleanly
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    
-    // Detach the thread to prevent join issues
-    timer.detach();
+    timer.join();
 }
 
 TEST_F(SystemService_L2Test, CTimer_Detach)
@@ -4041,15 +4039,13 @@ TEST_F(SystemService_L2Test, CTimer_Detach)
     bool startResult = timer.start();
     EXPECT_TRUE(startResult);
     
-    // Detach the thread
+    // Detach the thread (covers detach code path)
     timer.detach();
     TEST_LOG("Timer thread detached");
     
-    // Stop the timer
+    // Stop and wait for thread to exit before scope ends
     timer.stop();
-    
-    // Give some time for callback to potentially execute
-    std::this_thread::sleep_for(std::chrono::milliseconds(150));
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
     (void)executed;
 }
 
@@ -7017,10 +7013,10 @@ TEST_F(SystemService_L2Test, CTimer_Cov_StartDetach)
     bool started = timer.start();
     EXPECT_TRUE(started);
 
-    timer.detach(); /* detaches thread */
-    timer.stop();   /* sets clear=true, thread will exit on next check */
+    timer.detach(); /* detaches thread - covers detach() code path */
+    timer.stop();   /* sets clear=true immediately - thread exits within one interval */
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(120));
+    std::this_thread::sleep_for(std::chrono::milliseconds(200)); /* wait > 2x interval to ensure thread exited */
     TEST_LOG("  fired=%s", fired ? "true" : "false");
 }
 
