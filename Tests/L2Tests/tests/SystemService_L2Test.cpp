@@ -6688,27 +6688,8 @@ TEST_F(SystemService_L2Test, SysImpl_SetDeepSleepTimer_Valid_COMRPC)
     }
 }
 
-/* Reboot via COM-RPC (PowerManager mock handles Reboot call) */
-TEST_F(SystemService_L2Test, SysImpl_Reboot_COMRPC)
-{
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("Invalid SystemServices_Client");
-        return;
-    }
-    if (m_controller_SystemServices && m_SystemServicesPlugin) {
-        TEST_LOG("Testing Reboot via COM-RPC");
-
-        int iarmStatus = 0;
-        bool success = false;
-
-        /* Reboot delegates to _powerManagerPlugin->Reboot which is mocked → safe */
-        uint32_t result = m_SystemServicesPlugin->Reboot("L2Test", iarmStatus, success);
-        TEST_LOG("  result=%u, iarmStatus=%d, success=%s", result, iarmStatus, success ? "true" : "false");
-
-        m_SystemServicesPlugin->Release();
-        m_controller_SystemServices->Release();
-    }
-}
+/* Reboot_COMRPC intentionally omitted: Reboot_JSONRPC_Negative was disabled (#if 0)
+ * because PowerManager Reboot HAL can terminate the test process. */
 
 /* SetTerritory with invalid territory via COM-RPC */
 TEST_F(SystemService_L2Test, SysImpl_SetTerritory_Invalid_COMRPC)
@@ -6911,19 +6892,7 @@ TEST_F(SystemService_L2Test, SysImpl_UpdateFirmware_JSONRPC)
     }
 }
 
-/* reboot via JSON-RPC */
-TEST_F(SystemService_L2Test, SysImpl_Reboot_JSONRPC)
-{
-    TEST_LOG("SysImpl: reboot via JSON-RPC");
-    JsonObject params;
-    params["rebootReason"] = "L2TestCoverage";
-    JsonObject result;
-    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "reboot", params, result);
-    TEST_LOG("  status=%u", status);
-    if (result.HasLabel("success")) {
-        TEST_LOG("  success=%s", result["success"].Boolean() ? "true" : "false");
-    }
-}
+/* Reboot_JSONRPC intentionally omitted: mirrors disabled Reboot_JSONRPC_Negative (#if 0). */
 
 /***********************************************************************
  * Coverage Enhancement Tests - cTimer Class
