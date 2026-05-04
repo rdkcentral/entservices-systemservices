@@ -304,6 +304,7 @@ protected:
     IARM_EventHandler_t sysMgrEventHandler = nullptr;
     IARM_BusCall_t sysModeChangeHandler = nullptr;
     IARM_EventHandler_t pwrMgrEventHandler = nullptr;
+    IARM_EventHandler_t sysMgrDeviceHandler = nullptr;
 
     // Plugin interface objects
     Exchange::ISystemServices* m_SystemServicesPlugin = nullptr;
@@ -391,6 +392,10 @@ SystemService_L2Test::SystemService_L2Test()
                 } else if (string(IARM_BUS_PWRMGR_NAME) == string(ownerName)) {
                     pwrMgrEventHandler = handler;
                     TEST_LOG("Captured PWRMGR event handler");
+                } else if ((string(IARM_BUS_SYSMGR_NAME) == string(ownerName)) &&
+                           (eventId == IARM_BUS_SYSMGR_EVENT_DEVICE_UPDATE_RECEIVED)) {
+                    sysMgrDeviceHandler = handler;
+                    TEST_LOG("Captured SYSMGR device-update handler");
                 }
                 return IARM_RESULT_SUCCESS;
             }));
@@ -6442,5 +6447,580 @@ TEST_F(SystemService_L2Test, SysImpl_SetBootLoaderSplashScreen_NonExistentPath_J
     JsonObject result;
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setBootLoaderSplashScreen", params, result);
     TEST_LOG("  status=%u", status);
+}
+
+/***********************************************************************
+ * Coverage Enhancement Tests - IARM System State Event Handlers
+ * Directly trigger _systemStateChanged with various IARM event types
+ ***********************************************************************/
+
+/* Firmware update state → DOWNLOADING (covers _systemStateChanged + OnFirmwareUpdateStateChange) */
+TEST_F(SystemService_L2Test, SysImpl_IARM_FirmwareUpdateState_Downloading)
+{
+    TEST_LOG("SysImpl: IARM firmware update state → DOWNLOADING (state=2)");
+    if (systemStateChanged == nullptr) {
+        TEST_LOG("  systemStateChanged handler not captured, skipping");
+        return;
+    }
+    IARM_Bus_SYSMgr_EventData_t evt;
+    memset(&evt, 0, sizeof(evt));
+    evt.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_FIRMWARE_UPDATE_STATE;
+    evt.data.systemStates.state   = IARM_BUS_SYSMGR_FIRMWARE_UPDATE_STATE_DOWNLOADING;
+    systemStateChanged(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, &evt, sizeof(evt));
+    TEST_LOG("  fired FIRMWARE_UPDATE_STATE / DOWNLOADING");
+}
+
+/* Firmware update state → DOWNLOAD_COMPLETE (different state → OnFirmwareUpdateStateChange fires again) */
+TEST_F(SystemService_L2Test, SysImpl_IARM_FirmwareUpdateState_Complete)
+{
+    TEST_LOG("SysImpl: IARM firmware update state → DOWNLOAD_COMPLETE (state=4)");
+    if (systemStateChanged == nullptr) {
+        TEST_LOG("  systemStateChanged handler not captured, skipping");
+        return;
+    }
+    IARM_Bus_SYSMgr_EventData_t evt;
+    memset(&evt, 0, sizeof(evt));
+    evt.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_FIRMWARE_UPDATE_STATE;
+    evt.data.systemStates.state   = IARM_BUS_SYSMGR_FIRMWARE_UPDATE_STATE_DOWNLOAD_COMPLETE;
+    systemStateChanged(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, &evt, sizeof(evt));
+    TEST_LOG("  fired FIRMWARE_UPDATE_STATE / DOWNLOAD_COMPLETE");
+}
+
+/* Firmware update state same value twice → covers the else branch in OnFirmwareUpdateStateChange */
+TEST_F(SystemService_L2Test, SysImpl_IARM_FirmwareUpdateState_SameStateTwice)
+{
+    TEST_LOG("SysImpl: IARM firmware update state → same state twice (covers else branch)");
+    if (systemStateChanged == nullptr) {
+        TEST_LOG("  systemStateChanged handler not captured, skipping");
+        return;
+    }
+    IARM_Bus_SYSMgr_EventData_t evt;
+    memset(&evt, 0, sizeof(evt));
+    evt.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_FIRMWARE_UPDATE_STATE;
+    evt.data.systemStates.state   = IARM_BUS_SYSMGR_FIRMWARE_UPDATE_STATE_VALIDATION_COMPLETE;
+    /* First call sets m_FwUpdateState_LatestEvent */
+    systemStateChanged(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, &evt, sizeof(evt));
+    /* Second identical call → hits the "same state" else branch */
+    systemStateChanged(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, &evt, sizeof(evt));
+    TEST_LOG("  fired VALIDATION_COMPLETE twice");
+}
+
+/* Firmware update → CRITICAL_REBOOT covers OnFirmwarePendingReboot */
+TEST_F(SystemService_L2Test, SysImpl_IARM_FirmwarePendingReboot)
+{
+    TEST_LOG("SysImpl: IARM firmware update → CRITICAL_REBOOT (covers OnFirmwarePendingReboot)");
+    if (systemStateChanged == nullptr) {
+        TEST_LOG("  systemStateChanged handler not captured, skipping");
+        return;
+    }
+    IARM_Bus_SYSMgr_EventData_t evt;
+    memset(&evt, 0, sizeof(evt));
+    evt.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_FIRMWARE_UPDATE_STATE;
+    evt.data.systemStates.state   = IARM_BUS_SYSMGR_FIRMWARE_UPDATE_STATE_CRITICAL_REBOOT;
+    systemStateChanged(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, &evt, sizeof(evt));
+    TEST_LOG("  fired CRITICAL_REBOOT → OnFirmwarePendingReboot");
+}
+
+/* TIME_SOURCE state=1 → covers OnClockSet */
+TEST_F(SystemService_L2Test, SysImpl_IARM_ClockSet)
+{
+    TEST_LOG("SysImpl: IARM TIME_SOURCE event (covers OnClockSet)");
+    if (systemStateChanged == nullptr) {
+        TEST_LOG("  systemStateChanged handler not captured, skipping");
+        return;
+    }
+    IARM_Bus_SYSMgr_EventData_t evt;
+    memset(&evt, 0, sizeof(evt));
+    evt.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_TIME_SOURCE;
+    evt.data.systemStates.state   = 1; /* non-zero → clock is set */
+    systemStateChanged(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, &evt, sizeof(evt));
+    TEST_LOG("  fired TIME_SOURCE=1 → OnClockSet");
+}
+
+/* TIME_SOURCE state=0 → skipped (covers the if(state) false branch) */
+TEST_F(SystemService_L2Test, SysImpl_IARM_ClockNotSet)
+{
+    TEST_LOG("SysImpl: IARM TIME_SOURCE event state=0 (covers false branch)");
+    if (systemStateChanged == nullptr) {
+        TEST_LOG("  systemStateChanged handler not captured, skipping");
+        return;
+    }
+    IARM_Bus_SYSMgr_EventData_t evt;
+    memset(&evt, 0, sizeof(evt));
+    evt.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_TIME_SOURCE;
+    evt.data.systemStates.state   = 0; /* zero → not set, skip OnClockSet */
+    systemStateChanged(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, &evt, sizeof(evt));
+    TEST_LOG("  fired TIME_SOURCE=0 (no-op)");
+}
+
+/* LOG_UPLOAD event → covers OnLogUpload (m_uploadLogsPid=-1 → else branch) */
+TEST_F(SystemService_L2Test, SysImpl_IARM_LogUpload_NoPid)
+{
+    TEST_LOG("SysImpl: IARM LOG_UPLOAD event (covers OnLogUpload else branch: no pid)");
+    if (systemStateChanged == nullptr) {
+        TEST_LOG("  systemStateChanged handler not captured, skipping");
+        return;
+    }
+    IARM_Bus_SYSMgr_EventData_t evt;
+    memset(&evt, 0, sizeof(evt));
+    evt.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_LOG_UPLOAD;
+    evt.data.systemStates.state   = IARM_BUS_SYSMGR_LOG_UPLOAD_SUCCESS;
+    systemStateChanged(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, &evt, sizeof(evt));
+    TEST_LOG("  fired LOG_UPLOAD_SUCCESS (no pid → else branch)");
+}
+
+/* Default case in _systemStateChanged (unhandled stateId) */
+TEST_F(SystemService_L2Test, SysImpl_IARM_DefaultState)
+{
+    TEST_LOG("SysImpl: IARM unknown stateId (covers default case in switch)");
+    if (systemStateChanged == nullptr) {
+        TEST_LOG("  systemStateChanged handler not captured, skipping");
+        return;
+    }
+    IARM_Bus_SYSMgr_EventData_t evt;
+    memset(&evt, 0, sizeof(evt));
+    /* Use a stateId that has no explicit case */
+    evt.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_BOOTUP;
+    evt.data.systemStates.state   = 1;
+    systemStateChanged(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, &evt, sizeof(evt));
+    TEST_LOG("  fired unknown stateId (default case)");
+}
+
+/* Wrong eventId → covers early return in _systemStateChanged */
+TEST_F(SystemService_L2Test, SysImpl_IARM_WrongEventId)
+{
+    TEST_LOG("SysImpl: IARM wrong eventId (covers early return in _systemStateChanged)");
+    if (systemStateChanged == nullptr) {
+        TEST_LOG("  systemStateChanged handler not captured, skipping");
+        return;
+    }
+    IARM_Bus_SYSMgr_EventData_t evt;
+    memset(&evt, 0, sizeof(evt));
+    /* Pass eventId != IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE → early return */
+    systemStateChanged(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_DEVICE_UPDATE_RECEIVED, &evt, sizeof(evt));
+    TEST_LOG("  fired with wrong eventId → early return executed");
+}
+
+/* Device management update event → covers _deviceMgtUpdateReceived + OnDeviceMgtUpdateReceived */
+TEST_F(SystemService_L2Test, SysImpl_IARM_DeviceMgtUpdate)
+{
+    TEST_LOG("SysImpl: IARM device management update (covers _deviceMgtUpdateReceived)");
+    if (sysMgrDeviceHandler == nullptr) {
+        TEST_LOG("  sysMgrDeviceHandler not captured, skipping");
+        return;
+    }
+    IARM_BUS_SYSMGR_DeviceMgtUpdateInfo_Param_t param;
+    memset(&param, 0, sizeof(param));
+    strncpy(param.source, "rfc", sizeof(param.source) - 1);
+    strncpy(param.type, "initial", sizeof(param.type) - 1);
+    param.status = true;
+    sysMgrDeviceHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_DEVICE_UPDATE_RECEIVED, &param, sizeof(param));
+    TEST_LOG("  fired DEVICE_UPDATE_RECEIVED → OnDeviceMgtUpdateReceived");
+}
+
+/***********************************************************************
+ * Coverage Enhancement Tests - COM-RPC Interface Methods
+ ***********************************************************************/
+
+/* GetFirmwareDownloadPercent via COM-RPC */
+TEST_F(SystemService_L2Test, SysImpl_GetFirmwareDownloadPercent_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (m_controller_SystemServices && m_SystemServicesPlugin) {
+        TEST_LOG("Testing GetFirmwareDownloadPercent via COM-RPC");
+
+        int32_t downloadPercent = 0;
+        bool success = false;
+
+        uint32_t result = m_SystemServicesPlugin->GetFirmwareDownloadPercent(downloadPercent, success);
+        EXPECT_EQ(result, Core::ERROR_NONE);
+        TEST_LOG("  downloadPercent=%d, success=%s", downloadPercent, success ? "true" : "false");
+
+        m_SystemServicesPlugin->Release();
+        m_controller_SystemServices->Release();
+    }
+}
+
+/* UpdateFirmware via COM-RPC */
+TEST_F(SystemService_L2Test, SysImpl_UpdateFirmware_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (m_controller_SystemServices && m_SystemServicesPlugin) {
+        TEST_LOG("Testing UpdateFirmware via COM-RPC");
+
+        Exchange::ISystemServices::SystemResult sysResult;
+        uint32_t result = m_SystemServicesPlugin->UpdateFirmware(sysResult);
+        EXPECT_EQ(result, Core::ERROR_NONE);
+        TEST_LOG("  UpdateFirmware success=%s", sysResult.success ? "true" : "false");
+
+        m_SystemServicesPlugin->Release();
+        m_controller_SystemServices->Release();
+    }
+}
+
+/* SetDeepSleepTimer with valid value via COM-RPC */
+TEST_F(SystemService_L2Test, SysImpl_SetDeepSleepTimer_Valid_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (m_controller_SystemServices && m_SystemServicesPlugin) {
+        TEST_LOG("Testing SetDeepSleepTimer(3600) via COM-RPC");
+
+        uint32_t sysSrvStatus = 0;
+        string errorMessage;
+        bool success = false;
+
+        uint32_t result = m_SystemServicesPlugin->SetDeepSleepTimer(3600, sysSrvStatus, errorMessage, success);
+        TEST_LOG("  result=%u, success=%s, error=%s", result, success ? "true" : "false", errorMessage.c_str());
+
+        m_SystemServicesPlugin->Release();
+        m_controller_SystemServices->Release();
+    }
+}
+
+/* Reboot via COM-RPC (PowerManager mock handles Reboot call) */
+TEST_F(SystemService_L2Test, SysImpl_Reboot_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (m_controller_SystemServices && m_SystemServicesPlugin) {
+        TEST_LOG("Testing Reboot via COM-RPC");
+
+        int iarmStatus = 0;
+        bool success = false;
+
+        /* Reboot delegates to _powerManagerPlugin->Reboot which is mocked → safe */
+        uint32_t result = m_SystemServicesPlugin->Reboot("L2Test", iarmStatus, success);
+        TEST_LOG("  result=%u, iarmStatus=%d, success=%s", result, iarmStatus, success ? "true" : "false");
+
+        m_SystemServicesPlugin->Release();
+        m_controller_SystemServices->Release();
+    }
+}
+
+/* SetTerritory with invalid territory via COM-RPC */
+TEST_F(SystemService_L2Test, SysImpl_SetTerritory_Invalid_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (m_controller_SystemServices && m_SystemServicesPlugin) {
+        TEST_LOG("Testing SetTerritory with invalid territory via COM-RPC");
+
+        Exchange::ISystemServices::SystemError sysError;
+        bool success = false;
+
+        /* Invalid territory (not 3-char alpha) → error path */
+        m_SystemServicesPlugin->SetTerritory("XY", "US-NY", sysError, success);
+        TEST_LOG("  SetTerritory(XY) success=%s error=%s", success ? "true" : "false", sysError.message.c_str());
+
+        /* Empty territory → error path */
+        sysError = {};
+        success = false;
+        m_SystemServicesPlugin->SetTerritory("", "", sysError, success);
+        TEST_LOG("  SetTerritory('') success=%s error=%s", success ? "true" : "false", sysError.message.c_str());
+
+        m_SystemServicesPlugin->Release();
+        m_controller_SystemServices->Release();
+    }
+}
+
+/* OnFriendlyNameChanged notification via COM-RPC */
+TEST_F(SystemService_L2Test, SysImpl_OnFriendlyNameChanged_Notification_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (m_controller_SystemServices && m_SystemServicesPlugin) {
+        TEST_LOG("Testing OnFriendlyNameChanged notification via COM-RPC");
+
+        uint32_t result = m_SystemServicesPlugin->Register(&m_notificationHandler);
+        EXPECT_EQ(result, Core::ERROR_NONE);
+
+        m_notificationHandler.ResetEvent();
+
+        /* Trigger friendly name change (covers dispatchEvent ONFRIENDLYNAME_CHANGED) */
+        Exchange::ISystemServices::SystemResult setResult;
+        result = m_SystemServicesPlugin->SetFriendlyName("TestFriendlyNameNew", setResult);
+        EXPECT_EQ(result, Core::ERROR_NONE);
+
+        if (result == Core::ERROR_NONE) {
+            uint32_t eventStatus = m_notificationHandler.WaitForEvent(EVNT_TIMEOUT, SYSTEMSERVICEL2TEST_FRIENDLY_NAME_CHANGED);
+            if (eventStatus != SYSTEMSERVICEL2TEST_STATE_INVALID) {
+                string name = m_notificationHandler.GetLastFriendlyName();
+                TEST_LOG("  Received friendly name: %s", name.c_str());
+                EXPECT_STREQ(name.c_str(), "TestFriendlyNameNew");
+            } else {
+                TEST_LOG("  Timeout waiting for OnFriendlyNameChanged");
+            }
+        }
+
+        result = m_SystemServicesPlugin->Unregister(&m_notificationHandler);
+        EXPECT_EQ(result, Core::ERROR_NONE);
+
+        m_SystemServicesPlugin->Release();
+        m_controller_SystemServices->Release();
+    }
+}
+
+/* OnNetworkStandbyModeChanged notification (different from existing test - triggers dispatchEvent) */
+TEST_F(SystemService_L2Test, SysImpl_OnNetworkStandbyMode_Notification_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (m_controller_SystemServices && m_SystemServicesPlugin) {
+        TEST_LOG("Testing network standby mode change and notification");
+
+        uint32_t result = m_SystemServicesPlugin->Register(&m_notificationHandler);
+        EXPECT_EQ(result, Core::ERROR_NONE);
+
+        m_notificationHandler.ResetEvent();
+
+        Exchange::ISystemServices::SystemResult setResult;
+        result = m_SystemServicesPlugin->SetNetworkStandbyMode(false, setResult);
+        TEST_LOG("  SetNetworkStandbyMode(false) result=%u", result);
+
+        if (result == Core::ERROR_NONE) {
+            uint32_t eventStatus = m_notificationHandler.WaitForEvent(EVNT_TIMEOUT, SYSTEMSERVICEL2TEST_NETWORK_STANDBY_CHANGED);
+            TEST_LOG("  Event received=%s", eventStatus != SYSTEMSERVICEL2TEST_STATE_INVALID ? "yes" : "no/timeout");
+        }
+
+        result = m_SystemServicesPlugin->Unregister(&m_notificationHandler);
+        EXPECT_EQ(result, Core::ERROR_NONE);
+
+        m_SystemServicesPlugin->Release();
+        m_controller_SystemServices->Release();
+    }
+}
+
+/***********************************************************************
+ * Coverage Enhancement Tests - JSON-RPC Methods (Error and Edge Paths)
+ ***********************************************************************/
+
+/* getMacAddresses - /lib/rdk/getDeviceDetails.sh not present → SysSrv_FileNotPresent */
+TEST_F(SystemService_L2Test, SysImpl_GetMacAddresses_NoScript_JSONRPC)
+{
+    TEST_LOG("SysImpl: getMacAddresses (no getDeviceDetails.sh → error path)");
+    JsonObject params;
+    params["GUID"] = "test-guid-l2";
+    JsonObject result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getMacAddresses", params, result);
+    TEST_LOG("  status=%u", status);
+    if (result.HasLabel("success")) {
+        TEST_LOG("  success=%s", result["success"].Boolean() ? "true" : "false");
+    }
+}
+
+/* setTerritory with empty territory → error path */
+TEST_F(SystemService_L2Test, SysImpl_SetTerritory_Empty_JSONRPC)
+{
+    TEST_LOG("SysImpl: setTerritory with empty territory (covers empty-territory error branch)");
+    JsonObject params;
+    params["territory"] = "";
+    params["region"] = "";
+    JsonObject result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setTerritory", params, result);
+    TEST_LOG("  status=%u", status);
+    if (result.HasLabel("success")) {
+        TEST_LOG("  success=%s", result["success"].Boolean() ? "true" : "false");
+    }
+}
+
+/* setTerritory with invalid length territory → error path */
+TEST_F(SystemService_L2Test, SysImpl_SetTerritory_InvalidFormat_JSONRPC)
+{
+    TEST_LOG("SysImpl: setTerritory with invalid length territory (covers invalid-territory branch)");
+    JsonObject params;
+    params["territory"] = "AB";   /* 2 chars, not 3 → invalid */
+    params["region"] = "US-NY";
+    JsonObject result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setTerritory", params, result);
+    TEST_LOG("  status=%u", status);
+}
+
+/* setMode with empty mode → covers populateResponseWithError(SysSrv_MissingKeyValues) */
+TEST_F(SystemService_L2Test, SysImpl_SetMode_Empty_JSONRPC)
+{
+    TEST_LOG("SysImpl: setMode with empty mode string (covers MissingKeyValues error branch)");
+    JsonObject params;
+    params["mode"] = "";
+    params["duration"] = 0;
+    JsonObject result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
+    TEST_LOG("  status=%u", status);
+    if (result.HasLabel("success")) {
+        TEST_LOG("  success=%s", result["success"].Boolean() ? "true" : "false");
+    }
+}
+
+/* setMode with completely invalid mode string → covers invalid-mode early return */
+TEST_F(SystemService_L2Test, SysImpl_SetMode_InvalidMode_JSONRPC)
+{
+    TEST_LOG("SysImpl: setMode with invalid mode (covers invalid-mode validation branch)");
+    JsonObject params;
+    params["mode"] = "INVALID_XYZ_MODE";
+    params["duration"] = 0;
+    JsonObject result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
+    TEST_LOG("  status=%u", status);
+    if (result.HasLabel("success")) {
+        bool s = result["success"].Boolean();
+        TEST_LOG("  success=%s (expect false for invalid mode)", s ? "true" : "false");
+    }
+}
+
+/* setTimeZoneDST with empty string → covers MissingKeyValues branch */
+TEST_F(SystemService_L2Test, SysImpl_SetTimeZoneDST_Empty_JSONRPC)
+{
+    TEST_LOG("SysImpl: setTimeZoneDST with empty timeZone (covers MissingKeyValues branch)");
+    JsonObject params;
+    params["timeZone"] = "";
+    params["accuracy"] = "INITIAL";
+    JsonObject result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setTimeZoneDST", params, result);
+    TEST_LOG("  status=%u", status);
+}
+
+/* updateFirmware via JSON-RPC */
+TEST_F(SystemService_L2Test, SysImpl_UpdateFirmware_JSONRPC)
+{
+    TEST_LOG("SysImpl: updateFirmware via JSON-RPC");
+    JsonObject params;
+    JsonObject result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "updateFirmware", params, result);
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    TEST_LOG("  status=%u", status);
+    if (result.HasLabel("success")) {
+        TEST_LOG("  success=%s", result["success"].Boolean() ? "true" : "false");
+    }
+}
+
+/* reboot via JSON-RPC */
+TEST_F(SystemService_L2Test, SysImpl_Reboot_JSONRPC)
+{
+    TEST_LOG("SysImpl: reboot via JSON-RPC");
+    JsonObject params;
+    params["rebootReason"] = "L2TestCoverage";
+    JsonObject result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "reboot", params, result);
+    TEST_LOG("  status=%u", status);
+    if (result.HasLabel("success")) {
+        TEST_LOG("  success=%s", result["success"].Boolean() ? "true" : "false");
+    }
+}
+
+/***********************************************************************
+ * Coverage Enhancement Tests - cTimer Class
+ * Testing cTimer functions directly via standalone timer objects
+ ***********************************************************************/
+
+/* cTimer::start() with no interval/callback → should return false */
+TEST_F(SystemService_L2Test, CTimer_Coverage_StartInvalid)
+{
+    TEST_LOG("cTimer: start() with no interval set (covers false-return branch)");
+
+    cTimer timer;
+
+    /* interval=0 and callBack_function=NULL → start() returns false */
+    bool result = timer.start();
+    EXPECT_FALSE(result);
+    TEST_LOG("  start() with no interval: %s (expected false)", result ? "true" : "false");
+}
+
+/* cTimer: start/stop/join → covers timerFunction, start, stop, join */
+TEST_F(SystemService_L2Test, CTimer_Coverage_StartStopJoin)
+{
+    TEST_LOG("cTimer: start/stop/join (covers timerFunction, start, stop, join)");
+
+    static int callCount = 0;
+    callCount = 0;
+
+    cTimer timer;
+    timer.setInterval([]() { callCount++; }, 50); /* 50ms callback interval */
+
+    bool startResult = timer.start();
+    EXPECT_TRUE(startResult);
+    TEST_LOG("  timer started: %s", startResult ? "true" : "false");
+
+    /* Let timer run for ~150ms → callback should fire ~3 times */
+    std::this_thread::sleep_for(std::chrono::milliseconds(150));
+
+    /* Stop the timer */
+    timer.stop();
+
+    /* Wait for thread to exit its current iteration */
+    std::this_thread::sleep_for(std::chrono::milliseconds(60));
+
+    /* Join the thread */
+    timer.join();
+
+    TEST_LOG("  callCount=%d after start/stop/join", callCount);
+    EXPECT_GT(callCount, 0);
+}
+
+/* cTimer: start/detach → covers detach() */
+TEST_F(SystemService_L2Test, CTimer_Coverage_Detach)
+{
+    TEST_LOG("cTimer: start/detach (covers detach)");
+
+    static bool executed = false;
+    executed = false;
+
+    cTimer timer;
+    timer.setInterval([]() { executed = true; }, 50);
+
+    bool startResult = timer.start();
+    EXPECT_TRUE(startResult);
+
+    /* Detach the thread so it doesn't block on destructor */
+    timer.detach();
+
+    /* Allow one iteration */
+    std::this_thread::sleep_for(std::chrono::milliseconds(80));
+
+    /* Stop timer */
+    timer.stop();
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(60));
+    TEST_LOG("  timer detach test completed, executed=%s", executed ? "true" : "false");
+}
+
+/* cTimer: start/stop/join sequence → covers join() */
+TEST_F(SystemService_L2Test, CTimer_Coverage_Join)
+{
+    TEST_LOG("cTimer: start/stop/join sequence (covers join)");
+
+    static int jcnt = 0;
+    jcnt = 0;
+
+    cTimer timer;
+    timer.setInterval([]() { jcnt++; }, 50);
+
+    timer.start();
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(120));
+
+    /* Stop: sets clear=true so timerFunction exits after current sleep */
+    timer.stop();
+
+    /* Join: waits for the thread to finish */
+    timer.join();
+
+    TEST_LOG("  join completed, jcnt=%d", jcnt);
+    EXPECT_GE(jcnt, 1);
 }
 
