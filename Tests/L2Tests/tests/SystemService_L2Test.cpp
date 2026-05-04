@@ -7812,3 +7812,108 @@ TEST_F(SystemService_L2Test, SysImpl_GetTerritory_AfterSet_COMRPC)
     m_controller_SystemServices->Release();
 }
 
+/* ------------------------------------------------------------------- *
+ * GetNetworkStandbyMode — cached path (second call)                    *
+ * First call populates m_networkStandbyModeValid=true if PM succeeds.  *
+ * Second call in same test hits the cached branch.                      *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetNetworkStandbyMode_CachedPath_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetNetworkStandbyMode: two calls → second hits cached branch");
+
+    bool nwStandby = false, success = false;
+    m_SystemServicesPlugin->GetNetworkStandbyMode(nwStandby, success);
+    TEST_LOG("  First call: nwStandby=%d, success=%d", nwStandby, success);
+
+    /* Second call — if first succeeded, m_networkStandbyModeValid==true → cache path */
+    bool nwStandby2 = false, success2 = false;
+    uint32_t result = m_SystemServicesPlugin->GetNetworkStandbyMode(nwStandby2, success2);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  Second call: result=%u, nwStandby=%d, success=%d", result, nwStandby2, success2);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * powerModeEnumToString — LIGHT_SLEEP + DEEP_SLEEP branches            *
+ * Fire IARM_BUS_PWRMGR_POWERSTATE_STANDBY_LIGHT_SLEEP →               *
+ * IARM_BUS_PWRMGR_POWERSTATE_STANDBY_DEEP_SLEEP transition.           *
+ * This covers:                                                          *
+ *  • powerModeEnumToString(STANDBY_LIGHT_SLEEP) = "LIGHT_SLEEP"       *
+ *  • powerModeEnumToString(STANDBY_DEEP_SLEEP)  = "DEEP_SLEEP"        *
+ *  • OnSystemPowerStateChanged DEEP_SLEEP branch (uploadLogsPid==-1)   *
+ *  • t2_event_d("SYST_INFO_ThunderSleep2") branch                     *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_PowerMode_LightSleep_To_DeepSleep_COMRPC)
+{
+    TEST_LOG("PowerMode LIGHT_SLEEP→DEEP_SLEEP: covers powerModeEnumToString LIGHT/DEEP branches");
+
+    if (pwrMgrEventHandler == nullptr) {
+        TEST_LOG("  pwrMgrEventHandler not captured, skipping");
+        return;
+    }
+
+    IARM_Bus_PWRMgr_EventData_t eventData;
+    memset(&eventData, 0, sizeof(eventData));
+    eventData.data.state.curState = IARM_BUS_PWRMGR_POWERSTATE_STANDBY_LIGHT_SLEEP;
+    eventData.data.state.newState = IARM_BUS_PWRMGR_POWERSTATE_STANDBY_DEEP_SLEEP;
+    pwrMgrEventHandler(IARM_BUS_PWRMGR_NAME, IARM_BUS_PWRMGR_EVENT_MODECHANGED, &eventData, 0);
+
+    TEST_LOG("  Fired LIGHT_SLEEP→DEEP_SLEEP: powerModeEnumToString LIGHT_SLEEP/DEEP_SLEEP + DEEP_SLEEP AbortLogUpload-skip branch covered");
+}
+
+/* ------------------------------------------------------------------- *
+ * OnSystemPowerStateChanged — DEEP_SLEEP→LIGHT_SLEEP transition        *
+ * powerState="LIGHT_SLEEP", currentPowerState="DEEP_SLEEP":            *
+ *  • Hits if("LIGHT_SLEEP"==powerState) block                          *
+ *  • if("ON"==currentPowerState) → FALSE → RFC call SKIPPED (safe)     *
+ *  • t2_event_d("SYST_INFO_ThunderWake1") branch                      *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_PowerMode_DeepSleep_To_LightSleep_COMRPC)
+{
+    TEST_LOG("PowerMode DEEP_SLEEP→LIGHT_SLEEP: covers LIGHT_SLEEP block (currentPowerState!=ON) + ThunderWake1 branch");
+
+    if (pwrMgrEventHandler == nullptr) {
+        TEST_LOG("  pwrMgrEventHandler not captured, skipping");
+        return;
+    }
+
+    IARM_Bus_PWRMgr_EventData_t eventData;
+    memset(&eventData, 0, sizeof(eventData));
+    eventData.data.state.curState = IARM_BUS_PWRMGR_POWERSTATE_STANDBY_DEEP_SLEEP;
+    eventData.data.state.newState = IARM_BUS_PWRMGR_POWERSTATE_STANDBY_LIGHT_SLEEP;
+    pwrMgrEventHandler(IARM_BUS_PWRMGR_NAME, IARM_BUS_PWRMGR_EVENT_MODECHANGED, &eventData, 0);
+
+    TEST_LOG("  Fired DEEP_SLEEP→LIGHT_SLEEP: LIGHT_SLEEP block (non-ON current) + ThunderWake1 covered");
+}
+
+/* ------------------------------------------------------------------- *
+ * OnSystemPowerStateChanged — LIGHT_SLEEP→ON transition                *
+ * powerState="ON": neither LIGHT/STANDBY nor DEEP_SLEEP block hit.     *
+ * Covers t2_event_d("SYST_INFO_ThunderWake2") branch.                 *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_PowerMode_LightSleep_To_ON_COMRPC)
+{
+    TEST_LOG("PowerMode LIGHT_SLEEP→ON: covers ThunderWake2 t2_event_d branch");
+
+    if (pwrMgrEventHandler == nullptr) {
+        TEST_LOG("  pwrMgrEventHandler not captured, skipping");
+        return;
+    }
+
+    IARM_Bus_PWRMgr_EventData_t eventData;
+    memset(&eventData, 0, sizeof(eventData));
+    eventData.data.state.curState = IARM_BUS_PWRMGR_POWERSTATE_STANDBY_LIGHT_SLEEP;
+    eventData.data.state.newState = IARM_BUS_PWRMGR_POWERSTATE_ON;
+    pwrMgrEventHandler(IARM_BUS_PWRMGR_NAME, IARM_BUS_PWRMGR_EVENT_MODECHANGED, &eventData, 0);
+
+    TEST_LOG("  Fired LIGHT_SLEEP→ON: ThunderWake2 branch covered");
+}
+
