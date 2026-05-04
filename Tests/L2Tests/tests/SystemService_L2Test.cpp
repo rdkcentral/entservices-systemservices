@@ -7720,3 +7720,95 @@ TEST_F(SystemService_L2Test, SysImpl_SetTimeZoneDST_InvalidFormat_COMRPC)
     m_controller_SystemServices->Release();
 }
 
+/* ------------------------------------------------------------------- *
+ * SetTimeZoneDST — "Universal" timezone                                *
+ * isUniversal=true, isOlson=false, pos=npos so country=timeZone.       *
+ * dirExists("/usr/share/zoneinfo/Universal") fails on CI → no write.  *
+ * Covers the isUniversal=true branch (lines 2547-2549, 2560).         *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetTimeZoneDST_Universal_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetTimeZoneDST: 'Universal' → isUniversal=true branch, zoneinfo check fails safely");
+
+    uint32_t sysSrvStatus = 0;
+    string errorMessage;
+    bool success = false;
+
+    uint32_t result = m_SystemServicesPlugin->SetTimeZoneDST("Universal", "FINAL",
+                                                              sysSrvStatus, errorMessage, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  SetTimeZoneDST('Universal'): result=%u, success=%d", result, success);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * GetRFCConfig — null iterator → early return (SysSrv_MissingKeyValues)*
+ * rfcList==nullptr → populateResponseWithError + return ERROR_NONE.   *
+ * No RFC call made — fully safe.                                       *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetRFCConfig_NullList_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetRFCConfig: null rfcList → early-return (SysSrv_MissingKeyValues)");
+
+    string RFCConfig;
+    uint32_t sysSrvStatus = 0;
+    string errorMessage;
+    bool success = false;
+
+    uint32_t result = m_SystemServicesPlugin->GetRFCConfig(nullptr, RFCConfig,
+                                                           sysSrvStatus, errorMessage, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  GetRFCConfig(null): result=%u, sysSrvStatus=%u, error='%s'",
+             result, sysSrvStatus, errorMessage.c_str());
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * GetTerritory — read back after SetTerritory                          *
+ * SetTerritory("FRA","") writes to file, then GetTerritory reads it   *
+ * via readTerritoryFromFile() with actual data → covers the data path. *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetTerritory_AfterSet_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetTerritory: read back territory after SetTerritory");
+
+    /* First set a territory */
+    Exchange::ISystemServices::SystemError sysError{};
+    bool setSuccess = false;
+    m_SystemServicesPlugin->SetTerritory("FRA", "", sysError, setSuccess);
+    TEST_LOG("  SetTerritory('FRA',''): success=%d", setSuccess);
+
+    /* Now read it back */
+    string territory, region;
+    bool getSuccess = false;
+    uint32_t result = m_SystemServicesPlugin->GetTerritory(territory, region, getSuccess);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  GetTerritory: result=%u, territory='%s', region='%s', success=%d",
+             result, territory.c_str(), region.c_str(), getSuccess);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
