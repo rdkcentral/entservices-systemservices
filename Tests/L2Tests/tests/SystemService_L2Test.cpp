@@ -7349,3 +7349,332 @@ TEST_F(SystemService_L2Test, SysImpl_Unregister_NotFound_COMRPC)
     m_controller_SystemServices->Release();
 }
 
+/* ------------------------------------------------------------------- *
+ * GetWakeupReasonString — all 17 switch cases                          *
+ * Mock PLAT_DS_GetLastWakeupReason to return each DeepSleep enum value  *
+ * so that SystemServices::getWakeupReasonString() hits every branch.   *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetWakeupReasonString_AllCases_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetWakeupReasonString: cover all 17 switch cases via mocked PLAT_DS_GetLastWakeupReason");
+
+    struct TC {
+        DeepSleep_WakeupReason_t halReason;
+        const char* expectedStr;
+    } cases[] = {
+        {DEEPSLEEP_WAKEUPREASON_IR,               "WAKEUP_REASON_IR"},
+        {DEEPSLEEP_WAKEUPREASON_RCU_BT,           "WAKEUP_REASON_RCU_BT"},
+        {DEEPSLEEP_WAKEUPREASON_RCU_RF4CE,        "WAKEUP_REASON_RCU_RF4CE"},
+        {DEEPSLEEP_WAKEUPREASON_GPIO,             "WAKEUP_REASON_GPIO"},
+        {DEEPSLEEP_WAKEUPREASON_LAN,              "WAKEUP_REASON_LAN"},
+        {DEEPSLEEP_WAKEUPREASON_WLAN,             "WAKEUP_REASON_WLAN"},
+        {DEEPSLEEP_WAKEUPREASON_TIMER,            "WAKEUP_REASON_TIMER"},
+        {DEEPSLEEP_WAKEUPREASON_FRONT_PANEL,      "WAKEUP_REASON_FRONT_PANEL"},
+        {DEEPSLEEP_WAKEUPREASON_WATCHDOG,         "WAKEUP_REASON_WATCHDOG"},
+        {DEEPSLEEP_WAKEUPREASON_SOFTWARE_RESET,   "WAKEUP_REASON_SOFTWARE_RESET"},
+        {DEEPSLEEP_WAKEUPREASON_THERMAL_RESET,    "WAKEUP_REASON_THERMAL_RESET"},
+        {DEEPSLEEP_WAKEUPREASON_WARM_RESET,       "WAKEUP_REASON_WARM_RESET"},
+        {DEEPSLEEP_WAKEUPREASON_COLDBOOT,         "WAKEUP_REASON_COLDBOOT"},
+        {DEEPSLEEP_WAKEUPREASON_STR_AUTH_FAILURE, "WAKEUP_REASON_STR_AUTH_FAILURE"},
+        {DEEPSLEEP_WAKEUPREASON_CEC,              "WAKEUP_REASON_CEC"},
+        {DEEPSLEEP_WAKEUPREASON_PRESENCE,         "WAKEUP_REASON_PRESENCE"},
+        {DEEPSLEEP_WAKEUPREASON_VOICE,            "WAKEUP_REASON_VOICE"},
+    };
+    const int N = static_cast<int>(sizeof(cases) / sizeof(cases[0]));
+
+    /* Build an EXPECT_CALL with N WillOnce actions, one per enum value */
+    {
+        auto& exp = EXPECT_CALL(*p_powerManagerHalMock, PLAT_DS_GetLastWakeupReason(::testing::_));
+        for (int i = 0; i < N; i++) {
+            DeepSleep_WakeupReason_t r = cases[i].halReason;
+            exp.WillOnce(::testing::Invoke([r](DeepSleep_WakeupReason_t* reason) {
+                *reason = r;
+                return DEEPSLEEPMGR_SUCCESS;
+            }));
+        }
+    }
+
+    for (int i = 0; i < N; i++) {
+        string wakeupReason;
+        bool success = false;
+        uint32_t res = m_SystemServicesPlugin->GetWakeupReason(wakeupReason, success);
+        EXPECT_EQ(res, Core::ERROR_NONE) << "GetWakeupReason failed for case " << i;
+        EXPECT_EQ(wakeupReason, std::string(cases[i].expectedStr))
+            << "Mismatch for halReason=" << static_cast<int>(cases[i].halReason);
+        TEST_LOG("  [%d] halReason=%d -> wakeupReason='%s'",
+                 i, static_cast<int>(cases[i].halReason), wakeupReason.c_str());
+    }
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * GetMfgSerialNumber — cached path                                     *
+ * Call GetMfgSerialNumber twice: second call hits the cached branch     *
+ * (m_MfgSerialNumberValid == true) and returns the same value.         *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetMfgSerialNumber_CachedPath_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetMfgSerialNumber: cached path coverage (second call hits m_MfgSerialNumberValid=true)");
+
+    /* First call: IARM default mock succeeds; sets m_MfgSerialNumberValid = true */
+    string serial1;
+    bool success1 = false;
+    uint32_t r1 = m_SystemServicesPlugin->GetMfgSerialNumber(serial1, success1);
+    EXPECT_EQ(r1, Core::ERROR_NONE);
+    TEST_LOG("  First call: serial='%s', success=%d", serial1.c_str(), success1);
+
+    /* Second call: should hit the cached branch */
+    string serial2;
+    bool success2 = false;
+    uint32_t r2 = m_SystemServicesPlugin->GetMfgSerialNumber(serial2, success2);
+    EXPECT_EQ(r2, Core::ERROR_NONE);
+    EXPECT_EQ(serial2, serial1);    /* same cached value */
+    EXPECT_TRUE(success2);          /* cached path sets success=true */
+    TEST_LOG("  Second call (cached): serial='%s', success=%d", serial2.c_str(), success2);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * GetMfgSerialNumber — IARM failure path                               *
+ * Mock IARM_Bus_Call for MFRLIB GetSerializedData to return failure.   *
+ * The else branch (LOGERR) is executed and ERROR_GENERAL returned.     *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetMfgSerialNumber_IARMFail_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetMfgSerialNumber: IARM failure path (else branch)");
+
+    /* Override IARM_Bus_Call for MFRLIB GetSerializedData to fail */
+    ON_CALL(*p_iarmBusImplMock, IARM_Bus_Call(
+        ::testing::StrEq(IARM_BUS_MFRLIB_NAME),
+        ::testing::StrEq(IARM_BUS_MFRLIB_API_GetSerializedData),
+        ::testing::_,
+        ::testing::_))
+        .WillByDefault(::testing::Return(IARM_RESULT_IPCCORE_FAIL));
+
+    string serial;
+    bool success = false;
+    uint32_t result = m_SystemServicesPlugin->GetMfgSerialNumber(serial, success);
+    EXPECT_EQ(result, Core::ERROR_GENERAL);  /* IARM fail → returns ERROR_GENERAL */
+    EXPECT_FALSE(success);
+    TEST_LOG("  GetMfgSerialNumber with IARM fail: result=%u, success=%d", result, success);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * GetPowerState — cover function body                                   *
+ * Default HAL mock returns PWRMGR_POWERSTATE_OFF → POWER_STATE_OFF    *
+ * which does not match ON or STANDBY → powerState stays "UNKNOWN".    *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetPowerState_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetPowerState: cover function body (UNKNOWN/OFF path)");
+
+    string powerState;
+    bool success = false;
+    uint32_t result = m_SystemServicesPlugin->GetPowerState(powerState, success);
+    /* PowerManager HAL returns PWRMGR_POWERSTATE_OFF (from constructor mock) */
+    /* SystemServices maps OFF → powerState="UNKNOWN", success=false            */
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  GetPowerState result=%u, powerState='%s', success=%d",
+             result, powerState.c_str(), success);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * GetPowerState — ON branch                                             *
+ * Override PLAT_API_GetPowerState to return PWRMGR_POWERSTATE_ON.     *
+ * SystemServices maps ON → powerState="ON", success=true.             *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetPowerState_ON_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetPowerState: ON branch coverage");
+
+    EXPECT_CALL(*p_powerManagerHalMock, PLAT_API_GetPowerState(::testing::_))
+        .WillOnce(::testing::Invoke([](PWRMgr_PowerState_t* powerState) {
+            *powerState = PWRMGR_POWERSTATE_ON;
+            return PWRMGR_SUCCESS;
+        }))
+        .RetiresOnSaturation();
+
+    string powerState;
+    bool success = false;
+    uint32_t result = m_SystemServicesPlugin->GetPowerState(powerState, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    EXPECT_EQ(powerState, std::string("ON"));
+    EXPECT_TRUE(success);
+    TEST_LOG("  GetPowerState(ON): result=%u, powerState='%s', success=%d",
+             result, powerState.c_str(), success);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * GetPowerState — STANDBY branch                                        *
+ * Override PLAT_API_GetPowerState to return PWRMGR_POWERSTATE_STANDBY. *
+ * SystemServices maps STANDBY → powerState="STANDBY", success=true.   *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetPowerState_Standby_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetPowerState: STANDBY branch coverage");
+
+    EXPECT_CALL(*p_powerManagerHalMock, PLAT_API_GetPowerState(::testing::_))
+        .WillOnce(::testing::Invoke([](PWRMgr_PowerState_t* powerState) {
+            *powerState = PWRMGR_POWERSTATE_STANDBY;
+            return PWRMGR_SUCCESS;
+        }))
+        .RetiresOnSaturation();
+
+    string powerState;
+    bool success = false;
+    uint32_t result = m_SystemServicesPlugin->GetPowerState(powerState, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    EXPECT_EQ(powerState, std::string("STANDBY"));
+    EXPECT_TRUE(success);
+    TEST_LOG("  GetPowerState(STANDBY): result=%u, powerState='%s', success=%d",
+             result, powerState.c_str(), success);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * SetPowerState — STANDBY path through setPowerStateConversion         *
+ * Calls SetPowerState("STANDBY","") → covers the else branch in        *
+ * SetPowerState (non LIGHT/DEEP_SLEEP) and setPowerStateConversion     *
+ * STANDBY case → _powerManagerPlugin->SetPowerState(POWER_STATE_STANDBY)*
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetPowerState_Standby_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetPowerState: STANDBY path + setPowerStateConversion STANDBY branch");
+
+    string powerState = "STANDBY";
+    string standbyReason = "L2Test";
+    uint32_t sysSrvStatus = 0;
+    string errorMessage;
+    bool success = false;
+
+    uint32_t result = m_SystemServicesPlugin->SetPowerState(powerState, standbyReason,
+                                                            sysSrvStatus, errorMessage, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  SetPowerState(STANDBY): result=%u, success=%d, error='%s'",
+             result, success, errorMessage.c_str());
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * SetPowerState — empty powerState → else branch                       *
+ * Calls SetPowerState("","") → triggers populateResponseWithError for  *
+ * SysSrv_MissingKeyValues and returns Core::ERROR_NONE.               *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetPowerState_EmptyState_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetPowerState: empty powerState → else-branch (SysSrv_MissingKeyValues)");
+
+    string powerState = "";
+    string standbyReason = "";
+    uint32_t sysSrvStatus = 0;
+    string errorMessage;
+    bool success = false;
+
+    uint32_t result = m_SystemServicesPlugin->SetPowerState(powerState, standbyReason,
+                                                            sysSrvStatus, errorMessage, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);  /* function always returns ERROR_NONE */
+    EXPECT_FALSE(success);               /* empty state → success=false */
+    TEST_LOG("  SetPowerState(''): result=%u, success=%d, sysSrvStatus=%u, error='%s'",
+             result, success, sysSrvStatus, errorMessage.c_str());
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * setPowerStateConversion — invalid state (returns false)             *
+ * Calls SetPowerState("INVALID_STATE") → setPowerStateConversion hits  *
+ * the final else → returns false → success=false.                      *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetPowerState_InvalidState_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetPowerState: invalid state → setPowerStateConversion returns false");
+
+    string powerState = "INVALID_STATE";
+    string standbyReason = "test";
+    uint32_t sysSrvStatus = 0;
+    string errorMessage;
+    bool success = false;
+
+    uint32_t result = m_SystemServicesPlugin->SetPowerState(powerState, standbyReason,
+                                                            sysSrvStatus, errorMessage, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    EXPECT_FALSE(success);   /* invalid state → setPowerStateConversion returns false */
+    TEST_LOG("  SetPowerState('INVALID_STATE'): result=%u, success=%d",
+             result, success);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
