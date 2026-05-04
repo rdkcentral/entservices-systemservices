@@ -7528,11 +7528,10 @@ TEST_F(SystemService_L2Test, SysImpl_GetPowerState_ON_COMRPC)
     TEST_LOG("GetPowerState: ON branch coverage");
 
     EXPECT_CALL(*p_powerManagerHalMock, PLAT_API_GetPowerState(::testing::_))
-        .WillOnce(::testing::Invoke([](PWRMgr_PowerState_t* powerState) {
+        .WillRepeatedly(::testing::Invoke([](PWRMgr_PowerState_t* powerState) {
             *powerState = PWRMGR_POWERSTATE_ON;
             return PWRMGR_SUCCESS;
-        }))
-        .RetiresOnSaturation();
+        }));
 
     string powerState;
     bool success = false;
@@ -7563,11 +7562,10 @@ TEST_F(SystemService_L2Test, SysImpl_GetPowerState_Standby_COMRPC)
     TEST_LOG("GetPowerState: STANDBY branch coverage");
 
     EXPECT_CALL(*p_powerManagerHalMock, PLAT_API_GetPowerState(::testing::_))
-        .WillOnce(::testing::Invoke([](PWRMgr_PowerState_t* powerState) {
+        .WillRepeatedly(::testing::Invoke([](PWRMgr_PowerState_t* powerState) {
             *powerState = PWRMGR_POWERSTATE_STANDBY;
             return PWRMGR_SUCCESS;
-        }))
-        .RetiresOnSaturation();
+        }));
 
     string powerState;
     bool success = false;
