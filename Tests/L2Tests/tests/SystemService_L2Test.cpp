@@ -6449,6 +6449,8 @@ TEST_F(SystemService_L2Test, SysImpl_SetBootLoaderSplashScreen_NonExistentPath_J
     TEST_LOG("  status=%u", status);
 }
 
+
+//started new test cases
 /***********************************************************************
  * Coverage Enhancement Tests - IARM System State Event Handlers
  * Directly trigger _systemStateChanged with various IARM event types
@@ -6962,8 +6964,8 @@ TEST_F(SystemService_L2Test, CTimer_Coverage_StartStopJoin)
     /* Stop the timer */
     timer.stop();
 
-    /* Wait for thread to exit its current iteration */
-    std::this_thread::sleep_for(std::chrono::milliseconds(60));
+    /* Wait 150ms >> 50ms interval to guarantee thread has exited */
+    std::this_thread::sleep_for(std::chrono::milliseconds(150));
 
     /* Join the thread */
     timer.join();
@@ -6972,31 +6974,33 @@ TEST_F(SystemService_L2Test, CTimer_Coverage_StartStopJoin)
     EXPECT_GT(callCount, 0);
 }
 
-/* cTimer: start/detach → covers detach() */
+/* cTimer: start/stop/detach → covers detach() safely
+ * Strategy: use 10ms interval, stop immediately, sleep 150ms (>>10ms),
+ * then detach the already-finished thread. No race condition possible. */
 TEST_F(SystemService_L2Test, CTimer_Coverage_Detach)
 {
-    TEST_LOG("cTimer: start/detach (covers detach)");
+    TEST_LOG("cTimer: start/stop/detach (covers detach safely)");
 
     static bool executed = false;
     executed = false;
 
     cTimer timer;
-    timer.setInterval([]() { executed = true; }, 50);
+    /* 10ms interval: thread exits quickly after stop() */
+    timer.setInterval([]() { executed = true; }, 10);
 
     bool startResult = timer.start();
     EXPECT_TRUE(startResult);
 
-    /* Detach the thread so it doesn't block on destructor */
-    timer.detach();
-
-    /* Allow one iteration */
-    std::this_thread::sleep_for(std::chrono::milliseconds(80));
-
-    /* Stop timer */
+    /* Immediately stop: thread will see clear=true within one 10ms iteration */
     timer.stop();
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(60));
-    TEST_LOG("  timer detach test completed, executed=%s", executed ? "true" : "false");
+    /* Wait 150ms >> 10ms interval — thread has definitely finished */
+    std::this_thread::sleep_for(std::chrono::milliseconds(150));
+
+    /* Detach the already-finished thread (safe: thread already exited) */
+    timer.detach();
+
+    TEST_LOG("  timer detach completed safely, executed=%s", executed ? "true" : "false");
 }
 
 /* cTimer: start/stop/join sequence → covers join() */
@@ -7017,7 +7021,10 @@ TEST_F(SystemService_L2Test, CTimer_Coverage_Join)
     /* Stop: sets clear=true so timerFunction exits after current sleep */
     timer.stop();
 
-    /* Join: waits for the thread to finish */
+    /* Wait 150ms >> 50ms interval to guarantee thread has exited */
+    std::this_thread::sleep_for(std::chrono::milliseconds(150));
+
+    /* Join: waits for the thread to finish (returns immediately since thread already done) */
     timer.join();
 
     TEST_LOG("  join completed, jcnt=%d", jcnt);
