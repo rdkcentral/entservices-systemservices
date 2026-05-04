@@ -7608,3 +7608,115 @@ TEST_F(SystemService_L2Test, SysImpl_SetPowerState_InvalidState_COMRPC)
     m_controller_SystemServices->Release();
 }
 
+/* ------------------------------------------------------------------- *
+ * SetWakeupSrcConfiguration — null iterator → early return             *
+ * Passes nullptr as wakeupSources → function returns immediately with  *
+ * Core::ERROR_NONE and does not invoke _powerManagerPlugin at all.     *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetWakeupSrcConfiguration_Null_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetWakeupSrcConfiguration: null iterator → early-return path");
+
+    Exchange::ISystemServices::SystemResult result_val{};
+    uint32_t result = m_SystemServicesPlugin->SetWakeupSrcConfiguration("ON", nullptr, result_val);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  SetWakeupSrcConfiguration(null): result=%u", result);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * SetTerritory — valid territory, empty region                         *
+ * "FRA" is in the standard territory list; empty region takes the      *
+ * else branch → writeTerritory("FRA","") → success=true.              *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetTerritory_EmptyRegion_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetTerritory: FRA + empty region → writeTerritory branch");
+
+    Exchange::ISystemServices::SystemError sysError{};
+    bool success = false;
+    uint32_t result = m_SystemServicesPlugin->SetTerritory("FRA", "", sysError, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    EXPECT_TRUE(success);
+    TEST_LOG("  SetTerritory('FRA',''): result=%u, success=%d, msg='%s'",
+             result, success, sysError.message.c_str());
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * SetPowerState("ON") — non-DEEP/LIGHT_SLEEP path                     *
+ * Goes through the else branch (no device::Host) and calls            *
+ * setPowerStateConversion("ON") → _powerManagerPlugin->SetPowerState  *
+ * which is handled by the COM-RPC HAL mock.                           *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetPowerState_ON_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetPowerState: ON path → setPowerStateConversion ON branch");
+
+    string powerState = "ON";
+    string standbyReason = "";
+    uint32_t sysSrvStatus = 0;
+    string errorMessage;
+    bool success = false;
+
+    uint32_t result = m_SystemServicesPlugin->SetPowerState(powerState, standbyReason,
+                                                            sysSrvStatus, errorMessage, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  SetPowerState('ON'): result=%u, success=%d, error='%s'",
+             result, success, errorMessage.c_str());
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * SetTimeZoneDST — invalid format (no slash) → format validation branch*
+ * Timezone "BadTimezone" has no '/' → isOlson=true but pos==npos →    *
+ * logs LOGERR and falls through; zoneinfo path check fails → resp=true *
+ * is never set → success=false. No filesystem write, no process spawn. *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetTimeZoneDST_InvalidFormat_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetTimeZoneDST: bad format (no slash) → format-validation LOGERR branch");
+
+    uint32_t sysSrvStatus = 0;
+    string errorMessage;
+    bool success = false;
+
+    uint32_t result = m_SystemServicesPlugin->SetTimeZoneDST("BadTimezone", "FINAL",
+                                                              sysSrvStatus, errorMessage, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  SetTimeZoneDST('BadTimezone'): result=%u, success=%d", result, success);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
