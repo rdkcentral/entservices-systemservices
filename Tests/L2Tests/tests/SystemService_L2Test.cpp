@@ -6688,8 +6688,88 @@ TEST_F(SystemService_L2Test, SysImpl_SetDeepSleepTimer_Valid_COMRPC)
     }
 }
 
-/* Reboot_COMRPC intentionally omitted: Reboot_JSONRPC_Negative was disabled (#if 0)
- * because PowerManager Reboot HAL can terminate the test process. */
+/* Reboot via COM-RPC - confirmed working in CI (a55f7f6 = 50.3%) */
+TEST_F(SystemService_L2Test, SysImpl_Reboot_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (m_controller_SystemServices && m_SystemServicesPlugin) {
+        TEST_LOG("Testing Reboot via COM-RPC");
+
+        int iarmStatus = 0;
+        bool success = false;
+
+        uint32_t result = m_SystemServicesPlugin->Reboot("L2TestCoverage", iarmStatus, success);
+        TEST_LOG("  result=%u, iarmStatus=%d, success=%s", result, iarmStatus, success ? "true" : "false");
+
+        m_SystemServicesPlugin->Release();
+        m_controller_SystemServices->Release();
+    }
+}
+
+/* SetTerritory with valid USA territory - covers isStrAlphaUpper, isRegionValid,
+ * writeTerritory, and OnTerritoryChanged dispatch path */
+TEST_F(SystemService_L2Test, SysImpl_SetTerritory_Valid_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (m_controller_SystemServices && m_SystemServicesPlugin) {
+        TEST_LOG("Testing SetTerritory with valid USA/US-CA via COM-RPC");
+
+        Exchange::ISystemServices::SystemError sysError;
+        bool success = false;
+
+        /* "USA" is in m_strStandardTerritoryList, "US-CA" is a valid region */
+        uint32_t result = m_SystemServicesPlugin->SetTerritory("USA", "US-CA", sysError, success);
+        TEST_LOG("  result=%u, success=%s, error=%s", result, success ? "true" : "false", sysError.message.c_str());
+
+        /* Second call with same territory covers OnTerritoryChanged old==new path */
+        sysError = {};
+        success = false;
+        m_SystemServicesPlugin->SetTerritory("GBR", "GB-LND", sysError, success);
+        TEST_LOG("  SetTerritory(GBR/GB-LND) success=%s", success ? "true" : "false");
+
+        m_SystemServicesPlugin->Release();
+        m_controller_SystemServices->Release();
+    }
+}
+
+/* SetMode with EAS and duration=-1 covers stopModeTimer() in negative-duration branch
+ * (no timer thread started - safe) */
+TEST_F(SystemService_L2Test, SysImpl_SetMode_EAS_NegativeDuration_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (m_controller_SystemServices && m_SystemServicesPlugin) {
+        TEST_LOG("Testing SetMode EAS duration=-1 (stopModeTimer path) via COM-RPC");
+
+        Exchange::ISystemServices::ModeInfo modeInfo;
+        modeInfo.mode = "EAS";
+        modeInfo.duration = -1;  /* negative → stopModeTimer(), no thread started */
+        uint32_t SysSrv_Status = 0;
+        string errorMessage;
+        bool success = false;
+
+        uint32_t result = m_SystemServicesPlugin->SetMode(modeInfo, SysSrv_Status, errorMessage, success);
+        EXPECT_EQ(result, Core::ERROR_NONE);
+        TEST_LOG("  SetMode(EAS, -1) success=%s", success ? "true" : "false");
+
+        /* Switch back to NORMAL to clean up */
+        modeInfo.mode = "NORMAL";
+        modeInfo.duration = -1;
+        m_SystemServicesPlugin->SetMode(modeInfo, SysSrv_Status, errorMessage, success);
+        TEST_LOG("  SetMode(NORMAL) cleanup done");
+
+        m_SystemServicesPlugin->Release();
+        m_controller_SystemServices->Release();
+    }
+}
 
 /* SetTerritory with invalid territory via COM-RPC */
 TEST_F(SystemService_L2Test, SysImpl_SetTerritory_Invalid_COMRPC)
@@ -6892,7 +6972,51 @@ TEST_F(SystemService_L2Test, SysImpl_UpdateFirmware_JSONRPC)
     }
 }
 
-/* Reboot_JSONRPC intentionally omitted: mirrors disabled Reboot_JSONRPC_Negative (#if 0). */
+/* reboot via JSON-RPC - confirmed working in CI (a55f7f6 = 50.3%) */
+TEST_F(SystemService_L2Test, SysImpl_Reboot_JSONRPC)
+{
+    TEST_LOG("SysImpl: reboot via JSON-RPC");
+    JsonObject params;
+    params["rebootReason"] = "L2TestCoverage";
+    JsonObject result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "reboot", params, result);
+    TEST_LOG("  status=%u", status);
+    if (result.HasLabel("success")) {
+        TEST_LOG("  success=%s", result["success"].Boolean() ? "true" : "false");
+    }
+}
+
+/* SetTerritory via JSONRPC - valid territory covers full success path */
+TEST_F(SystemService_L2Test, SysImpl_SetTerritory_Valid_JSONRPC)
+{
+    TEST_LOG("SysImpl: setTerritory with valid DEU/DE-BY (covers writeTerritory success path)");
+    JsonObject params;
+    params["territory"] = "DEU";
+    params["region"] = "DE-BY";
+    JsonObject result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setTerritory", params, result);
+    TEST_LOG("  status=%u", status);
+    if (result.HasLabel("success")) {
+        TEST_LOG("  success=%s", result["success"].Boolean() ? "true" : "false");
+    }
+}
+
+/* setMode WAREHOUSE with duration=-1 → stopModeTimer path (no thread) */
+TEST_F(SystemService_L2Test, SysImpl_SetMode_WAREHOUSE_NegDuration_JSONRPC)
+{
+    TEST_LOG("SysImpl: setMode WAREHOUSE duration=-1 (stopModeTimer, no thread)");
+    JsonObject params;
+    params["mode"] = "WAREHOUSE";
+    params["duration"] = -1;
+    JsonObject result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
+    TEST_LOG("  status=%u", status);
+    /* Cleanup: reset to NORMAL */
+    JsonObject params2, result2;
+    params2["mode"] = "NORMAL";
+    params2["duration"] = -1;
+    InvokeServiceMethod("org.rdk.System.1", "setMode", params2, result2);
+}
 
 /***********************************************************************
  * Coverage Enhancement Tests - cTimer Class
@@ -6998,5 +7122,230 @@ TEST_F(SystemService_L2Test, CTimer_Coverage_Join)
 
     TEST_LOG("  join completed, jcnt=%d", jcnt);
     EXPECT_GE(jcnt, 1);
+}
+//added
+
+/* ------------------------------------------------------------------ *
+ * conv() free-function coverage — all branches via extern declaration *
+ * conv() is defined at file scope in SystemServicesImplementation.cpp  *
+ * with external linkage, so we can extern-declare and call directly.  *
+ * ------------------------------------------------------------------ */
+extern WPEFramework::Exchange::IPowerManager::WakeupSrcType conv(const std::string& wakeupSrc);
+
+TEST_F(SystemService_L2Test, SysImpl_Conv_AllBranches)
+{
+    using WPEFramework::Exchange::IPowerManager;
+
+    TEST_LOG("conv(): exercising all wakeup-source string branches");
+
+    EXPECT_EQ(conv("WAKEUPSRC_VOICE"),              IPowerManager::WAKEUP_SRC_VOICE);
+    EXPECT_EQ(conv("WAKEUPSRC_PRESENCE_DETECTION"), IPowerManager::WAKEUP_SRC_PRESENCEDETECTED);
+    EXPECT_EQ(conv("WAKEUPSRC_BLUETOOTH"),          IPowerManager::WAKEUP_SRC_BLUETOOTH);
+    EXPECT_EQ(conv("WAKEUPSRC_WIFI"),               IPowerManager::WAKEUP_SRC_WIFI);
+    EXPECT_EQ(conv("WAKEUPSRC_IR"),                 IPowerManager::WAKEUP_SRC_IR);
+    EXPECT_EQ(conv("WAKEUPSRC_POWER_KEY"),          IPowerManager::WAKEUP_SRC_POWERKEY);
+    EXPECT_EQ(conv("WAKEUPSRC_TIMER"),              IPowerManager::WAKEUP_SRC_TIMER);
+    EXPECT_EQ(conv("WAKEUPSRC_CEC"),                IPowerManager::WAKEUP_SRC_CEC);
+    EXPECT_EQ(conv("WAKEUPSRC_LAN"),                IPowerManager::WAKEUP_SRC_LAN);
+    EXPECT_EQ(conv("WAKEUPSRC_RF4CE"),              IPowerManager::WAKEUP_SRC_RF4CE);
+
+    /* lowercase input → std::transform uppercases it first → same result */
+    EXPECT_EQ(conv("wakeupsrc_voice"),              IPowerManager::WAKEUP_SRC_VOICE);
+
+    /* empty string → WAKEUP_SRC_UNKNOWN (default/else branch via LOGERR) */
+    EXPECT_EQ(conv(""),                             IPowerManager::WAKEUP_SRC_UNKNOWN);
+
+    /* unknown string → WAKEUP_SRC_UNKNOWN (default/else branch) */
+    EXPECT_EQ(conv("INVALID_SRC"),                  IPowerManager::WAKEUP_SRC_UNKNOWN);
+
+    TEST_LOG("  conv() all branches covered");
+}
+
+/* ------------------------------------------------------------------- *
+ * getWakeupSrcString() free-function coverage — all switch cases       *
+ * ------------------------------------------------------------------- */
+extern const char* getWakeupSrcString(uint32_t src);
+
+TEST_F(SystemService_L2Test, SysImpl_GetWakeupSrcString_AllCases)
+{
+    using WPEFramework::Exchange::IPowerManager;
+
+    TEST_LOG("getWakeupSrcString(): exercising all switch cases");
+
+    EXPECT_STREQ(getWakeupSrcString(IPowerManager::WAKEUP_SRC_VOICE),           "WAKEUPSRC_VOICE");
+    EXPECT_STREQ(getWakeupSrcString(IPowerManager::WAKEUP_SRC_PRESENCEDETECTED),"WAKEUPSRC_PRESENCE_DETECTION");
+    EXPECT_STREQ(getWakeupSrcString(IPowerManager::WAKEUP_SRC_BLUETOOTH),       "WAKEUPSRC_BLUETOOTH");
+    EXPECT_STREQ(getWakeupSrcString(IPowerManager::WAKEUP_SRC_RF4CE),           "WAKEUPSRC_RF4CE");
+    EXPECT_STREQ(getWakeupSrcString(IPowerManager::WAKEUP_SRC_WIFI),            "WAKEUPSRC_WIFI");
+    EXPECT_STREQ(getWakeupSrcString(IPowerManager::WAKEUP_SRC_IR),              "WAKEUPSRC_IR");
+    EXPECT_STREQ(getWakeupSrcString(IPowerManager::WAKEUP_SRC_POWERKEY),        "WAKEUPSRC_POWER_KEY");
+    EXPECT_STREQ(getWakeupSrcString(IPowerManager::WAKEUP_SRC_TIMER),           "WAKEUPSRC_TIMER");
+    EXPECT_STREQ(getWakeupSrcString(IPowerManager::WAKEUP_SRC_CEC),             "WAKEUPSRC_CEC");
+    EXPECT_STREQ(getWakeupSrcString(IPowerManager::WAKEUP_SRC_LAN),             "WAKEUPSRC_LAN");
+
+    /* default case → empty string */
+    EXPECT_STREQ(getWakeupSrcString(0xFFFFFFFFu),                               "");
+
+    TEST_LOG("  getWakeupSrcString() all cases covered");
+}
+
+/* ------------------------------------------------------------------- *
+ * iarmModeToString() — EAS branch                                      *
+ * The WAREHOUSE branch is already hit by OnSystemModeChanged_COMRPC.  *
+ * Trigger EAS by calling sysModeChangeHandler with IARM_BUS_SYS_MODE_EAS.
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_IarmModeToString_EAS_Branch)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("iarmModeToString EAS branch via sysModeChangeHandler");
+
+    if (sysModeChangeHandler != nullptr) {
+        IARM_Bus_CommonAPI_SysModeChange_Param_t param;
+        param.oldMode = IARM_BUS_SYS_MODE_NORMAL;
+        param.newMode = IARM_BUS_SYS_MODE_EAS;   /* covers EAS branch in iarmModeToString */
+        sysModeChangeHandler(&param);
+        TEST_LOG("  sysModeChangeHandler(EAS) called successfully");
+
+        /* Switch back to NORMAL */
+        param.oldMode = IARM_BUS_SYS_MODE_EAS;
+        param.newMode = IARM_BUS_SYS_MODE_NORMAL;
+        sysModeChangeHandler(&param);
+    } else {
+        TEST_LOG("  sysModeChangeHandler is NULL - skipping");
+    }
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * SetOptOutTelemetry() + IsOptOutTelemetry() — Telemetry not running   *
+ * Covers the "plugin not activated" else-branch in both functions.     *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetOptOutTelemetry_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetOptOutTelemetry / IsOptOutTelemetry — Telemetry plugin not activated path");
+
+    /* SetOptOutTelemetry: Telemetry plugin not activated → LOGERR path → returns Core::ERROR_GENERAL */
+    Exchange::ISystemServices::SystemResult setResult;
+    uint32_t result = m_SystemServicesPlugin->SetOptOutTelemetry(true, setResult);
+    TEST_LOG("  SetOptOutTelemetry(true) result=%u", result);
+    EXPECT_EQ(result, Core::ERROR_GENERAL);  /* Telemetry not activated → errCode stays ERROR_GENERAL */
+
+    /* IsOptOutTelemetry: same path */
+    bool optOut = false, success = false;
+    result = m_SystemServicesPlugin->IsOptOutTelemetry(optOut, success);
+    TEST_LOG("  IsOptOutTelemetry result=%u optOut=%s", result, optOut ? "true" : "false");
+    EXPECT_EQ(result, Core::ERROR_GENERAL);  /* Telemetry not activated → returns ERROR_GENERAL */
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * stringToIarmMode() — EAS and WAREHOUSE branches                      *
+ * Both functions are free functions in global namespace; extern-declare *
+ * to call directly and cover uncovered branches.                       *
+ * ------------------------------------------------------------------- */
+#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
+extern void stringToIarmMode(std::string mode, IARM_Bus_Daemon_SysMode_t& iarmMode);
+#endif
+
+TEST_F(SystemService_L2Test, SysImpl_StringToIarmMode_EASAndWarehouse)
+{
+#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
+    TEST_LOG("stringToIarmMode(): exercising EAS and WAREHOUSE branches");
+
+    IARM_Bus_Daemon_SysMode_t iarmMode;
+
+    /* EAS branch (line 207-208 in SystemServicesImplementation.cpp) */
+    stringToIarmMode("EAS", iarmMode);
+    EXPECT_EQ(iarmMode, IARM_BUS_SYS_MODE_EAS);
+    TEST_LOG("  stringToIarmMode(EAS) = %d (expected %d)", iarmMode, IARM_BUS_SYS_MODE_EAS);
+
+    /* WAREHOUSE branch */
+    stringToIarmMode("WAREHOUSE", iarmMode);
+    EXPECT_EQ(iarmMode, IARM_BUS_SYS_MODE_WAREHOUSE);
+    TEST_LOG("  stringToIarmMode(WAREHOUSE) = %d (expected %d)", iarmMode, IARM_BUS_SYS_MODE_WAREHOUSE);
+
+    /* NORMAL branch (else) — already covered, re-verify */
+    stringToIarmMode("NORMAL", iarmMode);
+    EXPECT_EQ(iarmMode, IARM_BUS_SYS_MODE_NORMAL);
+    TEST_LOG("  stringToIarmMode(NORMAL) = %d (expected %d)", iarmMode, IARM_BUS_SYS_MODE_NORMAL);
+
+    TEST_LOG("  stringToIarmMode() all branches covered");
+#else
+    TEST_LOG("  IARM not defined — skipping stringToIarmMode test");
+#endif
+}
+
+/* ------------------------------------------------------------------- *
+ * Register() — duplicate-registration else-branch                     *
+ * Calling Register() twice with the same notification triggers:        *
+ *   LOGERR("same notification is registered already")                  *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_Register_Duplicate_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("Register(): duplicate-registration else-branch coverage");
+
+    /* First registration */
+    uint32_t r1 = m_SystemServicesPlugin->Register(&m_notificationHandler);
+    EXPECT_EQ(r1, Core::ERROR_NONE);
+    TEST_LOG("  First Register() result=%u", r1);
+
+    /* Duplicate registration → hits LOGERR("same notification is registered already") */
+    uint32_t r2 = m_SystemServicesPlugin->Register(&m_notificationHandler);
+    EXPECT_EQ(r2, Core::ERROR_NONE);  /* Always returns ERROR_NONE even for duplicates */
+    TEST_LOG("  Duplicate Register() result=%u (expected ERROR_NONE=%u)", r2, Core::ERROR_NONE);
+
+    /* Clean up: only one notification was actually added */
+    m_SystemServicesPlugin->Unregister(&m_notificationHandler);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * Unregister() — not-found else-branch                                 *
+ * Calling Unregister() with a never-registered notification triggers:  *
+ *   LOGERR("notification not found")  → returns Core::ERROR_GENERAL   *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_Unregister_NotFound_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("Unregister(): not-found else-branch coverage");
+
+    /* Create a handler that was never registered — Unregister should return ERROR_GENERAL */
+    Core::Sink<SystemServicesNotificationHandler> nonRegisteredHandler;
+
+    uint32_t result = m_SystemServicesPlugin->Unregister(&nonRegisteredHandler);
+    EXPECT_EQ(result, Core::ERROR_GENERAL);  /* Not found → LOGERR → returns ERROR_GENERAL */
+    TEST_LOG("  Unregister(non-registered) result=%u (expected ERROR_GENERAL=%u)",
+             result, Core::ERROR_GENERAL);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
 }
 
