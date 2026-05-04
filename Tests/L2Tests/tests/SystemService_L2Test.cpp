@@ -7608,3 +7608,305 @@ TEST_F(SystemService_L2Test, SysImpl_SetPowerState_InvalidState_COMRPC)
     m_controller_SystemServices->Release();
 }
 
+/* ------------------------------------------------------------------- *
+ * powerModeEnumToString — all branches via pwrMgrEventHandler          *
+ * Fire PWRMGR events with each power state enum to cover all switch    *
+ * cases in powerModeEnumToString + OnSystemPowerStateChanged body.     *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_PowerModeEnumToString_AllBranches_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+    if (pwrMgrEventHandler == nullptr) {
+        TEST_LOG("pwrMgrEventHandler is NULL - skip");
+        m_SystemServicesPlugin->Release();
+        m_controller_SystemServices->Release();
+        return;
+    }
+
+    TEST_LOG("powerModeEnumToString: cover all switch cases via pwrMgrEventHandler");
+
+    IARM_Bus_PWRMgr_EventData_t evt;
+
+    /* ON → covers POWER_STATE_ON branch */
+    evt.data.state.curState = IARM_BUS_PWRMGR_POWERSTATE_STANDBY;
+    evt.data.state.newState = IARM_BUS_PWRMGR_POWERSTATE_ON;
+    pwrMgrEventHandler(IARM_BUS_PWRMGR_NAME, IARM_BUS_PWRMGR_EVENT_MODECHANGED, &evt, sizeof(evt));
+    TEST_LOG("  fired STANDBY->ON");
+
+    /* OFF → covers POWER_STATE_OFF branch */
+    evt.data.state.curState = IARM_BUS_PWRMGR_POWERSTATE_ON;
+    evt.data.state.newState = IARM_BUS_PWRMGR_POWERSTATE_OFF;
+    pwrMgrEventHandler(IARM_BUS_PWRMGR_NAME, IARM_BUS_PWRMGR_EVENT_MODECHANGED, &evt, sizeof(evt));
+    TEST_LOG("  fired ON->OFF");
+
+    /* STANDBY → covers LIGHT_SLEEP branch */
+    evt.data.state.curState = IARM_BUS_PWRMGR_POWERSTATE_ON;
+    evt.data.state.newState = IARM_BUS_PWRMGR_POWERSTATE_STANDBY;
+    pwrMgrEventHandler(IARM_BUS_PWRMGR_NAME, IARM_BUS_PWRMGR_EVENT_MODECHANGED, &evt, sizeof(evt));
+    TEST_LOG("  fired ON->STANDBY (LIGHT_SLEEP)");
+
+    /* STANDBY_LIGHT_SLEEP → covers LIGHT_SLEEP branch */
+    evt.data.state.curState = IARM_BUS_PWRMGR_POWERSTATE_ON;
+    evt.data.state.newState = IARM_BUS_PWRMGR_POWERSTATE_STANDBY_LIGHT_SLEEP;
+    pwrMgrEventHandler(IARM_BUS_PWRMGR_NAME, IARM_BUS_PWRMGR_EVENT_MODECHANGED, &evt, sizeof(evt));
+    TEST_LOG("  fired ON->STANDBY_LIGHT_SLEEP");
+
+    /* STANDBY_DEEP_SLEEP → covers DEEP_SLEEP branch */
+    evt.data.state.curState = IARM_BUS_PWRMGR_POWERSTATE_STANDBY_LIGHT_SLEEP;
+    evt.data.state.newState = IARM_BUS_PWRMGR_POWERSTATE_STANDBY_DEEP_SLEEP;
+    pwrMgrEventHandler(IARM_BUS_PWRMGR_NAME, IARM_BUS_PWRMGR_EVENT_MODECHANGED, &evt, sizeof(evt));
+    TEST_LOG("  fired LIGHT_SLEEP->DEEP_SLEEP");
+
+    /* Restore: DEEP_SLEEP → LIGHT_SLEEP */
+    evt.data.state.curState = IARM_BUS_PWRMGR_POWERSTATE_STANDBY_DEEP_SLEEP;
+    evt.data.state.newState = IARM_BUS_PWRMGR_POWERSTATE_STANDBY_LIGHT_SLEEP;
+    pwrMgrEventHandler(IARM_BUS_PWRMGR_NAME, IARM_BUS_PWRMGR_EVENT_MODECHANGED, &evt, sizeof(evt));
+
+    /* Restore: LIGHT_SLEEP → ON */
+    evt.data.state.curState = IARM_BUS_PWRMGR_POWERSTATE_STANDBY;
+    evt.data.state.newState = IARM_BUS_PWRMGR_POWERSTATE_ON;
+    pwrMgrEventHandler(IARM_BUS_PWRMGR_NAME, IARM_BUS_PWRMGR_EVENT_MODECHANGED, &evt, sizeof(evt));
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * SetTimeZoneDST — valid timezone (America/New_York)                   *
+ * Covers: try block, isOlson=true, dirExists, fopen, fwrite, dispatch  *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetTimeZoneDST_ValidTimezone_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetTimeZoneDST: valid America/New_York timezone");
+
+    uint32_t sysSrvStatus = 0;
+    string errorMessage;
+    bool success = false;
+
+    /* America/New_York exists in /usr/share/zoneinfo — covers the full success path */
+    uint32_t result = m_SystemServicesPlugin->SetTimeZoneDST(
+        "America/New_York", "FINAL", sysSrvStatus, errorMessage, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  SetTimeZoneDST(America/New_York): result=%u success=%d error='%s'",
+             result, success, errorMessage.c_str());
+
+    /* Second call with same timezone → covers oldTimeZoneDST == timeZone branch */
+    success = false;
+    result = m_SystemServicesPlugin->SetTimeZoneDST(
+        "America/New_York", "FINAL", sysSrvStatus, errorMessage, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  Second call (same TZ): result=%u success=%d", result, success);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * SetTimeZoneDST — Universal timezone                                  *
+ * Covers: isUniversal=true, isOlson=false branch                       *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetTimeZoneDST_Universal_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetTimeZoneDST: Universal timezone (isUniversal=true branch)");
+
+    uint32_t sysSrvStatus = 0;
+    string errorMessage;
+    bool success = false;
+
+    uint32_t result = m_SystemServicesPlugin->SetTimeZoneDST(
+        "Universal", "INITIAL", sysSrvStatus, errorMessage, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  SetTimeZoneDST(Universal): result=%u success=%d", result, success);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * SetWakeupSrcConfiguration — null iterator (early return)            *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetWakeupSrcConfiguration_Null_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetWakeupSrcConfiguration: null iterator (covers nullptr early return)");
+
+    Exchange::ISystemServices::SystemResult sysResult;
+    uint32_t result = m_SystemServicesPlugin->SetWakeupSrcConfiguration(
+        "DEEP_SLEEP", nullptr, sysResult);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  SetWakeupSrcConfiguration(null): result=%u", result);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * SetTerritory — empty region (only territory updated, no region)      *
+ * Covers the region.empty() else branch in SetTerritory               *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetTerritory_EmptyRegion_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetTerritory: empty region (covers territory-only update branch)");
+
+    Exchange::ISystemServices::SystemError sysError;
+    bool success = false;
+
+    /* Valid territory, empty region → hits the else branch that only writes territory */
+    uint32_t result = m_SystemServicesPlugin->SetTerritory("FRA", "", sysError, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  SetTerritory(FRA, ''): result=%u success=%d error='%s'",
+             result, success, sysError.message.c_str());
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * UploadLogsAsync — double call (covers "already running" branch)      *
+ * First call starts upload; second call detects pid!=-1 → AbortLogUpload
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_UploadLogsAsync_DoubleCall_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("UploadLogsAsync: double call covers 'already running' abort branch");
+
+    Exchange::ISystemServices::SystemResult result1, result2;
+
+    /* First call: starts upload */
+    uint32_t r1 = m_SystemServicesPlugin->UploadLogsAsync(result1);
+    EXPECT_EQ(r1, Core::ERROR_NONE);
+    TEST_LOG("  First UploadLogsAsync: result=%u success=%d", r1, result1.success);
+
+    /* Second call: detects running pid → calls AbortLogUpload internally */
+    uint32_t r2 = m_SystemServicesPlugin->UploadLogsAsync(result2);
+    EXPECT_EQ(r2, Core::ERROR_NONE);
+    TEST_LOG("  Second UploadLogsAsync (abort+restart): result=%u success=%d", r2, result2.success);
+
+    /* Cleanup: abort the running upload */
+    Exchange::ISystemServices::SystemResult abortResult;
+    m_SystemServicesPlugin->AbortLogUpload(abortResult);
+    TEST_LOG("  AbortLogUpload cleanup done");
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * GetLastWakeupKeyCode — via COMRPC (additional coverage)             *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetLastWakeupKeyCode_Extra_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetLastWakeupKeyCode: additional COMRPC coverage");
+
+    /* Mock return success with keyCode=0 */
+    ON_CALL(*p_powerManagerHalMock, PLAT_DS_GetLastWakeupKeyCode(::testing::_))
+        .WillByDefault(::testing::Invoke([](DeepSleepMgr_WakeupKeyCode_Param_t* param) {
+            param->keyCode = 42;
+            return DEEPSLEEPMGR_SUCCESS;
+        }));
+
+    int wakeupKeyCode = 0;
+    bool success = false;
+    uint32_t result = m_SystemServicesPlugin->GetLastWakeupKeyCode(wakeupKeyCode, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  GetLastWakeupKeyCode: result=%u keyCode=%d success=%d",
+             result, wakeupKeyCode, success);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * SetPowerState — ON path via setPowerStateConversion                  *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetPowerState_ON_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetPowerState: ON path (covers setPowerStateConversion ON branch)");
+
+    string powerState = "ON";
+    string standbyReason = "L2Test";
+    uint32_t sysSrvStatus = 0;
+    string errorMessage;
+    bool success = false;
+
+    uint32_t result = m_SystemServicesPlugin->SetPowerState(
+        powerState, standbyReason, sysSrvStatus, errorMessage, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  SetPowerState(ON): result=%u success=%d", result, success);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * SetPowerState — DEEP_SLEEP path (covers LIGHT/DEEP_SLEEP if-block)  *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetPowerState_DeepSleep_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetPowerState: DEEP_SLEEP path (covers LIGHT/DEEP_SLEEP if-block)");
+
+    string powerState = "DEEP_SLEEP";
+    string standbyReason = "L2Test";
+    uint32_t sysSrvStatus = 0;
+    string errorMessage;
+    bool success = false;
+
+    uint32_t result = m_SystemServicesPlugin->SetPowerState(
+        powerState, standbyReason, sysSrvStatus, errorMessage, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  SetPowerState(DEEP_SLEEP): result=%u success=%d", result, success);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
