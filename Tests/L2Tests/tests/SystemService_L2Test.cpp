@@ -8934,7 +8934,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetTerritory_InvalidRegionFormat_COMRPC)
     /* Territory "USA" is valid (3 chars, in list); region has invalid char '@' */
     uint32_t result = m_SystemServicesPlugin->SetTerritory("USA", "bad@region", sysError, success);
     /* Expected: ERROR_GENERAL because isRegionValid fails */
-    TEST_LOG("  SetTerritory('USA','bad@region'): result=%u success=%d",
+    TEST_LOG("  SetTerritory('USA','bad@region'): result=%u success=%d msg='%s'",
              result, success, sysError.message.c_str());
 
     m_SystemServicesPlugin->Release();
@@ -9063,8 +9063,9 @@ TEST_F(SystemService_L2Test, SysImpl_GetRFCConfig_InvalidCharsetName_JSONRPC)
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getRFCConfig", params, result);
     EXPECT_EQ(status, Core::ERROR_NONE);
     TEST_LOG("  status=%u", status);
-    if (result.HasLabel("RFCConfig"))
+    if (result.HasLabel("RFCConfig")) {
         TEST_LOG("  RFCConfig='%s'", result["RFCConfig"].String().c_str());
+    }
 }
 
 /* ------------------------------------------------------------------- *
@@ -9095,8 +9096,9 @@ TEST_F(SystemService_L2Test, SysImpl_GetRFCConfig_MockedSuccess_JSONRPC)
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getRFCConfig", params, result);
     EXPECT_EQ(status, Core::ERROR_NONE);
     TEST_LOG("  status=%u", status);
-    if (result.HasLabel("RFCConfig"))
+    if (result.HasLabel("RFCConfig")) {
         TEST_LOG("  RFCConfig='%s'", result["RFCConfig"].String().c_str());
+    }
 }
 
 /* ------------------------------------------------------------------- *
@@ -9324,8 +9326,9 @@ TEST_F(SystemService_L2Test, SysImpl_FriendlyName_RFC_Success_JSONRPC)
     JsonObject params2, result2;
     status = InvokeServiceMethod("org.rdk.System.1", "getFriendlyName", params2, result2);
     TEST_LOG("  getFriendlyName status=%u", status);
-    if (result2.HasLabel("friendlyName"))
+    if (result2.HasLabel("friendlyName")) {
         TEST_LOG("  friendlyName='%s'", result2["friendlyName"].String().c_str());
+    }
 
     /* Restore mock */
     ON_CALL(*p_rfcApiImplMock, getRFCParameter(::testing::_, ::testing::_, ::testing::_))
@@ -10100,15 +10103,14 @@ TEST_F(SystemService_L2Test, SysImpl_GetDownloadedFirmwareInfo_RebootTrue_COMRPC
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("GetDownloadedFirmwareInfo: Reboot|1 in file → isRebootDeferred=true (L1900-1906)");
+    TEST_LOG("GetDownloadedFirmwareInfo: Reboot|true in file → isRebootDeferred=true (L1900-1906)");
 
-    /* Ensure m_FwUpdateState_LatestEvent is reset to 0 (initial state = no download) */
-    /* Write file with Reboot|1 only */
+    /* Write file with Reboot|true — value must be >1 char for line.length()>1 check */
     {
         std::ofstream f("/opt/fwdnldstatus.txt");
         if (f.is_open()) {
             f << "Status|Downloading\n";
-            f << "Reboot|1\n";
+            f << "Reboot|true\n";  /* 'true' length=4 > 1, so isRebootDeferred=true */
         }
     }
 
@@ -10126,10 +10128,10 @@ TEST_F(SystemService_L2Test, SysImpl_GetDownloadedFirmwareInfo_RebootTrue_COMRPC
 }
 
 /* ------------------------------------------------------------------- *
- * OnNetworkStandbyModeChanged — call via _instance directly            *
- * Covers L2956-2975: OnNetworkStandbyModeChanged body + dispatch       *
+ * GetNetworkStandbyMode — exercise cached + fresh read paths           *
+ * Covers L1590-1614: both m_networkStandbyModeValid branches           *
  * ------------------------------------------------------------------- */
-TEST_F(SystemService_L2Test, SysImpl_OnNetworkStandbyModeChanged_Direct_COMRPC)
+TEST_F(SystemService_L2Test, SysImpl_GetNetworkStandbyMode_CachedAndFresh_COMRPC)
 {
     if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
         TEST_LOG("Invalid SystemServices_Client");
@@ -10137,22 +10139,28 @@ TEST_F(SystemService_L2Test, SysImpl_OnNetworkStandbyModeChanged_Direct_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("OnNetworkStandbyModeChanged direct call → covers L2956-2975");
+    TEST_LOG("GetNetworkStandbyMode: set then get to cover cached+uncached paths");
 
-    m_SystemServicesPlugin->Register(&m_notificationHandler);
+    /* SetNetworkStandbyMode(true) → sets m_networkStandbyModeValid=false via _powerManagerPlugin */
+    Exchange::ISystemServices::SystemResult sysResult{};
+    m_SystemServicesPlugin->SetNetworkStandbyMode(true, sysResult);
+    TEST_LOG("  SetNetworkStandbyMode(true): success=%d", sysResult.success);
 
-    WPEFramework::Plugin::SystemServicesImplementation* inst =
-        WPEFramework::Plugin::SystemServicesImplementation::_instance;
+    /* First GetNetworkStandbyMode — reads from plugin (m_networkStandbyModeValid=false) */
+    bool nwStandby = false;
+    bool getSuccess = false;
+    uint32_t result = m_SystemServicesPlugin->GetNetworkStandbyMode(nwStandby, getSuccess);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  GetNetworkStandbyMode 1st: result=%u nwStandby=%d success=%d",
+             result, nwStandby, getSuccess);
 
-    if (inst) {
-        inst->OnNetworkStandbyModeChanged(true);
-        usleep(100000);
-        inst->OnNetworkStandbyModeChanged(false);
-        usleep(100000);
-        TEST_LOG("  Called OnNetworkStandbyModeChanged(true) and (false)");
-    }
+    /* Second GetNetworkStandbyMode — should return cached value (m_networkStandbyModeValid=true) */
+    nwStandby = false; getSuccess = false;
+    result = m_SystemServicesPlugin->GetNetworkStandbyMode(nwStandby, getSuccess);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  GetNetworkStandbyMode 2nd (cached): result=%u nwStandby=%d success=%d",
+             result, nwStandby, getSuccess);
 
-    m_SystemServicesPlugin->Unregister(&m_notificationHandler);
     m_SystemServicesPlugin->Release();
     m_controller_SystemServices->Release();
 }
