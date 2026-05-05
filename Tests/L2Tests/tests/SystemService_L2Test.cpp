@@ -7917,6 +7917,8 @@ TEST_F(SystemService_L2Test, SysImpl_PowerMode_LightSleep_To_ON_COMRPC)
     TEST_LOG("  Fired LIGHT_SLEEP→ON: ThunderWake2 branch covered");
 }
 
+//aded65
+
 /* ------------------------------------------------------------------- *
  * SetMode("EAS", 3600) with DaemonSysModeChange mocked to succeed       *
  * This covers startModeTimer() (lines 759-764) which is NEVER hit      *
@@ -7990,5 +7992,280 @@ TEST_F(SystemService_L2Test, SysImpl_PwrMgr_UnhandledEvent_COMRPC)
     pwrMgrEventHandler(IARM_BUS_PWRMGR_NAME, (IARM_EventId_t)99, &eventData, 0);
 
     TEST_LOG("  Fired unhandled eventId=99, no crash");
+}
+
+/* ------------------------------------------------------------------- *
+ * SetMode("WAREHOUSE", 300) with DaemonSysModeChange mocked to succeed *
+ * Covers the if(MODE_WAREHOUSE == m_currentMode) branch that creates   *
+ * WAREHOUSE_MODE_FILE — previously uncovered because existing tests    *
+ * either had duration=0 (changeMode=false) or IARM call failing.      *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetMode_WAREHOUSE_PositiveDuration_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetMode WAREHOUSE+300 with IARM success → covers WAREHOUSE file creation branch");
+
+    ON_CALL(*p_iarmBusImplMock, IARM_Bus_Call(
+        ::testing::StrEq("Daemon"),
+        ::testing::StrEq("DaemonSysModeChange"),
+        ::testing::_,
+        ::testing::_))
+        .WillByDefault(::testing::Return(IARM_RESULT_SUCCESS));
+
+    Exchange::ISystemServices::ModeInfo modeInfo;
+    modeInfo.mode = "WAREHOUSE";
+    modeInfo.duration = 300;
+    uint32_t sysSrvStatus = 0;
+    string errorMessage;
+    bool success = false;
+
+    uint32_t result = m_SystemServicesPlugin->SetMode(modeInfo, sysSrvStatus, errorMessage, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  SetMode(WAREHOUSE,300): result=%u, success=%d", result, success);
+
+    /* Restore to NORMAL */
+    modeInfo.mode = "NORMAL";
+    modeInfo.duration = 0;
+    m_SystemServicesPlugin->SetMode(modeInfo, sysSrvStatus, errorMessage, success);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * Power mode: ON → LIGHT_SLEEP                                         *
+ * Fires IARM PWRMGR MODECHANGED with curState=ON, newState=LIGHT_SLEEP *
+ * Covers OnSystemPowerStateChanged("ON","LIGHT_SLEEP"):                *
+ *   • if("LIGHT_SLEEP" == powerState) → true outer branch              *
+ *   • if("ON" == currentPowerState) → true inner branch                *
+ *   • getRFCParameter(RFC_LOG_UPLOAD) → called                         *
+ *   • With RFC mock returning WDMP_BOOLEAN "true" → UploadLogsAsync    *
+ *   • UploadLogsAsync → logUploadAsync → no /usr/bin/logupload → -1    *
+ *   • t2_event_d(ThunderSleep1) branch                                 *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_PowerMode_ON_To_LightSleep_COMRPC)
+{
+    TEST_LOG("PowerMode ON→LIGHT_SLEEP: RFC call + UploadLogsAsync + ThunderSleep1");
+
+    if (pwrMgrEventHandler == nullptr) {
+        TEST_LOG("  pwrMgrEventHandler not captured, skipping");
+        return;
+    }
+
+    /* Mock RFC to enable log upload */
+    ON_CALL(*p_rfcApiImplMock, getRFCParameter(::testing::_, ::testing::_, ::testing::_))
+        .WillByDefault(::testing::Invoke(
+            [](char* pcCallerID, const char* pcParameterName, RFC_ParamData_t* pstParamData) {
+                pstParamData->type = WDMP_BOOLEAN;
+                strncpy(pstParamData->value, "true", sizeof(pstParamData->value));
+                return WDMP_SUCCESS;
+            }));
+
+    IARM_Bus_PWRMgr_EventData_t eventData;
+    memset(&eventData, 0, sizeof(eventData));
+    eventData.data.state.curState = IARM_BUS_PWRMGR_POWERSTATE_ON;
+    eventData.data.state.newState = IARM_BUS_PWRMGR_POWERSTATE_STANDBY_LIGHT_SLEEP;
+    pwrMgrEventHandler(IARM_BUS_PWRMGR_NAME, IARM_BUS_PWRMGR_EVENT_MODECHANGED, &eventData, 0);
+
+    TEST_LOG("  Fired ON→LIGHT_SLEEP: RFC call + UploadLogsAsync covered");
+}
+
+/* ------------------------------------------------------------------- *
+ * Power mode: ON → STANDBY                                             *
+ * Covers the "STANDBY" branch in OnSystemPowerStateChanged outer if:   *
+ *   if("LIGHT_SLEEP" == powerState || "STANDBY" == powerState)         *
+ * With currentPowerState=="ON" → RFC call to check log upload          *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_PowerMode_ON_To_Standby_COMRPC)
+{
+    TEST_LOG("PowerMode ON→STANDBY: covers STANDBY branch in OnSystemPowerStateChanged");
+
+    if (pwrMgrEventHandler == nullptr) {
+        TEST_LOG("  pwrMgrEventHandler not captured, skipping");
+        return;
+    }
+
+    IARM_Bus_PWRMgr_EventData_t eventData;
+    memset(&eventData, 0, sizeof(eventData));
+    eventData.data.state.curState = IARM_BUS_PWRMGR_POWERSTATE_ON;
+    eventData.data.state.newState = IARM_BUS_PWRMGR_POWERSTATE_STANDBY;
+    pwrMgrEventHandler(IARM_BUS_PWRMGR_NAME, IARM_BUS_PWRMGR_EVENT_MODECHANGED, &eventData, 0);
+
+    TEST_LOG("  Fired ON→STANDBY: STANDBY outer branch covered");
+}
+
+/* ------------------------------------------------------------------- *
+ * GetFirmwareUpdateInfo with httpStatus=404 in /tmp/ file              *
+ * Creates /tmp/xconf_httpcode_thunder.txt with "404", calls            *
+ * GetFirmwareUpdateInfo, waits for notification → triggers             *
+ * reportFirmwareUpdateInfoReceived with httpStatus==404 branch         *
+ * (updateAvailable=false, FW_MATCH_CURRENT_VER enum)                   *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetFW_Http404_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetFirmwareUpdateInfo with httpStatus=404 → 404 branch in reportFirmwareUpdateInfoReceived");
+
+    /* Create http code file with 404 */
+    {
+        std::ofstream f("/tmp/xconf_httpcode_thunder.txt");
+        f << "404";
+    }
+
+    uint32_t regResult = m_SystemServicesPlugin->Register(&m_notificationHandler);
+    EXPECT_EQ(regResult, Core::ERROR_NONE);
+    m_notificationHandler.ResetEvent();
+
+    bool asyncResponse = false;
+    bool success = false;
+    uint32_t result = m_SystemServicesPlugin->GetFirmwareUpdateInfo("test-404", asyncResponse, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+
+    if (result == Core::ERROR_NONE && asyncResponse) {
+        uint32_t evtStatus = m_notificationHandler.WaitForEvent(EVNT_TIMEOUT, SYSTEMSERVICEL2TEST_FIRMWARE_UPDATE_INFO);
+        TEST_LOG("  GetFW 404: notification status=%u", evtStatus);
+    }
+
+    /* Cleanup */
+    ::remove("/tmp/xconf_httpcode_thunder.txt");
+    m_SystemServicesPlugin->Unregister(&m_notificationHandler);
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * GetFirmwareUpdateInfo with httpStatus=460 (STATUS_CODE_NO_SWUPDATE_CONF)*
+ * Creates httpcode file with "460" → covers the empty-swupdate-conf   *
+ * branch in reportFirmwareUpdateInfoReceived:                           *
+ *   params["status"]=0, updateAvailable=false,                         *
+ *   updateAvailableEnum=EMPTY_SW_UPDATE_CONF                           *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetFW_Http460_NoSwUpdate_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetFirmwareUpdateInfo with httpStatus=460 → NO_SWUPDATE_CONF branch");
+
+    {
+        std::ofstream f("/tmp/xconf_httpcode_thunder.txt");
+        f << "460";
+    }
+
+    uint32_t regResult = m_SystemServicesPlugin->Register(&m_notificationHandler);
+    EXPECT_EQ(regResult, Core::ERROR_NONE);
+    m_notificationHandler.ResetEvent();
+
+    bool asyncResponse = false;
+    bool success = false;
+    uint32_t result = m_SystemServicesPlugin->GetFirmwareUpdateInfo("test-460", asyncResponse, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+
+    if (result == Core::ERROR_NONE && asyncResponse) {
+        uint32_t evtStatus = m_notificationHandler.WaitForEvent(EVNT_TIMEOUT, SYSTEMSERVICEL2TEST_FIRMWARE_UPDATE_INFO);
+        TEST_LOG("  GetFW 460: notification status=%u", evtStatus);
+    }
+
+    ::remove("/tmp/xconf_httpcode_thunder.txt");
+    m_SystemServicesPlugin->Unregister(&m_notificationHandler);
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * GetFirmwareUpdateInfo with HTTP 200 + JSON firmwareVersion in        *
+ * response file → covers the "firmware available" branch in            *
+ * reportFirmwareUpdateInfoReceived:                                     *
+ *   firmwareUpdateVersion.length()>0 && compare!=0 → FW_UPDATE_AVAILABLE*
+ *   also covers xconfResponse.FromString+rebootImmediately path        *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetFW_HttpOK_FWAvailable_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetFirmwareUpdateInfo with 200+JSON → FW_UPDATE_AVAILABLE branch");
+
+    {
+        std::ofstream f("/tmp/xconf_httpcode_thunder.txt");
+        f << "200";
+    }
+    {
+        std::ofstream f("/tmp/xconf_response_thunder.txt");
+        /* firmwareVersion != "unknown" (the current stbVersionString) → UPDATE_AVAILABLE */
+        f << R"({"firmwareVersion":"TEST_IMG_5.11.211_VBN","rebootImmediately":true})";
+    }
+
+    uint32_t regResult = m_SystemServicesPlugin->Register(&m_notificationHandler);
+    EXPECT_EQ(regResult, Core::ERROR_NONE);
+    m_notificationHandler.ResetEvent();
+
+    bool asyncResponse = false;
+    bool success = false;
+    uint32_t result = m_SystemServicesPlugin->GetFirmwareUpdateInfo("test-200-fwavail", asyncResponse, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+
+    if (result == Core::ERROR_NONE && asyncResponse) {
+        uint32_t evtStatus = m_notificationHandler.WaitForEvent(EVNT_TIMEOUT, SYSTEMSERVICEL2TEST_FIRMWARE_UPDATE_INFO);
+        TEST_LOG("  GetFW 200+FW: notification status=%u", evtStatus);
+    }
+
+    ::remove("/tmp/xconf_httpcode_thunder.txt");
+    ::remove("/tmp/xconf_response_thunder.txt");
+    m_SystemServicesPlugin->Unregister(&m_notificationHandler);
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * SetTimeZoneDST with valid OlsonTZ but wrong accuracy string          *
+ * Covers: currentAccuracy != INITIAL && != INTERIM && != FINAL         *
+ *         → LOGERR("Wrong TimeZone Accuracy") + reset to oldAccuracy   *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetTimeZoneDST_WrongAccuracy_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetTimeZoneDST with valid TZ but wrong accuracy → accuracy error branch");
+
+    uint32_t sysSrvStatus = 0;
+    string errorMessage;
+    bool success = false;
+
+    /* First set a known valid timezone with proper accuracy */
+    uint32_t result = m_SystemServicesPlugin->SetTimeZoneDST(
+        "America/New_York", "FINAL", sysSrvStatus, errorMessage, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  First SetTZ: result=%u, success=%d", result, success);
+
+    /* Now call with wrong accuracy → covers currentAccuracy != FINAL/INTERIM/INITIAL branch */
+    sysSrvStatus = 0; errorMessage = ""; success = false;
+    result = m_SystemServicesPlugin->SetTimeZoneDST(
+        "America/New_York", "WRONG_ACCURACY_VAL", sysSrvStatus, errorMessage, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  SetTZ wrong accuracy: result=%u, success=%d, status=%u", result, success, sysSrvStatus);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
 }
 
