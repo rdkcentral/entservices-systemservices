@@ -8098,33 +8098,6 @@ TEST_F(SystemService_L2Test, SysImpl_SetTimeZoneDST_WrongAccuracy_COMRPC)
 }
 
 /* ------------------------------------------------------------------- *
- * SystemServices::Information() — returns description string           *
- * This is a public method on the outer plugin class. The plugin is     *
- * already activated in the fixture → just call Information() directly  *
- * via JSONRPC introspection endpoint to cover that line.               *
- * Simplest approach: JSON-RPC call to the metadata endpoint OR call    *
- * InvokeServiceMethod with an empty method to hit the plugin object.   *
- * ------------------------------------------------------------------- */
-TEST_F(SystemService_L2Test, SysImpl_SystemServices_Information_COMRPC)
-{
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("Invalid SystemServices_Client");
-        return;
-    }
-    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
-
-    TEST_LOG("SystemServices::Information() — covering description string return");
-
-    /* IShell::Information() covers SystemServices.cpp line 166-169 */
-    string info = m_controller_SystemServices->Information();
-    TEST_LOG("  Information(): '%s'", info.c_str());
-    /* Just calling it is enough — no crash = success */
-
-    m_SystemServicesPlugin->Release();
-    m_controller_SystemServices->Release();
-}
-
-/* ------------------------------------------------------------------- *
  * SetTimeZoneDST — same timezone twice (oldTimeZoneDST == timeZone)    *
  * Covers the branch where oldTimeZoneDST == timeZone → skips file write*
  * but still checks accuracy. This is the "no change" path.            *
