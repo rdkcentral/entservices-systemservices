@@ -8560,7 +8560,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetMode_WAREHOUSE_FileCreate_COMRPC)
 
     ON_CALL(*p_iarmBusImplMock, IARM_Bus_Call(
         ::testing::StrEq(IARM_BUS_DAEMON_NAME),
-        ::testing::StrEq(IARM_BUS_DAEMON_API_SysModeChange),
+        ::testing::StrEq(IARM_BUS_COMMON_API_SysModeChange),
         ::testing::_,
         ::testing::_))
         .WillByDefault(::testing::Return(IARM_RESULT_SUCCESS));
@@ -8600,7 +8600,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetMode_EAS_IARMFail_COMRPC)
 
     ON_CALL(*p_iarmBusImplMock, IARM_Bus_Call(
         ::testing::StrEq(IARM_BUS_DAEMON_NAME),
-        ::testing::StrEq(IARM_BUS_DAEMON_API_SysModeChange),
+        ::testing::StrEq(IARM_BUS_COMMON_API_SysModeChange),
         ::testing::_,
         ::testing::_))
         .WillByDefault(::testing::Return(IARM_RESULT_IPCCORE_FAIL));
@@ -8619,7 +8619,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetMode_EAS_IARMFail_COMRPC)
     /* Restore default */
     ON_CALL(*p_iarmBusImplMock, IARM_Bus_Call(
         ::testing::StrEq(IARM_BUS_DAEMON_NAME),
-        ::testing::StrEq(IARM_BUS_DAEMON_API_SysModeChange),
+        ::testing::StrEq(IARM_BUS_COMMON_API_SysModeChange),
         ::testing::_,
         ::testing::_))
         .WillByDefault(::testing::Return(IARM_RESULT_SUCCESS));
