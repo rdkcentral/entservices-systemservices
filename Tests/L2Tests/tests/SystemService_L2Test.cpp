@@ -8940,7 +8940,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetTerritory_InvalidRegionFormat_COMRPC)
     /* Territory "USA" is valid (3 chars, in list); region has invalid char '@' */
     uint32_t result = m_SystemServicesPlugin->SetTerritory("USA", "bad@region", sysError, success);
     /* Expected: ERROR_GENERAL because isRegionValid fails */
-    TEST_LOG("  SetTerritory('USA','bad@region'): result=%u success=%d msg='%s'",
+    TEST_LOG("  SetTerritory('USA','bad@region'): result=%u success=%d",
              result, success, sysError.message.c_str());
 
     m_SystemServicesPlugin->Release();
@@ -8969,10 +8969,10 @@ TEST_F(SystemService_L2Test, SysImpl_SetBlocklistFlag_WriteOpenFail_COMRPC)
     int mkret = mkdir("/opt/secure/persistent/opflashstore/devicestate.txt", 0755);
     TEST_LOG("  mkdir devicestate.txt (as dir) ret=%d (0=ok, EEXIST=already exists)", mkret);
 
-    Exchange::ISystemServices::BlocklistFlagResult blResult{};
+    Exchange::ISystemServices::SetBlocklistResult blResult{};
     uint32_t result = m_SystemServicesPlugin->SetBlocklistFlag(true, blResult);
-    TEST_LOG("  SetBlocklistFlag(true): result=%u success=%d msg='%s'",
-             result, blResult.success, blResult.error.message.c_str());
+    TEST_LOG("  SetBlocklistFlag(true): result=%u success=%d",
+             result, blResult.success);
 
     /* Cleanup: remove the dir */
     rmdir("/opt/secure/persistent/opflashstore/devicestate.txt");
@@ -9006,10 +9006,10 @@ TEST_F(SystemService_L2Test, SysImpl_GetBlocklistFlag_InvalidBoolValue_COMRPC)
             f << "BLOCKLIST=notvalid\n";
     }
 
-    Exchange::ISystemServices::GetBlocklistFlagResult blResult{};
+    Exchange::ISystemServices::BlocklistResult blResult{};
     uint32_t result = m_SystemServicesPlugin->GetBlocklistFlag(blResult);
-    TEST_LOG("  GetBlocklistFlag: result=%u success=%d msg='%s'",
-             result, blResult.success, blResult.error.message.c_str());
+    TEST_LOG("  GetBlocklistFlag: result=%u success=%d",
+             result, blResult.success);
 
     std::remove(devFile);
 
@@ -9042,10 +9042,10 @@ TEST_F(SystemService_L2Test, SysImpl_GetBlocklistFlag_ParamNotFound_COMRPC)
             f << "OTHER_KEY=true\n";
     }
 
-    Exchange::ISystemServices::GetBlocklistFlagResult blResult{};
+    Exchange::ISystemServices::BlocklistResult blResult{};
     uint32_t result = m_SystemServicesPlugin->GetBlocklistFlag(blResult);
-    TEST_LOG("  GetBlocklistFlag: result=%u success=%d msg='%s'",
-             result, blResult.success, blResult.error.message.c_str());
+    TEST_LOG("  GetBlocklistFlag: result=%u success=%d",
+             result, blResult.success);
 
     std::remove(devFile);
 
