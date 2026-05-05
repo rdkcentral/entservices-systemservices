@@ -10165,4 +10165,224 @@ TEST_F(SystemService_L2Test, SysImpl_GetNetworkStandbyMode_CachedAndFresh_COMRPC
     m_controller_SystemServices->Release();
 }
 
+/* ------------------------------------------------------------------- *
+ * GetBlocklistFlag — BLOCKLIST=true in file → L955 true branch         *
+ * Covers L955: file_value == "true" → value = true                    *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetBlocklistFlag_TrueValue_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetBlocklistFlag: BLOCKLIST=true → covers L955 true-value branch");
+
+    mkdir("/opt/secure",                         0755);
+    mkdir("/opt/secure/persistent",              0755);
+    mkdir("/opt/secure/persistent/opflashstore", 0755);
+
+    const char* devFile = "/opt/secure/persistent/opflashstore/devicestate.txt";
+    {
+        std::ofstream f(devFile);
+        if (f.is_open())
+            f << "BLOCKLIST=true\n";
+    }
+
+    Exchange::ISystemServices::BlocklistResult blResult{};
+    uint32_t result = m_SystemServicesPlugin->GetBlocklistFlag(blResult);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    EXPECT_TRUE(blResult.blocklist);
+    TEST_LOG("  GetBlocklistFlag(true): result=%u blocklist=%d success=%d",
+             result, blResult.blocklist, blResult.success);
+
+    std::remove(devFile);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * GetBlocklistFlag — BLOCKLIST=false in file → L956 false branch       *
+ * Covers L956: file_value == "false" → value = false                  *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetBlocklistFlag_FalseValue_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetBlocklistFlag: BLOCKLIST=false → covers L956 false-value branch");
+
+    mkdir("/opt/secure",                         0755);
+    mkdir("/opt/secure/persistent",              0755);
+    mkdir("/opt/secure/persistent/opflashstore", 0755);
+
+    const char* devFile = "/opt/secure/persistent/opflashstore/devicestate.txt";
+    {
+        std::ofstream f(devFile);
+        if (f.is_open())
+            f << "BLOCKLIST=false\n";
+    }
+
+    Exchange::ISystemServices::BlocklistResult blResult{};
+    uint32_t result = m_SystemServicesPlugin->GetBlocklistFlag(blResult);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    EXPECT_FALSE(blResult.blocklist);
+    TEST_LOG("  GetBlocklistFlag(false): result=%u blocklist=%d success=%d",
+             result, blResult.blocklist, blResult.success);
+
+    std::remove(devFile);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * SetBlocklistFlag — set true then false: covers full write_parameters *
+ * Covers L871-930: read existing file, update parameter, write back   *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetBlocklistFlag_TrueThenFalse_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetBlocklistFlag: set true then false → covers full write_parameters path");
+
+    mkdir("/opt/secure",                         0755);
+    mkdir("/opt/secure/persistent",              0755);
+    mkdir("/opt/secure/persistent/opflashstore", 0755);
+
+    /* First call: set to true */
+    Exchange::ISystemServices::SetBlocklistResult setResult1{};
+    uint32_t result = m_SystemServicesPlugin->SetBlocklistFlag(true, setResult1);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  SetBlocklistFlag(true): result=%u success=%d", result, setResult1.success);
+
+    /* Second call: set to false (covers update path in write_parameters) */
+    Exchange::ISystemServices::SetBlocklistResult setResult2{};
+    result = m_SystemServicesPlugin->SetBlocklistFlag(false, setResult2);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  SetBlocklistFlag(false): result=%u success=%d", result, setResult2.success);
+
+    std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * GetNetworkStandbyMode — LOGWARN path when _powerManagerPlugin fails  *
+ * Covers L1590-1609: GetNetworkStandbyMode live call via HAL mock      *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetNetworkStandbyMode_Live_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetNetworkStandbyMode: live call → covers L1590-1609 full body");
+
+    /* First call: m_networkStandbyModeValid=false → reads from _powerManagerPlugin */
+    bool nwStandby = false;
+    bool success = false;
+    uint32_t result = m_SystemServicesPlugin->GetNetworkStandbyMode(nwStandby, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  GetNetworkStandbyMode 1st(live): nwStandby=%d success=%d",
+             nwStandby, success);
+
+    /* Second call: m_networkStandbyModeValid=true → returns cached value */
+    bool nwStandby2 = false;
+    bool success2 = false;
+    result = m_SystemServicesPlugin->GetNetworkStandbyMode(nwStandby2, success2);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  GetNetworkStandbyMode 2nd(cached): nwStandby=%d success=%d",
+             nwStandby2, success2);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * OnFirmwareUpdateStateChange — multiple different state transitions   *
+ * Covers L2965-2977: state change + same-state (else branch)           *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_OnFirmwareUpdateStateChange_AllTransitions_COMRPC)
+{
+    TEST_LOG("OnFirmwareUpdateStateChange: exercise all branches");
+
+    if (systemStateChanged == nullptr) {
+        TEST_LOG("  systemStateChanged not captured, skipping");
+        return;
+    }
+
+    auto fireState = [&](int state) {
+        IARM_Bus_SYSMgr_EventData_t evt;
+        memset(&evt, 0, sizeof(evt));
+        evt.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_FIRMWARE_UPDATE_STATE;
+        evt.data.systemStates.state   = state;
+        systemStateChanged(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE,
+                           &evt, sizeof(evt));
+    };
+
+    /* State 0 (IDLE) */
+    fireState(0);
+    /* State 1 (CHECKING) */
+    fireState(1);
+    /* State 3 (DOWNLOADED) */
+    fireState(3);
+    /* State 4 (FAILED) */
+    fireState(4);
+    /* State 5 (UNINSTALLING) */
+    fireState(5);
+    /* Same state again → else branch (L2974-2976) */
+    fireState(5);
+
+    TEST_LOG("  Fired states 0,1,3,4,5,5(same) → all OnFirmwareUpdateStateChange branches covered");
+}
+
+/* ------------------------------------------------------------------- *
+ * GetTimeZoneDST — covers /opt/persistent/timeZoneDSTInfo read        *
+ * Covers L2193-2220: reads file and returns cached timezone/accuracy  *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetTimeZoneDST_WithFile_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetTimeZoneDST: with /opt/persistent/timeZoneDSTInfo file → covers L2193-2220");
+
+    /* Create the timezone DST file (TZ_FILE = "/opt/persistent/timeZoneDST") */
+    mkdir("/opt/persistent", 0755);
+    {
+        std::ofstream f("/opt/persistent/timeZoneDST");
+        if (f.is_open()) {
+            f << "UTC\n";
+        }
+    }
+
+    string timeZone, accuracy;
+    bool success = false;
+    uint32_t result = m_SystemServicesPlugin->GetTimeZoneDST(timeZone, accuracy, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  GetTimeZoneDST: result=%u timeZone='%s' accuracy='%s' success=%d",
+             result, timeZone.c_str(), accuracy.c_str(), success);
+
+    std::remove("/opt/persistent/timeZoneDST");
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
 //75target
