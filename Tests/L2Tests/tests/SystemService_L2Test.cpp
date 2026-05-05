@@ -10518,8 +10518,8 @@ TEST_F(SystemService_L2Test, SysImpl_GetSystemVersions_VersionEqFound_COMRPC)
     Exchange::ISystemServices::SystemVersionsInfo info{};
     uint32_t result = m_SystemServicesPlugin->GetSystemVersions(info);
     EXPECT_EQ(result, Core::ERROR_NONE);
-    TEST_LOG("  GetSystemVersions: stbVersion='%s' clientVersion='%s'",
-             info.stbVersion.c_str(), info.clientVersion.c_str());
+    TEST_LOG("  GetSystemVersions: stbVersion='%s' receiverVersion='%s'",
+             info.stbVersion.c_str(), info.receiverVersion.c_str());
 
     std::remove("/version.txt");
 
