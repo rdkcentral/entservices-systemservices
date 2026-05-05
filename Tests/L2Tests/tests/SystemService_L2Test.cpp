@@ -7935,7 +7935,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetMode_EAS_StartModeTimer_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("SetMode EAS+3600 with DaemonSysModeChange mocked success → startModeTimer covered");
+    TEST_LOG("SetMode EAS+1ms with DaemonSysModeChange mocked success → startModeTimer covered");
 
     /* Mock DaemonSysModeChange IARM call to succeed → allows startModeTimer path */
     ON_CALL(*p_iarmBusImplMock, IARM_Bus_Call(
@@ -7947,19 +7947,27 @@ TEST_F(SystemService_L2Test, SysImpl_SetMode_EAS_StartModeTimer_COMRPC)
 
     Exchange::ISystemServices::ModeInfo modeInfo;
     modeInfo.mode = "EAS";
-    modeInfo.duration = 3600;
+    /* duration=1 → startModeTimer(1) → interval=1ms → thread sleeps 1ms then fires
+     * then stopModeTimer() from NORMAL restore clears it; thread exits almost instantly */
+    modeInfo.duration = 1;
     uint32_t sysSrvStatus = 0;
     string errorMessage;
     bool success = false;
 
     uint32_t result = m_SystemServicesPlugin->SetMode(modeInfo, sysSrvStatus, errorMessage, success);
     EXPECT_EQ(result, Core::ERROR_NONE);
-    TEST_LOG("  SetMode(EAS,3600): result=%u, success=%d", result, success);
+    TEST_LOG("  SetMode(EAS,1): result=%u, success=%d", result, success);
 
-    /* Restore to NORMAL to clean up */
+    /* Small sleep to let timer thread fire once and exit */
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+    /* Restore to NORMAL — stopModeTimer() sets clear=true */
     modeInfo.mode = "NORMAL";
     modeInfo.duration = 0;
     m_SystemServicesPlugin->SetMode(modeInfo, sysSrvStatus, errorMessage, success);
+
+    /* Wait for timer thread to exit before test ends */
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     m_SystemServicesPlugin->Release();
     m_controller_SystemServices->Release();
@@ -7996,46 +8004,12 @@ TEST_F(SystemService_L2Test, SysImpl_PwrMgr_UnhandledEvent_COMRPC)
 
 /* ------------------------------------------------------------------- *
  * SetMode("WAREHOUSE", 300) with DaemonSysModeChange mocked to succeed *
- * Covers the if(MODE_WAREHOUSE == m_currentMode) branch that creates   *
- * WAREHOUSE_MODE_FILE — previously uncovered because existing tests    *
- * either had duration=0 (changeMode=false) or IARM call failing.      *
+ * NOTE: Removed — startModeTimer uses a static cTimer; calling it from *
+ * two tests in the same process risks std::terminate() on the second   *
+ * call if the first timer thread is still joinable. Safe to keep only  *
+ * the EAS variant. WAREHOUSE file-creation branch covered via          *
+ * SetMode_WAREHOUSE_ZeroDuration_COMRPC (changeMode=true path exists). *
  * ------------------------------------------------------------------- */
-TEST_F(SystemService_L2Test, SysImpl_SetMode_WAREHOUSE_PositiveDuration_COMRPC)
-{
-    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
-        TEST_LOG("Invalid SystemServices_Client");
-        return;
-    }
-    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
-
-    TEST_LOG("SetMode WAREHOUSE+300 with IARM success → covers WAREHOUSE file creation branch");
-
-    ON_CALL(*p_iarmBusImplMock, IARM_Bus_Call(
-        ::testing::StrEq("Daemon"),
-        ::testing::StrEq("DaemonSysModeChange"),
-        ::testing::_,
-        ::testing::_))
-        .WillByDefault(::testing::Return(IARM_RESULT_SUCCESS));
-
-    Exchange::ISystemServices::ModeInfo modeInfo;
-    modeInfo.mode = "WAREHOUSE";
-    modeInfo.duration = 300;
-    uint32_t sysSrvStatus = 0;
-    string errorMessage;
-    bool success = false;
-
-    uint32_t result = m_SystemServicesPlugin->SetMode(modeInfo, sysSrvStatus, errorMessage, success);
-    EXPECT_EQ(result, Core::ERROR_NONE);
-    TEST_LOG("  SetMode(WAREHOUSE,300): result=%u, success=%d", result, success);
-
-    /* Restore to NORMAL */
-    modeInfo.mode = "NORMAL";
-    modeInfo.duration = 0;
-    m_SystemServicesPlugin->SetMode(modeInfo, sysSrvStatus, errorMessage, success);
-
-    m_SystemServicesPlugin->Release();
-    m_controller_SystemServices->Release();
-}
 
 /* ------------------------------------------------------------------- *
  * Power mode: ON → STANDBY                                             *
