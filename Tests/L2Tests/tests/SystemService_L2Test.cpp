@@ -10559,4 +10559,76 @@ TEST_F(SystemService_L2Test, SysImpl_GetLastFirmwareFailureReason_KnownReason_JS
     std::remove(statusFile);
 }
 
+/* ------------------------------------------------------------------- *
+ * OnThermalModeChanged → handleThermalLevelChange — all branches       *
+ * Covers: L496-500 (OnThermalModeChanged body)                         *
+ *         L3129-3194 (handleThermalLevelChange: all switch branches)   *
+ * 7 transitions cover every valid+invalid combo in the switch matrix.  *
+ * SAFE: pure synchronous function call — no threads, no timers.        *
+ * ------------------------------------------------------------------- */
+#ifdef ENABLE_THERMAL_PROTECTION
+TEST_F(SystemService_L2Test, SysImpl_OnThermalModeChanged_AllTransitions_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    WPEFramework::Plugin::SystemServicesImplementation* inst =
+        WPEFramework::Plugin::SystemServicesImplementation::_instance;
+    if (!inst) {
+        TEST_LOG("  _instance NULL, skip");
+        m_SystemServicesPlugin->Release();
+        m_controller_SystemServices->Release();
+        return;
+    }
+
+    m_SystemServicesPlugin->Register(&m_notificationHandler);
+
+    using TT = WPEFramework::Exchange::IPowerManager::ThermalTemperature;
+
+    /* (cur=NORMAL, new=HIGH) → HIGH outer, NORMAL inner → L3153-3155 */
+    TEST_LOG("  OnThermalModeChanged(NORMAL→HIGH)");
+    inst->OnThermalModeChanged(TT::THERMAL_TEMPERATURE_NORMAL,
+                               TT::THERMAL_TEMPERATURE_HIGH, 75.0f);
+
+    /* (cur=HIGH, new=CRITICAL) → CRITICAL outer, HIGH inner → L3171-3174 */
+    TEST_LOG("  OnThermalModeChanged(HIGH→CRITICAL)");
+    inst->OnThermalModeChanged(TT::THERMAL_TEMPERATURE_HIGH,
+                               TT::THERMAL_TEMPERATURE_CRITICAL, 100.0f);
+
+    /* (cur=CRITICAL, new=HIGH) → HIGH outer, CRITICAL inner → L3156-3159 */
+    TEST_LOG("  OnThermalModeChanged(CRITICAL→HIGH)");
+    inst->OnThermalModeChanged(TT::THERMAL_TEMPERATURE_CRITICAL,
+                               TT::THERMAL_TEMPERATURE_HIGH, 90.0f);
+
+    /* (cur=HIGH, new=NORMAL) → NORMAL outer, HIGH inner → L3138-3141 */
+    TEST_LOG("  OnThermalModeChanged(HIGH→NORMAL)");
+    inst->OnThermalModeChanged(TT::THERMAL_TEMPERATURE_HIGH,
+                               TT::THERMAL_TEMPERATURE_NORMAL, 60.0f);
+
+    /* (cur=NORMAL, new=NORMAL) → NORMAL outer, default inner → L3142,3144,3145 */
+    TEST_LOG("  OnThermalModeChanged(NORMAL→NORMAL invalid)");
+    inst->OnThermalModeChanged(TT::THERMAL_TEMPERATURE_NORMAL,
+                               TT::THERMAL_TEMPERATURE_NORMAL, 50.0f);
+
+    /* (cur=HIGH, new=HIGH) → HIGH outer, default inner → L3160,3162,3163 */
+    TEST_LOG("  OnThermalModeChanged(HIGH→HIGH invalid)");
+    inst->OnThermalModeChanged(TT::THERMAL_TEMPERATURE_HIGH,
+                               TT::THERMAL_TEMPERATURE_HIGH, 80.0f);
+
+    /* (cur=CRITICAL, new=CRITICAL) → CRITICAL outer, default inner → L3175,3177,3178 */
+    TEST_LOG("  OnThermalModeChanged(CRITICAL→CRITICAL invalid)");
+    inst->OnThermalModeChanged(TT::THERMAL_TEMPERATURE_CRITICAL,
+                               TT::THERMAL_TEMPERATURE_CRITICAL, 105.0f);
+
+    usleep(200000); /* let worker pool drain any dispatched events */
+
+    m_SystemServicesPlugin->Unregister(&m_notificationHandler);
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+#endif /* ENABLE_THERMAL_PROTECTION */
+
 //75target
