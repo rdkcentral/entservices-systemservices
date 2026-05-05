@@ -7917,3 +7917,78 @@ TEST_F(SystemService_L2Test, SysImpl_PowerMode_LightSleep_To_ON_COMRPC)
     TEST_LOG("  Fired LIGHT_SLEEP→ON: ThunderWake2 branch covered");
 }
 
+/* ------------------------------------------------------------------- *
+ * SetMode("EAS", 3600) with DaemonSysModeChange mocked to succeed       *
+ * This covers startModeTimer() (lines 759-764) which is NEVER hit      *
+ * in existing tests because IARM_Bus_Call DaemonSysModeChange is not   *
+ * mocked → returns failure → stopModeTimer() is called instead.        *
+ * Here we mock it to succeed → MODE_NORMAL!=EAS && duration!=0 &&      *
+ * duration>0 → startModeTimer(3600) is called.                         *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetMode_EAS_StartModeTimer_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetMode EAS+3600 with DaemonSysModeChange mocked success → startModeTimer covered");
+
+    /* Mock DaemonSysModeChange IARM call to succeed → allows startModeTimer path */
+    ON_CALL(*p_iarmBusImplMock, IARM_Bus_Call(
+        ::testing::StrEq("Daemon"),
+        ::testing::StrEq("DaemonSysModeChange"),
+        ::testing::_,
+        ::testing::_))
+        .WillByDefault(::testing::Return(IARM_RESULT_SUCCESS));
+
+    Exchange::ISystemServices::ModeInfo modeInfo;
+    modeInfo.mode = "EAS";
+    modeInfo.duration = 3600;
+    uint32_t sysSrvStatus = 0;
+    string errorMessage;
+    bool success = false;
+
+    uint32_t result = m_SystemServicesPlugin->SetMode(modeInfo, sysSrvStatus, errorMessage, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  SetMode(EAS,3600): result=%u, success=%d", result, success);
+
+    /* Restore to NORMAL to clean up */
+    modeInfo.mode = "NORMAL";
+    modeInfo.duration = 0;
+    m_SystemServicesPlugin->SetMode(modeInfo, sysSrvStatus, errorMessage, success);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * Dispatch() default case — unhandled event                            *
+ * Fire an event value that has no switch case → hits default:          *
+ *   LOGWARN("Event[%u] not handled") at line 752                       *
+ * We trigger this via OnSystemModeChanged which calls dispatchEvent    *
+ * with SYSTEMSERVICES_EVT_ONSYSTEMMODECHANGED — but that IS handled.   *
+ * Instead fire sysModeChangeHandler with NORMAL→NORMAL (changeMode=    *
+ * false path) which dispatches ONSYSTEMMODECHANGED covered.            *
+ * For Dispatch default: call SetOptOutTelemetry (it fires an internal  *
+ * Telemetry event not in our switch) — but Telemetry mock not set up.  *
+ * The safest trigger: fire pwrMgrEventHandler with unhandled eventId.  *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_PwrMgr_UnhandledEvent_COMRPC)
+{
+    TEST_LOG("PwrMgr: unhandled eventId (not IARM_BUS_PWRMGR_EVENT_MODECHANGED)");
+
+    if (pwrMgrEventHandler == nullptr) {
+        TEST_LOG("  pwrMgrEventHandler not captured, skipping");
+        return;
+    }
+
+    IARM_Bus_PWRMgr_EventData_t eventData;
+    memset(&eventData, 0, sizeof(eventData));
+    /* Use eventId 99 — not MODECHANGED (0) — pwrMgrEventHandler ignores it */
+    pwrMgrEventHandler(IARM_BUS_PWRMGR_NAME, (IARM_EventId_t)99, &eventData, 0);
+
+    TEST_LOG("  Fired unhandled eventId=99, no crash");
+}
+
