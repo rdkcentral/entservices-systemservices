@@ -10385,4 +10385,237 @@ TEST_F(SystemService_L2Test, SysImpl_GetTimeZoneDST_WithFile_COMRPC)
     m_controller_SystemServices->Release();
 }
 
+/* ================================================================== *
+ *  COVERAGE BRIDGE TESTS — targets uncovered blocks in artifact #29  *
+ * ================================================================== */
+
+/* ------------------------------------------------------------------- *
+ * SetMode with EAS mode and positive duration → startModeTimer         *
+ * Covers L758-764: startModeTimer(duration) body                      *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetMode_EAS_PositiveDuration_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetMode EAS duration=1 → covers startModeTimer L758-764");
+
+    Exchange::ISystemServices::ModeInfo modeInfo{};
+    modeInfo.mode = "EAS";
+    modeInfo.duration = 1;
+    uint32_t SysSrv_Status = 0;
+    std::string errorMessage;
+    bool success = false;
+    uint32_t result = m_SystemServicesPlugin->SetMode(modeInfo, SysSrv_Status, errorMessage, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  SetMode(EAS,1): result=%u SysSrv_Status=%u success=%d",
+             result, SysSrv_Status, success);
+
+    /* Restore NORMAL */
+    modeInfo.mode = "NORMAL";
+    modeInfo.duration = 0;
+    m_SystemServicesPlugin->SetMode(modeInfo, SysSrv_Status, errorMessage, success);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * SetTerritory without pre-creating /opt/secure/persistent/System      *
+ * Covers L3981-3982: makePersistentDir mkdir() returns 0 (created)    *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetTerritory_MkdirCreatesDir_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetTerritory without pre-creating dir → covers makePersistentDir L3981-3982");
+
+    mkdir("/opt/secure",             0755);
+    mkdir("/opt/secure/persistent",  0755);
+    /* Remove dir so makePersistentDir()'s mkdir() returns 0 → L3981-3982 covered */
+    rmdir("/opt/secure/persistent/System");
+
+    Exchange::ISystemServices::SystemError sysError{};
+    bool success = false;
+    uint32_t result = m_SystemServicesPlugin->SetTerritory("USA", "", sysError, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  SetTerritory(USA,''): result=%u success=%d", result, success);
+
+    std::remove("/opt/secure/persistent/System/Territory.txt");
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * GetTimeZoneDST when TZ_FILE exists as directory (unreadable)         *
+ * Covers L2202-2204: fileExists=true, readFromFile fails →             *
+ *   LOGERR "Unable to open", timeZone="null", resp=false               *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetTimeZoneDST_FileAsDir_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetTimeZoneDST: TZ_FILE as directory → covers L2202-2204");
+
+    /* Create TZ_FILE path as a directory so fileExists=true but readFromFile fails */
+    std::remove("/opt/persistent/timeZoneDST");   /* remove if exists as file */
+    mkdir("/opt/persistent", 0755);
+    mkdir("/opt/persistent/timeZoneDST", 0755);   /* create as directory       */
+
+    std::string timeZone, accuracy;
+    bool success = false;
+    uint32_t result = m_SystemServicesPlugin->GetTimeZoneDST(timeZone, accuracy, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  GetTimeZoneDST(dir): timeZone='%s' accuracy='%s' success=%d",
+             timeZone.c_str(), accuracy.c_str(), success);
+    /* timeZone expected "null" (L2203) when readFromFile fails */
+    EXPECT_EQ("null", timeZone);
+
+    /* Cleanup: remove the dir we created */
+    rmdir("/opt/persistent/timeZoneDST");
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * GetSystemVersions with "VERSION=" in /version.txt                    *
+ * Covers L3865-3878: getClientVersionString loop body finds "VERSION=" *
+ *   → clientVersionStr set → early return fires → loop branch covered  *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetSystemVersions_VersionEqFound_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetSystemVersions: VERSION= in /version.txt → covers L3865-3878");
+
+    /* Write a version file whose first line starts "VERSION=" so the loop body fires */
+    {
+        std::ofstream vf("/version.txt");
+        if (vf.is_open()) {
+            vf << "BRANCH=main\n";
+            vf << "VERSION=test_stb_1.0.0\n";
+            vf << "BUILD_TIME=2026-01-01_00:00:00\n";
+        }
+    }
+
+    Exchange::ISystemServices::SystemVersionsInfo info{};
+    uint32_t result = m_SystemServicesPlugin->GetSystemVersions(info);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  GetSystemVersions: stbVersion='%s' clientVersion='%s'",
+             info.stbVersion.c_str(), info.clientVersion.c_str());
+
+    std::remove("/version.txt");
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * setWakeupSrcConfiguration with all wakeup sources enabled            *
+ * Covers L2745-2792: wakeupSources->Next loop body + all src.X checks *
+ *   + configs.empty()==false → SetWakeupSourceConfig path             *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetWakeupSrc_AllSources_JSONRPC)
+{
+    TEST_LOG("setWakeupSrcConfiguration all sources → covers L2745-2792");
+
+    JsonObject params;
+    params["powerState"] = "STANDBY";
+    JsonArray sourcesArr;
+    JsonObject src;
+    src["voice"]             = true;
+    src["presenceDetection"] = true;
+    src["bluetooth"]         = true;
+    src["wifi"]              = true;
+    src["ir"]                = true;
+    src["powerKey"]          = true;
+    src["cec"]               = true;
+    src["lan"]               = true;
+    src["timer"]             = true;
+    sourcesArr.Add(src);
+    params["wakeupSources"] = sourcesArr;
+    JsonObject result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setWakeupSrcConfiguration",
+                                          params, result);
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    TEST_LOG("  setWakeupSrcConfiguration all: status=%u", status);
+}
+
+/* ------------------------------------------------------------------- *
+ * GetPowerState when PowerManager HAL reports PWRMGR_POWERSTATE_ON     *
+ * Covers L1491: powerState = "ON" assignment                          *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetPowerState_ON_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetPowerState with HAL returning ON → covers L1491 powerState='ON'");
+
+    /* Override HAL mock to return PWRMGR_POWERSTATE_ON */
+    ON_CALL(*p_powerManagerHalMock, PLAT_API_GetPowerState(::testing::_))
+        .WillByDefault(::testing::Invoke([](PWRMgr_PowerState_t* powerState) {
+            *powerState = PWRMGR_POWERSTATE_ON;
+            return PWRMGR_SUCCESS;
+        }));
+
+    std::string powerState;
+    bool success = false;
+    uint32_t result = m_SystemServicesPlugin->GetPowerState(powerState, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  GetPowerState: powerState='%s' success=%d", powerState.c_str(), success);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * getLastFirmwareFailureReason with a known failure reason in file      *
+ * Covers L1632: fwFailReason = it->second (map iterator found)        *
+ * "Versions Match" is a known entry in FwFailReasonFromText map        *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetLastFirmwareFailureReason_KnownReason_JSONRPC)
+{
+    TEST_LOG("getLastFirmwareFailureReason known reason → covers L1632");
+
+    const char* statusFile = "/opt/fwdnldstatus.txt";
+    {
+        std::ofstream f(statusFile);
+        if (f.is_open()) {
+            f << "FailureReason|Versions Match\n";
+        }
+    }
+
+    JsonObject params, result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1",
+                                          "getLastFirmwareFailureReason", params, result);
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    TEST_LOG("  getLastFirmwareFailureReason: status=%u", status);
+    if (result.HasLabel("failReason")) {
+        TEST_LOG("  failReason='%s'", result["failReason"].String().c_str());
+    }
+
+    std::remove(statusFile);
+}
+
 //75target
