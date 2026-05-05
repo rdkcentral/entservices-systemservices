@@ -8097,3 +8097,97 @@ TEST_F(SystemService_L2Test, SysImpl_SetTimeZoneDST_WrongAccuracy_COMRPC)
     m_controller_SystemServices->Release();
 }
 
+/* ------------------------------------------------------------------- *
+ * SystemServices::Information() — returns description string           *
+ * This is a public method on the outer plugin class. The plugin is     *
+ * already activated in the fixture → just call Information() directly  *
+ * via JSONRPC introspection endpoint to cover that line.               *
+ * Simplest approach: JSON-RPC call to the metadata endpoint OR call    *
+ * InvokeServiceMethod with an empty method to hit the plugin object.   *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SystemServices_Information_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SystemServices::Information() — covering description string return");
+
+    /* IShell::Information() covers SystemServices.cpp line 166-169 */
+    string info = m_controller_SystemServices->Information();
+    TEST_LOG("  Information(): '%s'", info.c_str());
+    /* Just calling it is enough — no crash = success */
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * SetTimeZoneDST — same timezone twice (oldTimeZoneDST == timeZone)    *
+ * Covers the branch where oldTimeZoneDST == timeZone → skips file write*
+ * but still checks accuracy. This is the "no change" path.            *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetTimeZoneDST_SameTZTwice_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetTimeZoneDST same TZ twice → skips file write (no-change path)");
+
+    uint32_t sysSrvStatus = 0;
+    string errorMessage;
+    bool success = false;
+
+    /* First set */
+    m_SystemServicesPlugin->SetTimeZoneDST("America/New_York", "INITIAL", sysSrvStatus, errorMessage, success);
+    TEST_LOG("  First: success=%d", success);
+
+    /* Second identical call → oldTimeZoneDST == timeZone → skip fopen */
+    sysSrvStatus = 0; errorMessage = ""; success = false;
+    uint32_t result = m_SystemServicesPlugin->SetTimeZoneDST("America/New_York", "FINAL", sysSrvStatus, errorMessage, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  Second same TZ: result=%u, success=%d", result, success);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * SetMode NORMAL when already NORMAL with duration=0 → changeMode=false*
+ * Covers the else branch: LOGWARN("Current mode not changed")          *
+ * This is the no-op path when mode is already NORMAL.                  *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetMode_NORMAL_AlreadyNormal_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetMode NORMAL when already NORMAL → changeMode=false (no-op branch)");
+
+    Exchange::ISystemServices::ModeInfo modeInfo;
+    modeInfo.mode = "NORMAL";
+    modeInfo.duration = 0;
+    uint32_t sysSrvStatus = 0;
+    string errorMessage;
+    bool success = false;
+
+    /* Call twice — second call hits changeMode=false → LOGWARN("Current mode not changed") */
+    m_SystemServicesPlugin->SetMode(modeInfo, sysSrvStatus, errorMessage, success);
+    sysSrvStatus = 0; errorMessage = ""; success = false;
+    uint32_t result = m_SystemServicesPlugin->SetMode(modeInfo, sysSrvStatus, errorMessage, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    EXPECT_TRUE(success);
+    TEST_LOG("  SetMode(NORMAL,NORMAL): result=%u, success=%d", result, success);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
