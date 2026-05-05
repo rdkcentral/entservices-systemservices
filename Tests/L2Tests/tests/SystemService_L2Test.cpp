@@ -8997,7 +8997,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetBlocklistFlag_InvalidBoolValue_COMRPC)
     {
         std::ofstream f(devFile);
         if (f.is_open())
-            f << "BLOCKLIST=notvalid\n";
+            f << "blocklist=notvalid\n";
     }
 
     Exchange::ISystemServices::BlocklistResult blResult{};
@@ -10187,7 +10187,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetBlocklistFlag_TrueValue_COMRPC)
     {
         std::ofstream f(devFile);
         if (f.is_open())
-            f << "BLOCKLIST=true\n";
+            f << "blocklist=true\n";
     }
 
     Exchange::ISystemServices::BlocklistResult blResult{};
@@ -10225,7 +10225,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetBlocklistFlag_FalseValue_COMRPC)
     {
         std::ofstream f(devFile);
         if (f.is_open())
-            f << "BLOCKLIST=false\n";
+            f << "blocklist=false\n";
     }
 
     Exchange::ISystemServices::BlocklistResult blResult{};
