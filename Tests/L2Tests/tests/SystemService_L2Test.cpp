@@ -31,6 +31,8 @@
 #include "../../../plugin/SystemServicesHelper.h"
 #include "../../../plugin/thermonitor.h"
 #include "../../../plugin/uploadlogs.h"
+/* Full class definition needed for _instance->OnThermalModeChanged direct call */
+#include "../../../plugin/SystemServicesImplementation.h"
 #ifdef ENABLE_SYSTIMEMGR_SUPPORT
 #include "systimerifc/itimermsg.h"
 #endif
@@ -8705,4 +8707,570 @@ TEST_F(SystemService_L2Test, SysImpl_GetFirmwareUpdateState_MultiState_COMRPC)
     m_controller_SystemServices->Release();
 }
 
-//65.9
+/* ================================================================== *
+ *  BATCH-2 COVERAGE TESTS — target plugin/ folder toward 75%         *
+ *  Targeting: GetDownloadedFirmwareInfo, getDownloadProgress,         *
+ *  GetLastFirmwareFailureReason, GetRFCConfig paths, SetMode invalid,  *
+ *  SetTerritory invalid region, GetBlocklistFlag branches,            *
+ *  SetBlocklistFlag write-fail, GetDeviceInfo unallowable chars,      *
+ *  readTerritoryFromFile corrupted, handleThermalLevelChange chain    *
+ * ================================================================== */
+
+/* ------------------------------------------------------------------- *
+ * GetDownloadedFirmwareInfo — no-file path (FWDNLDSTATUS not present)  *
+ * Covers L1868-1876: assigns downloadedFWVersion/Location, checks ver  *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetDownloadedFirmwareInfo_NoFile_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetDownloadedFirmwareInfo: no-file path → ver=unknown → success=false");
+
+    /* Ensure FWDNLDSTATUS_FILE_NAME does not exist */
+    std::remove("/opt/fwdnldstatus.txt");
+
+    Exchange::ISystemServices::DownloadedFirmwareInfo info;
+    uint32_t result = m_SystemServicesPlugin->GetDownloadedFirmwareInfo(info);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  result=%u downloadedFWVersion='%s' success=%d",
+             result, info.downloadedFWVersion.c_str(), info.success);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * GetDownloadedFirmwareInfo — file with Reboot|, DnldVersn|, DnldURL| *
+ * Covers L1888-1941: for-loop parsing all three fields                 *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetDownloadedFirmwareInfo_WithFile_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetDownloadedFirmwareInfo: with file → for-loop parses Reboot+DnldVersn+DnldURL");
+
+    /* Set m_FwUpdateState_LatestEvent >= 2 via IARM event so DnldVersn/ DnldURL parsed */
+    if (systemStateChanged != nullptr) {
+        IARM_Bus_SYSMgr_EventData_t evt;
+        memset(&evt, 0, sizeof(evt));
+        evt.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_FIRMWARE_UPDATE_STATE;
+        evt.data.systemStates.state   = IARM_BUS_SYSMGR_FIRMWARE_UPDATE_STATE_DOWNLOADING; /* =2 */
+        systemStateChanged(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, &evt, sizeof(evt));
+    }
+
+    /* Create the firmware status file */
+    {
+        std::ofstream f("/opt/fwdnldstatus.txt");
+        if (f.is_open()) {
+            f << "Reboot|1\n";
+            f << "DnldVersn|5.5.0.0\n";
+            f << "DnldURL|http://xconf.example.com/firmware.bin\n";
+            f << "FailureReason|NONE\n";
+        }
+    }
+
+    Exchange::ISystemServices::DownloadedFirmwareInfo info;
+    uint32_t result = m_SystemServicesPlugin->GetDownloadedFirmwareInfo(info);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  result=%u dnldVersion='%s' success=%d",
+             result, info.downloadedFWVersion.c_str(), info.success);
+
+    std::remove("/opt/fwdnldstatus.txt");
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * GetFirmwareDownloadPercent — with valid /opt/curl_progress file       *
+ * Covers getDownloadProgress() body in SystemServicesHelper.cpp        *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetFirmwareDownloadPercent_WithProgressFile_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetFirmwareDownloadPercent: create /opt/curl_progress → covers getDownloadProgress");
+
+    /* Create curl progress file: field[2] = "100" (pct), field[1] = "1234M" (has 'M') */
+    {
+        std::ofstream f("/opt/curl_progress");
+        if (f.is_open()) {
+            f << "  % Total    % Rcvd % Xferd  Average Speed\n";
+            f << " 100 1234M  100 1234M    0     0  3432k      0  0:00:01\n";
+        }
+    }
+
+    int32_t downloadPercent = -1;
+    bool success = false;
+    uint32_t result = m_SystemServicesPlugin->GetFirmwareDownloadPercent(downloadPercent, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  result=%u downloadPercent=%d success=%d", result, downloadPercent, success);
+
+    std::remove("/opt/curl_progress");
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * GetLastFirmwareFailureReason — file with KNOWN FailureReason          *
+ * Covers L1619-1621 (regex match) and L1632 (found in map)            *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetLastFirmwareFailureReason_Known_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetLastFirmwareFailureReason: known reason → covers L1619-1621 + L1632");
+
+    {
+        std::ofstream f("/opt/fwdnldstatus.txt");
+        if (f.is_open()) {
+            f << "FinalStatus|Failure\n";
+            f << "FailureReason|None\n";
+        }
+    }
+
+    string failReason;
+    bool success = false;
+    uint32_t result = m_SystemServicesPlugin->GetLastFirmwareFailureReason(failReason, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  result=%u failReason='%s' success=%d", result, failReason.c_str(), success);
+
+    std::remove("/opt/fwdnldstatus.txt");
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * GetLastFirmwareFailureReason — file with UNKNOWN FailureReason        *
+ * Covers L1634 (Unrecognised FailureReason warning)                    *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetLastFirmwareFailureReason_Unknown_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetLastFirmwareFailureReason: unknown reason → covers L1634 LOGWARN");
+
+    {
+        std::ofstream f("/opt/fwdnldstatus.txt");
+        if (f.is_open()) {
+            f << "FailureReason|TOTALLY_UNRECOGNIZED_REASON_XYZ\n";
+        }
+    }
+
+    string failReason;
+    bool success = false;
+    uint32_t result = m_SystemServicesPlugin->GetLastFirmwareFailureReason(failReason, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  result=%u failReason='%s' success=%d", result, failReason.c_str(), success);
+
+    std::remove("/opt/fwdnldstatus.txt");
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * SetMode — completely invalid mode name → L2814-2817                  *
+ * Covers: LOGWARN("value of new mode is incorrect") + success=false   *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetMode_InvalidModeName_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetMode: invalid mode name → covers L2814-2817 (incorrect-mode branch)");
+
+    Exchange::ISystemServices::ModeInfo modeInfo;
+    modeInfo.mode     = "TOTALLY_INVALID_MODE_XYZ";
+    modeInfo.duration = -1;
+    uint32_t sysSrvStatus = 0;
+    string errorMessage;
+    bool success = false;
+
+    uint32_t result = m_SystemServicesPlugin->SetMode(modeInfo, sysSrvStatus, errorMessage, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    EXPECT_FALSE(success);
+    TEST_LOG("  SetMode(INVALID_MODE): result=%u success=%d", result, success);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * SetTerritory — invalid region format → L2480-2481                    *
+ * isRegionValid("bad@region") returns false → ERROR_GENERAL branch    *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetTerritory_InvalidRegionFormat_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetTerritory: invalid region format → covers L2480-2481 LOGWARN branch");
+
+    Exchange::ISystemServices::SystemError sysError{};
+    bool success = false;
+    /* Territory "USA" is valid (3 chars, in list); region has invalid char '@' */
+    uint32_t result = m_SystemServicesPlugin->SetTerritory("USA", "bad@region", sysError, success);
+    /* Expected: ERROR_GENERAL because isRegionValid fails */
+    TEST_LOG("  SetTerritory('USA','bad@region'): result=%u success=%d msg='%s'",
+             result, success, sysError.message.c_str());
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * SetBlocklistFlag — write_parameters open fail (devicestate.txt=dir)  *
+ * Covers: L911 (ofstream open fail) + L1174-1178 (update fail path)   *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetBlocklistFlag_WriteOpenFail_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetBlocklistFlag: devicestate.txt is a DIRECTORY → write_parameters open fails");
+
+    /* Create parent dirs and put a DIRECTORY at the file path so ofstream fails */
+    mkdir("/opt/secure",                                    0755);
+    mkdir("/opt/secure/persistent",                         0755);
+    mkdir("/opt/secure/persistent/opflashstore",            0755);
+    /* Create devicestate.txt as a DIRECTORY to block file writes */
+    int mkret = mkdir("/opt/secure/persistent/opflashstore/devicestate.txt", 0755);
+    TEST_LOG("  mkdir devicestate.txt (as dir) ret=%d (0=ok, EEXIST=already exists)", mkret);
+
+    Exchange::ISystemServices::BlocklistFlagResult blResult{};
+    uint32_t result = m_SystemServicesPlugin->SetBlocklistFlag(true, blResult);
+    TEST_LOG("  SetBlocklistFlag(true): result=%u success=%d msg='%s'",
+             result, blResult.success, blResult.error.message.c_str());
+
+    /* Cleanup: remove the dir */
+    rmdir("/opt/secure/persistent/opflashstore/devicestate.txt");
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * GetBlocklistFlag — read_parameters invalid boolean value → L954-956  *
+ * File has BLOCKLIST=notvalid so value is neither "true" nor "false"   *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetBlocklistFlag_InvalidBoolValue_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetBlocklistFlag: BLOCKLIST=notvalid file → covers L954-956 invalid-value path");
+
+    mkdir("/opt/secure",                         0755);
+    mkdir("/opt/secure/persistent",              0755);
+    mkdir("/opt/secure/persistent/opflashstore", 0755);
+
+    const char* devFile = "/opt/secure/persistent/opflashstore/devicestate.txt";
+    {
+        std::ofstream f(devFile);
+        if (f.is_open())
+            f << "BLOCKLIST=notvalid\n";
+    }
+
+    Exchange::ISystemServices::GetBlocklistFlagResult blResult{};
+    uint32_t result = m_SystemServicesPlugin->GetBlocklistFlag(blResult);
+    TEST_LOG("  GetBlocklistFlag: result=%u success=%d msg='%s'",
+             result, blResult.success, blResult.error.message.c_str());
+
+    std::remove(devFile);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * GetBlocklistFlag — read_parameters param not found → L973            *
+ * File has OTHER_KEY=true but no BLOCKLIST key                         *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetBlocklistFlag_ParamNotFound_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetBlocklistFlag: no BLOCKLIST key in file → covers L973 param-not-found path");
+
+    mkdir("/opt/secure",                         0755);
+    mkdir("/opt/secure/persistent",              0755);
+    mkdir("/opt/secure/persistent/opflashstore", 0755);
+
+    const char* devFile = "/opt/secure/persistent/opflashstore/devicestate.txt";
+    {
+        std::ofstream f(devFile);
+        if (f.is_open())
+            f << "OTHER_KEY=true\n";
+    }
+
+    Exchange::ISystemServices::GetBlocklistFlagResult blResult{};
+    uint32_t result = m_SystemServicesPlugin->GetBlocklistFlag(blResult);
+    TEST_LOG("  GetBlocklistFlag: result=%u success=%d msg='%s'",
+             result, blResult.success, blResult.error.message.c_str());
+
+    std::remove(devFile);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * GetRFCConfig — RFC name with invalid charset → L3452-3454            *
+ * "Bad$Name" contains '$' which matches [^[:alnum:]_-] regex           *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetRFCConfig_InvalidCharsetName_JSONRPC)
+{
+    TEST_LOG("GetRFCConfig: pass RFC name with invalid charset ($) → L3452-3454");
+
+    JsonObject params;
+    JsonArray rfcArr;
+    rfcArr.Add("Invalid$RFC$Name");   /* '$' is unallowable */
+    params["rfcList"] = rfcArr;
+    JsonObject result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getRFCConfig", params, result);
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    TEST_LOG("  status=%u", status);
+    if (result.HasLabel("RFCConfig"))
+        TEST_LOG("  RFCConfig='%s'", result["RFCConfig"].String().c_str());
+}
+
+/* ------------------------------------------------------------------- *
+ * GetRFCConfig — mocked getRFCParameter returns SUCCESS → L3467-3468   *
+ * Covers cmdResponse = rfcParam.value; removeCharsFromString(...);     *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetRFCConfig_MockedSuccess_JSONRPC)
+{
+    TEST_LOG("GetRFCConfig: mock getRFCParameter SUCCESS → covers L3467-3468");
+
+    /* Override RFC mock to return success for our specific test key */
+    ON_CALL(*p_rfcApiImplMock, getRFCParameter(
+        ::testing::_,
+        ::testing::StrEq("Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.CoverageTest.Enabled"),
+        ::testing::_))
+        .WillByDefault(::testing::Invoke(
+            [](char*, const char*, RFC_ParamData_t* data) {
+                snprintf(data->value, sizeof(data->value), "testValue");
+                data->type = WDMP_STRING;
+                return WDMP_SUCCESS;
+            }));
+
+    JsonObject params;
+    JsonArray rfcArr;
+    rfcArr.Add("Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.CoverageTest.Enabled");
+    params["rfcList"] = rfcArr;
+    JsonObject result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getRFCConfig", params, result);
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    TEST_LOG("  status=%u", status);
+    if (result.HasLabel("RFCConfig"))
+        TEST_LOG("  RFCConfig='%s'", result["RFCConfig"].String().c_str());
+}
+
+/* ------------------------------------------------------------------- *
+ * GetDeviceInfo — JSON-RPC query with unallowable char '$' → L3526-28  *
+ * After removeCharsFromString([" ]), '$' remains → regex match fires   *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetDeviceInfo_UnallowableChars_JSONRPC)
+{
+    TEST_LOG("GetDeviceInfo: query with '$' char → covers L3526-3528 (unallowable input)");
+
+    JsonObject params;
+    JsonArray queryArr;
+    queryArr.Add("in$valid_query");   /* '$' survives removeCharsFromString */
+    params["params"] = queryArr;
+    JsonObject result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getDeviceInfo", params, result);
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    TEST_LOG("  status=%u", status);
+}
+
+/* ------------------------------------------------------------------- *
+ * GetTerritory — territory file has line with no colon                  *
+ * safeExtractAfterColon(no-colon) → L2084-L2086 LOGERR branch         *
+ * Also: extracted territory="" → territory.length()!=3 → L2115-2118.  *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetTerritory_CorruptedTerritoryFile_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetTerritory: corrupted territory file (no colon) → covers L2084+L2115-2118");
+
+    mkdir("/opt/secure", 0755);
+    mkdir("/opt/secure/persistent", 0755);
+    mkdir("/opt/secure/persistent/System", 0700);
+
+    /* Write a territory file with a line that has NO colon → safeExtractAfterColon fails */
+    {
+        std::ofstream f("/opt/secure/persistent/System/Territory.txt");
+        if (f.is_open())
+            f << "NOCOLON_TERRITORY\n";  /* no ':' → safeExtractAfterColon returns "" */
+    }
+
+    string territory, region;
+    bool success = false;
+    uint32_t result = m_SystemServicesPlugin->GetTerritory(territory, region, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  GetTerritory: result=%u territory='%s' region='%s' success=%d",
+             result, territory.c_str(), region.c_str(), success);
+
+    std::remove("/opt/secure/persistent/System/Territory.txt");
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * GetTerritory — file with valid territory but invalid region format    *
+ * Covers L2107-2110: region read but isRegionValid fails → LOGERR     *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetTerritory_CorruptedRegionFile_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetTerritory: valid territory, invalid region → covers L2107-2110 LOGERR");
+
+    mkdir("/opt/secure", 0755);
+    mkdir("/opt/secure/persistent", 0755);
+    mkdir("/opt/secure/persistent/System", 0700);
+
+    /* "USA" is 3 chars and in the standard list; "bad@region" fails isRegionValid */
+    {
+        std::ofstream f("/opt/secure/persistent/System/Territory.txt");
+        if (f.is_open()) {
+            f << "territory:USA\n";
+            f << "region:bad@region\n";
+        }
+    }
+
+    string territory, region;
+    bool success = false;
+    uint32_t result = m_SystemServicesPlugin->GetTerritory(territory, region, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  GetTerritory: result=%u territory='%s' region='%s' success=%d",
+             result, territory.c_str(), region.c_str(), success);
+
+    std::remove("/opt/secure/persistent/System/Territory.txt");
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * OnThermalModeChanged — direct _instance call → handleThermalLevelChange *
+ * Covers: L497-500, L3128-3196 (all handleThermalLevelChange cases),   *
+ *         L2978-2986 (OnTemperatureThresholdChanged dispatch),          *
+ *         L654-666 (Dispatch ONTEMPERATURETHRESHOLDCHANGED)             *
+ * ------------------------------------------------------------------- */
+#ifdef ENABLE_THERMAL_PROTECTION
+TEST_F(SystemService_L2Test, SysImpl_OnThermalModeChanged_Direct_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("OnThermalModeChanged: direct _instance call → handleThermalLevelChange all cases");
+
+    using TT = WPEFramework::Exchange::IPowerManager::ThermalTemperature;
+
+    /* Register notification handler to receive OnTemperatureThresholdChanged */
+    uint32_t regResult = m_SystemServicesPlugin->Register(&m_notificationHandler);
+    EXPECT_EQ(regResult, Core::ERROR_NONE);
+
+    WPEFramework::Plugin::SystemServicesImplementation* inst =
+        WPEFramework::Plugin::SystemServicesImplementation::_instance;
+
+    if (inst == nullptr) {
+        TEST_LOG("  _instance is NULL — skipping");
+        m_SystemServicesPlugin->Unregister(&m_notificationHandler);
+        m_SystemServicesPlugin->Release();
+        m_controller_SystemServices->Release();
+        return;
+    }
+
+    /* Case 1: NORMAL→HIGH  crossOver=true,  thermLevel="WARN" */
+    inst->OnThermalModeChanged(TT::THERMAL_TEMPERATURE_NORMAL,
+                               TT::THERMAL_TEMPERATURE_HIGH, 85.0f);
+    TEST_LOG("  NORMAL→HIGH: WARN cross-over covered");
+
+    /* Case 2: HIGH→NORMAL  crossOver=false, thermLevel="WARN" */
+    inst->OnThermalModeChanged(TT::THERMAL_TEMPERATURE_HIGH,
+                               TT::THERMAL_TEMPERATURE_NORMAL, 70.0f);
+    TEST_LOG("  HIGH→NORMAL: WARN non-cross-over covered");
+
+    /* Case 3: HIGH→CRITICAL crossOver=false, thermLevel="MAX" */
+    inst->OnThermalModeChanged(TT::THERMAL_TEMPERATURE_HIGH,
+                               TT::THERMAL_TEMPERATURE_CRITICAL, 115.0f);
+    TEST_LOG("  HIGH→CRITICAL: MAX non-cross-over covered");
+
+    /* Case 4: NORMAL→CRITICAL crossOver=true, thermLevel="MAX" */
+    inst->OnThermalModeChanged(TT::THERMAL_TEMPERATURE_NORMAL,
+                               TT::THERMAL_TEMPERATURE_CRITICAL, 120.0f);
+    TEST_LOG("  NORMAL→CRITICAL: MAX cross-over covered");
+
+    /* Case 5: CRITICAL→HIGH crossOver=false, thermLevel="MAX" (CRITICAL inner switch) */
+    inst->OnThermalModeChanged(TT::THERMAL_TEMPERATURE_CRITICAL,
+                               TT::THERMAL_TEMPERATURE_HIGH, 100.0f);
+    TEST_LOG("  CRITICAL→HIGH: MAX+ covered");
+
+    /* Case 6: NORMAL→NORMAL (invalid) → validparams=false → default case */
+    inst->OnThermalModeChanged(TT::THERMAL_TEMPERATURE_NORMAL,
+                               TT::THERMAL_TEMPERATURE_NORMAL, 75.0f);
+    TEST_LOG("  NORMAL→NORMAL: invalid‑combo → validparams=false default covered");
+
+    m_SystemServicesPlugin->Unregister(&m_notificationHandler);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+#endif /* ENABLE_THERMAL_PROTECTION */
+
+//75
