@@ -516,6 +516,16 @@ SystemService_L2Test::~SystemService_L2Test()
 
     TEST_LOG("Cleaning up SystemServices L2 Test");
 
+    /* Release COM-RPC interface objects if they were obtained via CreateSystemServicesInterfaceObject() */
+    if (m_SystemServicesPlugin) {
+        m_SystemServicesPlugin->Release();
+        m_SystemServicesPlugin = nullptr;
+    }
+    if (m_controller_SystemServices) {
+        m_controller_SystemServices->Release();
+        m_controller_SystemServices = nullptr;
+    }
+
     status = DeactivateService("org.rdk.System");
     EXPECT_EQ(Core::ERROR_NONE, status);
     TEST_LOG("Deactivated org.rdk.System");
