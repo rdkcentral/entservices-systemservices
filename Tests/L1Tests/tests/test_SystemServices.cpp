@@ -28,6 +28,7 @@
 #include <thread>
 #include <chrono>
 #include <atomic>
+#include <condition_variable>
 
 #include "SystemServices.h"
 #include "SystemServicesImplementation.h"
@@ -556,7 +557,7 @@ protected:
         // getBlocklistFlag property value; if the file contains "blocklist=true"
         // from a previous test, Thunder's serializer crashes (SIGSEGV) before
         // the test body even starts.
-        system("rm -f /opt/secure/persistent/opflashstore/devicestate.txt");
+        (void)system("rm -f /opt/secure/persistent/opflashstore/devicestate.txt");
 
         plugin->Initialize(&service);
 
@@ -579,7 +580,7 @@ protected:
         // GetBlocklistFlag) never sees "blocklist=true" and crashes.
         // This must run BEFORE Deinitialize so it is guaranteed even if
         // the test body exited early via ASSERT.
-        system("rm -f /opt/secure/persistent/opflashstore/devicestate.txt");
+        (void)system("rm -f /opt/secure/persistent/opflashstore/devicestate.txt");
 
         plugin->Deinitialize(&service);
 
@@ -740,7 +741,7 @@ TEST_F(SystemServicesTest, RequestSystemUptime_Success)
 TEST_F(SystemServicesTest, GetBlocklistFlag_Success)
 {
     // Create the opflashstore directory and devicestate file for blocklist tests
-    system("mkdir -p /opt/secure/persistent/opflashstore");
+    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
     createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "BLOCKLIST=false");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBlocklistFlag"), _T("{}"), response));
@@ -759,7 +760,7 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_Success)
 TEST_F(SystemServicesTest, SetBlocklistFlag_Success)
 {
     // Create the opflashstore directory for blocklist tests
-    system("mkdir -p /opt/secure/persistent/opflashstore");
+    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
     createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "BLOCKLIST=false");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"), _T("{\"blocklist\":true}"), response));
@@ -777,7 +778,7 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_Success)
 #if 0
 TEST_F(SystemServicesTest, SetBlocklistFlag_Failure_MissingParameter)
 {
-    system("mkdir -p /opt/secure/persistent/opflashstore");
+    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
     
     handler.Invoke(connection, _T("setBlocklistFlag"), _T("{}"), response);
     
@@ -1003,7 +1004,7 @@ TEST_F(SystemServicesTest, GetMfgSerialNumber_Success)
 TEST_F(SystemServicesTest, GetMigrationStatus_Success)
 {
     // Create migration file
-    system("mkdir -p /opt/secure/persistent/opflashstore");
+    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
     createFile("/opt/secure/persistent/opflashstore/migrationStatus.txt", "MIGRATION_STATUS=NOT_STARTED");
     
     EXPECT_CALL(*p_rfcApiMock, getRFCParameter(::testing::_, ::testing::_, ::testing::_))
@@ -1292,7 +1293,7 @@ TEST_F(SystemServicesTest, SetOptOutTelemetry_ExternalPluginNotAvailable)
 TEST_F(SystemServicesTest, GetSetBlocklistCombined)
 {
     // Combined test like the old test file - set and get blocklist
-    system("mkdir -p /opt/secure/persistent/opflashstore");
+    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
     createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "BLOCKLIST=false");
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"), _T("{\"blocklist\":true}"), response));
@@ -1308,7 +1309,7 @@ TEST_F(SystemServicesTest, GetSetBlocklistCombined)
 
 TEST_F(SystemServicesTest, SetBlocklist_ParamTrue)
 {
-    system("mkdir -p /opt/secure/persistent/opflashstore");
+    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
     createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "BLOCKLIST=false");
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"), _T("{\"blocklist\":true}"), response));
@@ -1319,7 +1320,7 @@ TEST_F(SystemServicesTest, SetBlocklist_ParamTrue)
 
 TEST_F(SystemServicesTest, SetBlocklist_ParamFalse)
 {
-    system("mkdir -p /opt/secure/persistent/opflashstore");
+    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
     createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "BLOCKLIST=true");
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"), _T("{\"blocklist\":false}"), response));
@@ -1558,7 +1559,7 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_InvalidFileWrite)
     //
     // Note: chmod-based write-failure tests are not reliable when CI runs as root
     // (root bypasses file permission checks). This test validates basic invocation only.
-    system("mkdir -p /opt/secure/persistent/opflashstore");
+    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
     createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "BLOCKLIST=false");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"), _T("{\"blocklist\":true}"), response));
@@ -1601,7 +1602,7 @@ TEST_F(SystemServicesTest, GetPowerStateBeforeReboot_Success)
 TEST_F(SystemServicesTest, GetTerritory_Success)
 {
     // Create territory file with colon-separated format expected by safeExtractAfterColon()
-    system("mkdir -p /opt/secure/persistent/System");
+    (void)system("mkdir -p /opt/secure/persistent/System");
     createFile(TERRITORYFILE, "territory:USA");
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTerritory"), _T("{}"), response));
@@ -1618,7 +1619,7 @@ TEST_F(SystemServicesTest, GetTerritory_Success)
 
 TEST_F(SystemServicesTest, SetTerritory_Success)
 {
-    system("mkdir -p /opt/persistent/System");
+    (void)system("mkdir -p /opt/persistent/System");
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"), _T("{\"territory\":\"USA\"}"), response));
     
@@ -2052,7 +2053,7 @@ TEST_F(SystemServicesTest, SetTimeZoneDST_InvalidFormat)
 TEST_F(SystemServicesTest, GetTerritory_WithRegion)
 {
     // Territory file: line1=<prefix>:USA, line2=<prefix>:US-CA (format required by readTerritoryFromFile)
-    system("mkdir -p /opt/secure/persistent/System");
+    (void)system("mkdir -p /opt/secure/persistent/System");
     createFile(TERRITORYFILE, "territory:USA\nregion:US-CA");
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTerritory"), _T("{}"), response));
@@ -2068,7 +2069,7 @@ TEST_F(SystemServicesTest, GetTerritory_WithRegion)
 
 TEST_F(SystemServicesTest, SetTerritory_WithRegion)
 {
-    system("mkdir -p /opt/secure/persistent/System");
+    (void)system("mkdir -p /opt/secure/persistent/System");
     
     // Region validation expects specific format - invalid region returns ERROR_GENERAL
     uint32_t result = handler.Invoke(connection, _T("setTerritory"), _T("{\"territory\":\"USA\",\"region\":\"California\"}"), response);
@@ -2236,10 +2237,10 @@ TEST_F(SystemServicesTest, RequestSystemUptime_MultipleInvocations)
 TEST_F(SystemServicesTest, GetTimeZones_AllTimeZones)
 {
     // System call to create timezone structure
-    system("mkdir -p /usr/share/zoneinfo/America");
-    system("mkdir -p /usr/share/zoneinfo/Europe");
-    system("touch /usr/share/zoneinfo/America/New_York");
-    system("touch /usr/share/zoneinfo/Europe/London");
+    (void)system("mkdir -p /usr/share/zoneinfo/America");
+    (void)system("mkdir -p /usr/share/zoneinfo/Europe");
+    (void)system("touch /usr/share/zoneinfo/America/New_York");
+    (void)system("touch /usr/share/zoneinfo/Europe/London");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTimeZones"), _T("{}"), response));
     
@@ -2251,20 +2252,20 @@ TEST_F(SystemServicesTest, GetTimeZones_AllTimeZones)
     TEST_LOG("GetTimeZones all zones test - Response: %s", response.c_str());
 
     // Cleanup created timezone files and directories
-    system("rm -f /usr/share/zoneinfo/America/New_York /usr/share/zoneinfo/Europe/London");
-    system("rmdir /usr/share/zoneinfo/America /usr/share/zoneinfo/Europe 2>/dev/null || true");
+    (void)system("rm -f /usr/share/zoneinfo/America/New_York /usr/share/zoneinfo/Europe/London");
+    (void)system("rmdir /usr/share/zoneinfo/America /usr/share/zoneinfo/Europe 2>/dev/null || true");
 }
 
 TEST_F(SystemServicesTest, GetTimeZones_EmptyDirectory)
 {
     // Remove timezone directory temporarily
-    system("rm -rf /usr/share/zoneinfo_backup");
-    system("mv /usr/share/zoneinfo /usr/share/zoneinfo_backup 2>/dev/null || true");
+    (void)system("rm -rf /usr/share/zoneinfo_backup");
+    (void)system("mv /usr/share/zoneinfo /usr/share/zoneinfo_backup 2>/dev/null || true");
     
     uint32_t result = handler.Invoke(connection, _T("getTimeZones"), _T("{}"), response);
     
     // Restore directory
-    system("mv /usr/share/zoneinfo_backup /usr/share/zoneinfo 2>/dev/null || true");
+    (void)system("mv /usr/share/zoneinfo_backup /usr/share/zoneinfo 2>/dev/null || true");
     
     // May return error if directory doesn't exist
     EXPECT_TRUE(result == Core::ERROR_NONE || result == Core::ERROR_GENERAL) << "Unexpected result: " << result;
@@ -2521,7 +2522,7 @@ TEST_F(SystemServicesTest, SetMigrationStatus_Failed)
 
 TEST_F(SystemServicesTest, GetBlocklistFlag_FileExists)
 {
-    system("mkdir -p /opt/secure/persistent/opflashstore");
+    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
     // Use uppercase key: read_parameters is case-sensitive so "BLOCKLIST" != "blocklist".
     // This ensures the success=false serialization path, which does NOT crash Thunder's
     // BlocklistResult serializer (only success=true with error.code="" crashes it).
@@ -2623,7 +2624,7 @@ TEST_F(SystemServicesTest, GetFirmwareUpdateState_Downloading)
 TEST_F(SystemServicesTest, GetFirmwareDownloadPercent_InProgress)
 {
     // Create progress file to test download percentage calculation
-    system("mkdir -p /opt");
+    (void)system("mkdir -p /opt");
     std::ofstream progressFile("/opt/curl_progress");
     progressFile << "25.5 100 25500000 102400000 0 0 0 0\n";
     progressFile.close();
@@ -2651,7 +2652,7 @@ TEST_F(SystemServicesTest, GetTerritory_NoFile)
 
 TEST_F(SystemServicesTest, SetTerritory_ValidRegion)
 {
-    system("mkdir -p /opt/secure/persistent/System");
+    (void)system("mkdir -p /opt/secure/persistent/System");
     
     // Test with supported territory/region combination
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
@@ -2783,7 +2784,7 @@ TEST_F(SystemServicesTest, GetFirmwareDownloadPercent_NoProgressFile)
 TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_AllFields)
 {
     // Create firmware info file with all fields
-    system("mkdir -p /opt");
+    (void)system("mkdir -p /opt");
     std::ofstream fwInfo("/opt/fwdnldstatus.txt");
     fwInfo << "Filename:test_firmware.bin\n";
     fwInfo << "Status:DL Completed\n";
@@ -2887,8 +2888,8 @@ TEST_F(SystemServicesTest, SetTerritory_LowercaseInvalid)
 
 TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_ValidFile)
 {
-    system("mkdir -p /opt");
-    system("echo 'FailureReason|DOWNLOAD_FAILED' > /opt/fwdnldstatus.txt");
+    (void)system("mkdir -p /opt");
+    (void)system("echo 'FailureReason|DOWNLOAD_FAILED' > /opt/fwdnldstatus.txt");
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getLastFirmwareFailureReason"), _T("{}"), response));
     
@@ -2900,8 +2901,8 @@ TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_ValidFile)
 
 TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_WithVersionFile)
 {
-    system("mkdir -p /opt");
-    system("echo 'DnldVersn|testversion' > /opt/fwdnldstatus.txt");
+    (void)system("mkdir -p /opt");
+    (void)system("echo 'DnldVersn|testversion' > /opt/fwdnldstatus.txt");
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDownloadedFirmwareInfo"), _T("{}"), response));
     
@@ -2924,7 +2925,7 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_DirectoryMissing)
     // Remove directory so checkOpFlashStoreDir() attempts mkdir.
     // In CI (runs as root), mkdir succeeds -> file missing -> success=false, ERROR_NONE.
     // success=false path is safe for Thunder BlocklistResult serializer.
-    system("rm -rf /opt/secure/persistent/opflashstore");
+    (void)system("rm -rf /opt/secure/persistent/opflashstore");
 
     uint32_t result = handler.Invoke(connection, _T("getBlocklistFlag"), _T("{}"), response);
 
@@ -2960,8 +2961,8 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_EnableFalse)
 
 TEST_F(SystemServicesTest, GetTerritory_TerritoryFilePresent)
 {
-    system("mkdir -p /opt/secure/persistent/System");
-    system("echo 'USA' > /opt/secure/persistent/System/Territory.txt");
+    (void)system("mkdir -p /opt/secure/persistent/System");
+    (void)system("echo 'USA' > /opt/secure/persistent/System/Territory.txt");
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTerritory"), _T("{}"), response));
     
@@ -3036,8 +3037,8 @@ TEST_F(SystemServicesTest, GetNetworkStandbyMode_FalseState)
 
 TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_DownloadFailed)
 {
-    system("mkdir -p /opt");
-    system("echo 'FailureReason|DOWNLOAD_FAILED' > /opt/fwdnldstatus.txt");
+    (void)system("mkdir -p /opt");
+    (void)system("echo 'FailureReason|DOWNLOAD_FAILED' > /opt/fwdnldstatus.txt");
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getLastFirmwareFailureReason"), _T("{}"), response));
     
@@ -3049,8 +3050,8 @@ TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_DownloadFailed)
 
 TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_CriticalFailure)
 {
-    system("mkdir -p /opt");
-    system("echo 'FailureReason|CRITICAL_FAILURE' > /opt/fwdnldstatus.txt");
+    (void)system("mkdir -p /opt");
+    (void)system("echo 'FailureReason|CRITICAL_FAILURE' > /opt/fwdnldstatus.txt");
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getLastFirmwareFailureReason"), _T("{}"), response));
     
@@ -3062,10 +3063,10 @@ TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_CriticalFailure)
 
 TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_CompleteData)
 {
-    system("mkdir -p /opt");
-    system("echo 'DnldVersn|1.2.3.4' > /opt/fwdnldstatus.txt");
-    system("echo 'DnldFile|/tmp/firmware.bin' >> /opt/fwdnldstatus.txt");
-    system("echo 'Status|200' >> /opt/fwdnldstatus.txt");
+    (void)system("mkdir -p /opt");
+    (void)system("echo 'DnldVersn|1.2.3.4' > /opt/fwdnldstatus.txt");
+    (void)system("echo 'DnldFile|/tmp/firmware.bin' >> /opt/fwdnldstatus.txt");
+    (void)system("echo 'Status|200' >> /opt/fwdnldstatus.txt");
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDownloadedFirmwareInfo"), _T("{}"), response));
     
@@ -3266,7 +3267,7 @@ TEST_F(SystemServicesTest, GetWakeupReason_VoiceWakeup)
 
 TEST_F(SystemServicesTest, SetBootLoaderSplashScreen_ValidPath)
 {
-    system("touch /tmp/splash.png");
+    (void)system("touch /tmp/splash.png");
     
     EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
         .WillOnce(::testing::Return(IARM_RESULT_SUCCESS));
@@ -3277,7 +3278,7 @@ TEST_F(SystemServicesTest, SetBootLoaderSplashScreen_ValidPath)
     ASSERT_TRUE(jsonResponse.FromString(response));
     EXPECT_TRUE(jsonResponse.HasLabel("success"));
     
-    system("rm -f /tmp/splash.png");
+    (void)system("rm -f /tmp/splash.png");
 }
 
 TEST_F(SystemServicesTest, SetBootLoaderSplashScreen_InvalidPath)
@@ -3472,7 +3473,7 @@ TEST_F(SystemServicesTest, GetMigrationStatus_PluginNotAvailable)
 
 TEST_F(SystemServicesTest, GetMigrationStatus_FileExists)
 {
-    system("mkdir -p /opt/secure/persistent");
+    (void)system("mkdir -p /opt/secure/persistent");
     createFile("/opt/secure/persistent/MigrationStatus", "2");
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getMigrationStatus"), _T("{}"), response));
@@ -3488,7 +3489,7 @@ TEST_F(SystemServicesTest, GetMigrationStatus_FileExists)
 
 TEST_F(SystemServicesTest, GetMigrationStatus_InvalidFileContent)
 {
-    system("mkdir -p /opt/secure/persistent");
+    (void)system("mkdir -p /opt/secure/persistent");
     createFile("/opt/secure/persistent/MigrationStatus", "invalid_content");
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getMigrationStatus"), _T("{}"), response));
@@ -4012,7 +4013,7 @@ TEST_F(SystemServicesTest, Notification_OnBlocklistChanged_ViaSetBlocklistFlag)
     // IMPORTANT: key must be lowercase 'blocklist' to match #define BLOCKLIST "blocklist".
     // If the file uses uppercase 'BLOCKLIST', write_parameters won't find the key,
     // update stays false, and OnBlocklistChanged is never fired.
-    system("mkdir -p /opt/secure/persistent/opflashstore");
+    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
     createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "blocklist=false");
 
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
@@ -4189,7 +4190,7 @@ TEST_F(SystemServicesTest, Notification_OnBlocklistChanged_MultipleChanges)
 {
     // Create required directory and file for blocklist write to succeed.
     // Key must be lowercase 'blocklist' to match #define BLOCKLIST "blocklist".
-    system("mkdir -p /opt/secure/persistent/opflashstore");
+    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
     createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "blocklist=false");
 
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
@@ -4480,8 +4481,8 @@ TEST_F(SystemServicesTest, SetTimeZoneDST_TrailingSlash_SuccessFalse)
 
 TEST_F(SystemServicesTest, SetTimeZoneDST_ValidZone_ExistingFile)
 {
-    system("mkdir -p /usr/share/zoneinfo/America");
-    system("touch /usr/share/zoneinfo/America/Chicago");
+    (void)system("mkdir -p /usr/share/zoneinfo/America");
+    (void)system("touch /usr/share/zoneinfo/America/Chicago");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTimeZoneDST"),
               _T("{\"timeZone\":\"America/Chicago\"}"), response));
@@ -4495,8 +4496,8 @@ TEST_F(SystemServicesTest, SetTimeZoneDST_ValidZone_ExistingFile)
 
 TEST_F(SystemServicesTest, SetTimeZoneDST_ValidZone_AccuracyINITIAL)
 {
-    system("mkdir -p /usr/share/zoneinfo/America");
-    system("touch /usr/share/zoneinfo/America/Denver");
+    (void)system("mkdir -p /usr/share/zoneinfo/America");
+    (void)system("touch /usr/share/zoneinfo/America/Denver");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTimeZoneDST"),
               _T("{\"timeZone\":\"America/Denver\",\"accuracy\":\"INITIAL\"}"), response));
@@ -4510,8 +4511,8 @@ TEST_F(SystemServicesTest, SetTimeZoneDST_ValidZone_AccuracyINITIAL)
 
 TEST_F(SystemServicesTest, SetTimeZoneDST_ValidZone_AccuracyINTERIM)
 {
-    system("mkdir -p /usr/share/zoneinfo/America");
-    system("touch /usr/share/zoneinfo/America/Detroit");
+    (void)system("mkdir -p /usr/share/zoneinfo/America");
+    (void)system("touch /usr/share/zoneinfo/America/Detroit");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTimeZoneDST"),
               _T("{\"timeZone\":\"America/Detroit\",\"accuracy\":\"INTERIM\"}"), response));
@@ -4525,8 +4526,8 @@ TEST_F(SystemServicesTest, SetTimeZoneDST_ValidZone_AccuracyINTERIM)
 
 TEST_F(SystemServicesTest, SetTimeZoneDST_ValidZone_AccuracyFINAL)
 {
-    system("mkdir -p /usr/share/zoneinfo/Europe");
-    system("touch /usr/share/zoneinfo/Europe/Paris");
+    (void)system("mkdir -p /usr/share/zoneinfo/Europe");
+    (void)system("touch /usr/share/zoneinfo/Europe/Paris");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTimeZoneDST"),
               _T("{\"timeZone\":\"Europe/Paris\",\"accuracy\":\"FINAL\"}"), response));
@@ -4540,8 +4541,8 @@ TEST_F(SystemServicesTest, SetTimeZoneDST_ValidZone_AccuracyFINAL)
 
 TEST_F(SystemServicesTest, SetTimeZoneDST_InvalidAccuracy_Ignored)
 {
-    system("mkdir -p /usr/share/zoneinfo/America");
-    system("touch /usr/share/zoneinfo/America/Los_Angeles");
+    (void)system("mkdir -p /usr/share/zoneinfo/America");
+    (void)system("touch /usr/share/zoneinfo/America/Los_Angeles");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTimeZoneDST"),
               _T("{\"timeZone\":\"America/Los_Angeles\",\"accuracy\":\"BOGUS\"}"), response));
@@ -4559,7 +4560,7 @@ TEST_F(SystemServicesTest, SetTimeZoneDST_InvalidAccuracy_Ignored)
 
 TEST_F(SystemServicesTest, GetTimeZoneDST_FileAbsent_ReturnsDefault)
 {
-    system("rm -f /opt/persistent/timeZoneDST");
+    (void)system("rm -f /opt/persistent/timeZoneDST");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTimeZoneDST"), _T("{}"), response));
 
@@ -4574,7 +4575,7 @@ TEST_F(SystemServicesTest, GetTimeZoneDST_FileAbsent_ReturnsDefault)
 
 TEST_F(SystemServicesTest, GetTimeZoneDST_FilePresent_ReturnsContents)
 {
-    system("mkdir -p /opt/persistent");
+    (void)system("mkdir -p /opt/persistent");
     std::ofstream tzFile("/opt/persistent/timeZoneDST");
     tzFile << "America/New_York";
     tzFile.close();
@@ -4586,7 +4587,7 @@ TEST_F(SystemServicesTest, GetTimeZoneDST_FilePresent_ReturnsContents)
     ASSERT_TRUE(jsonResponse.HasLabel("timeZone")) << "Missing timeZone: " << response;
     EXPECT_TRUE(jsonResponse["success"].Boolean()) << "File present should succeed: " << response;
 
-    system("rm -f /opt/persistent/timeZoneDST");
+    (void)system("rm -f /opt/persistent/timeZoneDST");
 
     TEST_LOG("GetTimeZoneDST_FilePresent_ReturnsContents - Response: %s", response.c_str());
 }
@@ -4597,7 +4598,7 @@ TEST_F(SystemServicesTest, GetTimeZoneDST_FilePresent_ReturnsContents)
 
 TEST_F(SystemServicesTest, GetTerritory_FileAbsent_SuccessFalse)
 {
-    system("rm -f /opt/secure/persistent/System/territorial.setting");
+    (void)system("rm -f /opt/secure/persistent/System/territorial.setting");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTerritory"), _T("{}"), response));
 
@@ -4610,7 +4611,7 @@ TEST_F(SystemServicesTest, GetTerritory_FileAbsent_SuccessFalse)
 
 TEST_F(SystemServicesTest, GetTerritory_FileWithTerritoryAndRegion)
 {
-    system("mkdir -p /opt/secure/persistent/System");
+    (void)system("mkdir -p /opt/secure/persistent/System");
     createFile(TERRITORYFILE, "territory:USA\nregion:US-NY");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTerritory"), _T("{}"), response));
@@ -4633,7 +4634,7 @@ TEST_F(SystemServicesTest, GetTerritory_FileWithTerritoryAndRegion)
 
 TEST_F(SystemServicesTest, SetTerritory_ValidGBR)
 {
-    system("mkdir -p /opt/secure/persistent/System");
+    (void)system("mkdir -p /opt/secure/persistent/System");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
               _T("{\"territory\":\"GBR\"}"), response));
@@ -4681,7 +4682,7 @@ TEST_F(SystemServicesTest, SetTerritory_EmptyTerritory_SuccessFalse)
 
 TEST_F(SystemServicesTest, SetTerritory_ValidRegion_US_CA)
 {
-    system("mkdir -p /opt/secure/persistent/System");
+    (void)system("mkdir -p /opt/secure/persistent/System");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
               _T("{\"territory\":\"USA\",\"region\":\"US-CA\"}"), response));
@@ -4701,7 +4702,7 @@ TEST_F(SystemServicesTest, SetTerritory_ValidRegion_US_CA)
 
 TEST_F(SystemServicesTest, GetBlocklistFlag_LowercaseKey_SuccessTrue)
 {
-    system("mkdir -p /opt/secure/persistent/opflashstore");
+    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
     createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "blocklist=false");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBlocklistFlag"), _T("{}"), response));
@@ -4722,7 +4723,7 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_LowercaseKey_SuccessTrue)
 
 TEST_F(SystemServicesTest, SetBlocklistFlag_SameValue_NoEvent)
 {
-    system("mkdir -p /opt/secure/persistent/opflashstore");
+    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
     createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "blocklist=true");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"),
@@ -4740,7 +4741,7 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_SameValue_NoEvent)
 
 TEST_F(SystemServicesTest, SetBlocklistFlag_DifferentValue_FiresEvent)
 {
-    system("mkdir -p /opt/secure/persistent/opflashstore");
+    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
     createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "blocklist=false");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"),
@@ -4855,7 +4856,7 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_RebootImmediateOne)
 
 TEST_F(SystemServicesTest, GetFirmwareDownloadPercent_ProgressFile_Returns50)
 {
-    system("mkdir -p /opt");
+    (void)system("mkdir -p /opt");
     std::ofstream f("/opt/curl_progress");
     f << "50\n";
     f.close();
@@ -4891,7 +4892,7 @@ TEST_F(SystemServicesTest, GetFirmwareDownloadPercent_NoFile_ReturnsMinus1)
 
 TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_SigVerifyFailed)
 {
-    system("mkdir -p /opt/persistent");
+    (void)system("mkdir -p /opt/persistent");
     std::ofstream f("/opt/persistent/.lastswupdatestatus");
     f << "LastStatus|Failed|Signature verification failed\n";
     f.close();
@@ -4910,7 +4911,7 @@ TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_SigVerifyFailed)
 
 TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_EmptyFile)
 {
-    system("mkdir -p /opt/persistent");
+    (void)system("mkdir -p /opt/persistent");
     std::ofstream("/opt/persistent/.lastswupdatestatus").close();
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getLastFirmwareFailureReason"), _T("{}"), response));
@@ -5561,8 +5562,8 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_WriteParamFails_DirectoryUnwritable)
     // Actually it's hard to make the dir un-creatable in CI.
     // Instead: pre-create a REGULAR FILE at /opt/secure/persistent/opflashstore
     // so mkdir fails with ENOTDIR → errno != EEXIST → ret=false.
-    system("rm -rf /opt/secure/persistent/opflashstore");
-    system("mkdir -p /opt/secure/persistent && touch /opt/secure/persistent/opflashstore");
+    (void)system("rm -rf /opt/secure/persistent/opflashstore");
+    (void)system("mkdir -p /opt/secure/persistent && touch /opt/secure/persistent/opflashstore");
 
     uint32_t result = handler.Invoke(connection, _T("setBlocklistFlag"),
                                      _T("{\"blocklist\":true}"), response);
@@ -5570,15 +5571,15 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_WriteParamFails_DirectoryUnwritable)
     EXPECT_EQ(Core::ERROR_GENERAL, result) << "Should fail when opflashstore is a file";
 
     // Clean up — restore proper dir for subsequent tests
-    system("rm -f /opt/secure/persistent/opflashstore");
-    system("mkdir -p /opt/secure/persistent/opflashstore");
+    (void)system("rm -f /opt/secure/persistent/opflashstore");
+    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
 
     TEST_LOG("SetBlocklistFlag_WriteParamFails_DirectoryUnwritable - Result: %u", result);
 }
 
 TEST_F(SystemServicesTest, SetBlocklistFlag_SameValueAsFile_NoEventDispatched)
 {
-    system("mkdir -p /opt/secure/persistent/opflashstore");
+    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
     // Pre-write "blocklist=true" so write_parameters finds the same value → update=false
     std::ofstream f("/opt/secure/persistent/opflashstore/devicestate.txt");
     f << "blocklist=true\n"; f.close();
@@ -5596,7 +5597,7 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_SameValueAsFile_NoEventDispatched)
 
 TEST_F(SystemServicesTest, SetBlocklistFlag_DifferentValueFromFile_EventDispatched)
 {
-    system("mkdir -p /opt/secure/persistent/opflashstore");
+    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
     // Pre-write "blocklist=false", then set to true → update=true → event
     std::ofstream f("/opt/secure/persistent/opflashstore/devicestate.txt");
     f << "blocklist=false\n"; f.close();
@@ -5622,7 +5623,7 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_DifferentValueFromFile_EventDispatch
 
 TEST_F(SystemServicesTest, GetBlocklistFlag_FileAbsent_SuccessFalse)
 {
-    system("mkdir -p /opt/secure/persistent/opflashstore");
+    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
     std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBlocklistFlag"), _T("{}"), response));
@@ -5636,7 +5637,7 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_FileAbsent_SuccessFalse)
 
 TEST_F(SystemServicesTest, GetBlocklistFlag_FilePresent_BlocklistTrue)
 {
-    system("mkdir -p /opt/secure/persistent/opflashstore");
+    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
     std::ofstream f("/opt/secure/persistent/opflashstore/devicestate.txt");
     f << "blocklist=true\n"; f.close();
 
@@ -5654,7 +5655,7 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_FilePresent_BlocklistTrue)
 
 TEST_F(SystemServicesTest, GetBlocklistFlag_FilePresent_BlocklistFalse)
 {
-    system("mkdir -p /opt/secure/persistent/opflashstore");
+    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
     std::ofstream f("/opt/secure/persistent/opflashstore/devicestate.txt");
     f << "blocklist=false\n"; f.close();
 
@@ -5855,7 +5856,7 @@ TEST_F(SystemServicesTest, SetTerritory_Length2_ReturnsErrorGeneral)
 
 TEST_F(SystemServicesTest, SetTerritory_ValidUSA_EmptyRegion_Succeeds)
 {
-    system("mkdir -p /opt/secure/persistent/System");
+    (void)system("mkdir -p /opt/secure/persistent/System");
     std::remove("/opt/secure/persistent/System/Territory.txt");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
@@ -5871,7 +5872,7 @@ TEST_F(SystemServicesTest, SetTerritory_ValidUSA_EmptyRegion_Succeeds)
 
 TEST_F(SystemServicesTest, SetTerritory_ValidUSA_ValidRegion_Succeeds)
 {
-    system("mkdir -p /opt/secure/persistent/System");
+    (void)system("mkdir -p /opt/secure/persistent/System");
     std::remove("/opt/secure/persistent/System/Territory.txt");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
@@ -6205,7 +6206,7 @@ TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_NoFile_ReturnsNoneAndSuc
 
 TEST_F(SystemServicesTest, GetTimeZoneDST_AfterSet_ReturnsSetValue)
 {
-    system("mkdir -p /opt/persistent");
+    (void)system("mkdir -p /opt/persistent");
     std::ofstream f("/opt/persistent/timeZoneDST");
     f << "Europe/London"; f.close();
 
@@ -6459,7 +6460,7 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_AllFields_Read)
 
 TEST_F(SystemServicesTest, GetTerritory_FileAbsent_SuccessFalseOrEmpty)
 {
-    system("mkdir -p /opt/secure/persistent/System");
+    (void)system("mkdir -p /opt/secure/persistent/System");
     std::remove("/opt/secure/persistent/System/Territory.txt");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTerritory"), _T("{}"), response));
@@ -6473,7 +6474,7 @@ TEST_F(SystemServicesTest, GetTerritory_FileAbsent_SuccessFalseOrEmpty)
 
 TEST_F(SystemServicesTest, GetTerritory_FilePresent_ReturnsTerritory)
 {
-    system("mkdir -p /opt/secure/persistent/System");
+    (void)system("mkdir -p /opt/secure/persistent/System");
     std::ofstream f("/opt/secure/persistent/System/Territory.txt");
     f << "territory:AUS\nregion:AU-NSW\n"; f.close();
 
@@ -7434,13 +7435,13 @@ TEST_F(SystemServicesTest, Helper_DirnameOf_NoSlash_ReturnsEmpty)
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, Helper_DirExists_ExistingDir_ReturnsTrue)
 {
-    system("mkdir -p /tmp/test_dir_helper");
+    (void)system("mkdir -p /tmp/test_dir_helper");
     EXPECT_TRUE(dirExists("/tmp/test_dir_helper/somefile.txt"));
-    system("rmdir /tmp/test_dir_helper");
+    (void)system("rmdir /tmp/test_dir_helper");
 }
 TEST_F(SystemServicesTest, Helper_DirExists_NonExistingDir_ReturnsFalse)
 {
-    system("rm -rf /tmp/test_dir_helper_absent");
+    (void)system("rm -rf /tmp/test_dir_helper_absent");
     EXPECT_FALSE(dirExists("/tmp/test_dir_helper_absent/file.txt"));
 }
 
@@ -8003,7 +8004,7 @@ TEST_F(SystemServicesTest, SetMode_IarmFailure_Path)
 // Covers: read_parameters returns false → success=false branch.
 TEST_F(SystemServicesTest, GetBlocklistFlag_FileMissing)
 {
-    system("mkdir -p /opt/secure/persistent/opflashstore");
+    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
     std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
 
     EXPECT_EQ(Core::ERROR_NONE,
@@ -8240,7 +8241,7 @@ TEST_F(SystemServicesTest, Dispatch_OnTerritoryChanged_ReachesNotification)
     // Remove territory file first so the impl starts from an empty state.
     // This avoids the race where the first setTerritory call queues an async
     // WorkerPool job that fires AFTER ResetEvent(), causing stale data.
-    system("mkdir -p /opt/secure/persistent/System");
+    (void)system("mkdir -p /opt/secure/persistent/System");
     std::remove("/opt/secure/persistent/System/Territory.txt");
 
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
@@ -8822,7 +8823,7 @@ TEST_F(SystemServicesTest, Notification_OnTerritoryChanged_ViaSetTerritory)
 
     // Remove territory file first to start from clean state — avoids the async
     // race where the first setTerritory WorkerPool job fires after ResetEvent().
-    system("mkdir -p /opt/secure/persistent/System");
+    (void)system("mkdir -p /opt/secure/persistent/System");
     std::remove("/opt/secure/persistent/System/Territory.txt");
 
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
@@ -8950,7 +8951,7 @@ TEST_F(SystemServicesTest, Dispatch_TerritoryChanged_WithRegion)
 
     // Remove territory file for clean state; valid region format: "XY-ZW" (2 + "-" + 2+).
     // "LON"/"NYC" are invalid regions (no "-"), causing ERROR_GENERAL.
-    system("mkdir -p /opt/secure/persistent/System");
+    (void)system("mkdir -p /opt/secure/persistent/System");
     std::remove("/opt/secure/persistent/System/Territory.txt");
 
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
@@ -9029,7 +9030,7 @@ TEST_F(SystemServicesTest, GetFirmwareUpdateState_AfterStateChange_ReflectsNewSt
 
 TEST_F(SystemServicesTest, GetBlocklistFlag_DefaultFalse_WhenFileExists)
 {
-    system("mkdir -p /opt/secure/persistent/opflashstore");
+    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
     createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "blocklist=false");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBlocklistFlag"), _T("{}"), response));
@@ -10308,7 +10309,7 @@ TEST_F(SystemServicesTest, Dispatch_OnMacAddressesRetrieved_ReachesNotification)
     // /lib/rdk/getDeviceDetails.sh must exist or GetMacAddresses returns early without
     // starting the async thread. Create a dummy file so the thread is launched,
     // which then calls pSs->dispatchEvent(ONMACADDRESSRETRIEVED) → Dispatch() L718-737.
-    system("mkdir -p /lib/rdk && touch /lib/rdk/getDeviceDetails.sh");
+    (void)system("mkdir -p /lib/rdk && touch /lib/rdk/getDeviceDetails.sh");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getMacAddresses"),
               _T("{\"GUID\":\"\"}"), response));
@@ -10592,19 +10593,19 @@ TEST_F(SystemServicesTest, SetPowerState_DeepSleep_WithStandbyReason)
 TEST_F(SystemServicesTest, UploadLogsAsync_LoguploadBinaryExists_CoversAsyncBody)
 {
     // Create /usr/bin/logupload (empty executable) so fileExists() → true
-    system("touch /usr/bin/logupload && chmod +x /usr/bin/logupload");
+    (void)system("touch /usr/bin/logupload && chmod +x /usr/bin/logupload");
 
     // Create /etc/device.properties with BUILD_TYPE=dev
     // so parseConfigFile(DEVICE_PROPERTIES,"BUILD_TYPE") succeeds
     // and OPT_DCM_PROPERTIES path is NOT used (only if non-prod)
-    system("echo 'BUILD_TYPE=dev' >> /etc/device.properties");
+    (void)system("echo 'BUILD_TYPE=dev' >> /etc/device.properties");
 
     // Create /etc/dcm.properties with LOG_SERVER for tftp_server
-    system("echo 'LOG_SERVER=test-server' > /etc/dcm.properties");
+    (void)system("echo 'LOG_SERVER=test-server' > /etc/dcm.properties");
 
     // Create /tmp/DCMSettings.conf for getDCMconfigDetails()
     // needs: UploadProtocol, URL, and UploadOnReboot patterns
-    system("printf 'LogUploadSettings:UploadRepository:uploadProtocol=https\nLogUploadSettings:UploadRepository:URL=https://test.log.server/upload\nLogUploadSettings:UploadOnReboot=false\n' > /tmp/DCMSettings.conf");
+    (void)system("printf 'LogUploadSettings:UploadRepository:uploadProtocol=https\nLogUploadSettings:UploadRepository:URL=https://test.log.server/upload\nLogUploadSettings:UploadOnReboot=false\n' > /tmp/DCMSettings.conf");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("uploadLogsAsync"),
               _T("{\"url\":\"https://test.log.server/upload\"}"), response));
@@ -10612,9 +10613,9 @@ TEST_F(SystemServicesTest, UploadLogsAsync_LoguploadBinaryExists_CoversAsyncBody
     TEST_LOG("UploadLogsAsync_LoguploadBinaryExists - Response: %s", response.c_str());
 
     // Cleanup
-    system("rm -f /usr/bin/logupload /tmp/DCMSettings.conf");
-    system("sed -i '/^BUILD_TYPE=dev$/d' /etc/device.properties 2>/dev/null || true");
-    system("rm -f /etc/dcm.properties");
+    (void)system("rm -f /usr/bin/logupload /tmp/DCMSettings.conf");
+    (void)system("sed -i '/^BUILD_TYPE=dev$/d' /etc/device.properties 2>/dev/null || true");
+    (void)system("rm -f /etc/dcm.properties");
 }
 
 // =============================================================================
@@ -10649,7 +10650,7 @@ TEST_F(SystemServicesTest, GetFirmwareDownloadPercent_WithMegabyteProgress_Cover
 // =============================================================================
 TEST_F(SystemServicesTest, GetBlocklistFlag_InvalidValueInFile_CoversReadParamsError)
 {
-    system("mkdir -p /opt/secure/persistent/opflashstore");
+    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
     // Write an invalid (non true/false) value for "blocklist"
     {
         std::ofstream f("/opt/secure/persistent/opflashstore/devicestate.txt");
