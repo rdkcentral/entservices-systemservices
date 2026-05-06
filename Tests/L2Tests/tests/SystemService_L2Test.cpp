@@ -6411,7 +6411,7 @@ TEST_F(SystemService_L2Test, Helper_Cov_GetXconfOverrideUrl_CommentOnlyFile)
 /* setDeepSleepTimer seconds=0: covers populateResponseWithError(SysSrv_MissingKeyValues) branch */
 TEST_F(SystemService_L2Test, SysImpl_SetDeepSleepTimer_ZeroSeconds_JSONRPC)
 {
-    TEST_LOG("SysImpl: setDeepSleepTimer(0) - covers MissingKeyValues error branch");
+    TEST_LOG("SysImpl_SetDeepSleepTimer_ZeroSeconds: seconds=0 returns MissingKeyValues error");
     JsonObject params;
     params["seconds"] = 0;
     JsonObject result;
@@ -6422,7 +6422,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetDeepSleepTimer_ZeroSeconds_JSONRPC)
 /* setDeepSleepTimer seconds=999999: covers overflow clamping branch (>864000 → clamp to 0) */
 TEST_F(SystemService_L2Test, SysImpl_SetDeepSleepTimer_OverflowSeconds_JSONRPC)
 {
-    TEST_LOG("SysImpl: setDeepSleepTimer(999999) - covers value>864000 clamping branch");
+    TEST_LOG("SysImpl_SetDeepSleepTimer_OverflowSeconds: seconds=999999 clamped (exceeds 864000)");
     JsonObject params;
     params["seconds"] = 999999;
     JsonObject result;
@@ -6433,7 +6433,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetDeepSleepTimer_OverflowSeconds_JSONRPC)
 /* setBootLoaderSplashScreen empty path → covers invalid path branch */
 TEST_F(SystemService_L2Test, SysImpl_SetBootLoaderSplashScreen_EmptyPath_JSONRPC)
 {
-    TEST_LOG("SysImpl: setBootLoaderSplashScreen('') - covers empty/invalid path branch");
+    TEST_LOG("SysImpl_SetBootLoaderSplashScreen_EmptyPath: empty path is rejected");
     JsonObject params;
     params["path"] = "";
     JsonObject result;
@@ -6444,7 +6444,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetBootLoaderSplashScreen_EmptyPath_JSONRPC
 /* setBootLoaderSplashScreen non-existent path → covers fileExists==false branch */
 TEST_F(SystemService_L2Test, SysImpl_SetBootLoaderSplashScreen_NonExistentPath_JSONRPC)
 {
-    TEST_LOG("SysImpl: setBootLoaderSplashScreen('/no/such/file') - covers fileExists false branch");
+    TEST_LOG("SysImpl_SetBootLoaderSplashScreen_NonExistentPath: non-existent file path is rejected");
     JsonObject params;
     params["path"] = "/no/such/splash.png";
     JsonObject result;
@@ -6494,7 +6494,7 @@ TEST_F(SystemService_L2Test, SysImpl_IARM_FirmwareUpdateState_Complete)
 /* Firmware update state same value twice → covers the else branch in OnFirmwareUpdateStateChange */
 TEST_F(SystemService_L2Test, SysImpl_IARM_FirmwareUpdateState_SameStateTwice)
 {
-    TEST_LOG("SysImpl: IARM firmware update state → same state twice (covers else branch)");
+    TEST_LOG("SysImpl_IARM_FirmwareUpdateState_SameStateTwice: same firmware state fired twice");
     if (systemStateChanged == nullptr) {
         TEST_LOG("  systemStateChanged handler not captured, skipping");
         return;
@@ -6513,7 +6513,7 @@ TEST_F(SystemService_L2Test, SysImpl_IARM_FirmwareUpdateState_SameStateTwice)
 /* Firmware update → CRITICAL_REBOOT covers OnFirmwarePendingReboot */
 TEST_F(SystemService_L2Test, SysImpl_IARM_FirmwarePendingReboot)
 {
-    TEST_LOG("SysImpl: IARM firmware update → CRITICAL_REBOOT (covers OnFirmwarePendingReboot)");
+    TEST_LOG("SysImpl_IARM_FirmwarePendingReboot: CRITICAL_REBOOT triggers OnFirmwarePendingReboot");
     if (systemStateChanged == nullptr) {
         TEST_LOG("  systemStateChanged handler not captured, skipping");
         return;
@@ -6529,7 +6529,7 @@ TEST_F(SystemService_L2Test, SysImpl_IARM_FirmwarePendingReboot)
 /* TIME_SOURCE state=1 → covers OnClockSet */
 TEST_F(SystemService_L2Test, SysImpl_IARM_ClockSet)
 {
-    TEST_LOG("SysImpl: IARM TIME_SOURCE event (covers OnClockSet)");
+    TEST_LOG("SysImpl_IARM_ClockSet: TIME_SOURCE state=1 triggers OnClockSet");
     if (systemStateChanged == nullptr) {
         TEST_LOG("  systemStateChanged handler not captured, skipping");
         return;
@@ -6545,7 +6545,7 @@ TEST_F(SystemService_L2Test, SysImpl_IARM_ClockSet)
 /* TIME_SOURCE state=0 → skipped (covers the if(state) false branch) */
 TEST_F(SystemService_L2Test, SysImpl_IARM_ClockNotSet)
 {
-    TEST_LOG("SysImpl: IARM TIME_SOURCE event state=0 (covers false branch)");
+    TEST_LOG("SysImpl_IARM_ClockNotSet: TIME_SOURCE state=0 skips OnClockSet");
     if (systemStateChanged == nullptr) {
         TEST_LOG("  systemStateChanged handler not captured, skipping");
         return;
@@ -6561,7 +6561,7 @@ TEST_F(SystemService_L2Test, SysImpl_IARM_ClockNotSet)
 /* LOG_UPLOAD event → covers OnLogUpload (m_uploadLogsPid=-1 → else branch) */
 TEST_F(SystemService_L2Test, SysImpl_IARM_LogUpload_NoPid)
 {
-    TEST_LOG("SysImpl: IARM LOG_UPLOAD event (covers OnLogUpload else branch: no pid)");
+    TEST_LOG("SysImpl_IARM_LogUpload_NoPid: LOG_UPLOAD event with no active pid runs else branch");
     if (systemStateChanged == nullptr) {
         TEST_LOG("  systemStateChanged handler not captured, skipping");
         return;
@@ -6577,7 +6577,7 @@ TEST_F(SystemService_L2Test, SysImpl_IARM_LogUpload_NoPid)
 /* Default case in _systemStateChanged (unhandled stateId) */
 TEST_F(SystemService_L2Test, SysImpl_IARM_DefaultState)
 {
-    TEST_LOG("SysImpl: IARM unknown stateId (covers default case in switch)");
+    TEST_LOG("SysImpl_IARM_DefaultState: unhandled stateId hits default case in switch");
     if (systemStateChanged == nullptr) {
         TEST_LOG("  systemStateChanged handler not captured, skipping");
         return;
@@ -6594,7 +6594,7 @@ TEST_F(SystemService_L2Test, SysImpl_IARM_DefaultState)
 /* Wrong eventId → covers early return in _systemStateChanged */
 TEST_F(SystemService_L2Test, SysImpl_IARM_WrongEventId)
 {
-    TEST_LOG("SysImpl: IARM wrong eventId (covers early return in _systemStateChanged)");
+    TEST_LOG("SysImpl_IARM_WrongEventId: wrong eventId triggers early return in handler");
     if (systemStateChanged == nullptr) {
         TEST_LOG("  systemStateChanged handler not captured, skipping");
         return;
@@ -6609,7 +6609,7 @@ TEST_F(SystemService_L2Test, SysImpl_IARM_WrongEventId)
 /* Device management update event → covers _deviceMgtUpdateReceived + OnDeviceMgtUpdateReceived */
 TEST_F(SystemService_L2Test, SysImpl_IARM_DeviceMgtUpdate)
 {
-    TEST_LOG("SysImpl: IARM device management update (covers _deviceMgtUpdateReceived)");
+    TEST_LOG("SysImpl_IARM_DeviceMgtUpdate: device management update triggers OnDeviceMgtUpdateReceived");
     if (sysMgrDeviceHandler == nullptr) {
         TEST_LOG("  sysMgrDeviceHandler not captured, skipping");
         return;
@@ -6894,7 +6894,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetMacAddresses_NoScript_JSONRPC)
 /* setTerritory with empty territory → error path */
 TEST_F(SystemService_L2Test, SysImpl_SetTerritory_Empty_JSONRPC)
 {
-    TEST_LOG("SysImpl: setTerritory with empty territory (covers empty-territory error branch)");
+    TEST_LOG("SysImpl_SetTerritory_Empty: empty territory string returns error");
     JsonObject params;
     params["territory"] = "";
     params["region"] = "";
@@ -6909,7 +6909,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetTerritory_Empty_JSONRPC)
 /* setTerritory with invalid length territory → error path */
 TEST_F(SystemService_L2Test, SysImpl_SetTerritory_InvalidFormat_JSONRPC)
 {
-    TEST_LOG("SysImpl: setTerritory with invalid length territory (covers invalid-territory branch)");
+    TEST_LOG("SysImpl_SetTerritory_InvalidLength: territory string of invalid length is rejected");
     JsonObject params;
     params["territory"] = "AB";   /* 2 chars, not 3 → invalid */
     params["region"] = "US-NY";
@@ -6921,7 +6921,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetTerritory_InvalidFormat_JSONRPC)
 /* setMode with empty mode → covers populateResponseWithError(SysSrv_MissingKeyValues) */
 TEST_F(SystemService_L2Test, SysImpl_SetMode_Empty_JSONRPC)
 {
-    TEST_LOG("SysImpl: setMode with empty mode string (covers MissingKeyValues error branch)");
+    TEST_LOG("SysImpl_SetMode_EmptyModeString: empty mode string returns MissingKeyValues error");
     JsonObject params;
     params["mode"] = "";
     params["duration"] = 0;
@@ -6936,7 +6936,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetMode_Empty_JSONRPC)
 /* setMode with completely invalid mode string → covers invalid-mode early return */
 TEST_F(SystemService_L2Test, SysImpl_SetMode_InvalidMode_JSONRPC)
 {
-    TEST_LOG("SysImpl: setMode with invalid mode (covers invalid-mode validation branch)");
+    TEST_LOG("SysImpl_SetMode_InvalidMode: invalid mode name is rejected");
     JsonObject params;
     params["mode"] = "INVALID_XYZ_MODE";
     params["duration"] = 0;
@@ -6952,7 +6952,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetMode_InvalidMode_JSONRPC)
 /* setTimeZoneDST with empty string → covers MissingKeyValues branch */
 TEST_F(SystemService_L2Test, SysImpl_SetTimeZoneDST_Empty_JSONRPC)
 {
-    TEST_LOG("SysImpl: setTimeZoneDST with empty timeZone (covers MissingKeyValues branch)");
+    TEST_LOG("SysImpl_SetTimeZoneDST_EmptyTimeZone: empty timezone string returns MissingKeyValues error");
     JsonObject params;
     params["timeZone"] = "";
     params["accuracy"] = "INITIAL";
@@ -6992,7 +6992,7 @@ TEST_F(SystemService_L2Test, SysImpl_Reboot_JSONRPC)
 /* SetTerritory via JSONRPC - valid territory covers full success path */
 TEST_F(SystemService_L2Test, SysImpl_SetTerritory_Valid_JSONRPC)
 {
-    TEST_LOG("SysImpl: setTerritory with valid DEU/DE-BY (covers writeTerritory success path)");
+    TEST_LOG("SysImpl_SetTerritory_Valid_DEU_DEBY: valid DEU/DE-BY writes territory to file");
     JsonObject params;
     params["territory"] = "DEU";
     params["region"] = "DE-BY";
@@ -7029,7 +7029,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetMode_WAREHOUSE_NegDuration_JSONRPC)
 /* cTimer::start() with no interval/callback → should return false */
 TEST_F(SystemService_L2Test, CTimer_Coverage_StartInvalid)
 {
-    TEST_LOG("cTimer: start() with no interval set (covers false-return branch)");
+    TEST_LOG("cTimer_Start_NoInterval: start with no interval set returns false");
 
     cTimer timer;
 
@@ -7042,7 +7042,7 @@ TEST_F(SystemService_L2Test, CTimer_Coverage_StartInvalid)
 /* cTimer: start/stop/join → covers timerFunction, start, stop, join */
 TEST_F(SystemService_L2Test, CTimer_Coverage_StartStopJoin)
 {
-    TEST_LOG("cTimer: start/stop/join (covers timerFunction, start, stop, join)");
+    TEST_LOG("cTimer_StartStopJoin: full start/stop/join cycle");
 
     static int callCount = 0;
     callCount = 0;
@@ -7075,7 +7075,7 @@ TEST_F(SystemService_L2Test, CTimer_Coverage_StartStopJoin)
  * then detach the already-finished thread. No race condition possible. */
 TEST_F(SystemService_L2Test, CTimer_Coverage_Detach)
 {
-    TEST_LOG("cTimer: start/stop/detach (covers detach safely)");
+    TEST_LOG("cTimer_StartStopDetach: start/stop/detach cycle");
 
     static bool executed = false;
     executed = false;
@@ -7102,7 +7102,7 @@ TEST_F(SystemService_L2Test, CTimer_Coverage_Detach)
 /* cTimer: start/stop/join sequence → covers join() */
 TEST_F(SystemService_L2Test, CTimer_Coverage_Join)
 {
-    TEST_LOG("cTimer: start/stop/join sequence (covers join)");
+    TEST_LOG("cTimer_StartStopJoinSequence: start/stop/join in sequence");
 
     static int jcnt = 0;
     jcnt = 0;
@@ -7856,7 +7856,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetNetworkStandbyMode_CachedPath_COMRPC)
  * ------------------------------------------------------------------- */
 TEST_F(SystemService_L2Test, SysImpl_PowerMode_LightSleep_To_DeepSleep_COMRPC)
 {
-    TEST_LOG("PowerMode LIGHT_SLEEP→DEEP_SLEEP: covers powerModeEnumToString LIGHT/DEEP branches");
+    TEST_LOG("SysImpl_PowerMode_LightSleep_To_DeepSleep: LIGHT_SLEEP to DEEP_SLEEP transitions both states");
 
     if (pwrMgrEventHandler == nullptr) {
         TEST_LOG("  pwrMgrEventHandler not captured, skipping");
@@ -7881,7 +7881,7 @@ TEST_F(SystemService_L2Test, SysImpl_PowerMode_LightSleep_To_DeepSleep_COMRPC)
  * ------------------------------------------------------------------- */
 TEST_F(SystemService_L2Test, SysImpl_PowerMode_DeepSleep_To_LightSleep_COMRPC)
 {
-    TEST_LOG("PowerMode DEEP_SLEEP→LIGHT_SLEEP: covers LIGHT_SLEEP block (currentPowerState!=ON) + ThunderWake1 branch");
+    TEST_LOG("SysImpl_PowerMode_DeepSleep_To_LightSleep: DEEP_SLEEP to LIGHT_SLEEP with non-ON current state");
 
     if (pwrMgrEventHandler == nullptr) {
         TEST_LOG("  pwrMgrEventHandler not captured, skipping");
@@ -7904,7 +7904,7 @@ TEST_F(SystemService_L2Test, SysImpl_PowerMode_DeepSleep_To_LightSleep_COMRPC)
  * ------------------------------------------------------------------- */
 TEST_F(SystemService_L2Test, SysImpl_PowerMode_LightSleep_To_ON_COMRPC)
 {
-    TEST_LOG("PowerMode LIGHT_SLEEP→ON: covers ThunderWake2 t2_event_d branch");
+    TEST_LOG("SysImpl_PowerMode_LightSleep_To_ON: LIGHT_SLEEP to ON triggers ThunderWake2 event");
 
     if (pwrMgrEventHandler == nullptr) {
         TEST_LOG("  pwrMgrEventHandler not captured, skipping");
@@ -7976,7 +7976,7 @@ TEST_F(SystemService_L2Test, SysImpl_PwrMgr_UnhandledEvent_COMRPC)
  * ------------------------------------------------------------------- */
 TEST_F(SystemService_L2Test, SysImpl_PowerMode_ON_To_Standby_COMRPC)
 {
-    TEST_LOG("PowerMode ON→STANDBY: covers STANDBY branch in OnSystemPowerStateChanged");
+    TEST_LOG("SysImpl_PowerMode_ON_To_Standby: ON to STANDBY transition");
 
     if (pwrMgrEventHandler == nullptr) {
         TEST_LOG("  pwrMgrEventHandler not captured, skipping");
@@ -8137,7 +8137,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetPlatformConfiguration_DeviceInfo_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("GetPlatformConfiguration('DeviceInfo'): covers DeviceInfo branch");
+    TEST_LOG("SysImpl_GetPlatformConfiguration_DeviceInfo: queries DeviceInfo section");
 
     Exchange::ISystemServices::PlatformConfig platformConfig;
     uint32_t result = m_SystemServicesPlugin->GetPlatformConfiguration("DeviceInfo", platformConfig);
@@ -8160,7 +8160,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetPlatformConfiguration_AccountInfo_COMRPC
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("GetPlatformConfiguration('AccountInfo'): covers AccountInfo branch");
+    TEST_LOG("SysImpl_GetPlatformConfiguration_AccountInfo: queries AccountInfo section");
 
     Exchange::ISystemServices::PlatformConfig platformConfig;
     uint32_t result = m_SystemServicesPlugin->GetPlatformConfiguration("AccountInfo", platformConfig);
@@ -8419,7 +8419,7 @@ TEST_F(SystemService_L2Test, SysImpl_Dispatch_OnLogUpload_WithHandler_COMRPC)
  * ------------------------------------------------------------------- */
 TEST_F(SystemService_L2Test, SysImpl_PowerMode_Standby_To_ON_COMRPC)
 {
-    TEST_LOG("PowerMode STANDBY→ON: covers powerModeEnumToString POWER_STATE_ON branch");
+    TEST_LOG("SysImpl_PowerMode_Standby_To_ON: STANDBY to ON maps to POWER_STATE_ON");
 
     if (pwrMgrEventHandler == nullptr) {
         TEST_LOG("  pwrMgrEventHandler not captured, skipping");
@@ -8441,7 +8441,7 @@ TEST_F(SystemService_L2Test, SysImpl_PowerMode_Standby_To_ON_COMRPC)
  * ------------------------------------------------------------------- */
 TEST_F(SystemService_L2Test, SysImpl_PowerMode_ON_To_OFF_COMRPC)
 {
-    TEST_LOG("PowerMode ON→OFF: covers powerModeEnumToString POWER_STATE_OFF branch");
+    TEST_LOG("SysImpl_PowerMode_ON_To_OFF: ON to OFF maps to POWER_STATE_OFF");
 
     if (pwrMgrEventHandler == nullptr) {
         TEST_LOG("  pwrMgrEventHandler not captured, skipping");
@@ -8467,7 +8467,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetPowerState_ON_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("GetPowerState: override HAL to return ON → covers 'ON' mapping branch (L1491)");
+    TEST_LOG("SysImpl_GetPowerState_ON: HAL returns ON power state");
 
     ON_CALL(*p_powerManagerHalMock, PLAT_API_GetPowerState(::testing::_))
         .WillByDefault(::testing::Invoke([](PWRMgr_PowerState_t* powerState) {
@@ -8552,7 +8552,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetMode_WAREHOUSE_FileCreate_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("SetMode WAREHOUSE duration=-1: covers WAREHOUSE file creation (L2860-2863)");
+    TEST_LOG("SysImpl_SetMode_WAREHOUSE_FileCreate: WAREHOUSE mode with duration=-1 creates mode file");
 
     ON_CALL(*p_iarmBusImplMock, IARM_Bus_Call(
         ::testing::StrEq(IARM_BUS_DAEMON_NAME),
@@ -8592,7 +8592,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetMode_EAS_IARMFail_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("SetMode EAS IARM fail → covers stopModeTimer+LOGERR path (L2851-2855)");
+    TEST_LOG("SysImpl_SetMode_EAS_IARMFail: IARM failure triggers stopModeTimer and LOGERR");
 
     ON_CALL(*p_iarmBusImplMock, IARM_Bus_Call(
         ::testing::StrEq(IARM_BUS_DAEMON_NAME),
@@ -8657,11 +8657,11 @@ TEST_F(SystemService_L2Test, SysImpl_GetValueFromPropertiesFile_AllBranches)
     JsonObject params, result;
     params["query"] = "DeviceInfo";
     InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
-    TEST_LOG("  DeviceInfo query: covers GetValueFromPropertiesFile paths");
+    TEST_LOG("  DeviceInfo query via getPlatformConfiguration");
 
     params["query"] = "";
     InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
-    TEST_LOG("  empty query: covers both AccountInfo+DeviceInfo GetValueFromPropertiesFile paths");
+    TEST_LOG("  Empty query via getPlatformConfiguration returns all sections");
 
     std::remove(testFile);
 }
@@ -8795,7 +8795,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetFirmwareDownloadPercent_WithProgressFile
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("GetFirmwareDownloadPercent: create /opt/curl_progress → covers getDownloadProgress");
+    TEST_LOG("SysImpl_GetFirmwareDownloadPercent: reads download progress from /opt/curl_progress");
 
     /* Create curl progress file: field[2] = "100" (pct), field[1] = "1234M" (has 'M') */
     {
@@ -8830,7 +8830,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetLastFirmwareFailureReason_Known_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("GetLastFirmwareFailureReason: known reason → covers L1619-1621 + L1632");
+    TEST_LOG("SysImpl_GetLastFirmwareFailureReason_Known: known failure reason found in status file");
 
     {
         std::ofstream f("/opt/fwdnldstatus.txt");
@@ -8864,7 +8864,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetLastFirmwareFailureReason_Unknown_COMRPC
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("GetLastFirmwareFailureReason: unknown reason → covers L1634 LOGWARN");
+    TEST_LOG("SysImpl_GetLastFirmwareFailureReason_Unknown: unknown reason triggers LOGWARN");
 
     {
         std::ofstream f("/opt/fwdnldstatus.txt");
@@ -8897,7 +8897,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetMode_InvalidModeName_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("SetMode: invalid mode name → covers L2814-2817 (incorrect-mode branch)");
+    TEST_LOG("SysImpl_SetMode_InvalidModeName: invalid mode name is rejected");
 
     Exchange::ISystemServices::ModeInfo modeInfo;
     modeInfo.mode     = "TOTALLY_INVALID_MODE_XYZ";
@@ -8927,7 +8927,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetTerritory_InvalidRegionFormat_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("SetTerritory: invalid region format → covers L2480-2481 LOGWARN branch");
+    TEST_LOG("SysImpl_SetTerritory_InvalidRegionFormat: territory with invalid region format");
 
     Exchange::ISystemServices::SystemError sysError{};
     bool success = false;
@@ -8987,7 +8987,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetBlocklistFlag_InvalidBoolValue_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("GetBlocklistFlag: BLOCKLIST=notvalid file → covers L954-956 invalid-value path");
+    TEST_LOG("SysImpl_GetBlocklistFlag_InvalidBoolValue: BLOCKLIST=notvalid is an invalid value");
 
     mkdir("/opt/secure",                         0755);
     mkdir("/opt/secure/persistent",              0755);
@@ -9023,7 +9023,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetBlocklistFlag_ParamNotFound_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("GetBlocklistFlag: no BLOCKLIST key in file → covers L973 param-not-found path");
+    TEST_LOG("SysImpl_GetBlocklistFlag_ParamNotFound: no BLOCKLIST key in config file");
 
     mkdir("/opt/secure",                         0755);
     mkdir("/opt/secure/persistent",              0755);
@@ -9074,7 +9074,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetRFCConfig_InvalidCharsetName_JSONRPC)
  * ------------------------------------------------------------------- */
 TEST_F(SystemService_L2Test, SysImpl_GetRFCConfig_MockedSuccess_JSONRPC)
 {
-    TEST_LOG("GetRFCConfig: mock getRFCParameter SUCCESS → covers L3467-3468");
+    TEST_LOG("SysImpl_GetRFCConfig_MockedSuccess: getRFCParameter returns SUCCESS");
 
     /* Override RFC mock to return success for our specific test key */
     ON_CALL(*p_rfcApiImplMock, getRFCParameter(
@@ -9107,7 +9107,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetRFCConfig_MockedSuccess_JSONRPC)
  * ------------------------------------------------------------------- */
 TEST_F(SystemService_L2Test, SysImpl_GetDeviceInfo_UnallowableChars_JSONRPC)
 {
-    TEST_LOG("GetDeviceInfo: query with '$' char → covers L3526-3528 (unallowable input)");
+    TEST_LOG("SysImpl_GetDeviceInfo_UnallowableChars: device info query with special chars is rejected");
 
     JsonObject params;
     JsonArray queryArr;
@@ -9132,7 +9132,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetTerritory_CorruptedTerritoryFile_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("GetTerritory: corrupted territory file (no colon) → covers L2084+L2115-2118");
+    TEST_LOG("SysImpl_GetTerritory_CorruptedTerritoryFile: territory file missing colon separator");
 
     mkdir("/opt/secure", 0755);
     mkdir("/opt/secure/persistent", 0755);
@@ -9170,7 +9170,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetTerritory_CorruptedRegionFile_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("GetTerritory: valid territory, invalid region → covers L2107-2110 LOGERR");
+    TEST_LOG("SysImpl_GetTerritory_CorruptedRegionFile: valid territory with invalid region triggers LOGERR");
 
     mkdir("/opt/secure", 0755);
     mkdir("/opt/secure/persistent", 0755);
@@ -9256,7 +9256,7 @@ TEST_F(SystemService_L2Test, SysImpl_PowerModeEnumToString_AllCases_COMRPC)
  * ------------------------------------------------------------------- */
 TEST_F(SystemService_L2Test, SysImpl_PowerMode_ON_STANDBY_RFC_LogUpload_COMRPC)
 {
-    TEST_LOG("PowerMode ON→STANDBY with RFC_LOG_UPLOAD=true → covers L2894-2914");
+    TEST_LOG("SysImpl_PowerMode_ON_STANDBY_RFC_LogUpload: RFC log upload triggered on STANDBY transition");
 
     if (pwrMgrEventHandler == nullptr) {
         TEST_LOG("  pwrMgrEventHandler not captured, skipping");
@@ -9297,7 +9297,7 @@ TEST_F(SystemService_L2Test, SysImpl_PowerMode_ON_STANDBY_RFC_LogUpload_COMRPC)
  * ------------------------------------------------------------------- */
 TEST_F(SystemService_L2Test, SysImpl_FriendlyName_RFC_Success_JSONRPC)
 {
-    TEST_LOG("FriendlyName RFC success path → covers L402-403 m_friendlyName assignment");
+    TEST_LOG("SysImpl_FriendlyName_RFC_Success: RFC successfully sets m_friendlyName");
 
     /* Override RFC mock to return success for TR181_SYSTEM_FRIENDLY_NAME */
     ON_CALL(*p_rfcApiImplMock, getRFCParameter(
@@ -9379,7 +9379,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetBlocklistFlag_OpFlashFailure_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("GetBlocklistFlag: opflashstore dir creation fails → covers L1251-1256");
+    TEST_LOG("SysImpl_GetBlocklistFlag_OpFlashFailure: opflash store directory creation fails");
 
     /* Create parent dirs, then put a FILE at /opt/secure/persistent/opflashstore
      * so mkdir() inside checkOpFlashStoreDir() fails with ENOTDIR or EEXIST(file) */
@@ -9417,7 +9417,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetSystemVersions_BranchRegexMatch_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("GetSystemVersions: BRANCH=_5.1.2.3.4 → regex match → covers L2304");
+    TEST_LOG("SysImpl_GetSystemVersions_BranchRegexMatch: BRANCH=_5.1.2.3.4 triggers regex match");
 
     /* Create /version.txt with BRANCH entry matching N.N.N.N.N regex */
     {
@@ -9455,7 +9455,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetLastFirmwareFailureReason_NoFile_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("GetLastFirmwareFailureReason: no-file path → covers L1636 LOGINFO branch");
+    TEST_LOG("SysImpl_GetLastFirmwareFailureReason_NoFile: missing status file triggers LOGINFO");
 
     /* Ensure file does NOT exist → getFileContent fails → LOGINFO("Could not read...") */
     std::remove("/opt/fwdnldstatus.txt");
@@ -9484,7 +9484,7 @@ TEST_F(SystemService_L2Test, SysImpl_RequestSystemUptime_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("RequestSystemUptime: covers L2270-2295 body + L2282 potential branch");
+    TEST_LOG("SysImpl_RequestSystemUptime: reads system uptime from /proc/uptime");
 
     string uptime;
     bool success = false;
@@ -9605,7 +9605,7 @@ TEST_F(SystemService_L2Test, SysImpl_ReportFirmwareInfo_EmptySwUpdateConf_COMRPC
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("reportFirmwareUpdateInfoReceived: STATUS_CODE_NO_SWUPDATE_CONF → covers L1662-1670");
+    TEST_LOG("SysImpl_ReportFirmwareInfo_EmptySwUpdateConf: no swupdate.conf triggers empty response");
 
     m_SystemServicesPlugin->Register(&m_notificationHandler);
 
@@ -9666,7 +9666,7 @@ TEST_F(SystemService_L2Test, SysImpl_ReportFirmwareInfo_WithResponseString_COMRP
         string responseJson = "{\"rebootImmediately\":true,\"firmwareVersion\":\"FW_2.0\"}";
         inst->reportFirmwareUpdateInfoReceived("FW_2.0", 200, true, "FW_1.0", responseJson);
         usleep(100000);
-        TEST_LOG("  fired with JSON responseString → covers xconfResponse.FromString() path");
+        TEST_LOG("  fired with JSON responseString: xconfResponse.FromString() executed");
     }
 
     m_SystemServicesPlugin->Release();
@@ -9724,7 +9724,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetTerritory_ValidTerritoryNoRegion_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("SetTerritory: valid territory FRA + empty region → covers else(region.empty) branch");
+    TEST_LOG("SysImpl_SetTerritory_ValidTerritoryNoRegion: FRA with empty region writes territory only");
 
     mkdir("/opt/secure", 0755);
     mkdir("/opt/secure/persistent", 0755);
@@ -9755,7 +9755,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetTerritory_ValidFileWithRegion_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("GetTerritory: file with valid territory+region → covers full readTerritoryFromFile path");
+    TEST_LOG("SysImpl_GetTerritory_ValidFileWithRegion: reads both territory and region from file");
 
     mkdir("/opt/secure", 0755);
     mkdir("/opt/secure/persistent", 0755);
@@ -9794,7 +9794,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetBootLoaderSplashScreen_ValidPath_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("SetBootLoaderSplashScreen: valid file path → covers L2440-2446 MFRLib IARM call");
+    TEST_LOG("SysImpl_SetBootLoaderSplashScreen_ValidPath: MFRLib IARM call with valid splash screen");
 
     /* Create a valid splash screen file */
     const char* splashPath = "/tmp/test_splash.img";
@@ -9837,7 +9837,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetBootLoaderSplashScreen_IARMFail_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("SetBootLoaderSplashScreen: IARM fail → covers L2443-2448 LOGERR path");
+    TEST_LOG("SysImpl_SetBootLoaderSplashScreen_IARMFail: IARM failure triggers LOGERR path");
 
     const char* splashPath = "/tmp/test_splash_fail.img";
     {
@@ -9917,7 +9917,7 @@ TEST_F(SystemService_L2Test, SysImpl_OnSystemPowerStateChanged_T2Events_COMRPC)
  * ------------------------------------------------------------------- */
 TEST_F(SystemService_L2Test, SysImpl_OnSystemPowerStateChanged_DeepSleep_COMRPC)
 {
-    TEST_LOG("OnSystemPowerStateChanged DEEP_SLEEP: covers L2916-2926 (no pid → skip abort)");
+    TEST_LOG("SysImpl_OnSystemPowerStateChanged_DeepSleep: ON to DEEP_SLEEP with no active upload pid");
 
     if (pwrMgrEventHandler == nullptr) {
         TEST_LOG("  pwrMgrEventHandler not captured, skipping");
@@ -9930,7 +9930,7 @@ TEST_F(SystemService_L2Test, SysImpl_OnSystemPowerStateChanged_DeepSleep_COMRPC)
     ev.data.state.curState = IARM_BUS_PWRMGR_POWERSTATE_ON;
     ev.data.state.newState = IARM_BUS_PWRMGR_POWERSTATE_STANDBY_DEEP_SLEEP;
     pwrMgrEventHandler(IARM_BUS_PWRMGR_NAME, IARM_BUS_PWRMGR_EVENT_MODECHANGED, &ev, 0);
-    TEST_LOG("  Fired ON→DEEP_SLEEP: covers L2916-2926");
+    TEST_LOG("  Fired ON to DEEP_SLEEP power state change event");
 
     /* Restore to ON */
     memset(&ev, 0, sizeof(ev));
@@ -9951,7 +9951,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetSystemVersions_ClientVersionFound_COMRPC
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("GetSystemVersions: client_version in /version.txt → covers L3863-3870");
+    TEST_LOG("SysImpl_GetSystemVersions_ClientVersionFound: client_version line in /version.txt");
 
     {
         std::ofstream f("/version.txt");
@@ -9988,7 +9988,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetSystemVersions_BuildTimeFound_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("GetSystemVersions: BUILD_TIME in /version.txt → covers getStbTimestampString");
+    TEST_LOG("SysImpl_GetSystemVersions_BuildTimeFound: BUILD_TIME line in /version.txt");
 
     {
         std::ofstream f("/version.txt");
@@ -10024,7 +10024,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetMode_EAS_NegDuration_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("SetMode EAS duration=-1: covers L2842-2848 + L2866-2869");
+    TEST_LOG("SysImpl_SetMode_EAS_NegDuration: EAS mode with duration=-1 triggers negative duration path");
 
     ON_CALL(*p_iarmBusImplMock, IARM_Bus_Call(
         ::testing::StrEq(IARM_BUS_DAEMON_NAME),
@@ -10073,7 +10073,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetMode_EmptyMode_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("SetMode empty mode string → covers L2808-2810 MissingKeyValues path");
+    TEST_LOG("SysImpl_SetMode_EmptyMode: empty mode string returns MissingKeyValues error");
 
     Exchange::ISystemServices::ModeInfo modeInfo;
     modeInfo.mode = "";
@@ -10177,7 +10177,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetBlocklistFlag_TrueValue_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("GetBlocklistFlag: BLOCKLIST=true → covers L955 true-value branch");
+    TEST_LOG("SysImpl_GetBlocklistFlag_TrueValue: BLOCKLIST=true returns true");
 
     mkdir("/opt/secure",                         0755);
     mkdir("/opt/secure/persistent",              0755);
@@ -10215,7 +10215,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetBlocklistFlag_FalseValue_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("GetBlocklistFlag: BLOCKLIST=false → covers L956 false-value branch");
+    TEST_LOG("SysImpl_GetBlocklistFlag_FalseValue: BLOCKLIST=false returns false");
 
     mkdir("/opt/secure",                         0755);
     mkdir("/opt/secure/persistent",              0755);
@@ -10253,7 +10253,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetBlocklistFlag_TrueThenFalse_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("SetBlocklistFlag: set true then false → covers full write_parameters path");
+    TEST_LOG("SysImpl_SetBlocklistFlag_TrueThenFalse: set true then set false writes both values");
 
     mkdir("/opt/secure",                         0755);
     mkdir("/opt/secure/persistent",              0755);
@@ -10289,7 +10289,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetNetworkStandbyMode_Live_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("GetNetworkStandbyMode: live call → covers L1590-1609 full body");
+    TEST_LOG("SysImpl_GetNetworkStandbyMode_Live: live IARM call reads network standby mode");
 
     /* First call: m_networkStandbyModeValid=false → reads from _powerManagerPlugin */
     bool nwStandby = false;
@@ -10361,7 +10361,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetTimeZoneDST_WithFile_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("GetTimeZoneDST: with /opt/persistent/timeZoneDSTInfo file → covers L2193-2220");
+    TEST_LOG("SysImpl_GetTimeZoneDST_WithFile: reads timezone from /opt/persistent/timeZoneDSTInfo");
 
     /* Create the timezone DST file (TZ_FILE = "/opt/persistent/timeZoneDST") */
     mkdir("/opt/persistent", 0755);
@@ -10407,7 +10407,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetTerritory_MkdirCreatesDir_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("SetTerritory without pre-creating dir → covers makePersistentDir L3981-3982");
+    TEST_LOG("SysImpl_SetTerritory_MkdirCreatesDir: mkdir creates /opt/secure/persistent/System");
 
     mkdir("/opt/secure",             0755);
     mkdir("/opt/secure/persistent",  0755);
@@ -10418,7 +10418,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetTerritory_MkdirCreatesDir_COMRPC)
     bool success = false;
     uint32_t result = m_SystemServicesPlugin->SetTerritory("USA", "", sysError, success);
     EXPECT_EQ(result, Core::ERROR_NONE);
-    TEST_LOG("  SetTerritory(USA,''): result=%u success=%d", result, success);
+    TEST_LOG("SetTerritory result=%u success=%d", result, success);
 
     std::remove("/opt/secure/persistent/System/Territory.txt");
 
@@ -10439,7 +10439,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetTimeZoneDST_FileAsDir_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("GetTimeZoneDST: TZ_FILE as directory → covers L2202-2204");
+    TEST_LOG("SysImpl_GetTimeZoneDST_FileAsDir: TZ_FILE path exists as directory (unreadable)");
 
     /* Create TZ_FILE path as a directory so fileExists=true but readFromFile fails */
     std::remove("/opt/persistent/timeZoneDST");   /* remove if exists as file */
@@ -10450,7 +10450,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetTimeZoneDST_FileAsDir_COMRPC)
     bool success = false;
     uint32_t result = m_SystemServicesPlugin->GetTimeZoneDST(timeZone, accuracy, success);
     EXPECT_EQ(result, Core::ERROR_NONE);
-    TEST_LOG("  GetTimeZoneDST(dir): timeZone='%s' accuracy='%s' success=%d",
+    TEST_LOG("GetTimeZoneDST timeZone='%s' accuracy='%s' success=%d",
              timeZone.c_str(), accuracy.c_str(), success);
     /* Note: on Linux, ifstream on a directory may or may not open; */
     /* L2202-2204 covered when readFromFile returns false ('null' path) */
@@ -10475,7 +10475,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetSystemVersions_VersionEqFound_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("GetSystemVersions: VERSION= in /version.txt → covers L3865-3878");
+    TEST_LOG("SysImpl_GetSystemVersions_VersionEqFound: VERSION= line found in /version.txt");
 
     /* Write a version file whose first line starts "VERSION=" so the loop body fires */
     {
@@ -10507,7 +10507,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetSystemVersions_VersionEqFound_COMRPC)
  * ------------------------------------------------------------------- */
 TEST_F(SystemService_L2Test, SysImpl_SetWakeupSrc_AllSources_JSONRPC)
 {
-    TEST_LOG("setWakeupSrcConfiguration all sources → covers L2745-2792");
+    TEST_LOG("SysImpl_SetWakeupSrc_AllSources: all wakeup sources enabled for STANDBY");
 
     JsonObject params;
     params["powerState"] = "STANDBY";
@@ -10528,7 +10528,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetWakeupSrc_AllSources_JSONRPC)
     JsonObject result;
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setWakeupSrcConfiguration",
                                           params, result);
-    TEST_LOG("  setWakeupSrcConfiguration all: status=%u", status);
+    TEST_LOG("setWakeupSrcConfiguration status=%u", status);
 }
 
 /* ------------------------------------------------------------------- *
@@ -10538,7 +10538,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetWakeupSrc_AllSources_JSONRPC)
  * ------------------------------------------------------------------- */
 TEST_F(SystemService_L2Test, SysImpl_GetLastFirmwareFailureReason_KnownReason_JSONRPC)
 {
-    TEST_LOG("getLastFirmwareFailureReason known reason → covers L1632");
+    TEST_LOG("SysImpl_GetLastFirmwareFailureReason_KnownReason: reason 'Versions Match' in status file");
 
     const char* statusFile = "/opt/fwdnldstatus.txt";
     {
@@ -10552,9 +10552,9 @@ TEST_F(SystemService_L2Test, SysImpl_GetLastFirmwareFailureReason_KnownReason_JS
     uint32_t status = InvokeServiceMethod("org.rdk.System.1",
                                           "getLastFirmwareFailureReason", params, result);
     EXPECT_EQ(status, Core::ERROR_NONE);
-    TEST_LOG("  getLastFirmwareFailureReason: status=%u", status);
+    TEST_LOG("getLastFirmwareFailureReason status=%u", status);
     if (result.HasLabel("failReason")) {
-        TEST_LOG("  failReason='%s'", result["failReason"].String().c_str());
+        TEST_LOG("failReason='%s'", result["failReason"].String().c_str());
     }
 
     std::remove(statusFile);
