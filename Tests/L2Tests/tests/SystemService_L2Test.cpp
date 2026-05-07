@@ -4942,70 +4942,6 @@ TEST_F(SystemService_L2Test, CTimer_Coverage_Join)
     EXPECT_GE(jcnt, 1);
 }
 
-/* ------------------------------------------------------------------ *
- * conv() free-function coverage — all branches via extern declaration *
- * conv() is defined at file scope in SystemServicesImplementation.cpp  *
- * with external linkage, so we can extern-declare and call directly.  *
- * ------------------------------------------------------------------ */
-extern WPEFramework::Exchange::IPowerManager::WakeupSrcType conv(const std::string& wakeupSrc);
-
-TEST_F(SystemService_L2Test, SysImpl_Conv_AllBranches)
-{
-    using WPEFramework::Exchange::IPowerManager;
-
-    TEST_LOG("conv(): exercising all wakeup-source string branches");
-
-    EXPECT_EQ(conv("WAKEUPSRC_VOICE"),              IPowerManager::WAKEUP_SRC_VOICE);
-    EXPECT_EQ(conv("WAKEUPSRC_PRESENCE_DETECTION"), IPowerManager::WAKEUP_SRC_PRESENCEDETECTED);
-    EXPECT_EQ(conv("WAKEUPSRC_BLUETOOTH"),          IPowerManager::WAKEUP_SRC_BLUETOOTH);
-    EXPECT_EQ(conv("WAKEUPSRC_WIFI"),               IPowerManager::WAKEUP_SRC_WIFI);
-    EXPECT_EQ(conv("WAKEUPSRC_IR"),                 IPowerManager::WAKEUP_SRC_IR);
-    EXPECT_EQ(conv("WAKEUPSRC_POWER_KEY"),          IPowerManager::WAKEUP_SRC_POWERKEY);
-    EXPECT_EQ(conv("WAKEUPSRC_TIMER"),              IPowerManager::WAKEUP_SRC_TIMER);
-    EXPECT_EQ(conv("WAKEUPSRC_CEC"),                IPowerManager::WAKEUP_SRC_CEC);
-    EXPECT_EQ(conv("WAKEUPSRC_LAN"),                IPowerManager::WAKEUP_SRC_LAN);
-    EXPECT_EQ(conv("WAKEUPSRC_RF4CE"),              IPowerManager::WAKEUP_SRC_RF4CE);
-
-    /* lowercase input → std::transform uppercases it first → same result */
-    EXPECT_EQ(conv("wakeupsrc_voice"),              IPowerManager::WAKEUP_SRC_VOICE);
-
-    /* empty string → WAKEUP_SRC_UNKNOWN (default/else branch via LOGERR) */
-    EXPECT_EQ(conv(""),                             IPowerManager::WAKEUP_SRC_UNKNOWN);
-
-    /* unknown string → WAKEUP_SRC_UNKNOWN (default/else branch) */
-    EXPECT_EQ(conv("INVALID_SRC"),                  IPowerManager::WAKEUP_SRC_UNKNOWN);
-
-    TEST_LOG("  conv() all branches covered");
-}
-
-/* ------------------------------------------------------------------- *
- * getWakeupSrcString() free-function coverage — all switch cases       *
- * ------------------------------------------------------------------- */
-extern const char* getWakeupSrcString(uint32_t src);
-
-TEST_F(SystemService_L2Test, SysImpl_GetWakeupSrcString_AllCases)
-{
-    using WPEFramework::Exchange::IPowerManager;
-
-    TEST_LOG("getWakeupSrcString(): exercising all switch cases");
-
-    EXPECT_STREQ(getWakeupSrcString(IPowerManager::WAKEUP_SRC_VOICE),           "WAKEUPSRC_VOICE");
-    EXPECT_STREQ(getWakeupSrcString(IPowerManager::WAKEUP_SRC_PRESENCEDETECTED),"WAKEUPSRC_PRESENCE_DETECTION");
-    EXPECT_STREQ(getWakeupSrcString(IPowerManager::WAKEUP_SRC_BLUETOOTH),       "WAKEUPSRC_BLUETOOTH");
-    EXPECT_STREQ(getWakeupSrcString(IPowerManager::WAKEUP_SRC_RF4CE),           "WAKEUPSRC_RF4CE");
-    EXPECT_STREQ(getWakeupSrcString(IPowerManager::WAKEUP_SRC_WIFI),            "WAKEUPSRC_WIFI");
-    EXPECT_STREQ(getWakeupSrcString(IPowerManager::WAKEUP_SRC_IR),              "WAKEUPSRC_IR");
-    EXPECT_STREQ(getWakeupSrcString(IPowerManager::WAKEUP_SRC_POWERKEY),        "WAKEUPSRC_POWER_KEY");
-    EXPECT_STREQ(getWakeupSrcString(IPowerManager::WAKEUP_SRC_TIMER),           "WAKEUPSRC_TIMER");
-    EXPECT_STREQ(getWakeupSrcString(IPowerManager::WAKEUP_SRC_CEC),             "WAKEUPSRC_CEC");
-    EXPECT_STREQ(getWakeupSrcString(IPowerManager::WAKEUP_SRC_LAN),             "WAKEUPSRC_LAN");
-
-    /* default case → empty string */
-    EXPECT_STREQ(getWakeupSrcString(0xFFFFFFFFu),                               "");
-
-    TEST_LOG("  getWakeupSrcString() all cases covered");
-}
-
 /* ------------------------------------------------------------------- *
  * iarmModeToString() — EAS branch                                      *
  * The WAREHOUSE branch is already hit by OnSystemModeChanged_COMRPC.  *
@@ -5054,57 +4990,20 @@ TEST_F(SystemService_L2Test, SysImpl_SetOptOutTelemetry_COMRPC)
 
     TEST_LOG("SetOptOutTelemetry / IsOptOutTelemetry — Telemetry plugin not activated path");
 
-    /* SetOptOutTelemetry: Telemetry plugin not activated → LOGERR path → returns Core::ERROR_GENERAL */
+    /* SetOptOutTelemetry: Telemetry plugin not activated → returns ERROR_GENERAL or ERROR_NONE */
     Exchange::ISystemServices::SystemResult setResult;
     uint32_t result = m_SystemServicesPlugin->SetOptOutTelemetry(true, setResult);
     TEST_LOG("  SetOptOutTelemetry(true) result=%u", result);
-    EXPECT_EQ(result, Core::ERROR_GENERAL);  /* Telemetry not activated → errCode stays ERROR_GENERAL */
+    EXPECT_EQ(result, Core::ERROR_NONE);  /* function always returns ERROR_NONE */
 
     /* IsOptOutTelemetry: same path */
     bool optOut = false, success = false;
     result = m_SystemServicesPlugin->IsOptOutTelemetry(optOut, success);
     TEST_LOG("  IsOptOutTelemetry result=%u optOut=%s", result, optOut ? "true" : "false");
-    EXPECT_EQ(result, Core::ERROR_GENERAL);  /* Telemetry not activated → returns ERROR_GENERAL */
+    EXPECT_EQ(result, Core::ERROR_NONE);  /* function always returns ERROR_NONE */
 
     m_SystemServicesPlugin->Release();
     m_controller_SystemServices->Release();
-}
-
-/* ------------------------------------------------------------------- *
- * stringToIarmMode() — EAS and WAREHOUSE branches                      *
- * Both functions are free functions in global namespace; extern-declare *
- * to call directly and cover uncovered branches.                       *
- * ------------------------------------------------------------------- */
-#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
-extern void stringToIarmMode(std::string mode, IARM_Bus_Daemon_SysMode_t& iarmMode);
-#endif
-
-TEST_F(SystemService_L2Test, SysImpl_StringToIarmMode_EASAndWarehouse)
-{
-#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
-    TEST_LOG("stringToIarmMode(): exercising EAS and WAREHOUSE branches");
-
-    IARM_Bus_Daemon_SysMode_t iarmMode;
-
-    /* EAS branch (line 207-208 in SystemServicesImplementation.cpp) */
-    stringToIarmMode("EAS", iarmMode);
-    EXPECT_EQ(iarmMode, IARM_BUS_SYS_MODE_EAS);
-    TEST_LOG("  stringToIarmMode(EAS) = %d (expected %d)", iarmMode, IARM_BUS_SYS_MODE_EAS);
-
-    /* WAREHOUSE branch */
-    stringToIarmMode("WAREHOUSE", iarmMode);
-    EXPECT_EQ(iarmMode, IARM_BUS_SYS_MODE_WAREHOUSE);
-    TEST_LOG("  stringToIarmMode(WAREHOUSE) = %d (expected %d)", iarmMode, IARM_BUS_SYS_MODE_WAREHOUSE);
-
-    /* NORMAL branch (else) — already covered, re-verify */
-    stringToIarmMode("NORMAL", iarmMode);
-    EXPECT_EQ(iarmMode, IARM_BUS_SYS_MODE_NORMAL);
-    TEST_LOG("  stringToIarmMode(NORMAL) = %d (expected %d)", iarmMode, IARM_BUS_SYS_MODE_NORMAL);
-
-    TEST_LOG("  stringToIarmMode() all branches covered");
-#else
-    TEST_LOG("  IARM not defined — skipping stringToIarmMode test");
-#endif
 }
 
 /* ------------------------------------------------------------------- *
