@@ -6332,13 +6332,11 @@ TEST_F(SystemService_L2Test, SysImpl_SetMode_EAS_IARMFail_COMRPC)
 }
 
 /* ------------------------------------------------------------------- *
- * GetValueFromPropertiesFile — extern-declare and test all branches     *
- * Covers the GetValueFromPropertiesFile body (L808-838, 0 hits).       *
+ * GetValueFromPropertiesFile — indirect coverage via getPlatformConfiguration *
+ * GetValueFromPropertiesFile is a private class member of              *
+ * SystemServicesImplementation — not accessible via extern.            *
+ * Covered indirectly when getPlatformConfiguration is called.          *
  * ------------------------------------------------------------------- */
-extern "C" uint32_t GetValueFromPropertiesFile(const char* filename, const char* key,
-                                                char* response, size_t responseLen,
-                                                const char* delimiter) __attribute__((weak));
-
 TEST_F(SystemService_L2Test, SysImpl_GetValueFromPropertiesFile_AllBranches)
 {
     TEST_LOG("GetValueFromPropertiesFile: exercise all branches via JSON-RPC getPlatformConfiguration");
