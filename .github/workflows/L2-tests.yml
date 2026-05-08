@@ -114,7 +114,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-testframework
           path: entservices-testframework
-          ref: 1.0.4
+          ref: 1.0.1
 
       - name: Checkout googletest
         if: steps.cache.outputs.cache-hit != 'true'
@@ -178,7 +178,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-apis
           path: entservices-apis
-          ref: ${{env.INTERFACES_REF}}
+          ref: feature/RDKEMW-7075
           run: rm -rf $GITHUB_WORKSPACE/entservices-apis/jsonrpc/DTV.json
 
       - name: Apply patches entservices-apis
@@ -211,8 +211,10 @@ jobs:
           headers/rdk/ds
           headers/rdk/iarmbus
           headers/rdk/iarmmgrs-hal
+          headers/rdk/halif/deepsleep-manager
           headers/systemservices
           headers/systemservices/proc
+          headers/systimerifc
           &&
           cd headers
           &&
@@ -246,6 +248,7 @@ jobs:
           rdk/iarmmgrs-hal/pwrMgr.h
           rdk/iarmmgrs-hal/sysMgr.h
           rdk/iarmbus/iarmUtil.h
+          rdk/halif/deepsleep-manager/deepSleepMgr.h
           rfcapi.h
           rbus.h
           libudev.h
@@ -256,6 +259,7 @@ jobs:
           systemservices/proc/readproc.h
           systemservices/secure_wrapper.h
           systemaudioplatform.h
+          systimerifc/itimermsg.h
           maintenanceMGR.h
           pkg.h
           edid-parser.hpp
@@ -274,6 +278,8 @@ jobs:
           rdk/ds/VideoDFC.hpp
           dsRpc.h
           telemetry_busmessage_sender.h
+          &&
+          printf '#ifndef __ITIMERMSG_H__\n#define __ITIMERMSG_H__\n#define IARM_BUS_SYSTIME_MGR_NAME "SYSTEMTIME"\n#define cTIMER_STATUS_UPDATE 0\n#define TIMER_STATUS_MSG "TimerStatus"\n#define cTIMER_STATUS_MESSAGE_LENGTH 256\ntypedef struct _TimerMsg {\n    char message[256];\n    char timerSrc[256];\n    char currentTime[256];\n} TimerMsg;\n#endif\n' > systimerifc/itimermsg.h
           &&
           cp -r /usr/include/gstreamer-1.0/gst /usr/include/glib-2.0/* /usr/lib/x86_64-linux-gnu/glib-2.0/include/* /usr/local/include/trower-base64/base64.h /usr/include/libdrm/drm.h /usr/include/libdrm/drm_mode.h /usr/include/xf86drm.h .
 
@@ -424,6 +430,7 @@ jobs:
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmmgrs-hal
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systemservices
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systemservices/proc
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systimerifc
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks
           -I $GITHUB_WORKSPACE/entservices-systemservices/helpers
           -I $GITHUB_WORKSPACE/install/usr/include
@@ -452,8 +459,12 @@ jobs:
           -Wl,-wrap,popen -Wl,-wrap,syslog -Wl,-wrap,v_secure_system -Wl,-wrap,v_secure_popen -Wl,-wrap,v_secure_pclose -Wl,-wrap,unlink
           -DUSE_IARMBUS
           -DRDK_SERVICE_L2_TEST
+          -DHAS_API_SYSTEM
           -DHAS_API_POWERSTATE
-          -DENABLE_THERMAL_PROTECTION"
+          -DENABLE_THERMAL_PROTECTION
+          -DENABLE_DEEP_SLEEP
+          -DENABLE_DEVICE_MANUFACTURER_INFO
+          -DENABLE_SYSTIMEMGR_SUPPORT"
           -DPLUGIN_PERSISTENTSTORE_PATH="/tmp/secure/persistent/rdkservicestore"
           -DPLUGIN_PERSISTENTSTORE_LEGACYPATH="/tmp/persistent/rdkservicestore"
           -DCOMCAST_CONFIG=OFF
@@ -565,6 +576,7 @@ jobs:
           /opt/secure/reboot
           /opt/secure/persistent
           /opt/secure/persistent/System
+          /opt/secure/persistent/opflashstore
           /tmp/secure/persistent
           /tmp/persistent
           /tmp/persistent/rdkservicestore
@@ -641,6 +653,8 @@ jobs:
           /tmp/block/sdb/device/vendor
           /tmp/block/sdb/device/model
           &&
+          echo "BUILD_TYPE=VBN" | sudo tee /etc/device.properties
+          &&
           cd /dev/disk/by-id/
           &&
           sudo ln -s ../../sda /dev/disk/by-id/usb-Generic_Flash_Disk_B32FD507-0
@@ -657,28 +671,35 @@ jobs:
           $GITHUB_WORKSPACE/entservices-testframework/Tests/L2Tests/pact/install-verifier-cli.sh
 
       - name: Run unit tests without valgrind
-        run: >
-          PATH=$GITHUB_WORKSPACE/install/usr/bin:${PATH}
-          LD_LIBRARY_PATH=$GITHUB_WORKSPACE/install/usr/lib:$GITHUB_WORKSPACE/install/usr/lib/wpeframework/plugins:${LD_LIBRARY_PATH}
-          RdkServicesL2Test &&
-          cp -rf $(pwd)/rdkL2TestResults.json $GITHUB_WORKSPACE/rdkL2TestResultsWithoutValgrind.json &&
-          rm -rf $(pwd)/rdkL2TestResults.json
+        run: |
+          export PATH=$GITHUB_WORKSPACE/install/usr/bin:${PATH}
+          export LD_LIBRARY_PATH=$GITHUB_WORKSPACE/install/usr/lib:$GITHUB_WORKSPACE/install/usr/lib/wpeframework/plugins:${LD_LIBRARY_PATH}
+          RdkServicesL2Test
+          TEST_EXIT=$?
+          JSON_FILE=$(find "$GITHUB_WORKSPACE" /tmp /root -maxdepth 5 -name "rdkL2TestResults.json" 2>/dev/null | head -1)
+          if [ -n "$JSON_FILE" ]; then
+            cp -rf "$JSON_FILE" $GITHUB_WORKSPACE/rdkL2TestResultsWithoutValgrind.json
+            rm -rf "$JSON_FILE"
+          else
+            echo '{"tests":0,"failures":0,"errors":0,"timestamp":"","time":"0","name":"AllTests","testsuites":[]}' > $GITHUB_WORKSPACE/rdkL2TestResultsWithoutValgrind.json
+          fi
+          exit $TEST_EXIT
 
       - name: Run unit tests with valgrind
         if: ${{ !env.ACT && inputs.caller_source != 'testframework' }}
-        run: >
-          PATH=$GITHUB_WORKSPACE/install/usr/bin:${PATH}
-          LD_LIBRARY_PATH=$GITHUB_WORKSPACE/install/usr/lib:$GITHUB_WORKSPACE/install/usr/lib/wpeframework/plugins:${LD_LIBRARY_PATH}
-          valgrind
-          --tool=memcheck
-          --log-file=valgrind_log
-          --leak-check=yes
-          --show-reachable=yes
-          --track-fds=yes
-          --fair-sched=try
-          RdkServicesL2Test &&
-          cp -rf $(pwd)/rdkL2TestResults.json $GITHUB_WORKSPACE/rdkL2TestResultsWithValgrind.json &&
-          rm -rf $(pwd)/rdkL2TestResults.json
+        run: |
+          export PATH=$GITHUB_WORKSPACE/install/usr/bin:${PATH}
+          export LD_LIBRARY_PATH=$GITHUB_WORKSPACE/install/usr/lib:$GITHUB_WORKSPACE/install/usr/lib/wpeframework/plugins:${LD_LIBRARY_PATH}
+          valgrind --tool=memcheck --log-file=valgrind_log --leak-check=yes --show-reachable=yes --track-fds=yes --fair-sched=try RdkServicesL2Test
+          TEST_EXIT=$?
+          JSON_FILE=$(find "$GITHUB_WORKSPACE" /tmp /root -maxdepth 5 -name "rdkL2TestResults.json" 2>/dev/null | head -1)
+          if [ -n "$JSON_FILE" ]; then
+            cp -rf "$JSON_FILE" $GITHUB_WORKSPACE/rdkL2TestResultsWithValgrind.json
+            rm -rf "$JSON_FILE"
+          else
+            echo '{"tests":0,"failures":0,"errors":0,"timestamp":"","time":"0","name":"AllTests","testsuites":[]}' > $GITHUB_WORKSPACE/rdkL2TestResultsWithValgrind.json
+          fi
+          exit $TEST_EXIT
 
       - name: Generate coverage
         if: ${{ matrix.coverage == 'with-coverage' && !env.ACT && inputs.caller_source != 'testframework' }}

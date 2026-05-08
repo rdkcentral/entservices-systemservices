@@ -1,8 +1,8 @@
-/**
-* If not stated otherwise in this file or this component's LICENSE
-* file the following copyright and licenses apply:
+/*
+* If not stated otherwise in this file or this component's LICENSE file the
+* following copyright and licenses apply:
 *
-* Copyright 2020 RDK Management
+* Copyright 2026 RDK Management
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -15,390 +15,192 @@
 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 * See the License for the specific language governing permissions and
 * limitations under the License.
-**/
+*/
 
-#ifndef SYSTEMSERVICES_H
-#define SYSTEMSERVICES_H
-
-#include <memory>
-#include <stdint.h>
-#include <thread>
-#include <regex.h>
-#include <cctype>
-#include <fstream>
-#include <cstring>
-using std::ofstream;
-#include <cstdlib>
-#include <iostream>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <mutex>
+#pragma once
 
 #include "Module.h"
+#include <interfaces/ISystemServices.h>
+#include <interfaces/json/JSystemServices.h>
+#include <interfaces/json/JsonData_SystemServices.h>
+#include <interfaces/IConfiguration.h>
+#include "UtilsLogging.h"
 #include "tracing/Logging.h"
-#include "UtilsThreadRAII.h"
-#include "SystemServicesHelper.h"
-#include "platformcaps/platformcaps.h"
-#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
-#include "libIARM.h"
-#include "host.hpp"
-#include "sleepMode.hpp"
-#endif /* USE_IARMBUS || USE_IARM_BUS */
 
-#include "sysMgr.h"
-#include "cSettings.h"
-#include "cTimer.h"
-#include "rfcapi.h"
-#include <interfaces/IPowerManager.h>
-#include <core/core.h>
-#include <core/JSON.h>
-#include "mfrMgr.h"
-
-#include "PowerManagerInterface.h"
-
-using namespace WPEFramework::Exchange;
-using PowerState = WPEFramework::Exchange::IPowerManager::PowerState;
-using WakeupReason = WPEFramework::Exchange::IPowerManager::WakeupReason;
-using ThermalTemperature = WPEFramework::Exchange::IPowerManager::ThermalTemperature;
-
-
-/* System Services Triggered Events. */
-#define EVT_ONSYSTEMSAMPLEEVENT           "onSampleEvent"
-#define EVT_ONSYSTEMPOWERSTATECHANGED     "onSystemPowerStateChanged"
-#define EVT_ONSYSTEMMODECHANGED           "onSystemModeChanged"
-#define EVT_ONNETWORKSTANDBYMODECHANGED   "onNetworkStandbyModeChanged"
-#define EVT_ONFIRMWAREUPDATEINFORECEIVED  "onFirmwareUpdateInfoReceived"
-#define EVT_ONFIRMWAREUPDATESTATECHANGED  "onFirmwareUpdateStateChange"
-#define EVT_ONTEMPERATURETHRESHOLDCHANGED "onTemperatureThresholdChanged"
-#define EVT_ONMACADDRESSRETRIEVED         "onMacAddressesRetreived"
-#define EVT_ONREBOOTREQUEST               "onRebootRequest"
-#define EVT_ON_SYSTEM_CLOCK_SET           "onSystemClockSet"
-#define EVT_ONFWPENDINGREBOOT             "onFirmwarePendingReboot" /* Auto Reboot notifier */
-#define EVT_ONREBOOTREQUEST               "onRebootRequest"
-#define EVT_ONTERRITORYCHANGED            "onTerritoryChanged"
-#define EVT_ONTIMEZONEDSTCHANGED          "onTimeZoneDSTChanged"
-#define EVT_FRIENDLYNAMECHANGED           "onFriendlyNameChanged"
-#define EVT_ONLOGUPLOAD                   "onLogUpload"
-#define EVT_ONDEVICEMGTUPDATERECEIVED     "onDeviceMgtUpdateReceived"
-#define TERRITORYFILE                     "/opt/secure/persistent/System/Territory.txt"
-#define EVT_ONBLOCKLISTCHANGED            "onBlocklistChanged"
-
-
-#ifdef ENABLE_SYSTIMEMGR_SUPPORT
-#define EVT_ONTIMESTATUSCHANGED           "onTimeStatusChanged"
-#endif// ENABLE_SYSTIMEMGR_SUPPORT
-
-namespace WPEFramework {
-    namespace Plugin {
-        // This is a server for a JSONRPC communication channel.
-        // For a plugin to be capable to handle JSONRPC, inherit from PluginHost::JSONRPC.
-        // By inheriting from this class, the plugin realizes the interface PluginHost::IDispatcher.
-        // This realization of this interface implements, by default, the following methods on this plugin
-        // - exists
-        // - register
-        // - unregister
-        // Any other methood to be handled by this plugin  can be added can be added by using the
-        // templated methods Register on the PluginHost::JSONRPC class.
-        // As the registration/unregistration of notifications is realized by the class PluginHost::JSONRPC,
-        // this class exposes a public method called, Notify(), using this methods, all subscribed clients
-        // will receive a JSONRPC message as a notification, in case this method is called.
-
-        /**
-         * @struct modeInfo
-         * @brief This structure contains information of modes.
-         * @ingroup SERVMGR_SYSTEM
-         */
-        struct modeInfo {
-            std::string mode;  //operating mode
-            int duration;  // duration in seconds
-        };
-
-        class SystemServices : public PluginHost::IPlugin, public PluginHost::JSONRPCErrorAssessor<PluginHost::JSONRPCErrorAssessorTypes::FunctionCallbackType> {
+namespace WPEFramework 
+{
+    namespace Plugin
+    {
+        class SystemServices : public PluginHost::IPlugin, public PluginHost::JSONRPC 
+        {
             private:
+                class Notification : public RPC::IRemoteConnection::INotification, public Exchange::ISystemServices::INotification
+                {
+                    private:
+                        Notification() = delete;
+                        Notification(const Notification&) = delete;
+                        Notification& operator=(const Notification&) = delete;
 
-                class PowerManagerNotification : public Exchange::IPowerManager::INetworkStandbyModeChangedNotification,
-                                                     public Exchange::IPowerManager::IThermalModeChangedNotification,
-                                                     public Exchange::IPowerManager::IRebootNotification,
-                                                     public Exchange::IPowerManager::IModeChangedNotification {
-                private:
-                    PowerManagerNotification(const PowerManagerNotification&) = delete;
-                    PowerManagerNotification& operator=(const PowerManagerNotification&) = delete;
+                    public:
+                    explicit Notification(SystemServices* parent) 
+                        : _parent(*parent)
+                        {
+                            ASSERT(parent != nullptr);
+                        }
 
-                public:
-                    explicit PowerManagerNotification(SystemServices& parent)
-                        : _parent(parent)
-                    {
-                    }
-                    ~PowerManagerNotification() override = default;
+                        virtual ~Notification()
+                        {
+                        }
 
-                public:
-                    void OnPowerModeChanged(const PowerState currentState, const PowerState newState) override
-                    {
-                        _parent.onPowerModeChanged(currentState, newState);
-                    }
-                    void OnNetworkStandbyModeChanged(const bool enabled) override
-                    {
-                        _parent.onNetworkStandbyModeChanged(enabled);
-                    }
-                    void OnThermalModeChanged(const ThermalTemperature currentThermalLevel, const ThermalTemperature newThermalLevel, const float currentTemperature) override
-                    {
-                        _parent.onThermalModeChanged(currentThermalLevel, newThermalLevel, currentTemperature);
-                    }
-                    void OnRebootBegin(const string &rebootReasonCustom, const string &rebootReasonOther, const string &rebootRequestor) override
-                    {
-                        _parent.onRebootBegin(rebootReasonCustom, rebootReasonOther, rebootRequestor);
-                    }
+                        BEGIN_INTERFACE_MAP(Notification)
+                        INTERFACE_ENTRY(Exchange::ISystemServices::INotification)
+                        INTERFACE_ENTRY(RPC::IRemoteConnection::INotification)
+                        END_INTERFACE_MAP
 
-                    template <typename T>
-                    T* baseInterface()
-                    {
-                        static_assert(std::is_base_of<T, PowerManagerNotification>(), "base type mismatch");
-                        return static_cast<T*>(this);
-                    }
+                        void Activated(RPC::IRemoteConnection*) override
+                        {
+                           
+                        }
 
-                    BEGIN_INTERFACE_MAP(PowerManagerNotification)
-                    INTERFACE_ENTRY(Exchange::IPowerManager::INetworkStandbyModeChangedNotification)
-                    INTERFACE_ENTRY(Exchange::IPowerManager::IThermalModeChangedNotification)
-                    INTERFACE_ENTRY(Exchange::IPowerManager::IRebootNotification)
-                    INTERFACE_ENTRY(Exchange::IPowerManager::IModeChangedNotification)
-                    END_INTERFACE_MAP
+                        void Deactivated(RPC::IRemoteConnection *connection) override
+                        {
+                            _parent.Deactivated(connection);
+                        }
 
-                private:
-                    SystemServices& _parent;
+                        void OnFirmwareUpdateInfoReceived(const Exchange::ISystemServices::FirmwareUpdateInfo &firmwareUpdateInfo) override
+                        {
+                            LOGINFO("FirmwareUpdateInfo");
+                            Exchange::JSystemServices::Event::OnFirmwareUpdateInfoReceived(_parent, firmwareUpdateInfo);
+                        }
+
+                        void OnRebootRequest(const string& requestedApp, const string& rebootReason) override
+                        {
+                            LOGINFO("requestedApp:%s, rebootReason:%s", requestedApp.c_str(), rebootReason.c_str());
+                            Exchange::JSystemServices::Event::OnRebootRequest(_parent, requestedApp, rebootReason);
+                        }
+
+                        void OnSystemPowerStateChanged(const string& powerState, const string& currentPowerState) override
+                        {
+                            LOGINFO("powerState:%s, currentPowerState:%s", powerState.c_str(), currentPowerState.c_str());
+                            Exchange::JSystemServices::Event::OnSystemPowerStateChanged(_parent, powerState, currentPowerState);
+                        }
+
+                        void OnTerritoryChanged(const Exchange::ISystemServices::TerritoryChangedInfo &territoryChangedInfo) override
+                        {
+                            LOGINFO("territoryChangedInfo");
+                            Exchange::JSystemServices::Event::OnTerritoryChanged(_parent, territoryChangedInfo);
+                        }
+
+                        void OnTimeZoneDSTChanged(const Exchange::ISystemServices::TimeZoneDSTChangedInfo& timeZoneDSTChangedInfo) override
+                        {
+                            LOGINFO("timeZoneDSTChangedInfo");
+                            Exchange::JSystemServices::Event::OnTimeZoneDSTChanged(_parent, timeZoneDSTChangedInfo);
+                        }
+
+                        void OnMacAddressesRetreived(const Exchange::ISystemServices::MacAddressesInfo& macAddressesInfo) override
+                        {
+                            LOGINFO("macAddressesInfo");
+                            Exchange::JSystemServices::Event::OnMacAddressesRetreived(_parent, macAddressesInfo);
+                        }
+
+                        void OnSystemModeChanged(const string& mode) override
+                        {
+                            LOGINFO("mode:%s", mode.c_str());
+                            Exchange::JSystemServices::Event::OnSystemModeChanged(_parent, mode);
+                        }
+
+                        void OnLogUpload(const string& logUploadStatus) override
+                        {
+                            LOGINFO("mode:%s", logUploadStatus.c_str());
+                            Exchange::JSystemServices::Event::OnLogUpload(_parent, logUploadStatus);
+                        }
+                        
+                        void OnFirmwareUpdateStateChanged(const int firmwareUpdateStateChange) override
+                        {
+                            LOGINFO("firmwareUpdateStateChange:%d", firmwareUpdateStateChange);
+                            Exchange::JSystemServices::Event::OnFirmwareUpdateStateChanged(_parent, firmwareUpdateStateChange);
+                        }
+                        
+                        void OnTemperatureThresholdChanged(const string& thresholdType, const bool exceeded, const string& temperature) override
+                        {
+                            LOGINFO("thresholdType:%s exceeded:%d temperature:%s", thresholdType.c_str(), exceeded, temperature.c_str());
+                            Exchange::JSystemServices::Event::OnTemperatureThresholdChanged(_parent, thresholdType, exceeded, temperature);
+                        }
+                        
+                        void OnSystemClockSet() override
+                        {
+                            LOGINFO("OnSystemClockSet");
+                            Exchange::JSystemServices::Event::OnSystemClockSet(_parent);
+                        }
+                        
+                        void OnFirmwarePendingReboot(const int fireFirmwarePendingReboot) override
+                        {
+                            LOGINFO("fireFirmwarePendingReboot:%d", fireFirmwarePendingReboot);
+                            Exchange::JSystemServices::Event::OnFirmwarePendingReboot(_parent, fireFirmwarePendingReboot);
+                        }
+                        
+                        void OnFriendlyNameChanged(const string& friendlyName) override
+                        {
+                            LOGINFO("friendlyName:%s", friendlyName.c_str());
+                            Exchange::JSystemServices::Event::OnFriendlyNameChanged(_parent, friendlyName);
+                        }
+                        
+                        void OnDeviceMgtUpdateReceived(const string& source, const string& type, const bool success) override
+                        {
+                            LOGINFO("source:%s type:%s success:%d", source.c_str(), type.c_str(), success);
+                            Exchange::JSystemServices::Event::OnDeviceMgtUpdateReceived(_parent, source, type, success);
+                        }
+                        
+                        void OnBlocklistChanged(const string& oldBlocklistFlag, const string& newBlocklistFlag) override
+                        {
+                            LOGINFO("oldBlocklistFlag:%s newBlocklistFlag:%s", oldBlocklistFlag.c_str(), newBlocklistFlag.c_str());
+                            Exchange::JSystemServices::Event::OnBlocklistChanged(_parent, oldBlocklistFlag, newBlocklistFlag);
+                        }
+                        
+                        void OnTimeStatusChanged(const string& TimeQuality, const string& TimeSrc, const string& Time) override
+                        {
+                            LOGINFO("TimeQuality:%s TimeSrc:%s Time:%s", TimeQuality.c_str(), TimeSrc.c_str(), Time.c_str());
+                            Exchange::JSystemServices::Event::OnTimeStatusChanged(_parent, TimeQuality, TimeSrc, Time);
+                        }
+                        
+                        void OnNetworkStandbyModeChanged(const bool nwStandby) override
+                        {
+                            LOGINFO("nwStandby:%d", nwStandby);
+                            Exchange::JSystemServices::Event::OnNetworkStandbyModeChanged(_parent, nwStandby);
+                        }
+
+                    private:
+                        SystemServices& _parent;
                 };
 
-                typedef Core::JSON::String JString;
-                typedef Core::JSON::ArrayType<JString> JStringArray;
-                typedef Core::JSON::Boolean JBool;
-                string m_stbVersionString;
-                static cSettings m_temp_settings;
-#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
-                static IARM_Bus_SYSMgr_GetSystemStates_Param_t paramGetSysState;
-#endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
-                Utils::ThreadRAII thread_getMacAddresses;
-                SystemServices* m_systemService;
-                /* TODO: Need to decide whether needed or not since setProperty
-                   and getProperty functionalities are XRE/RTRemote dependent. */
-                static JsonObject _systemParams;
-                static const string MODEL_NAME;
-                static const string HARDWARE_ID;
-		static const string FRIENDLY_ID;
+                public:
+                    SystemServices(const SystemServices&) = delete;
+                    SystemServices& operator=(const SystemServices&) = delete;
 
-                enum class FWUpdateAvailableEnum { FW_UPDATE_AVAILABLE, FW_MATCH_CURRENT_VER, NO_FW_VERSION, EMPTY_SW_UPDATE_CONF };
-                // We do not allow this plugin to be copied !!
-                SystemServices(const SystemServices&) = delete;
-                SystemServices& operator=(const SystemServices&) = delete;
-                static void getMacAddressesAsync(SystemServices *p);
-                static std::string m_currentMode;
-                std::string m_current_state;
-                static cTimer m_operatingModeTimer;
-                static int m_remainingDuration;
-                Utils::ThreadRAII m_getFirmwareInfoThread;
-                PluginHost::IShell* m_shellService { nullptr };
-                regex_t m_regexUnallowedChars;
+                    SystemServices();
+                    virtual ~SystemServices();
 
-                int m_FwUpdateState_LatestEvent;
+                    BEGIN_INTERFACE_MAP(SystemServices)
+                    INTERFACE_ENTRY(PluginHost::IPlugin)
+                    INTERFACE_ENTRY(PluginHost::IDispatcher)
+                    INTERFACE_AGGREGATE(Exchange::ISystemServices, _systemServices)
+                    END_INTERFACE_MAP
 
-                bool m_networkStandbyMode;
-                bool m_networkStandbyModeValid;
+                    //  IPlugin methods
+                    // -------------------------------------------------------------------------------------------------------
+                    const string Initialize(PluginHost::IShell* service) override;
+                    void Deinitialize(PluginHost::IShell* service) override;
+                    string Information() const override;
 
-                std::string m_friendlyName;
-		std::string m_powerStateBeforeReboot;
-                bool m_powerStateBeforeRebootValid;
-		std::string m_strTerritory;
-                std::string m_strRegion;
+                private:
+                    void Deactivated(RPC::IRemoteConnection* connection);
 
-                static void startModeTimer(int duration);
-                static void stopModeTimer();
-                static void updateDuration();
-				std::string  m_strStandardTerritoryList;
-#ifdef ENABLE_DEVICE_MANUFACTURER_INFO
-                bool getManufacturerData(const string& parameter, JsonObject& response);
-                uint32_t getMfgSerialNumber(const JsonObject& parameters, JsonObject& response);
-                bool getModelName(const string& parameter, JsonObject& response);
-		std::string m_ManufacturerDataHardwareID;
-		std::string m_ManufacturerDataModelName;
-                bool m_ManufacturerDataHardwareIdValid;
-		bool m_ManufacturerDataModelNameValid;
-                std::string m_MfgSerialNumber;
-                bool m_MfgSerialNumberValid;
-#endif
-                pid_t m_uploadLogsPid;
-                std::mutex m_uploadLogsMutex;
-                std::mutex m_territoryMutex;
-                PowerManagerInterfaceRef _powerManagerPlugin;
-                Core::Sink<PowerManagerNotification> _pwrMgrNotification;
-                bool _registeredEventHandlers;
-                void InitializePowerManager();
-            public:
-                SystemServices();
-                virtual ~SystemServices();
-
-                static SystemServices* _instance;
-                virtual const string Initialize(PluginHost::IShell* service) override;
-                virtual void Deinitialize(PluginHost::IShell* service) override;
-                virtual string Information() const override { return {}; }
-                IPowerManager* getPwrMgrPluginInstance();
-                void registerEventHandlers();
-                void onPowerModeChanged(const PowerState currentState, const PowerState newState);
-                std::string powerModeEnumToString(PowerState state);
-                void onNetworkStandbyModeChanged(const bool enabled);
-                void onThermalModeChanged(const ThermalTemperature currentThermalLevel, const ThermalTemperature newThermalLevel, const float currentTemperature);
-                void onRebootBegin(const string &rebootReasonCustom, const string &rebootReasonOther, const string &rebootRequestor);
-		static uint32_t OnJSONRPCError(const Core::JSONRPC::Context& context, const string& method, const string& parameters, const uint32_t errorcode, string& errormessage);
-
-                BEGIN_INTERFACE_MAP(SystemServices)
-                INTERFACE_ENTRY(PluginHost::IPlugin)
-                INTERFACE_ENTRY(PluginHost::IDispatcher)
-                END_INTERFACE_MAP
-
-                bool setPowerState(std::string powerState);
-                std::string getStbVersionString();
-                std::string getClientVersionString();
-                std::string getStbTimestampString();
-		std::string getStbBranchString();
-                bool makePersistentDir();
-                std::string safeExtractAfterColon(const std::string& inputLine);
-
-#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
-                void InitializeIARM();
-                void DeinitializeIARM();
-#endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
-
-                /* Events : Begin */
-                void onFirmwareUpdateInfoRecieved(string CallGUID);
-                void onSystemPowerStateChanged(string currentPowerState, string powerState);
-                void onPwrMgrReboot(string requestedApp, string rebootReason);
-                void onNetworkModeChanged(bool betworkStandbyMode);
-                void onSystemModeChanged(string mode);
-                void onFirmwareUpdateStateChange(int state);
-                void onClockSet();
-                void onLogUpload(int newState);
-                void onTemperatureThresholdChanged(string thresholdType,
-                        bool exceed, float temperature);
-#ifdef ENABLE_SYSTIMEMGR_SUPPORT
-                void onTimeStatusChanged(string timequality,string timesource, string utctime);
-#endif// ENABLE_SYSTIMEMGR_SUPPORT
-                void onRebootRequest(string reason);
-                void onFirmwarePendingReboot(int seconds); /* Event handler for Pending Reboot */
-		void onTerritoryChanged(string oldTerritory, string newTerritory, string oldRegion="", string newRegion="");
-		void onTimeZoneDSTChanged(string oldTimeZone, string newTimeZone, string oldAccuracy, string newAccuracy);
-		void onDeviceMgtUpdateReceived(IARM_BUS_SYSMGR_DeviceMgtUpdateInfo_Param_t *config);
-                void onBlocklistChanged(bool newBlocklistFlag, bool oldBlocklistFlag);
-                /* Events : End */
-
-                /* Methods : Begin */
-#ifdef DEBUG
-                uint32_t sampleAPI(const JsonObject& parameters, JsonObject& response);
-#endif /* DEBUG */
-                uint32_t requestSystemReboot(const JsonObject& parameters, JsonObject& response);
-                uint32_t requestSystemUptime(const JsonObject& parameters, JsonObject& response);
-                uint32_t getDeviceInfo(const JsonObject& parameters, JsonObject& response);
-#if defined(HAS_API_SYSTEM) && defined(HAS_API_POWERSTATE)
-                uint32_t getDevicePowerState(const JsonObject& parameters,JsonObject& response);
-                uint32_t setDevicePowerState(const JsonObject& parameters,JsonObject& response);
-#endif /* HAS_API_SYSTEM && HAS_API_POWERSTATE */
-
-#ifdef ENABLE_SYSTIMEMGR_SUPPORT
-                uint32_t getSystemTimeStatus(const JsonObject& parameters,JsonObject& response);
-#endif// ENABLE_SYSTIMEMGR_SUPPORT
-
-                uint32_t getSystemVersions(const JsonObject& parameters, JsonObject& response);
-
-                /* TODO: Stub implementation; Decide whether needed or not since setProperty
-                   and getProperty functionalities are XRE/RTRemote dependent. */
-                bool setProperties(const JsonObject& propertyNames);
-                bool getProperties(const JsonObject& params, JsonObject& returnProperties);
-                uint32_t updateFirmware(const JsonObject& parameters, JsonObject& response);
-                uint32_t setMode(const JsonObject& parameters, JsonObject& response);
-		uint32_t setBootLoaderSplashScreen(const JsonObject& parameters, JsonObject& response);		
-                static void firmwareUpdateInfoReceived(void);
-                uint32_t getFirmwareUpdateInfo(const JsonObject& parameters, JsonObject& response);
-                void reportFirmwareUpdateInfoReceived(string firmwareUpdateVersion,
-                        int httpStatus, bool success, string firmwareVersion, string responseString);
-                uint32_t setDeepSleepTimer(const JsonObject& parameters, JsonObject& response);
-#ifdef ENABLE_DEEP_SLEEP
-		uint32_t getWakeupReason(const JsonObject& parameters, JsonObject& response);
-                uint32_t getLastWakeupKeyCode(const JsonObject& parameters, JsonObject& response);
-                std::string getWakeupReasonString(WakeupReason reason);
-#endif
-                uint32_t getFriendlyName(const JsonObject& parameters, JsonObject& response);
-                uint32_t setFriendlyName(const JsonObject& parameters, JsonObject& response);
-                uint32_t setTerritory(const JsonObject& parameters, JsonObject& response);
-		uint32_t getTerritory(const JsonObject& parameters, JsonObject& response);
-		bool readTerritoryFromFile();
-		bool isStrAlphaUpper(string strVal);
-		bool isRegionValid(string regionStr);
-		uint32_t writeTerritory(string territory, string region);
-        uint32_t uploadLogsAsync(const JsonObject& parameters, JsonObject& response);
-        uint32_t abortLogUpload(const JsonObject& parameters, JsonObject& response);
-                uint32_t getSerialNumber(const JsonObject& parameters, JsonObject& response);
-                bool getSerialNumberTR069(JsonObject& response);
-                bool getSerialNumberSnmp(JsonObject& response);
-                uint32_t getFirmwareDownloadPercent(const JsonObject& parameters,JsonObject& response);
-                uint32_t getFirmwareUpdateState(const JsonObject& parameters, JsonObject& response);
-                uint32_t getDownloadedFirmwareInfo(const JsonObject& parameters, JsonObject& response);
-                uint32_t setTimeZoneDST(const JsonObject& parameters, JsonObject& response);
-                uint32_t getTimeZoneDST(const JsonObject& parameters, JsonObject& response);
-                bool processTimeZones(std::string dir, JsonObject& out);
-                uint32_t getTimeZones(const JsonObject& parameters, JsonObject& response);
-                uint32_t getRFCConfig(const JsonObject& parameters, JsonObject& response);
-                uint32_t setNetworkStandbyMode (const JsonObject& parameters, JsonObject& response);
-                uint32_t getNetworkStandbyMode (const JsonObject& parameters, JsonObject& response);
-                uint32_t getPowerStateBeforeReboot (const JsonObject& parameters,JsonObject& response);
-                uint32_t getLastFirmwareFailureReason(const JsonObject& parameters, JsonObject& response);
-                uint32_t setOptOutTelemetry(const JsonObject& parameters,JsonObject& response);
-                uint32_t isOptOutTelemetry(const JsonObject& parameters,JsonObject& response);
-                uint32_t setFirmwareAutoReboot(const JsonObject& parameters, JsonObject& response);
-                uint32_t setFSRFlag(const JsonObject& parameters, JsonObject& response);
-                uint32_t getFSRFlag(const JsonObject& parameters, JsonObject& response);
-                uint32_t setBlocklistFlag(const JsonObject& parameters, JsonObject& response);
-                uint32_t getBlocklistFlag(const JsonObject& parameters, JsonObject& response);
-                uint32_t getBootTypeInfo(const JsonObject& parameters, JsonObject& response);
-                uint32_t getBuildType(const JsonObject& parameters, JsonObject& response);
-		uint32_t setMigrationStatus(const JsonObject& parameters, JsonObject& response);
-                uint32_t getMigrationStatus(const JsonObject& parameters, JsonObject& response);
-                uint32_t setWakeupSrcConfiguration(const JsonObject& parameters, JsonObject& response);
-                uint32_t getMacAddresses(const JsonObject& parameters, JsonObject& response);
-                uint32_t getPlatformConfiguration(const JsonObject& parameters, PlatformCaps& response);
-#if 0
-                uint32_t getStoreDemoLink(const JsonObject& parameters, JsonObject& response);
-                uint32_t getPreferredStandbyMode(const JsonObject& parameters, JsonObject& response);
-                uint32_t getXconfParams(const JsonObject& parameters, JsonObject& response);
-                uint32_t getPowerStateIsManagedByDevice(const JsonObject& parameters, JsonObject& response);
-                uint32_t clearLastDeepSleepReason(const JsonObject& parameters, JsonObject& response);
-                uint32_t deletePersistentPath(const JsonObject& parameters, JsonObject& response);
-                uint32_t requestEnableMoca(const JsonObject& parameters, JsonObject& response);
-                uint32_t enableXREConnectionRetention(const JsonObject& parameters, JsonObject& response);
-                uint32_t getMilestones(const JsonObject& parameters, JsonObject& response);
-                uint32_t getAvailableStandbyModes(const JsonObject& parameters, JsonObject& response);
-                uint32_t getPreviousRebootInfo(const JsonObject& parameters, JsonObject& response);
-                uint32_t getPreviousRebootInfo2(const JsonObject& parameters, JsonObject& response);
-                uint32_t getPreviousRebootReason(const JsonObject& parameters, JsonObject& response);
-                uint32_t isGZEnabled(const JsonObject& parameters,JsonObject& response);
-                uint32_t queryMocaStatus(const JsonObject& parameters, JsonObject& response);
-                uint32_t setGZEnabled(const JsonObject& parameters,JsonObject& response);
-                uint32_t setPreferredStandbyMode(const JsonObject& parameters, JsonObject& response);
-                uint32_t getThunderStartReason(const JsonObject& parameters, JsonObject& response);
-                uint32_t fireFirmwarePendingReboot(const JsonObject& parameters, JsonObject& response);
-                uint32_t getLastDeepSleepReason(const JsonObject& parameters, JsonObject& response);
-                uint32_t getMode(const JsonObject& parameters, JsonObject& response);
-                uint32_t getStateInfo(const JsonObject& parameter, JsonObject& resposne);
-                uint32_t setBootLoaderPattern(const JsonObject& parameters, JsonObject& response);
-				uint32_t getCoreTemperature(const JsonObject& parameters, JsonObject& response);
-                uint32_t setFirmwareRebootDelay(const JsonObject& parameters, JsonObject& response);
-		        uint32_t getWakeupSrcConfiguration(const JsonObject& parameters, JsonObject& response);
-#ifdef ENABLE_THERMAL_PROTECTION
-                uint32_t getTemperatureThresholds(const JsonObject& parameters, JsonObject& response);
-                uint32_t setTemperatureThresholds(const JsonObject& parameters, JsonObject& response);
-		        uint32_t getOvertempGraceInterval(const JsonObject& parameters, JsonObject& response);
-                uint32_t setOvertempGraceInterval(const JsonObject& parameters, JsonObject& response);
-#endif /* ENABLE_THERMAL_PROTECTION */
-#endif
-                	
-        }; /* end of system service class */
-    } /* end of plugin */
-} /* end of wpeframework */
-
-#endif //SYSTEMSERVICES_H
+                private:
+                    PluginHost::IShell* _service{};
+                    uint32_t _connectionId{};
+                    Exchange::ISystemServices* _systemServices{};
+                    Core::Sink<Notification> _systemServicesNotification;
+                    Exchange::IConfiguration* _configure{};
+       };
+    } // namespace Plugin
+} // namespace WPEFramework
