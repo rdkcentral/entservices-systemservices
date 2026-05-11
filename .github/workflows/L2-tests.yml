@@ -95,6 +95,13 @@ jobs:
           path: entservices-powermanager
           ref: develop
 
+      - name: Checkout entservices-migration
+        uses: actions/checkout@v3
+        with:
+          repository: rdkcentral/entservices-migration
+          path: entservices-migration
+          ref: develop
+
       - name: Checkout entservices-systemservices
         if: ${{ inputs.caller_source == 'local' }}
         uses: actions/checkout@v3
@@ -403,6 +410,94 @@ jobs:
           cmake --build build/entservices-powermanager -j8
           &&
           cmake --install build/entservices-powermanager
+
+      - name: Build entservices-migration
+        run: >
+          cmake
+          -S "$GITHUB_WORKSPACE/entservices-migration"
+          -B build/entservices-migration
+          -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
+          -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/install/usr"
+          -DCMAKE_MODULE_PATH="$GITHUB_WORKSPACE/install/tools/cmake"
+          -DHIDE_NON_EXTERNAL_SYMBOLS=OFF
+          -DPLUGIN_CLOUDSTORE_URI="localhost:50051"
+          -DCMAKE_CXX_FLAGS="
+          -DEXCEPTIONS_ENABLE=ON
+          -fprofile-arcs
+          -ftest-coverage
+          -DUSE_THUNDER_R4=ON
+          -DTHUNDER_VERSION=4
+          -DTHUNDER_VERSION_MAJOR=4
+          -DTHUNDER_VERSION_MINOR=4
+          -DDEVICE_TYPE=AVOutputTV
+          -DPLUGIN_PERSISTENTSTORE_PATH="/tmp/secure/persistent/rdkservicestore"
+          -DPLUGIN_PERSISTENTSTORE_LEGACYPATH="/tmp/persistent/rdkservicestore"
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/ds
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmbus
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmmgrs-hal
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systemservices
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systemservices/proc
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/libusb
+          -I $GITHUB_WORKSPACE/install/usr/include
+          -I $GITHUB_WORKSPACE/build/mocks
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/Dobby
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/Dobby/Public/Dobby
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/Dobby/IpcService
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/devicesettings.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Iarm.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Rfc.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/RBus.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Udev.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Wraps.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/libusb/libusb.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/maintenanceMGR.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/pkg.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/secure_wrappermock.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/wpa_ctrl_mock.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/readprocMockInterface.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/btmgr.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tr181api.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvSettings.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvError.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvSettingsExtODM.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvSettingsODM.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvTypes.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/essos-resmgr.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Dobby.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/i_omi_proxy.hpp
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/omi_proxy.hpp
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/Dobby/DobbyProtocol.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/Dobby/DobbyProxy.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/Dobby/Public/Dobby/IDobbyProxy.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/Dobby/IpcService/IpcFactory.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Telemetry.h
+          -Werror -Wall -Wno-unused-result -Wno-deprecated-declarations -Wno-error=format=
+          -DUSE_IARMBUS
+          -DHAS_RBUS
+          -DRDK_SERVICE_L2_TEST
+          -DDISABLE_SECURITY_TOKEN
+          -DENABLE_THERMAL_PROTECTION"
+          -DPLUGIN_PERSISTENTSTORE_PATH="/tmp/secure/persistent/rdkservicestore"
+          -DPLUGIN_PERSISTENTSTORE_LEGACYPATH="/tmp/persistent/rdkservicestore"
+          -DPLUGIN_STORAGE_MANAGER_PATH="/tmp/persistent/storageManager"
+          -DCOMCAST_CONFIG=OFF
+          -DCMAKE_DISABLE_FIND_PACKAGE_DS=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_IARMBus=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_Udev=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_RFC=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_RBus=ON
+          -DPLUGIN_MIGRATION=ON
+          -DUSE_THUNDER_R4=ON
+          -DPLUGIN_L2Tests=ON
+          -DRDK_SERVICE_L2_TEST=ON
+          -DDS_FOUND=ON
+          -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+          &&
+          cmake --build build/entservices-migration 
+          &&
+          cmake --install build/entservices-migration
 
       - name: Build entservices-systemservices
         run: >
