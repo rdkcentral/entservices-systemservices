@@ -206,7 +206,7 @@ namespace Plugin {
             return _retryInterval;
         }
 
-        const int retryCount() const
+        int retryCount() const
         {
             return _retryCount;
         }
