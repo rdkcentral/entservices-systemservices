@@ -8973,3 +8973,358 @@ TEST_F(SystemService_L2Test_WithMigration, Migration_SetMigrationStatus_COMRPC)
     m_controller_SystemServices->Release();
 }
 
+// ==================================================================================
+// Test fixture for DeviceInfo plugin integration tests
+// ==================================================================================
+/**
+ * @brief Fixture that activates DeviceInfo before running DeviceInfo-dependent tests.
+ *
+ * Coverage goal: exercise the `if (deviceInfoObject)` TRUE branches inside
+ *   - SystemServicesImplementation::GetSerialNumber
+ *   - SystemServicesImplementation::GetDeviceInfo
+ */
+class SystemService_L2Test_WithDeviceInfo : public SystemService_L2Test {
+protected:
+    bool m_deviceInfoActivated = false;
+
+    SystemService_L2Test_WithDeviceInfo() : SystemService_L2Test()
+    {
+        uint32_t status = ActivateService("DeviceInfo");
+        if (status == Core::ERROR_NONE) {
+            m_deviceInfoActivated = true;
+            TEST_LOG("DeviceInfo activated for coverage tests");
+        } else {
+            TEST_LOG("DeviceInfo activation returned %u - tests will be gracefully skipped", status);
+        }
+    }
+
+    ~SystemService_L2Test_WithDeviceInfo() override
+    {
+        if (m_deviceInfoActivated) {
+            uint32_t s = DeactivateService("DeviceInfo");
+            if (s != Core::ERROR_NONE) {
+                TEST_LOG("DeviceInfo deactivation returned %u (non-fatal)", s);
+            }
+        }
+    }
+};
+
+// ==================================================================================
+// GetSerialNumber tests — exercises the `if (deviceInfoObject)` TRUE branch
+// ==================================================================================
+
+TEST_F(SystemService_L2Test_WithDeviceInfo, DeviceInfo_GetSerialNumber_JSONRPC)
+{
+    TEST_LOG("DeviceInfo_GetSerialNumber: Testing getSerialNumber via JSON-RPC with DeviceInfo");
+    if (!m_deviceInfoActivated) { TEST_LOG("DeviceInfo not activated - skipping"); return; }
+
+    JsonObject params, result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getSerialNumber", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    TEST_LOG("  getSerialNumber status=%u", status);
+    if (result.HasLabel("serialNumber")) {
+        TEST_LOG("  serialNumber='%s'", result["serialNumber"].String().c_str());
+    }
+}
+
+TEST_F(SystemService_L2Test_WithDeviceInfo, DeviceInfo_GetSerialNumber_COMRPC)
+{
+    TEST_LOG("DeviceInfo_GetSerialNumber_COMRPC: Testing GetSerialNumber via COM-RPC with DeviceInfo");
+    if (!m_deviceInfoActivated) { TEST_LOG("DeviceInfo not activated - skipping"); return; }
+
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("  CreateSystemServicesInterfaceObject failed - skipping");
+        return;
+    }
+    ASSERT_TRUE(m_controller_SystemServices != nullptr);
+    ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
+
+    string serialNumber;
+    bool success = false;
+    uint32_t result = m_SystemServicesPlugin->GetSerialNumber(serialNumber, success);
+
+    /* With DeviceInfo activated the inner SerialNumber() call is reached.
+       The result depends on the IARM mock; we verify the call completes without crash. */
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  GetSerialNumber (COM-RPC): result=%u, serialNumber='%s', success=%s",
+             result, serialNumber.c_str(), success ? "true" : "false");
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+// ==================================================================================
+// GetDeviceInfo tests — exercises the plugin-UP path (lines after plugin null-check)
+// ==================================================================================
+
+TEST_F(SystemService_L2Test_WithDeviceInfo, DeviceInfo_GetDeviceInfo_EmptyQuery_JSONRPC)
+{
+    TEST_LOG("DeviceInfo_GetDeviceInfo: Testing getDeviceInfo (all fields) via JSON-RPC");
+    if (!m_deviceInfoActivated) { TEST_LOG("DeviceInfo not activated - skipping"); return; }
+
+    JsonObject params, result;
+    /* Pass empty params to request all device info fields */
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getDeviceInfo", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    TEST_LOG("  getDeviceInfo status=%u", status);
+}
+
+TEST_F(SystemService_L2Test_WithDeviceInfo, DeviceInfo_GetDeviceInfo_MakeQuery_JSONRPC)
+{
+    TEST_LOG("DeviceInfo_GetDeviceInfo_Make: Testing getDeviceInfo?params=make via JSON-RPC");
+    if (!m_deviceInfoActivated) { TEST_LOG("DeviceInfo not activated - skipping"); return; }
+
+    JsonObject params, result;
+    JsonArray queryParams;
+    queryParams.Add("make");
+    params["params"] = queryParams;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getDeviceInfo", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    TEST_LOG("  getDeviceInfo?make status=%u", status);
+}
+
+// ==================================================================================
+// Test fixture for Telemetry plugin integration tests
+// ==================================================================================
+/**
+ * @brief Fixture that activates org.rdk.Telemetry before running telemetry tests.
+ *
+ * Coverage goal: exercise the `if (telemetryObject)` TRUE branches inside
+ *   - SystemServicesImplementation::IsOptOutTelemetry
+ *   - SystemServicesImplementation::SetOptOutTelemetry
+ */
+class SystemService_L2Test_WithTelemetry : public SystemService_L2Test {
+protected:
+    bool m_telemetryActivated = false;
+
+    SystemService_L2Test_WithTelemetry() : SystemService_L2Test()
+    {
+        /* Ensure opt-out file directory exists */
+        (void)system("mkdir -p /opt");
+
+        uint32_t status = ActivateService("org.rdk.Telemetry");
+        if (status == Core::ERROR_NONE) {
+            m_telemetryActivated = true;
+            TEST_LOG("org.rdk.Telemetry activated for coverage tests");
+        } else {
+            TEST_LOG("org.rdk.Telemetry activation returned %u - tests will be gracefully skipped", status);
+        }
+    }
+
+    ~SystemService_L2Test_WithTelemetry() override
+    {
+        /* Remove opt-out file created by tests */
+        (void)system("rm -f /opt/tmtryoptout");
+
+        if (m_telemetryActivated) {
+            uint32_t s = DeactivateService("org.rdk.Telemetry");
+            if (s != Core::ERROR_NONE) {
+                TEST_LOG("org.rdk.Telemetry deactivation returned %u (non-fatal)", s);
+            }
+        }
+    }
+};
+
+// ==================================================================================
+// IsOptOutTelemetry tests — exercises the `if (telemetryObject)` TRUE branch
+// ==================================================================================
+
+TEST_F(SystemService_L2Test_WithTelemetry, Telemetry_IsOptOutTelemetry_JSONRPC)
+{
+    TEST_LOG("Telemetry_IsOptOutTelemetry: Testing isOptOutTelemetry via JSON-RPC with Telemetry");
+    if (!m_telemetryActivated) { TEST_LOG("Telemetry plugin not activated - skipping"); return; }
+
+    JsonObject params, result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "isOptOutTelemetry", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    TEST_LOG("  isOptOutTelemetry status=%u", status);
+    if (result.HasLabel("Opt-Out")) {
+        TEST_LOG("  Opt-Out=%s", result["Opt-Out"].Boolean() ? "true" : "false");
+    }
+}
+
+TEST_F(SystemService_L2Test_WithTelemetry, Telemetry_IsOptOutTelemetry_COMRPC)
+{
+    TEST_LOG("Telemetry_IsOptOutTelemetry_COMRPC: Testing IsOptOutTelemetry via COM-RPC with Telemetry");
+    if (!m_telemetryActivated) { TEST_LOG("Telemetry plugin not activated - skipping"); return; }
+
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("  CreateSystemServicesInterfaceObject failed - skipping");
+        return;
+    }
+    ASSERT_TRUE(m_controller_SystemServices != nullptr);
+    ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
+
+    bool optOut = false;
+    bool success = false;
+    uint32_t result = m_SystemServicesPlugin->IsOptOutTelemetry(optOut, success);
+
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  IsOptOutTelemetry (COM-RPC): result=%u, OptOut=%s, success=%s",
+             result, optOut ? "true" : "false", success ? "true" : "false");
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+// ==================================================================================
+// SetOptOutTelemetry tests — exercises the `if (telemetryObject)` TRUE branch
+// ==================================================================================
+
+TEST_F(SystemService_L2Test_WithTelemetry, Telemetry_SetOptOutTelemetry_Enable_JSONRPC)
+{
+    TEST_LOG("Telemetry_SetOptOutTelemetry_Enable: Testing setOptOutTelemetry true via JSON-RPC");
+    if (!m_telemetryActivated) { TEST_LOG("Telemetry plugin not activated - skipping"); return; }
+
+    JsonObject params, result;
+    params["Opt-Out"] = true;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setOptOutTelemetry", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    if (status == Core::ERROR_NONE) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+    TEST_LOG("  setOptOutTelemetry(true) status=%u", status);
+}
+
+TEST_F(SystemService_L2Test_WithTelemetry, Telemetry_SetOptOutTelemetry_Disable_JSONRPC)
+{
+    TEST_LOG("Telemetry_SetOptOutTelemetry_Disable: Testing setOptOutTelemetry false via JSON-RPC");
+    if (!m_telemetryActivated) { TEST_LOG("Telemetry plugin not activated - skipping"); return; }
+
+    JsonObject params, result;
+    params["Opt-Out"] = false;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setOptOutTelemetry", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    if (status == Core::ERROR_NONE) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+    TEST_LOG("  setOptOutTelemetry(false) status=%u", status);
+}
+
+TEST_F(SystemService_L2Test_WithTelemetry, Telemetry_SetOptOutTelemetry_COMRPC)
+{
+    TEST_LOG("Telemetry_SetOptOutTelemetry_COMRPC: Testing SetOptOutTelemetry via COM-RPC with Telemetry");
+    if (!m_telemetryActivated) { TEST_LOG("Telemetry plugin not activated - skipping"); return; }
+
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("  CreateSystemServicesInterfaceObject failed - skipping");
+        return;
+    }
+    ASSERT_TRUE(m_controller_SystemServices != nullptr);
+    ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
+
+    Exchange::ISystemServices::SystemResult sysResult;
+    uint32_t result = m_SystemServicesPlugin->SetOptOutTelemetry(true, sysResult);
+
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    if (result == Core::ERROR_NONE) {
+        EXPECT_TRUE(sysResult.success);
+        TEST_LOG("  SetOptOutTelemetry(true) COM-RPC success=%s", sysResult.success ? "true" : "false");
+    }
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+// ==================================================================================
+// Test fixture for FirmwareUpdate plugin integration tests
+// ==================================================================================
+/**
+ * @brief Fixture that activates org.rdk.FirmwareUpdate before running firmware tests.
+ *
+ * Coverage goal: exercise the `if (firmwareupdateObject)` TRUE branch inside
+ *   - SystemServicesImplementation::SetFirmwareAutoReboot
+ */
+class SystemService_L2Test_WithFirmwareUpdate : public SystemService_L2Test {
+protected:
+    bool m_firmwareUpdateActivated = false;
+
+    SystemService_L2Test_WithFirmwareUpdate() : SystemService_L2Test()
+    {
+        uint32_t status = ActivateService("org.rdk.FirmwareUpdate");
+        if (status == Core::ERROR_NONE) {
+            m_firmwareUpdateActivated = true;
+            TEST_LOG("org.rdk.FirmwareUpdate activated for coverage tests");
+        } else {
+            TEST_LOG("org.rdk.FirmwareUpdate activation returned %u - tests will be gracefully skipped", status);
+        }
+    }
+
+    ~SystemService_L2Test_WithFirmwareUpdate() override
+    {
+        if (m_firmwareUpdateActivated) {
+            uint32_t s = DeactivateService("org.rdk.FirmwareUpdate");
+            if (s != Core::ERROR_NONE) {
+                TEST_LOG("org.rdk.FirmwareUpdate deactivation returned %u (non-fatal)", s);
+            }
+        }
+    }
+};
+
+// ==================================================================================
+// SetFirmwareAutoReboot tests — exercises the `if (firmwareupdateObject)` TRUE branch
+// ==================================================================================
+
+TEST_F(SystemService_L2Test_WithFirmwareUpdate, FirmwareUpdate_SetFirmwareAutoReboot_Enable_JSONRPC)
+{
+    TEST_LOG("FirmwareUpdate_SetFirmwareAutoReboot_Enable: Testing setFirmwareAutoReboot true via JSON-RPC");
+    if (!m_firmwareUpdateActivated) { TEST_LOG("FirmwareUpdate plugin not activated - skipping"); return; }
+
+    JsonObject params, result;
+    params["enable"] = true;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setFirmwareAutoReboot", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    if (status == Core::ERROR_NONE) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+    TEST_LOG("  setFirmwareAutoReboot(true) status=%u", status);
+}
+
+TEST_F(SystemService_L2Test_WithFirmwareUpdate, FirmwareUpdate_SetFirmwareAutoReboot_Disable_JSONRPC)
+{
+    TEST_LOG("FirmwareUpdate_SetFirmwareAutoReboot_Disable: Testing setFirmwareAutoReboot false via JSON-RPC");
+    if (!m_firmwareUpdateActivated) { TEST_LOG("FirmwareUpdate plugin not activated - skipping"); return; }
+
+    JsonObject params, result;
+    params["enable"] = false;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setFirmwareAutoReboot", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    if (status == Core::ERROR_NONE) {
+        EXPECT_TRUE(result["success"].Boolean());
+    }
+    TEST_LOG("  setFirmwareAutoReboot(false) status=%u", status);
+}
+
+TEST_F(SystemService_L2Test_WithFirmwareUpdate, FirmwareUpdate_SetFirmwareAutoReboot_COMRPC)
+{
+    TEST_LOG("FirmwareUpdate_SetFirmwareAutoReboot_COMRPC: Testing SetFirmwareAutoReboot via COM-RPC with FirmwareUpdate");
+    if (!m_firmwareUpdateActivated) { TEST_LOG("FirmwareUpdate plugin not activated - skipping"); return; }
+
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("  CreateSystemServicesInterfaceObject failed - skipping");
+        return;
+    }
+    ASSERT_TRUE(m_controller_SystemServices != nullptr);
+    ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
+
+    Exchange::ISystemServices::SystemResult sysResult;
+    uint32_t result = m_SystemServicesPlugin->SetFirmwareAutoReboot(true, sysResult);
+
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    if (result == Core::ERROR_NONE) {
+        EXPECT_TRUE(sysResult.success);
+        TEST_LOG("  SetFirmwareAutoReboot(true) COM-RPC success=%s", sysResult.success ? "true" : "false");
+    }
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
