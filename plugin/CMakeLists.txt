@@ -25,6 +25,7 @@ set(PLUGIN_SYSTEMSERVICE_STARTUPORDER "" CACHE STRING "To configure startup orde
 find_package(${NAMESPACE}Plugins REQUIRED)
 find_package(${NAMESPACE}Definitions REQUIRED)
 find_package(CompileSettingsDebug CONFIG REQUIRED)
+find_package(${NAMESPACE}Helpers REQUIRED)
 find_library(PROCPS_LIBRARIES NAMES procps)
 
 find_package(Telemetry)
@@ -135,8 +136,8 @@ if(TELEMETRY_FOUND)
     target_include_directories(${MODULE_NAME} PRIVATE ${TELEMETRY_INCLUDE_DIRS})
 endif()
 
-target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ../helpers)
 target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ./)
+target_link_libraries(${MODULE_NAME} PRIVATE ${NAMESPACE}::${NAMESPACE}Helpers)
 
 #Add mock headers and SYSTIMEMGR support for L1 and L2 tests only
 if (RDK_SERVICES_L1_TEST OR RDK_SERVICE_L2_TEST)
