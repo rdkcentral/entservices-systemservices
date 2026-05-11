@@ -3124,12 +3124,14 @@ TEST_F(SystemService_L2Test, SysImpl_Cov_GetBootTypeInfo_COMRPC)
     Exchange::ISystemServices::BootType bootInfo;
     uint32_t result = m_SystemServicesPlugin->GetBootTypeInfo(bootInfo);
 
-    /* GetBootTypeInfo requires Migration plugin - may not be active in CI */
-    if (result == Core::ERROR_NONE) {
-        TEST_LOG("  bootType: %s", bootInfo.bootType.c_str());
-    } else {
-        TEST_LOG("  GetBootTypeInfo returned %u - Migration plugin may not be active (acceptable)", result);
-    }
+    /* GetBootTypeInfo requires Migration plugin - not activated in this fixture.
+       Implementation initialises errCode = Core::ERROR_GENERAL and only changes
+       it when migrationObject != nullptr, so ERROR_GENERAL is the guaranteed
+       return when the plugin is absent. bootType string is never written,
+       so it must remain empty. */
+    EXPECT_EQ(result, Core::ERROR_GENERAL);
+    EXPECT_TRUE(bootInfo.bootType.empty());
+    TEST_LOG("  GetBootTypeInfo (no plugin) returned %u as expected", result);
 
     m_SystemServicesPlugin->Release();
     m_controller_SystemServices->Release();
@@ -3150,11 +3152,41 @@ TEST_F(SystemService_L2Test, SysImpl_Cov_GetMigrationStatus_COMRPC)
     Exchange::ISystemServices::MigrationStatus migrationInfo;
     uint32_t result = m_SystemServicesPlugin->GetMigrationStatus(migrationInfo);
 
-    if (result == Core::ERROR_NONE) {
-        TEST_LOG("  migrationStatus: %s", migrationInfo.migrationStatus.c_str());
-    } else {
-        TEST_LOG("  GetMigrationStatus returned %u - acceptable (Migration plugin may not be available)", result);
+    /* GetMigrationStatus requires Migration plugin - not activated in this fixture.
+       Implementation initialises result = Core::ERROR_GENERAL and only changes
+       it when migrationObject != nullptr, so ERROR_GENERAL is the guaranteed
+       return. migrationStatus string is never written, so it must remain empty. */
+    EXPECT_EQ(result, Core::ERROR_GENERAL);
+    EXPECT_TRUE(migrationInfo.migrationStatus.empty());
+    TEST_LOG("  GetMigrationStatus (no plugin) returned %u as expected", result);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+TEST_F(SystemService_L2Test, SysImpl_Cov_SetMigrationStatus_NoPlugin_COMRPC)
+{
+    TEST_LOG("SysImpl_Cov: Testing SetMigrationStatus via COM-RPC when Migration plugin is NOT activated");
+
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("  Invalid SystemServices_Client");
+        return;
     }
+
+    ASSERT_TRUE(m_controller_SystemServices != nullptr);
+    ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
+
+    Exchange::ISystemServices::SystemResult sysResult;
+    uint32_t result = m_SystemServicesPlugin->SetMigrationStatus("STARTED", sysResult);
+
+    /* SetMigrationStatus requires Migration plugin - not activated in this fixture.
+       Implementation initialises errCode = Core::ERROR_GENERAL and only changes
+       it when migrationObject != nullptr. result.success is never assigned when
+       the plugin is absent, so it stays at its default false value. */
+    EXPECT_EQ(result, Core::ERROR_GENERAL);
+    EXPECT_FALSE(sysResult.success);
+    TEST_LOG("  SetMigrationStatus (no plugin) returned %u, success=%s as expected",
+             result, sysResult.success ? "true" : "false");
 
     m_SystemServicesPlugin->Release();
     m_controller_SystemServices->Release();
