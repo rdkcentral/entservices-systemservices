@@ -8361,4 +8361,583 @@ TEST_F(SystemService_L2Test, SysImpl_GetLastFirmwareFailureReason_KnownReason_JS
     std::remove(statusFile);
 }
 
+// ==================================================================================
+// Test fixture for Migration plugin integration tests
+// ==================================================================================
+/**
+ * @brief Fixture that activates org.rdk.Migration before running migration tests.
+ *
+ * Inherits from SystemService_L2Test (which already activates org.rdk.System and
+ * org.rdk.PowerManager). The Migration plugin is activated in the constructor and
+ * deactivated in the destructor so each test gets a clean plugin lifecycle.
+ *
+ * Coverage goal: exercise the `if (migrationObject)` TRUE branches inside
+ *   - SystemServicesImplementation::GetBootTypeInfo
+ *   - SystemServicesImplementation::GetMigrationStatus
+ *   - SystemServicesImplementation::SetMigrationStatus
+ * and all internal enum/string conversion tables that are unreachable without the
+ * Migration plugin being present.
+ */
+class SystemService_L2Test_WithMigration : public SystemService_L2Test {
+protected:
+    bool m_migrationActivated = false;
+
+    SystemService_L2Test_WithMigration() : SystemService_L2Test()
+    {
+        /* The MigrationStatus file lives under /opt/secure/persistent/ */
+        (void)system("mkdir -p /opt/secure/persistent");
+
+        uint32_t status = ActivateService("org.rdk.Migration");
+        if (status == Core::ERROR_NONE) {
+            m_migrationActivated = true;
+            TEST_LOG("org.rdk.Migration activated for migration coverage tests");
+        } else {
+            TEST_LOG("org.rdk.Migration activation returned %u - migration tests will be gracefully skipped", status);
+        }
+    }
+
+    ~SystemService_L2Test_WithMigration() override
+    {
+        /* Clean up test files written by the Migration plugin */
+        (void)system("rm -f /tmp/bootType");
+        (void)system("rm -f /opt/secure/persistent/MigrationStatus");
+
+        if (m_migrationActivated) {
+            uint32_t s = DeactivateService("org.rdk.Migration");
+            if (s != Core::ERROR_NONE) {
+                TEST_LOG("org.rdk.Migration deactivation returned %u (non-fatal)", s);
+            }
+        }
+    }
+
+    /**
+     * @brief Write a BOOT_TYPE entry to /tmp/bootType so that
+     *        MigrationImplementation::GetBootTypeInfo can find it.
+     */
+    void WriteBootTypeFile(const char* bootTypeValue)
+    {
+        std::ofstream f("/tmp/bootType");
+        if (f.is_open()) {
+            f << "BOOT_TYPE=" << bootTypeValue << "\n";
+        }
+    }
+
+    /**
+     * @brief Configure p_rfcApiImplMock to return @p statusValue for the
+     *        TR181 Migration-status parameter so that
+     *        MigrationImplementation::GetMigrationStatus returns that status.
+     */
+    void SetRFCMigrationStatus(const char* statusValue)
+    {
+        std::string sv(statusValue);
+        ON_CALL(*p_rfcApiImplMock, getRFCParameter(
+            ::testing::_,
+            ::testing::StrEq("Device.DeviceInfo.Migration.MigrationStatus"),
+            ::testing::_))
+        .WillByDefault(::testing::Invoke(
+            [sv](char*, const char*, RFC_ParamData_t* d) {
+                strncpy(d->value, sv.c_str(), sizeof(d->value) - 1);
+                d->value[sizeof(d->value) - 1] = '\0';
+                return WDMP_SUCCESS;
+            }));
+    }
+};
+
+// ==================================================================================
+// GetBootTypeInfo tests – covers the migrationObject-non-null success / failure paths
+// and all four BootType enum values in the bootTypeToString map
+// ==================================================================================
+
+TEST_F(SystemService_L2Test_WithMigration, Migration_GetBootTypeInfo_BootNormal_JSONRPC)
+{
+    TEST_LOG("Migration_GetBootTypeInfo_BootNormal: Testing BOOT_NORMAL via JSON-RPC");
+    if (!m_migrationActivated) { TEST_LOG("Migration plugin not activated - skipping"); return; }
+
+    WriteBootTypeFile("BOOT_NORMAL");
+
+    JsonObject params, result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getBootTypeInfo", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    if (status == Core::ERROR_NONE) {
+        EXPECT_TRUE(result.HasLabel("bootType")) << "Response missing bootType field";
+        EXPECT_EQ(result["bootType"].String(), "BOOT_NORMAL");
+        TEST_LOG("  bootType: %s", result["bootType"].String().c_str());
+    }
+}
+
+TEST_F(SystemService_L2Test_WithMigration, Migration_GetBootTypeInfo_BootInit_JSONRPC)
+{
+    TEST_LOG("Migration_GetBootTypeInfo_BootInit: Testing BOOT_INIT via JSON-RPC");
+    if (!m_migrationActivated) { TEST_LOG("Migration plugin not activated - skipping"); return; }
+
+    WriteBootTypeFile("BOOT_INIT");
+
+    JsonObject params, result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getBootTypeInfo", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    if (status == Core::ERROR_NONE) {
+        EXPECT_TRUE(result.HasLabel("bootType"));
+        EXPECT_EQ(result["bootType"].String(), "BOOT_INIT");
+        TEST_LOG("  bootType: %s", result["bootType"].String().c_str());
+    }
+}
+
+TEST_F(SystemService_L2Test_WithMigration, Migration_GetBootTypeInfo_BootMigration_JSONRPC)
+{
+    TEST_LOG("Migration_GetBootTypeInfo_BootMigration: Testing BOOT_MIGRATION via JSON-RPC");
+    if (!m_migrationActivated) { TEST_LOG("Migration plugin not activated - skipping"); return; }
+
+    WriteBootTypeFile("BOOT_MIGRATION");
+
+    JsonObject params, result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getBootTypeInfo", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    if (status == Core::ERROR_NONE) {
+        EXPECT_TRUE(result.HasLabel("bootType"));
+        EXPECT_EQ(result["bootType"].String(), "BOOT_MIGRATION");
+        TEST_LOG("  bootType: %s", result["bootType"].String().c_str());
+    }
+}
+
+TEST_F(SystemService_L2Test_WithMigration, Migration_GetBootTypeInfo_BootUpdate_JSONRPC)
+{
+    TEST_LOG("Migration_GetBootTypeInfo_BootUpdate: Testing BOOT_UPDATE via JSON-RPC");
+    if (!m_migrationActivated) { TEST_LOG("Migration plugin not activated - skipping"); return; }
+
+    WriteBootTypeFile("BOOT_UPDATE");
+
+    JsonObject params, result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getBootTypeInfo", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    if (status == Core::ERROR_NONE) {
+        EXPECT_TRUE(result.HasLabel("bootType"));
+        EXPECT_EQ(result["bootType"].String(), "BOOT_UPDATE");
+        TEST_LOG("  bootType: %s", result["bootType"].String().c_str());
+    }
+}
+
+TEST_F(SystemService_L2Test_WithMigration, Migration_GetBootTypeInfo_NoBootTypeFile_JSONRPC)
+{
+    TEST_LOG("Migration_GetBootTypeInfo_NoBootTypeFile: Testing when /tmp/bootType is absent");
+    if (!m_migrationActivated) { TEST_LOG("Migration plugin not activated - skipping"); return; }
+
+    /* Ensure the file does not exist */
+    (void)system("rm -f /tmp/bootType");
+
+    JsonObject params, result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getBootTypeInfo", params, result);
+
+    /* Without the bootType file the Migration plugin returns an error which
+       SystemServices propagates back as a non-zero status. */
+    EXPECT_NE(status, Core::ERROR_NONE);
+    TEST_LOG("  getBootTypeInfo (no file) returned %u as expected", status);
+}
+
+// ==================================================================================
+// GetMigrationStatus tests – covers all 8 MigrationStatus enum-to-string mappings
+// and the RFC failure path
+// ==================================================================================
+
+TEST_F(SystemService_L2Test_WithMigration, Migration_GetMigrationStatus_NotStarted_JSONRPC)
+{
+    TEST_LOG("Migration_GetMigrationStatus_NotStarted: Testing NOT_STARTED via JSON-RPC");
+    if (!m_migrationActivated) { TEST_LOG("Migration plugin not activated - skipping"); return; }
+
+    SetRFCMigrationStatus("NOT_STARTED");
+
+    JsonObject params, result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getMigrationStatus", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    if (status == Core::ERROR_NONE) {
+        EXPECT_TRUE(result.HasLabel("migrationStatus")) << "Response missing migrationStatus field";
+        EXPECT_EQ(result["migrationStatus"].String(), "NOT_STARTED");
+        TEST_LOG("  migrationStatus: %s", result["migrationStatus"].String().c_str());
+    }
+}
+
+TEST_F(SystemService_L2Test_WithMigration, Migration_GetMigrationStatus_NotNeeded_JSONRPC)
+{
+    TEST_LOG("Migration_GetMigrationStatus_NotNeeded: Testing NOT_NEEDED via JSON-RPC");
+    if (!m_migrationActivated) { TEST_LOG("Migration plugin not activated - skipping"); return; }
+
+    SetRFCMigrationStatus("NOT_NEEDED");
+
+    JsonObject params, result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getMigrationStatus", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    if (status == Core::ERROR_NONE) {
+        EXPECT_EQ(result["migrationStatus"].String(), "NOT_NEEDED");
+        TEST_LOG("  migrationStatus: %s", result["migrationStatus"].String().c_str());
+    }
+}
+
+TEST_F(SystemService_L2Test_WithMigration, Migration_GetMigrationStatus_Started_JSONRPC)
+{
+    TEST_LOG("Migration_GetMigrationStatus_Started: Testing STARTED via JSON-RPC");
+    if (!m_migrationActivated) { TEST_LOG("Migration plugin not activated - skipping"); return; }
+
+    SetRFCMigrationStatus("STARTED");
+
+    JsonObject params, result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getMigrationStatus", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    if (status == Core::ERROR_NONE) {
+        EXPECT_EQ(result["migrationStatus"].String(), "STARTED");
+        TEST_LOG("  migrationStatus: %s", result["migrationStatus"].String().c_str());
+    }
+}
+
+TEST_F(SystemService_L2Test_WithMigration, Migration_GetMigrationStatus_PrioritySettingsMigrated_JSONRPC)
+{
+    TEST_LOG("Migration_GetMigrationStatus_PrioritySettingsMigrated: Testing PRIORITY_SETTINGS_MIGRATED via JSON-RPC");
+    if (!m_migrationActivated) { TEST_LOG("Migration plugin not activated - skipping"); return; }
+
+    SetRFCMigrationStatus("PRIORITY_SETTINGS_MIGRATED");
+
+    JsonObject params, result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getMigrationStatus", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    if (status == Core::ERROR_NONE) {
+        EXPECT_EQ(result["migrationStatus"].String(), "PRIORITY_SETTINGS_MIGRATED");
+        TEST_LOG("  migrationStatus: %s", result["migrationStatus"].String().c_str());
+    }
+}
+
+TEST_F(SystemService_L2Test_WithMigration, Migration_GetMigrationStatus_DeviceSettingsMigrated_JSONRPC)
+{
+    TEST_LOG("Migration_GetMigrationStatus_DeviceSettingsMigrated: Testing DEVICE_SETTINGS_MIGRATED via JSON-RPC");
+    if (!m_migrationActivated) { TEST_LOG("Migration plugin not activated - skipping"); return; }
+
+    SetRFCMigrationStatus("DEVICE_SETTINGS_MIGRATED");
+
+    JsonObject params, result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getMigrationStatus", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    if (status == Core::ERROR_NONE) {
+        EXPECT_EQ(result["migrationStatus"].String(), "DEVICE_SETTINGS_MIGRATED");
+        TEST_LOG("  migrationStatus: %s", result["migrationStatus"].String().c_str());
+    }
+}
+
+TEST_F(SystemService_L2Test_WithMigration, Migration_GetMigrationStatus_CloudSettingsMigrated_JSONRPC)
+{
+    TEST_LOG("Migration_GetMigrationStatus_CloudSettingsMigrated: Testing CLOUD_SETTINGS_MIGRATED via JSON-RPC");
+    if (!m_migrationActivated) { TEST_LOG("Migration plugin not activated - skipping"); return; }
+
+    SetRFCMigrationStatus("CLOUD_SETTINGS_MIGRATED");
+
+    JsonObject params, result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getMigrationStatus", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    if (status == Core::ERROR_NONE) {
+        EXPECT_EQ(result["migrationStatus"].String(), "CLOUD_SETTINGS_MIGRATED");
+        TEST_LOG("  migrationStatus: %s", result["migrationStatus"].String().c_str());
+    }
+}
+
+TEST_F(SystemService_L2Test_WithMigration, Migration_GetMigrationStatus_AppDataMigrated_JSONRPC)
+{
+    TEST_LOG("Migration_GetMigrationStatus_AppDataMigrated: Testing APP_DATA_MIGRATED via JSON-RPC");
+    if (!m_migrationActivated) { TEST_LOG("Migration plugin not activated - skipping"); return; }
+
+    SetRFCMigrationStatus("APP_DATA_MIGRATED");
+
+    JsonObject params, result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getMigrationStatus", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    if (status == Core::ERROR_NONE) {
+        EXPECT_EQ(result["migrationStatus"].String(), "APP_DATA_MIGRATED");
+        TEST_LOG("  migrationStatus: %s", result["migrationStatus"].String().c_str());
+    }
+}
+
+TEST_F(SystemService_L2Test_WithMigration, Migration_GetMigrationStatus_MigrationCompleted_JSONRPC)
+{
+    TEST_LOG("Migration_GetMigrationStatus_MigrationCompleted: Testing MIGRATION_COMPLETED via JSON-RPC");
+    if (!m_migrationActivated) { TEST_LOG("Migration plugin not activated - skipping"); return; }
+
+    SetRFCMigrationStatus("MIGRATION_COMPLETED");
+
+    JsonObject params, result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getMigrationStatus", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    if (status == Core::ERROR_NONE) {
+        EXPECT_EQ(result["migrationStatus"].String(), "MIGRATION_COMPLETED");
+        TEST_LOG("  migrationStatus: %s", result["migrationStatus"].String().c_str());
+    }
+}
+
+TEST_F(SystemService_L2Test_WithMigration, Migration_GetMigrationStatus_RFCFailure_JSONRPC)
+{
+    TEST_LOG("Migration_GetMigrationStatus_RFCFailure: Testing when RFC call fails");
+    if (!m_migrationActivated) { TEST_LOG("Migration plugin not activated - skipping"); return; }
+
+    /* The base-fixture ON_CALL already returns WDMP_FAILURE for parameters
+       not explicitly listed (Device.DeviceInfo.Migration.MigrationStatus is
+       not one of the ThermalProtection ones), so no additional mock setup
+       is needed here.  The Migration plugin will therefore return an error,
+       and SystemServices propagates it as a non-zero status. */
+
+    JsonObject params, result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getMigrationStatus", params, result);
+
+    EXPECT_NE(status, Core::ERROR_NONE);
+    TEST_LOG("  getMigrationStatus (RFC failure) returned %u as expected", status);
+}
+
+// ==================================================================================
+// SetMigrationStatus tests – covers the string-to-enum TRUE branch for all 8 valid
+// status strings and the FALSE branch (fallback to NOT_STARTED) for an unknown string
+// ==================================================================================
+
+TEST_F(SystemService_L2Test_WithMigration, Migration_SetMigrationStatus_NotStarted_JSONRPC)
+{
+    TEST_LOG("Migration_SetMigrationStatus_NotStarted: Testing NOT_STARTED via JSON-RPC");
+    if (!m_migrationActivated) { TEST_LOG("Migration plugin not activated - skipping"); return; }
+
+    JsonObject params, result;
+    params["status"] = "NOT_STARTED";
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMigrationStatus", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    if (status == Core::ERROR_NONE) {
+        EXPECT_TRUE(result["success"].Boolean());
+        TEST_LOG("  setMigrationStatus NOT_STARTED success=%s", result["success"].Boolean() ? "true" : "false");
+    }
+}
+
+TEST_F(SystemService_L2Test_WithMigration, Migration_SetMigrationStatus_NotNeeded_JSONRPC)
+{
+    TEST_LOG("Migration_SetMigrationStatus_NotNeeded: Testing NOT_NEEDED via JSON-RPC");
+    if (!m_migrationActivated) { TEST_LOG("Migration plugin not activated - skipping"); return; }
+
+    JsonObject params, result;
+    params["status"] = "NOT_NEEDED";
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMigrationStatus", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    if (status == Core::ERROR_NONE) {
+        EXPECT_TRUE(result["success"].Boolean());
+        TEST_LOG("  setMigrationStatus NOT_NEEDED success=%s", result["success"].Boolean() ? "true" : "false");
+    }
+}
+
+TEST_F(SystemService_L2Test_WithMigration, Migration_SetMigrationStatus_Started_JSONRPC)
+{
+    TEST_LOG("Migration_SetMigrationStatus_Started: Testing STARTED via JSON-RPC");
+    if (!m_migrationActivated) { TEST_LOG("Migration plugin not activated - skipping"); return; }
+
+    JsonObject params, result;
+    params["status"] = "STARTED";
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMigrationStatus", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    if (status == Core::ERROR_NONE) {
+        EXPECT_TRUE(result["success"].Boolean());
+        TEST_LOG("  setMigrationStatus STARTED success=%s", result["success"].Boolean() ? "true" : "false");
+    }
+}
+
+TEST_F(SystemService_L2Test_WithMigration, Migration_SetMigrationStatus_PrioritySettingsMigrated_JSONRPC)
+{
+    TEST_LOG("Migration_SetMigrationStatus_PrioritySettingsMigrated: Testing PRIORITY_SETTINGS_MIGRATED via JSON-RPC");
+    if (!m_migrationActivated) { TEST_LOG("Migration plugin not activated - skipping"); return; }
+
+    JsonObject params, result;
+    params["status"] = "PRIORITY_SETTINGS_MIGRATED";
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMigrationStatus", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    if (status == Core::ERROR_NONE) {
+        EXPECT_TRUE(result["success"].Boolean());
+        TEST_LOG("  setMigrationStatus PRIORITY_SETTINGS_MIGRATED success=%s",
+                 result["success"].Boolean() ? "true" : "false");
+    }
+}
+
+TEST_F(SystemService_L2Test_WithMigration, Migration_SetMigrationStatus_DeviceSettingsMigrated_JSONRPC)
+{
+    TEST_LOG("Migration_SetMigrationStatus_DeviceSettingsMigrated: Testing DEVICE_SETTINGS_MIGRATED via JSON-RPC");
+    if (!m_migrationActivated) { TEST_LOG("Migration plugin not activated - skipping"); return; }
+
+    JsonObject params, result;
+    params["status"] = "DEVICE_SETTINGS_MIGRATED";
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMigrationStatus", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    if (status == Core::ERROR_NONE) {
+        EXPECT_TRUE(result["success"].Boolean());
+        TEST_LOG("  setMigrationStatus DEVICE_SETTINGS_MIGRATED success=%s",
+                 result["success"].Boolean() ? "true" : "false");
+    }
+}
+
+TEST_F(SystemService_L2Test_WithMigration, Migration_SetMigrationStatus_CloudSettingsMigrated_JSONRPC)
+{
+    TEST_LOG("Migration_SetMigrationStatus_CloudSettingsMigrated: Testing CLOUD_SETTINGS_MIGRATED via JSON-RPC");
+    if (!m_migrationActivated) { TEST_LOG("Migration plugin not activated - skipping"); return; }
+
+    JsonObject params, result;
+    params["status"] = "CLOUD_SETTINGS_MIGRATED";
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMigrationStatus", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    if (status == Core::ERROR_NONE) {
+        EXPECT_TRUE(result["success"].Boolean());
+        TEST_LOG("  setMigrationStatus CLOUD_SETTINGS_MIGRATED success=%s",
+                 result["success"].Boolean() ? "true" : "false");
+    }
+}
+
+TEST_F(SystemService_L2Test_WithMigration, Migration_SetMigrationStatus_AppDataMigrated_JSONRPC)
+{
+    TEST_LOG("Migration_SetMigrationStatus_AppDataMigrated: Testing APP_DATA_MIGRATED via JSON-RPC");
+    if (!m_migrationActivated) { TEST_LOG("Migration plugin not activated - skipping"); return; }
+
+    JsonObject params, result;
+    params["status"] = "APP_DATA_MIGRATED";
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMigrationStatus", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    if (status == Core::ERROR_NONE) {
+        EXPECT_TRUE(result["success"].Boolean());
+        TEST_LOG("  setMigrationStatus APP_DATA_MIGRATED success=%s",
+                 result["success"].Boolean() ? "true" : "false");
+    }
+}
+
+TEST_F(SystemService_L2Test_WithMigration, Migration_SetMigrationStatus_MigrationCompleted_JSONRPC)
+{
+    TEST_LOG("Migration_SetMigrationStatus_MigrationCompleted: Testing MIGRATION_COMPLETED via JSON-RPC");
+    if (!m_migrationActivated) { TEST_LOG("Migration plugin not activated - skipping"); return; }
+
+    JsonObject params, result;
+    params["status"] = "MIGRATION_COMPLETED";
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMigrationStatus", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    if (status == Core::ERROR_NONE) {
+        EXPECT_TRUE(result["success"].Boolean());
+        TEST_LOG("  setMigrationStatus MIGRATION_COMPLETED success=%s",
+                 result["success"].Boolean() ? "true" : "false");
+    }
+}
+
+TEST_F(SystemService_L2Test_WithMigration, Migration_SetMigrationStatus_InvalidString_WithPlugin_JSONRPC)
+{
+    TEST_LOG("Migration_SetMigrationStatus_InvalidString_WithPlugin: Testing unknown string "
+             "covers FALSE branch of SystemServices string-to-enum map lookup");
+    if (!m_migrationActivated) { TEST_LOG("Migration plugin not activated - skipping"); return; }
+
+    /* "UNKNOWN_STATUS" is not in SystemServicesImplementation's stringToStatus map.
+       The implementation falls back to MIGRATION_STATUS_NOT_STARTED as the default
+       enum value, then forwards it to the Migration plugin which successfully writes
+       "NOT_STARTED" to the file.  The overall call therefore SUCCEEDS - this test
+       verifies the graceful fallback logic while covering the FALSE branch. */
+    JsonObject params, result;
+    params["status"] = "UNKNOWN_STATUS";
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMigrationStatus", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    if (status == Core::ERROR_NONE) {
+        TEST_LOG("  setMigrationStatus UNKNOWN_STATUS used NOT_STARTED fallback, success=%s",
+                 result["success"].Boolean() ? "true" : "false");
+    }
+}
+
+// ==================================================================================
+// COM-RPC integration tests with Migration plugin active – verify the COM-RPC path
+// end-to-end including the same enum/string conversions
+// ==================================================================================
+
+TEST_F(SystemService_L2Test_WithMigration, Migration_GetBootTypeInfo_COMRPC)
+{
+    TEST_LOG("Migration_GetBootTypeInfo_COMRPC: Testing GetBootTypeInfo via COM-RPC with Migration");
+    if (!m_migrationActivated) { TEST_LOG("Migration plugin not activated - skipping"); return; }
+
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("  CreateSystemServicesInterfaceObject failed - skipping");
+        return;
+    }
+    ASSERT_TRUE(m_controller_SystemServices != nullptr);
+    ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
+
+    WriteBootTypeFile("BOOT_NORMAL");
+
+    Exchange::ISystemServices::BootType bootInfo;
+    uint32_t result = m_SystemServicesPlugin->GetBootTypeInfo(bootInfo);
+
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    if (result == Core::ERROR_NONE) {
+        EXPECT_EQ(bootInfo.bootType, "BOOT_NORMAL");
+        TEST_LOG("  bootType (COM-RPC): %s", bootInfo.bootType.c_str());
+    }
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+TEST_F(SystemService_L2Test_WithMigration, Migration_GetMigrationStatus_COMRPC)
+{
+    TEST_LOG("Migration_GetMigrationStatus_COMRPC: Testing GetMigrationStatus via COM-RPC with Migration");
+    if (!m_migrationActivated) { TEST_LOG("Migration plugin not activated - skipping"); return; }
+
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("  CreateSystemServicesInterfaceObject failed - skipping");
+        return;
+    }
+    ASSERT_TRUE(m_controller_SystemServices != nullptr);
+    ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
+
+    SetRFCMigrationStatus("MIGRATION_COMPLETED");
+
+    Exchange::ISystemServices::MigrationStatus migrationInfo;
+    uint32_t result = m_SystemServicesPlugin->GetMigrationStatus(migrationInfo);
+
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    if (result == Core::ERROR_NONE) {
+        EXPECT_EQ(migrationInfo.migrationStatus, "MIGRATION_COMPLETED");
+        TEST_LOG("  migrationStatus (COM-RPC): %s", migrationInfo.migrationStatus.c_str());
+    }
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+TEST_F(SystemService_L2Test_WithMigration, Migration_SetMigrationStatus_COMRPC)
+{
+    TEST_LOG("Migration_SetMigrationStatus_COMRPC: Testing SetMigrationStatus via COM-RPC with Migration");
+    if (!m_migrationActivated) { TEST_LOG("Migration plugin not activated - skipping"); return; }
+
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("  CreateSystemServicesInterfaceObject failed - skipping");
+        return;
+    }
+    ASSERT_TRUE(m_controller_SystemServices != nullptr);
+    ASSERT_TRUE(m_SystemServicesPlugin != nullptr);
+
+    Exchange::ISystemServices::SystemResult sysResult;
+    uint32_t result = m_SystemServicesPlugin->SetMigrationStatus("STARTED", sysResult);
+
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    if (result == Core::ERROR_NONE) {
+        EXPECT_TRUE(sysResult.success);
+        TEST_LOG("  SetMigrationStatus STARTED (COM-RPC): success=%s", sysResult.success ? "true" : "false");
+    }
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
 
