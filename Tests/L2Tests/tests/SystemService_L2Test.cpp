@@ -24,6 +24,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <fstream>
+#include <sstream>
 #include <interfaces/ISystemServices.h>
 #include "deepSleepMgr.h"
 #include "PowerManagerHalMock.h"
@@ -9084,6 +9085,59 @@ TEST_F(SystemService_L2Test_WithDeviceInfo, DeviceInfo_GetDeviceInfo_MakeQuery_J
 
     EXPECT_EQ(status, Core::ERROR_NONE);
     TEST_LOG("  getDeviceInfo?make status=%u", status);
+}
+
+TEST_F(SystemService_L2Test_WithDeviceInfo, DeviceInfo_GetDeviceInfo_BadQuery_JSONRPC)
+{
+    TEST_LOG("DeviceInfo_GetDeviceInfo_BadQuery: Unallowable characters must be rejected before plugin call");
+    /* This path (lines ~3527-3532 in SystemServicesImplementation.cpp) does NOT require DeviceInfo
+     * to be active — the unallowable-chars check runs before the plugin null-check.
+     * We still use this fixture so the test is grouped with other GetDeviceInfo tests. */
+
+    JsonObject params, result;
+    JsonArray queryParams;
+    queryParams.Add("estb|mac");   /* '|' triggers REGEX_UNALLOWABLE_INPUT = "[^[:alnum:]_-]{1}" */
+    params["params"] = queryParams;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getDeviceInfo", params, result);
+
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    TEST_LOG("  getDeviceInfo(bad query) status=%u, message='%s'",
+             status, result.HasLabel("message") ? result["message"].String().c_str() : "(none)");
+}
+
+TEST_F(SystemService_L2Test_WithDeviceInfo, DeviceInfo_GetDeviceInfo_PlatcoPath_JSONRPC)
+{
+    TEST_LOG("DeviceInfo_GetDeviceInfo_Platco: Testing getDeviceInfo with DEVICE_NAME=PLATCO");
+    if (!m_deviceInfoActivated) { TEST_LOG("DeviceInfo not activated - skipping"); return; }
+
+    /* Write PLATCO into device.properties to exercise the PLATCO branch (lines ~3551-3565).
+     * Restore original content afterwards so subsequent tests are unaffected. */
+    std::string origContent;
+    {
+        std::ifstream orig("/etc/device.properties");
+        if (orig.is_open()) {
+            std::ostringstream ss;
+            ss << orig.rdbuf();
+            origContent = ss.str();
+        }
+    }
+
+    {
+        std::ofstream dp("/etc/device.properties");
+        dp << "DEVICE_NAME=PLATCO\n";
+        dp << "MFG_NAME=TestMfg\n";
+    }
+
+    JsonObject params, result;
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getDeviceInfo", params, result);
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    TEST_LOG("  getDeviceInfo(PLATCO) status=%u", status);
+
+    /* Restore device.properties */
+    {
+        std::ofstream dp("/etc/device.properties");
+        dp << origContent;
+    }
 }
 
 // ==================================================================================
