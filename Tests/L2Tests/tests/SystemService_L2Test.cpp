@@ -9506,6 +9506,10 @@ public:
     INTERFACE_ENTRY(WPEFramework::RPC::IStringIterator)
     END_INTERFACE_MAP
 
+    /* Stack-allocated test helper — reference counting is a no-op. */
+    void AddRef() const override {}
+    uint32_t Release() const override { return 1; }
+
     bool IsValid() const override { return (_index > 0 && _index <= _list.size()); }
     bool Next(string& e) override {
         if (_index < _list.size()) { e = _list[_index++]; return true; } return false;
@@ -9557,7 +9561,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetTimeZones_WithIterator_COMRPC)
     ON_CALL(*p_wrapsImplMock, pclose(::testing::_))
         .WillByDefault(::testing::Invoke([](FILE* f) -> int { return f ? fclose(f) : 0; }));
 
-    Core::Sink<SimpleStringIterator> iter({"US/Pacific"});
+    SimpleStringIterator iter({"US/Pacific"});
     string zoneinfo;
     bool success = false;
 
