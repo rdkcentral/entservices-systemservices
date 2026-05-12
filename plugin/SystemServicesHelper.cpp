@@ -339,6 +339,7 @@ bool getDownloadProgress(int& downloadPercent)
                   if (found_DOWN != std::string::npos)
                   {
                       std::string downPart = last_line.substr(found_DOWN + 5);
+                      Utils::String::trim(downPart);
                       std::string strDown;
                       Utils::String::removeExtraWhitespaces(downPart, strDown);
                       std::vector<std::string> downList;
