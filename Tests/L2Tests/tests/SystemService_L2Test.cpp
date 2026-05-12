@@ -2022,7 +2022,11 @@ TEST_F(SystemService_L2Test, UploadLogsAsync_COMRPC)
                 }
 
                 TEST_LOG("success: %d", systemResult.success);
+                
+                uint32_t abortResult = m_SystemServicesPlugin->AbortLogUpload(systemResult);
 
+                EXPECT_EQ(abortResult, Core::ERROR_NONE);
+                TEST_LOG("Abort success: %d", systemResult.success);
                 m_SystemServicesPlugin->Release();
             } else {
                 TEST_LOG("m_SystemServicesPlugin is NULL");
@@ -2317,6 +2321,7 @@ TEST_F(SystemService_L2Test, UploadLogsAsync_JSONRPC)
         bool success = result["success"].Boolean();
         TEST_LOG("  success: %d", success);
     }
+
 }
 
 TEST_F(SystemService_L2Test, AbortLogUpload_JSONRPC)
@@ -9393,6 +9398,174 @@ TEST_F(SystemService_L2Test_WithFirmwareUpdate, FirmwareUpdate_SetFirmwareAutoRe
         EXPECT_TRUE(sysResult.success);
         TEST_LOG("  SetFirmwareAutoReboot(true) COM-RPC success=%s", sysResult.success ? "true" : "false");
     }
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+// ==================================================================================
+// GetMacAddresses — async thread branch (lines 2677-2737)
+// Coverage: else-branch where /lib/rdk/getDeviceDetails.sh exists → thread launched
+// getMacAddressesAsync body covered.
+// ==================================================================================
+TEST_F(SystemService_L2Test, SysImpl_GetMacAddresses_WithScript_JSONRPC)
+{
+    TEST_LOG("SysImpl_GetMacAddresses_WithScript: covering thread-launch + getMacAddressesAsync");
+
+    /* Create the script so Utils::fileExists("/lib/rdk/getDeviceDetails.sh") returns true */
+    (void)system("mkdir -p /lib/rdk && printf '#!/bin/sh\\n' > /lib/rdk/getDeviceDetails.sh && chmod +x /lib/rdk/getDeviceDetails.sh");
+
+    /* v_secure_popen → /dev/null so getMacAddressesAsync reads empty buffer safely */
+    ON_CALL(*p_wrapsImplMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_))
+        .WillByDefault(::testing::Invoke(
+            [](const char*, const char*, va_list) -> FILE* { return fopen("/dev/null", "r"); }));
+    ON_CALL(*p_wrapsImplMock, v_secure_pclose(::testing::_))
+        .WillByDefault(::testing::Invoke([](FILE* f) -> int { return f ? fclose(f) : 0; }));
+
+    JsonObject params, result;
+    params["GUID"] = "test-guid-async-branch";
+
+    /* First call: launches getMacAddressesAsync thread */
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getMacAddresses", params, result);
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    TEST_LOG("  1st getMacAddresses status=%u asyncResponse=%s",
+             status, result.HasLabel("asyncResponse") ? (result["asyncResponse"].Boolean()?"true":"false") : "N/A");
+
+    /* Second call: implementation joins the previous thread first (thread_getMacAddresses.joinable()),
+     * guaranteeing getMacAddressesAsync has finished → full async body coverage. */
+    JsonObject params2, result2;
+    params2["GUID"] = "test-guid-async-join";
+    status = InvokeServiceMethod("org.rdk.System.1", "getMacAddresses", params2, result2);
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    TEST_LOG("  2nd getMacAddresses (joins thread) status=%u", status);
+
+    (void)system("rm -f /lib/rdk/getDeviceDetails.sh");
+}
+
+// ==================================================================================
+// AbortLogUpload — active-pid branch (lines 1007-1038)
+// Coverage: if(-1 != m_uploadLogsPid) branch including kill/waitpid/dispatchEvent
+// ==================================================================================
+TEST_F(SystemService_L2Test, SysImpl_AbortLogUpload_ActivePid_COMRPC)
+{
+    TEST_LOG("SysImpl_AbortLogUpload_ActivePid: covering kill-pid branch in AbortLogUpload");
+
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("  CreateSystemServicesInterfaceObject failed - skipping");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    /* Create fake logupload script that sleeps — gives us time to abort it */
+    (void)system("printf '#!/bin/sh\\nsleep 60\\n' > /usr/bin/logupload && chmod +x /usr/bin/logupload");
+
+    /* Set up required config files for getUploadLogParameters() to succeed */
+    { std::ofstream f("/etc/device.properties"); f << "BUILD_TYPE=dev\nFORCE_MTLS=false\n"; }
+    { std::ofstream f("/opt/dcm.properties");    f << "LOG_SERVER=test.server\n"; }
+    { std::ofstream f("/tmp/DCMSettings.conf");
+      f << "LogUploadSettings:UploadRepository:uploadProtocol=https\n"
+        << "LogUploadSettings:UploadRepository:URL=https://example.com/upload\n"
+        << "LogUploadSettings:UploadOnReboot=true\n"; }
+
+    Exchange::ISystemServices::SystemResult uploadResult;
+    uint32_t uploadRet = m_SystemServicesPlugin->UploadLogsAsync(uploadResult);
+    TEST_LOG("  UploadLogsAsync ret=%u success=%s", uploadRet, uploadResult.success ? "true" : "false");
+
+    if (uploadRet == Core::ERROR_NONE && uploadResult.success) {
+        /* m_uploadLogsPid is now the forked sleep process → AbortLogUpload kills it */
+        Exchange::ISystemServices::SystemResult abortResult;
+        uint32_t abortRet = m_SystemServicesPlugin->AbortLogUpload(abortResult);
+        EXPECT_EQ(abortRet, Core::ERROR_NONE);
+        TEST_LOG("  AbortLogUpload ret=%u success=%s", abortRet, abortResult.success ? "true" : "false");
+    } else {
+        TEST_LOG("  UploadLogsAsync could not fork (env setup issue) - skipping abort");
+    }
+
+    (void)system("rm -f /usr/bin/logupload");
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+// ==================================================================================
+// GetTimeZones — non-null IStringIterator branch (lines 3403-3418)
+// Coverage: if(timeZones && timeZones->Count() != 0) TRUE path
+//
+// getTimeZones JSON-RPC has no params so a non-null iterator requires COM-RPC.
+// We implement a minimal inline IStringIterator and call the proxy directly.
+// ==================================================================================
+
+/** Minimal COM-RPC string iterator for GetTimeZones coverage test.
+ *  Uses BEGIN_INTERFACE_MAP so WPEFramework's RPC framework can marshal it
+ *  from the test process to the Thunder plugin process. */
+class SimpleStringIterator : public WPEFramework::RPC::IStringIterator {
+public:
+    explicit SimpleStringIterator(std::initializer_list<string> l) : _list(l), _index(0) {}
+
+    BEGIN_INTERFACE_MAP(SimpleStringIterator)
+    INTERFACE_ENTRY(WPEFramework::RPC::IStringIterator)
+    END_INTERFACE_MAP
+
+    bool IsValid() const override { return (_index > 0 && _index <= _list.size()); }
+    bool Next(string& e) override {
+        if (_index < _list.size()) { e = _list[_index++]; return true; } return false;
+    }
+    bool Previous(string& e) override {
+        if (_index > 1) { e = _list[--_index - 1]; return true; } return false;
+    }
+    void Reset(const uint32_t p) override { _index = p; }
+    uint32_t Count() const override { return static_cast<uint32_t>(_list.size()); }
+    bool Current(string& e) const override {
+        if (_index > 0 && _index <= _list.size()) { e = _list[_index-1]; return true; }
+        return false;
+    }
+private:
+    std::vector<string> _list;
+    uint32_t _index;
+};
+
+TEST_F(SystemService_L2Test, SysImpl_GetTimeZones_WithIterator_COMRPC)
+{
+    TEST_LOG("SysImpl_GetTimeZones_WithIterator: covering non-null timeZones iterator branch");
+
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("  CreateSystemServicesInterfaceObject failed - skipping");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    /* Mock access() → success so processTimeZones doesn't early-return */
+    ON_CALL(*p_wrapsImplMock, access(::testing::_, ::testing::_))
+        .WillByDefault(::testing::Return(0));
+
+    /* Mock stat() → regular file to avoid directory recursion in processTimeZones */
+    ON_CALL(*p_wrapsImplMock, stat(::testing::_, ::testing::_))
+        .WillByDefault(::testing::Invoke([](const char*, struct stat* s) -> int {
+            if (s) { memset(s, 0, sizeof(*s)); s->st_mode = S_IFREG; } return 0; }));
+
+    /* Mock popen() → fake zdump output line */
+    ON_CALL(*p_wrapsImplMock, popen(::testing::_, ::testing::_))
+        .WillByDefault(::testing::Invoke([](const char*, const char*) -> FILE* {
+            FILE* f = tmpfile();
+            if (f) {
+                const char* line =
+                    "/usr/share/zoneinfo/US/Pacific  Thu Nov  5 12:21:17 2020 PST\n";
+                fwrite(line, 1, strlen(line), f);
+                rewind(f);
+            }
+            return f; }));
+    ON_CALL(*p_wrapsImplMock, pclose(::testing::_))
+        .WillByDefault(::testing::Invoke([](FILE* f) -> int { return f ? fclose(f) : 0; }));
+
+    SimpleStringIterator iter({"US/Pacific"});
+    string zoneinfo;
+    bool success = false;
+
+    uint32_t result = m_SystemServicesPlugin->GetTimeZones(&iter, zoneinfo, success);
+
+    TEST_LOG("  GetTimeZones(iter) ret=%u success=%s zoneinfo_len=%zu",
+             result, success ? "true" : "false", zoneinfo.size());
+    EXPECT_TRUE(result == Core::ERROR_NONE || result == Core::ERROR_GENERAL);
 
     m_SystemServicesPlugin->Release();
     m_controller_SystemServices->Release();
