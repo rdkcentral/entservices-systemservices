@@ -9515,9 +9515,9 @@ public:
     }
     void Reset(const uint32_t p) override { _index = p; }
     uint32_t Count() const override { return static_cast<uint32_t>(_list.size()); }
-    bool Current(string& e) const override {
-        if (_index > 0 && _index <= _list.size()) { e = _list[_index-1]; return true; }
-        return false;
+    string Current() const override {
+        if (_index > 0 && _index <= _list.size()) return _list[_index - 1];
+        return {};
     }
 private:
     std::vector<string> _list;
@@ -9557,7 +9557,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetTimeZones_WithIterator_COMRPC)
     ON_CALL(*p_wrapsImplMock, pclose(::testing::_))
         .WillByDefault(::testing::Invoke([](FILE* f) -> int { return f ? fclose(f) : 0; }));
 
-    SimpleStringIterator iter({"US/Pacific"});
+    Core::Sink<SimpleStringIterator> iter({"US/Pacific"});
     string zoneinfo;
     bool success = false;
 
