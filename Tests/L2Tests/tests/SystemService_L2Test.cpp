@@ -38,6 +38,20 @@
 #endif
 
 
+/* Simple concrete SleepModeImpl used by LIGHT_SLEEP / DEEP_SLEEP tests.
+ * Avoids SleepModeMock.h (gmock header) which caused plugin-load regressions.
+ * set with device::SleepMode::setImpl() / reset with setImpl(nullptr) per test. */
+class LocalSleepModeImpl : public device::SleepModeImpl {
+public:
+    explicit LocalSleepModeImpl(const std::string& mode) : m_mode(mode) {}
+    device::SleepMode& getInstanceById(int) override { return device::SleepMode::getInstance(); }
+    device::SleepMode& getInstanceByName(const std::string&) override { return device::SleepMode::getInstance(); }
+    device::List<device::SleepMode> getSleepModes() override { return {}; }
+    const std::string& toString() const override { return m_mode; }
+private:
+    std::string m_mode;
+};
+
 #define JSON_TIMEOUT   (1000)
 #define TEST_LOG(x, ...) fprintf(stderr, "\033[1;32m[%s:%d](%s)<PID:%d><TID:%d>" x "\n\033[0m", __FILE__, __LINE__, __FUNCTION__, getpid(), gettid(), ##__VA_ARGS__); fflush(stderr);
 #define SYSTEM_CALLSIGN  _T("org.rdk.System.1")
@@ -5461,6 +5475,82 @@ TEST_F(SystemService_L2Test, SysImpl_SetPowerState_InvalidState_COMRPC)
     EXPECT_FALSE(success);   /* invalid state → setPowerStateConversion returns false */
     TEST_LOG("  SetPowerState('INVALID_STATE'): result=%u, success=%d",
              result, success);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * SetPowerState — LIGHT_SLEEP path                                     *
+ * getPreferredSleepMode().toString() returns "LIGHT_SLEEP" so          *
+ * convert("DEEP_SLEEP","LIGHT_SLEEP") is false → setPowerStateConversion*
+ * is called with the original "LIGHT_SLEEP" → POWER_STATE_STANDBY.    *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetPowerState_LightSleep_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetPowerState: LIGHT_SLEEP path via getPreferredSleepMode");
+
+    /* Install a concrete SleepModeImpl so SleepMode::toString() works. */
+    LocalSleepModeImpl sleepModeImpl("LIGHT_SLEEP");
+    device::SleepMode::setImpl(&sleepModeImpl);
+
+    string powerState    = "LIGHT_SLEEP";
+    string standbyReason = "L2Test";
+    uint32_t sysSrvStatus = 0;
+    string errorMessage;
+    bool success = false;
+
+    uint32_t result = m_SystemServicesPlugin->SetPowerState(powerState, standbyReason,
+                                                            sysSrvStatus, errorMessage, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  SetPowerState(LIGHT_SLEEP): result=%u, success=%d, error='%s'",
+             result, success, errorMessage.c_str());
+
+    device::SleepMode::setImpl(nullptr);
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * SetPowerState — DEEP_SLEEP path                                      *
+ * getPreferredSleepMode().toString() returns "DEEP_SLEEP" so           *
+ * convert("DEEP_SLEEP","DEEP_SLEEP") is true → setPowerStateConversion *
+ * is called with "DEEP_SLEEP" → POWER_STATE_STANDBY_DEEP_SLEEP.       *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetPowerState_DeepSleep_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetPowerState: DEEP_SLEEP path via getPreferredSleepMode");
+
+    /* Install a concrete SleepModeImpl so SleepMode::toString() works. */
+    LocalSleepModeImpl sleepModeImpl("DEEP_SLEEP");
+    device::SleepMode::setImpl(&sleepModeImpl);
+
+    string powerState    = "DEEP_SLEEP";
+    string standbyReason = "L2Test";
+    uint32_t sysSrvStatus = 0;
+    string errorMessage;
+    bool success = false;
+
+    uint32_t result = m_SystemServicesPlugin->SetPowerState(powerState, standbyReason,
+                                                            sysSrvStatus, errorMessage, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  SetPowerState(DEEP_SLEEP): result=%u, success=%d, error='%s'",
+             result, success, errorMessage.c_str());
+
+    device::SleepMode::setImpl(nullptr);
 
     m_SystemServicesPlugin->Release();
     m_controller_SystemServices->Release();
