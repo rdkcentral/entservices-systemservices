@@ -314,11 +314,11 @@ bool getDownloadProgress(int& downloadPercent)
         {
               retStatus = false;
               // trim the leading spaces, which is equivalent to "sed 's/^ *//g'"
-              Utils::String::ltrim(last_line);
+              Utils::String::trim(last_line);
               // filter lines which has 'M' or 'G'  sed '/^[^M/G]*$/d', which is equivalent to "sed '/^[^M/G]*$/d'"
               std::size_t found_M = last_line.find_first_of("M");
               std::size_t found_G = last_line.find_first_of("G");
-              if ((found_M != std::string::npos) | (found_G != std::string::npos))
+              if ((found_M != std::string::npos) || (found_G != std::string::npos))
               {
                   /* Remove extra whitespaces from given input string, which is equivalent to "tr -s ' '" */
                   Utils::String::removeExtraWhitespaces(last_line, str);
@@ -326,10 +326,43 @@ bool getDownloadProgress(int& downloadPercent)
                   /* Divide the input string into words with delimiter(space) and get the third word,
                      which is equivalent to "cut -d ' ' -f3" */
                   Utils::String::split(stringList, str, " ");
-                  if ((!stringList[2].empty()))
+                  if (stringList.size() >= 3 && (!stringList[2].empty()))
                   {
                       downloadprogress = stringList[2];
                       retStatus = true;
+                  }
+              }
+              else
+              {
+                  /* Handle "UP: 0 of 0  DOWN: <downloaded> of <total>" format (bytes-based progress) */
+                  std::size_t found_DOWN = last_line.find("DOWN:");
+                  if (found_DOWN != std::string::npos)
+                  {
+                      std::string downPart = last_line.substr(found_DOWN + 5);
+                      std::string strDown;
+                      Utils::String::removeExtraWhitespaces(downPart, strDown);
+                      std::vector<std::string> downList;
+                      Utils::String::split(downList, strDown, " ");
+                      /* downList[0] = downloaded bytes, downList[1] = "of", downList[2] = total bytes */
+                      if (downList.size() >= 3 && !downList[0].empty() && !downList[2].empty())
+                      {
+                          char *endptr_dl = nullptr, *endptr_tot = nullptr;
+                          const char *str_dl = downList[0].c_str();
+                          const char *str_tot = downList[2].c_str();
+                          long long downloaded = strtoll(str_dl, &endptr_dl, 10);
+                          long long total = strtoll(str_tot, &endptr_tot, 10);
+                          /* Verify conversion consumed the entire string (no leading-only or partial parse) */
+                          if (endptr_dl != str_dl && *endptr_dl == '\0'
+                              && endptr_tot != str_tot && *endptr_tot == '\0'
+                              && total > 0 && downloaded >= 0 && downloaded <= total)
+                          {
+                              /* Use double to avoid overflow; clamp to 100 before int cast */
+                              double percent = (static_cast<double>(downloaded) / static_cast<double>(total)) * 100.0;
+                              if (percent > 100.0) percent = 100.0;
+                              downloadprogress = std::to_string(static_cast<int>(percent));
+                              retStatus = true;
+                          }
+                      }
                   }
               }
         }
