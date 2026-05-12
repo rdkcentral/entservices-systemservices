@@ -29,6 +29,7 @@
 #include "deepSleepMgr.h"
 #include "PowerManagerHalMock.h"
 #include "MfrMock.h"
+#include "devicesettings/SleepModeMock.h"
 #include "../../../plugin/SystemServicesHelper.h"
 #include "../../../plugin/thermonitor.h"
 #include "../../../plugin/uploadlogs.h"
@@ -9500,15 +9501,11 @@ TEST_F(SystemService_L2Test, SysImpl_AbortLogUpload_ActivePid_COMRPC)
  *  from the test process to the Thunder plugin process. */
 class SimpleStringIterator : public WPEFramework::RPC::IStringIterator {
 public:
-    explicit SimpleStringIterator(std::initializer_list<string> l) : _list(l), _index(0) {}
+    explicit SimpleStringIterator(std::vector<string> l) : _list(std::move(l)), _index(0) {}
 
     BEGIN_INTERFACE_MAP(SimpleStringIterator)
     INTERFACE_ENTRY(WPEFramework::RPC::IStringIterator)
     END_INTERFACE_MAP
-
-    /* Stack-allocated test helper — reference counting is a no-op. */
-    void AddRef() const override {}
-    uint32_t Release() const override { return 1; }
 
     bool IsValid() const override { return (_index > 0 && _index <= _list.size()); }
     bool Next(string& e) override {
@@ -9561,7 +9558,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetTimeZones_WithIterator_COMRPC)
     ON_CALL(*p_wrapsImplMock, pclose(::testing::_))
         .WillByDefault(::testing::Invoke([](FILE* f) -> int { return f ? fclose(f) : 0; }));
 
-    SimpleStringIterator iter({"US/Pacific"});
+    Core::Sink<SimpleStringIterator> iter(std::vector<string>{"US/Pacific"});
     string zoneinfo;
     bool success = false;
 
@@ -9571,6 +9568,99 @@ TEST_F(SystemService_L2Test, SysImpl_GetTimeZones_WithIterator_COMRPC)
              result, success ? "true" : "false", zoneinfo.size());
     EXPECT_TRUE(result == Core::ERROR_NONE || result == Core::ERROR_GENERAL);
 
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * SetPowerState("LIGHT_SLEEP") — LIGHT_SLEEP branch                    *
+ * Covers lines 1518-1531 in SystemServicesImplementation.cpp:          *
+ *   if (powerState == "LIGHT_SLEEP" || powerState == "DEEP_SLEEP")     *
+ * getPreferredSleepMode() returns "LIGHT_SLEEP" →                      *
+ *   convert("DEEP_SLEEP", "LIGHT_SLEEP") == false                      *
+ *   → setPowerStateConversion("LIGHT_SLEEP") → POWER_STATE_STANDBY     *
+ * Also writes /opt/standbyReason.txt (STANDBY_REASON_FILE).            *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetPowerState_LightSleep_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetPowerState: LIGHT_SLEEP branch (getPreferredSleepMode→LIGHT_SLEEP path)");
+
+    /* SleepModeMock is not in L2TestsMock — set up locally */
+    NiceMock<SleepModeMock> sleepModeMock;
+    device::SleepMode::setImpl(&sleepModeMock);
+    string sleepModeStr("LIGHT_SLEEP");
+    ON_CALL(sleepModeMock, toString())
+        .WillByDefault(::testing::ReturnRef(sleepModeStr));
+
+    /* HostImplMock already created by L2TestMocks; set up getPreferredSleepMode */
+    device::SleepMode dummyMode;
+    ON_CALL(*p_hostImplMock, getPreferredSleepMode())
+        .WillByDefault(::testing::Return(dummyMode));
+
+    string powerState = "LIGHT_SLEEP";
+    string standbyReason = "L2Test";
+    uint32_t sysSrvStatus = 0;
+    string errorMessage;
+    bool success = false;
+
+    uint32_t result = m_SystemServicesPlugin->SetPowerState(powerState, standbyReason,
+                                                            sysSrvStatus, errorMessage, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  SetPowerState('LIGHT_SLEEP'): result=%u, success=%d, error='%s'",
+             result, success, errorMessage.c_str());
+
+    device::SleepMode::setImpl(nullptr);
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * SetPowerState("DEEP_SLEEP") — DEEP_SLEEP branch                      *
+ * getPreferredSleepMode() returns "DEEP_SLEEP" →                       *
+ *   convert("DEEP_SLEEP", "DEEP_SLEEP") == true                        *
+ *   → setPowerStateConversion("DEEP_SLEEP") → POWER_STATE_STANDBY_DEEP_SLEEP
+ * Also writes /opt/standbyReason.txt (STANDBY_REASON_FILE).            *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_SetPowerState_DeepSleep_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("SetPowerState: DEEP_SLEEP branch (getPreferredSleepMode→DEEP_SLEEP path)");
+
+    /* SleepModeMock — local setup */
+    NiceMock<SleepModeMock> sleepModeMock;
+    device::SleepMode::setImpl(&sleepModeMock);
+    string sleepModeStr("DEEP_SLEEP");
+    ON_CALL(sleepModeMock, toString())
+        .WillByDefault(::testing::ReturnRef(sleepModeStr));
+
+    device::SleepMode dummyMode;
+    ON_CALL(*p_hostImplMock, getPreferredSleepMode())
+        .WillByDefault(::testing::Return(dummyMode));
+
+    string powerState = "DEEP_SLEEP";
+    string standbyReason = "L2Test";
+    uint32_t sysSrvStatus = 0;
+    string errorMessage;
+    bool success = false;
+
+    uint32_t result = m_SystemServicesPlugin->SetPowerState(powerState, standbyReason,
+                                                            sysSrvStatus, errorMessage, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  SetPowerState('DEEP_SLEEP'): result=%u, success=%d, error='%s'",
+             result, success, errorMessage.c_str());
+
+    device::SleepMode::setImpl(nullptr);
     m_SystemServicesPlugin->Release();
     m_controller_SystemServices->Release();
 }
