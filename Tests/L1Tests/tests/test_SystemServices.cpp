@@ -11567,7 +11567,7 @@ TEST_F(SystemServicesTest, IARM_DeviceMgtUpdateReceived_ValidEvent_CoversCallbac
     IARM_BUS_SYSMGR_DeviceMgtUpdateInfo_Param_t devMgtParam = {};
     strncpy(devMgtParam.source, "XCONF", sizeof(devMgtParam.source) - 1);
     strncpy(devMgtParam.type, "FW_UPDATE", sizeof(devMgtParam.type) - 1);
-    devMgtParam.success = true;
+    devMgtParam.status = true;
 
     capturedHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_DEVICE_UPDATE_RECEIVED,
                     &devMgtParam, sizeof(devMgtParam));
