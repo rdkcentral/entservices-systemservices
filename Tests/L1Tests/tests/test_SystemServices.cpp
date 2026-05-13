@@ -470,8 +470,20 @@ protected:
             .WillByDefault(::testing::Return(IARM_RESULT_SUCCESS));
         ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterEventHandler(::testing::_, ::testing::_, ::testing::_))
             .WillByDefault(::testing::Return(IARM_RESULT_SUCCESS));
+        // Zero-initialise the output buffer arg before returning success.
+        // Without this, any code path that reads struct fields from IARM_Bus_Call
+        // (e.g. GetTimeStatus reads TimerMsg.currentTime[128]) gets raw uninitialised
+        // stack bytes.  Those bytes end up as std::string content with invalid UTF-8
+        // sequences (e.g. 0xDD 0x90 = U+0750) that crash JSON::String::Serialize inside
+        // the WorkerPool thread when OnTimeStatusChanged dispatches the notification.
         ON_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
-            .WillByDefault(::testing::Return(IARM_RESULT_SUCCESS));
+            .WillByDefault(::testing::Invoke(
+                [](const char* /*owner*/, const char* /*method*/, void* arg, size_t argLen) -> IARM_Result_t {
+                    if (arg && argLen) {
+                        memset(arg, 0, argLen);
+                    }
+                    return IARM_RESULT_SUCCESS;
+                }));
 
         ON_CALL(service, COMLink())
             .WillByDefault(::testing::Return(&comLinkMock));
@@ -1204,18 +1216,8 @@ INSTANTIATE_TEST_SUITE_P(
 #endif
 TEST_F(SystemServicesTest, GetTimeStatus_Success)
 {
-    // GetTimeStatus calls IARM_Bus_Call and reads the output param (TimerMsg: three char[256] fields).
-    // The generic ON_CALL fixture returns IARM_RESULT_SUCCESS but does NOT populate the output buffer,
-    // leaving 768 bytes of stack garbage.  The plugin then constructs std::string(garbage, 256) which
-    // can contain embedded nulls / non-printable bytes and crash in LOGINFO → SIGSEGV.
-    // Fix: override IARM_Bus_Call here to zero-initialise the TimerMsg buffer before returning.
-    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
-        .WillOnce(::testing::Invoke(
-            [](const char*, const char*, void* arg, size_t argLen) -> IARM_Result_t {
-                memset(arg, 0, argLen);   // zero all three char[256] fields
-                return IARM_RESULT_SUCCESS;
-            }));
-
+    // IARM_Bus_Call is zero-initialised by the fixture's default ON_CALL, so
+    // TimerMsg fields will be all-zero strings — no garbage bytes, no crash.
     uint32_t result = handler.Invoke(connection, _T("getTimeStatus"), _T("{}"), response);
 
     EXPECT_EQ(Core::ERROR_NONE, result) << "GetTimeStatus should return ERROR_NONE when IARM_Bus_Call succeeds";
