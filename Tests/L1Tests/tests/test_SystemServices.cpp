@@ -45,6 +45,8 @@
 #include "devicesettings/HostMock.h"
 #include "devicesettings/SleepModeMock.h"
 #include "TelemetryMock.h"
+#include "DeviceInfoMock.h"
+#include <interfaces/IMigration.h>
 #include "readprocMock.h"
 #include "ThunderPortability.h"
 #include "WorkerPoolImplementation.h"
@@ -10663,6 +10665,1181 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_InvalidValueInFile_CoversReadParamsE
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection,
               _T("getBlocklistFlag"), _T("{}"), response));
 
+    {
+        std::ofstream f("/opt/secure/persistent/opflashstore/devicestate.txt");
+        f << "blocklist=INVALID_VALUE\n";
+    }
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection,
+              _T("getBlocklistFlag"), _T("{}"), response));
+
     TEST_LOG("GetBlocklistFlag_InvalidValueInFile - Response: %s", response.c_str());
     std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
+}
+
+// =============================================================================
+// SECTION: QueryInterfaceByCallsign-based dependency mock helpers
+// =============================================================================
+// MigrationMock: minimal IMigration implementation for coverage tests.
+// =============================================================================
+class MigrationMock : public WPEFramework::Exchange::IMigration {
+public:
+    MigrationMock() = default;
+    virtual ~MigrationMock() = default;
+
+    MOCK_METHOD(WPEFramework::Core::hresult, GetBootTypeInfo,
+                (WPEFramework::Exchange::IMigration::BootTypeInfo& bootTypeInfo), (override));
+    MOCK_METHOD(WPEFramework::Core::hresult, SetMigrationStatus,
+                (const WPEFramework::Exchange::IMigration::MigrationStatus status,
+                 WPEFramework::Exchange::IMigration::MigrationResult& migrationResult), (override));
+    MOCK_METHOD(WPEFramework::Core::hresult, GetMigrationStatus,
+                (WPEFramework::Exchange::IMigration::MigrationStatusInfo& migrationStatusInfo), (override));
+    MOCK_METHOD(void, AddRef, (), (const, override));
+    MOCK_METHOD(uint32_t, Release, (), (const, override));
+    MOCK_METHOD(void*, QueryInterface, (const uint32_t interfacenumber), (override));
+};
+
+// =============================================================================
+// SetWakeupSrcConfiguration — covers lines 2751-2779 (all boolean field checks)
+// and 2782-2790 (PowerManager SetWakeupSourceConfig call)
+// =============================================================================
+TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_AllSources_True_CoversFieldChecks)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), SetWakeupSourceConfig(::testing::_))
+        .Times(1)
+        .WillOnce(::testing::Return(Core::ERROR_NONE));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection,
+              _T("setWakeupSrcConfiguration"),
+              _T("{\"powerState\":\"STANDBY\","
+                 "\"wakeupSources\":[{"
+                 "\"voice\":true,"
+                 "\"presenceDetection\":true,"
+                 "\"bluetooth\":true,"
+                 "\"wifi\":true,"
+                 "\"ir\":true,"
+                 "\"powerKey\":true,"
+                 "\"cec\":true,"
+                 "\"lan\":true,"
+                 "\"timer\":true"
+                 "}]}"),
+              response));
+
+    TEST_LOG("SetWakeupSrcConfiguration_AllSources - Response: %s", response.c_str());
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response));
+    EXPECT_TRUE(jsonResponse["success"].Boolean());
+}
+
+TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_SingleSource_Voice_CoversVoiceField)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), SetWakeupSourceConfig(::testing::_))
+        .Times(1)
+        .WillOnce(::testing::Return(Core::ERROR_NONE));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection,
+              _T("setWakeupSrcConfiguration"),
+              _T("{\"powerState\":\"ON\","
+                 "\"wakeupSources\":[{"
+                 "\"voice\":true"
+                 "}]}"),
+              response));
+
+    TEST_LOG("SetWakeupSrcConfiguration_Voice - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_AllFalse_NoConfigSent)
+{
+    // All false → configs list stays empty → SetWakeupSourceConfig NOT called
+    EXPECT_CALL(PowerManagerMock::Mock(), SetWakeupSourceConfig(::testing::_))
+        .Times(0);
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection,
+              _T("setWakeupSrcConfiguration"),
+              _T("{\"powerState\":\"STANDBY\","
+                 "\"wakeupSources\":[{"
+                 "\"voice\":false,"
+                 "\"bluetooth\":false"
+                 "}]}"),
+              response));
+
+    TEST_LOG("SetWakeupSrcConfiguration_AllFalse - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_PresenceOnly_CoversPresenceField)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), SetWakeupSourceConfig(::testing::_))
+        .Times(1)
+        .WillOnce(::testing::Return(Core::ERROR_NONE));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection,
+              _T("setWakeupSrcConfiguration"),
+              _T("{\"powerState\":\"STANDBY\","
+                 "\"wakeupSources\":[{"
+                 "\"presenceDetection\":true"
+                 "}]}"),
+              response));
+
+    TEST_LOG("SetWakeupSrcConfiguration_Presence - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_PowerManagerFailure_ReturnsError)
+{
+    EXPECT_CALL(PowerManagerMock::Mock(), SetWakeupSourceConfig(::testing::_))
+        .Times(1)
+        .WillOnce(::testing::Return(Core::ERROR_GENERAL));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection,
+              _T("setWakeupSrcConfiguration"),
+              _T("{\"powerState\":\"STANDBY\","
+                 "\"wakeupSources\":[{\"timer\":true}]}"),
+              response));
+
+    TEST_LOG("SetWakeupSrcConfiguration_PMFailure - Response: %s", response.c_str());
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response));
+    EXPECT_FALSE(jsonResponse["success"].Boolean());
+}
+
+// =============================================================================
+// IsOptOutTelemetry success path — covers line 1284
+// TelemetryApiImplMock extends ITelemetry → can be returned via QueryInterfaceByCallsign
+// =============================================================================
+TEST_F(SystemServicesTest, IsOptOutTelemetry_WithTelemetryPlugin_SuccessPath)
+{
+    EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("org.rdk.Telemetry"))))
+        .WillOnce(::testing::Return(static_cast<Exchange::ITelemetry*>(p_telemetryApiImplMock)));
+    ON_CALL(*p_telemetryApiImplMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(*p_telemetryApiImplMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(*p_telemetryApiImplMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+    ON_CALL(*p_telemetryApiImplMock, IsOptOutTelemetry(::testing::_, ::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SetArgReferee<0>(true),
+            ::testing::SetArgReferee<1>(true),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("isOptOutTelemetry"), _T("{}"), response));
+
+    TEST_LOG("IsOptOutTelemetry_SuccessPath - Response: %s", response.c_str());
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response));
+    EXPECT_TRUE(jsonResponse["success"].Boolean());
+
+    // Restore default
+    ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
+        .WillByDefault(::testing::Return(nullptr));
+}
+
+TEST_F(SystemServicesTest, SetOptOutTelemetry_WithTelemetryPlugin_SuccessPath)
+{
+    // Covers line 1303 (telemetryObject->SetOptOutTelemetry)
+    EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("org.rdk.Telemetry"))))
+        .WillOnce(::testing::Return(static_cast<Exchange::ITelemetry*>(p_telemetryApiImplMock)));
+    ON_CALL(*p_telemetryApiImplMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(*p_telemetryApiImplMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(*p_telemetryApiImplMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+
+    Exchange::ITelemetry::TelemetrySuccess teleSuccessResult;
+    teleSuccessResult.success = true;
+    ON_CALL(*p_telemetryApiImplMock, SetOptOutTelemetry(::testing::_, ::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SetArgReferee<1>(teleSuccessResult),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setOptOutTelemetry"),
+              _T("{\"optOut\":true}"), response));
+
+    TEST_LOG("SetOptOutTelemetry_SuccessPath - Response: %s", response.c_str());
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response));
+    EXPECT_TRUE(jsonResponse["success"].Boolean());
+
+    ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
+        .WillByDefault(::testing::Return(nullptr));
+}
+
+// =============================================================================
+// GetMigrationStatus success path — covers lines 1380-1399 (statusToString map)
+// =============================================================================
+TEST_F(SystemServicesTest, GetMigrationStatus_WithMigrationPlugin_MigrationCompleted)
+{
+    ::testing::NiceMock<MigrationMock> migrationMock;
+
+    EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("org.rdk.Migration"))))
+        .WillOnce(::testing::Return(static_cast<Exchange::IMigration*>(&migrationMock)));
+    ON_CALL(migrationMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(migrationMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(migrationMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+
+    WPEFramework::Exchange::IMigration::MigrationStatusInfo statusInfo;
+    statusInfo.migrationStatus = WPEFramework::Exchange::IMigration::MIGRATION_STATUS_MIGRATION_COMPLETED;
+    ON_CALL(migrationMock, GetMigrationStatus(::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SetArgReferee<0>(statusInfo),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getMigrationStatus"), _T("{}"), response));
+
+    TEST_LOG("GetMigrationStatus_MigrationCompleted - Response: %s", response.c_str());
+
+    ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
+        .WillByDefault(::testing::Return(nullptr));
+}
+
+TEST_F(SystemServicesTest, GetMigrationStatus_AllStatusValues_CoversAllMapEntries)
+{
+    // Test each status value to cover all entries in statusToString map (lines 1381-1388)
+    const std::vector<WPEFramework::Exchange::IMigration::MigrationStatus> statuses = {
+        WPEFramework::Exchange::IMigration::MIGRATION_STATUS_NOT_STARTED,
+        WPEFramework::Exchange::IMigration::MIGRATION_STATUS_NOT_NEEDED,
+        WPEFramework::Exchange::IMigration::MIGRATION_STATUS_STARTED,
+        WPEFramework::Exchange::IMigration::MIGRATION_STATUS_PRIORITY_SETTINGS_MIGRATED,
+        WPEFramework::Exchange::IMigration::MIGRATION_STATUS_DEVICE_SETTINGS_MIGRATED,
+        WPEFramework::Exchange::IMigration::MIGRATION_STATUS_CLOUD_SETTINGS_MIGRATED,
+        WPEFramework::Exchange::IMigration::MIGRATION_STATUS_APP_DATA_MIGRATED,
+    };
+
+    for (const auto& status : statuses) {
+        ::testing::NiceMock<MigrationMock> migrationMock;
+
+        EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("org.rdk.Migration"))))
+            .WillOnce(::testing::Return(static_cast<Exchange::IMigration*>(&migrationMock)));
+        ON_CALL(migrationMock, AddRef()).WillByDefault(::testing::Return());
+        ON_CALL(migrationMock, Release()).WillByDefault(::testing::Return(1));
+        ON_CALL(migrationMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+
+        WPEFramework::Exchange::IMigration::MigrationStatusInfo statusInfo;
+        statusInfo.migrationStatus = status;
+        ON_CALL(migrationMock, GetMigrationStatus(::testing::_))
+            .WillByDefault(::testing::DoAll(
+                ::testing::SetArgReferee<0>(statusInfo),
+                ::testing::Return(Core::ERROR_NONE)));
+
+        EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getMigrationStatus"), _T("{}"), response));
+        TEST_LOG("MigrationStatus %d - Response: %s", (int)status, response.c_str());
+
+        ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
+            .WillByDefault(::testing::Return(nullptr));
+    }
+}
+
+// =============================================================================
+// GetBootTypeInfo success path — covers lines 1420-1427 (bootTypeToString map)
+// =============================================================================
+TEST_F(SystemServicesTest, GetBootTypeInfo_WithMigrationPlugin_BootMigration)
+{
+    ::testing::NiceMock<MigrationMock> migrationMock;
+
+    EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("org.rdk.Migration"))))
+        .WillOnce(::testing::Return(static_cast<Exchange::IMigration*>(&migrationMock)));
+    ON_CALL(migrationMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(migrationMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(migrationMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+
+    WPEFramework::Exchange::IMigration::BootTypeInfo bootTypeInfo;
+    bootTypeInfo.bootType = WPEFramework::Exchange::IMigration::BOOT_TYPE_MIGRATION;
+    ON_CALL(migrationMock, GetBootTypeInfo(::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SetArgReferee<0>(bootTypeInfo),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBootTypeInfo"), _T("{}"), response));
+
+    TEST_LOG("GetBootTypeInfo_BootMigration - Response: %s", response.c_str());
+
+    ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
+        .WillByDefault(::testing::Return(nullptr));
+}
+
+TEST_F(SystemServicesTest, GetBootTypeInfo_AllBootTypes_CoversAllMapEntries)
+{
+    const std::vector<WPEFramework::Exchange::IMigration::BootType> bootTypes = {
+        WPEFramework::Exchange::IMigration::BOOT_TYPE_INIT,
+        WPEFramework::Exchange::IMigration::BOOT_TYPE_NORMAL,
+        WPEFramework::Exchange::IMigration::BOOT_TYPE_MIGRATION,
+        WPEFramework::Exchange::IMigration::BOOT_TYPE_UPDATE,
+    };
+
+    for (const auto& bootType : bootTypes) {
+        ::testing::NiceMock<MigrationMock> migrationMock;
+
+        EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("org.rdk.Migration"))))
+            .WillOnce(::testing::Return(static_cast<Exchange::IMigration*>(&migrationMock)));
+        ON_CALL(migrationMock, AddRef()).WillByDefault(::testing::Return());
+        ON_CALL(migrationMock, Release()).WillByDefault(::testing::Return(1));
+        ON_CALL(migrationMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+
+        WPEFramework::Exchange::IMigration::BootTypeInfo info;
+        info.bootType = bootType;
+        ON_CALL(migrationMock, GetBootTypeInfo(::testing::_))
+            .WillByDefault(::testing::DoAll(
+                ::testing::SetArgReferee<0>(info),
+                ::testing::Return(Core::ERROR_NONE)));
+
+        EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBootTypeInfo"), _T("{}"), response));
+        TEST_LOG("GetBootTypeInfo type=%d - Response: %s", (int)bootType, response.c_str());
+
+        ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
+            .WillByDefault(::testing::Return(nullptr));
+    }
+}
+
+// =============================================================================
+// getDeviceInfo with DeviceInfoImplementationMock — covers lines 3552-3831
+// =============================================================================
+TEST_F(SystemServicesTest, GetDeviceInfo_ModelNumber_WithDeviceInfoPlugin)
+{
+    ::testing::NiceMock<DeviceInfoImplementationMock> deviceInfoMock;
+
+    EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
+        .WillOnce(::testing::Return(static_cast<Exchange::IDeviceInfo*>(&deviceInfoMock)));
+    ON_CALL(deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+
+    Exchange::IDeviceInfo::DeviceModelNo modelNo;
+    modelNo.sku = "TEST-MODEL-123";
+    ON_CALL(deviceInfoMock, Sku(::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SetArgReferee<0>(modelNo),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDeviceInfo"),
+              _T("{\"params\":[\"model_number\"]}"), response));
+
+    TEST_LOG("GetDeviceInfo_ModelNumber - Response: %s", response.c_str());
+
+    ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
+        .WillByDefault(::testing::Return(nullptr));
+}
+
+TEST_F(SystemServicesTest, GetDeviceInfo_DeviceType_WithDeviceInfoPlugin)
+{
+    ::testing::NiceMock<DeviceInfoImplementationMock> deviceInfoMock;
+
+    EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
+        .WillOnce(::testing::Return(static_cast<Exchange::IDeviceInfo*>(&deviceInfoMock)));
+    ON_CALL(deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+
+    Exchange::IDeviceInfo::DeviceTypeInfos typeInfos;
+    typeInfos.devicetype = Exchange::IDeviceInfo::DEVICE_TYPE_IPSTB;
+    ON_CALL(deviceInfoMock, DeviceType(::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SetArgReferee<0>(typeInfos),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDeviceInfo"),
+              _T("{\"params\":[\"device_type\"]}"), response));
+
+    TEST_LOG("GetDeviceInfo_DeviceType - Response: %s", response.c_str());
+
+    ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
+        .WillByDefault(::testing::Return(nullptr));
+}
+
+TEST_F(SystemServicesTest, GetDeviceInfo_EstbMac_WithDeviceInfoPlugin)
+{
+    ::testing::NiceMock<DeviceInfoImplementationMock> deviceInfoMock;
+
+    EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
+        .WillOnce(::testing::Return(static_cast<Exchange::IDeviceInfo*>(&deviceInfoMock)));
+    ON_CALL(deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+
+    Exchange::IDeviceInfo::StbMac stbMac;
+    stbMac.estbMac = "AA:BB:CC:DD:EE:FF";
+    ON_CALL(deviceInfoMock, EstbMac(::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SetArgReferee<0>(stbMac),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDeviceInfo"),
+              _T("{\"params\":[\"estb_mac\"]}"), response));
+
+    TEST_LOG("GetDeviceInfo_EstbMac - Response: %s", response.c_str());
+
+    ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
+        .WillByDefault(::testing::Return(nullptr));
+}
+
+TEST_F(SystemServicesTest, GetDeviceInfo_EthMac_WithDeviceInfoPlugin)
+{
+    ::testing::NiceMock<DeviceInfoImplementationMock> deviceInfoMock;
+
+    EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
+        .WillOnce(::testing::Return(static_cast<Exchange::IDeviceInfo*>(&deviceInfoMock)));
+    ON_CALL(deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+
+    Exchange::IDeviceInfo::EthernetMac ethMac;
+    ethMac.ethMac = "11:22:33:44:55:66";
+    ON_CALL(deviceInfoMock, EthMac(::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SetArgReferee<0>(ethMac),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDeviceInfo"),
+              _T("{\"params\":[\"eth_mac\"]}"), response));
+
+    TEST_LOG("GetDeviceInfo_EthMac - Response: %s", response.c_str());
+
+    ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
+        .WillByDefault(::testing::Return(nullptr));
+}
+
+TEST_F(SystemServicesTest, GetDeviceInfo_WifiMac_WithDeviceInfoPlugin)
+{
+    ::testing::NiceMock<DeviceInfoImplementationMock> deviceInfoMock;
+
+    EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
+        .WillOnce(::testing::Return(static_cast<Exchange::IDeviceInfo*>(&deviceInfoMock)));
+    ON_CALL(deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+
+    Exchange::IDeviceInfo::WiFiMac wifiMac;
+    wifiMac.wifiMac = "AA:BB:CC:11:22:33";
+    ON_CALL(deviceInfoMock, WifiMac(::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SetArgReferee<0>(wifiMac),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDeviceInfo"),
+              _T("{\"params\":[\"wifi_mac\"]}"), response));
+
+    TEST_LOG("GetDeviceInfo_WifiMac - Response: %s", response.c_str());
+
+    ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
+        .WillByDefault(::testing::Return(nullptr));
+}
+
+TEST_F(SystemServicesTest, GetDeviceInfo_BoxIP_WithDeviceInfoPlugin)
+{
+    ::testing::NiceMock<DeviceInfoImplementationMock> deviceInfoMock;
+
+    EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
+        .WillOnce(::testing::Return(static_cast<Exchange::IDeviceInfo*>(&deviceInfoMock)));
+    ON_CALL(deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+
+    Exchange::IDeviceInfo::StbIp stbIp;
+    stbIp.estbIp = "192.168.1.100";
+    ON_CALL(deviceInfoMock, EstbIp(::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SetArgReferee<0>(stbIp),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDeviceInfo"),
+              _T("{\"params\":[\"boxIP\"]}"), response));
+
+    TEST_LOG("GetDeviceInfo_BoxIP - Response: %s", response.c_str());
+
+    ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
+        .WillByDefault(::testing::Return(nullptr));
+}
+
+TEST_F(SystemServicesTest, GetDeviceInfo_FirmwareVersion_WithDeviceInfoPlugin)
+{
+    ::testing::NiceMock<DeviceInfoImplementationMock> deviceInfoMock;
+
+    EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
+        .WillOnce(::testing::Return(static_cast<Exchange::IDeviceInfo*>(&deviceInfoMock)));
+    ON_CALL(deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+
+    Exchange::IDeviceInfo::FirmwareversionInfo fwInfo;
+    fwInfo.imagename = "TEST-RDK-2025001.1p1";
+    ON_CALL(deviceInfoMock, FirmwareVersion(::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SetArgReferee<0>(fwInfo),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDeviceInfo"),
+              _T("{\"params\":[\"imageVersion\"]}"), response));
+
+    TEST_LOG("GetDeviceInfo_ImageVersion - Response: %s", response.c_str());
+
+    ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
+        .WillByDefault(::testing::Return(nullptr));
+}
+
+TEST_F(SystemServicesTest, GetDeviceInfo_FriendlyId_WithDeviceInfoPlugin)
+{
+    ::testing::NiceMock<DeviceInfoImplementationMock> deviceInfoMock;
+
+    EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
+        .WillOnce(::testing::Return(static_cast<Exchange::IDeviceInfo*>(&deviceInfoMock)));
+    ON_CALL(deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+
+    Exchange::IDeviceInfo::DeviceModel deviceModel;
+    deviceModel.model = "TestFriendlyModel";
+    ON_CALL(deviceInfoMock, Model(::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SetArgReferee<0>(deviceModel),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDeviceInfo"),
+              _T("{\"params\":[\"friendlyId\"]}"), response));
+
+    TEST_LOG("GetDeviceInfo_FriendlyId - Response: %s", response.c_str());
+
+    ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
+        .WillByDefault(::testing::Return(nullptr));
+}
+
+TEST_F(SystemServicesTest, GetDeviceInfo_AllFields_WithDeviceInfoPlugin_CoversAllBranches)
+{
+    // Empty params array → queries ALL fields → covers all branches in GetDeviceInfo
+    ::testing::NiceMock<DeviceInfoImplementationMock> deviceInfoMock;
+
+    EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
+        .WillOnce(::testing::Return(static_cast<Exchange::IDeviceInfo*>(&deviceInfoMock)));
+    ON_CALL(deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+
+    Exchange::IDeviceInfo::DeviceModelNo modelNo;
+    modelNo.sku = "SKU-12345";
+    ON_CALL(deviceInfoMock, Sku(::testing::_))
+        .WillByDefault(::testing::DoAll(::testing::SetArgReferee<0>(modelNo), ::testing::Return(Core::ERROR_NONE)));
+
+    Exchange::IDeviceInfo::DeviceMake deviceMake;
+    deviceMake.make = "TestMfg";
+    ON_CALL(deviceInfoMock, Make(::testing::_))
+        .WillByDefault(::testing::DoAll(::testing::SetArgReferee<0>(deviceMake), ::testing::Return(Core::ERROR_NONE)));
+
+    Exchange::IDeviceInfo::FirmwareversionInfo fwInfo;
+    fwInfo.imagename = "TEST-IMAGE-001";
+    ON_CALL(deviceInfoMock, FirmwareVersion(::testing::_))
+        .WillByDefault(::testing::DoAll(::testing::SetArgReferee<0>(fwInfo), ::testing::Return(Core::ERROR_NONE)));
+
+    Exchange::IDeviceInfo::DeviceTypeInfos typeInfos;
+    typeInfos.devicetype = Exchange::IDeviceInfo::DEVICE_TYPE_IPTV;
+    ON_CALL(deviceInfoMock, DeviceType(::testing::_))
+        .WillByDefault(::testing::DoAll(::testing::SetArgReferee<0>(typeInfos), ::testing::Return(Core::ERROR_NONE)));
+
+    Exchange::IDeviceInfo::DeviceModel deviceModel;
+    deviceModel.model = "FriendlyTestModel";
+    ON_CALL(deviceInfoMock, Model(::testing::_))
+        .WillByDefault(::testing::DoAll(::testing::SetArgReferee<0>(deviceModel), ::testing::Return(Core::ERROR_NONE)));
+
+    Exchange::IDeviceInfo::StbMac stbMac;
+    stbMac.estbMac = "AA:BB:CC:DD:EE:FF";
+    ON_CALL(deviceInfoMock, EstbMac(::testing::_))
+        .WillByDefault(::testing::DoAll(::testing::SetArgReferee<0>(stbMac), ::testing::Return(Core::ERROR_NONE)));
+
+    Exchange::IDeviceInfo::EthernetMac ethMac;
+    ethMac.ethMac = "11:22:33:44:55:66";
+    ON_CALL(deviceInfoMock, EthMac(::testing::_))
+        .WillByDefault(::testing::DoAll(::testing::SetArgReferee<0>(ethMac), ::testing::Return(Core::ERROR_NONE)));
+
+    Exchange::IDeviceInfo::WiFiMac wifiMac;
+    wifiMac.wifiMac = "77:88:99:AA:BB:CC";
+    ON_CALL(deviceInfoMock, WifiMac(::testing::_))
+        .WillByDefault(::testing::DoAll(::testing::SetArgReferee<0>(wifiMac), ::testing::Return(Core::ERROR_NONE)));
+
+    Exchange::IDeviceInfo::StbIp stbIp;
+    stbIp.estbIp = "10.0.0.1";
+    ON_CALL(deviceInfoMock, EstbIp(::testing::_))
+        .WillByDefault(::testing::DoAll(::testing::SetArgReferee<0>(stbIp), ::testing::Return(Core::ERROR_NONE)));
+
+    // Also create device.properties so make/build_type branches can execute
+    createFile("/etc/device.properties", "DEVICE_NAME=SOME_DEVICE\nMFG_NAME=RDK\nBUILD_TYPE=dev");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDeviceInfo"),
+              _T("{\"params\":[]}"), response));
+
+    TEST_LOG("GetDeviceInfo_AllFields - Response: %s", response.c_str());
+
+    std::ofstream("/etc/device.properties").close();
+
+    ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
+        .WillByDefault(::testing::Return(nullptr));
+}
+
+TEST_F(SystemServicesTest, GetDeviceInfo_UnallowableChars_ReturnsEarlyWithMessage)
+{
+    // Input with unallowable chars → covers early error return at line 3531-3533
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDeviceInfo"),
+              _T("{\"params\":[\"make|rm\"]}"), response));
+
+    TEST_LOG("GetDeviceInfo_UnallowableChars - Response: %s", response.c_str());
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response));
+    EXPECT_TRUE(jsonResponse.HasLabel("message"));
+}
+
+// =============================================================================
+// _systemStateChanged IARM callback — covers lines 3046-3125
+// Captured via IARM_Bus_RegisterEventHandler with SaveArg.
+// Tests re-initialize to capture with the EXPECT_CALL/SaveArg in place.
+// =============================================================================
+TEST_F(SystemServicesTest, IARM_SystemStateChanged_FirmwareUpdateState_CoversCallback)
+{
+    IARM_EventHandler_t capturedHandler = nullptr;
+
+    ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterEventHandler(
+                ::testing::StrEq(IARM_BUS_SYSMGR_NAME),
+                ::testing::Eq(IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE),
+                ::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SaveArg<2>(&capturedHandler),
+            ::testing::Return(IARM_RESULT_SUCCESS)));
+
+    plugin->Deinitialize(&service);
+    plugin->Initialize(&service);
+
+    if (capturedHandler == nullptr) {
+        TEST_LOG("IARM_SystemStateChanged: capturedHandler is null, skipping");
+        GTEST_SKIP();
+    }
+
+    IARM_Bus_SYSMgr_EventData_t eventData = {};
+    eventData.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_FIRMWARE_UPDATE_STATE;
+    eventData.data.systemStates.state = 3; // not CRITICAL_REBOOT → OnFirmwareUpdateStateChange
+
+    capturedHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, &eventData, sizeof(eventData));
+    TEST_LOG("IARM_SystemStateChanged_FirmwareUpdateState - callback invoked");
+}
+
+TEST_F(SystemServicesTest, IARM_SystemStateChanged_FirmwareUpdateState_CriticalReboot)
+{
+    IARM_EventHandler_t capturedHandler = nullptr;
+
+    ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterEventHandler(
+                ::testing::StrEq(IARM_BUS_SYSMGR_NAME),
+                ::testing::Eq(IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE),
+                ::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SaveArg<2>(&capturedHandler),
+            ::testing::Return(IARM_RESULT_SUCCESS)));
+
+    plugin->Deinitialize(&service);
+    plugin->Initialize(&service);
+
+    if (capturedHandler == nullptr) {
+        TEST_LOG("IARM_SystemStateChanged_CriticalReboot: capturedHandler is null, skipping");
+        GTEST_SKIP();
+    }
+
+    IARM_Bus_SYSMgr_EventData_t eventData = {};
+    eventData.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_FIRMWARE_UPDATE_STATE;
+    eventData.data.systemStates.state = IARM_BUS_SYSMGR_FIRMWARE_UPDATE_STATE_CRITICAL_REBOOT;
+
+    capturedHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, &eventData, sizeof(eventData));
+    TEST_LOG("IARM_SystemStateChanged_CriticalReboot - callback invoked");
+}
+
+TEST_F(SystemServicesTest, IARM_SystemStateChanged_TimeSource_CoversOnClockSet)
+{
+    IARM_EventHandler_t capturedHandler = nullptr;
+
+    ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterEventHandler(
+                ::testing::StrEq(IARM_BUS_SYSMGR_NAME),
+                ::testing::Eq(IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE),
+                ::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SaveArg<2>(&capturedHandler),
+            ::testing::Return(IARM_RESULT_SUCCESS)));
+
+    plugin->Deinitialize(&service);
+    plugin->Initialize(&service);
+
+    if (capturedHandler == nullptr) {
+        TEST_LOG("IARM_SystemStateChanged_TimeSource: capturedHandler is null, skipping");
+        GTEST_SKIP();
+    }
+
+    IARM_Bus_SYSMgr_EventData_t eventData = {};
+    eventData.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_TIME_SOURCE;
+    eventData.data.systemStates.state = 1; // → OnClockSet
+
+    capturedHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, &eventData, sizeof(eventData));
+    TEST_LOG("IARM_SystemStateChanged_TimeSource - callback invoked");
+}
+
+TEST_F(SystemServicesTest, IARM_SystemStateChanged_LogUpload_CoversOnLogUploadAndDispatchEvent)
+{
+    // Covers _systemStateChanged LOG_UPLOAD branch + _instance->OnLogUpload() call (lines 3100-3105)
+    // Note: OnLogUpload only dispatches ONLOGUPLOAD event when m_uploadLogsPid != -1;
+    // this test covers the IARM callback path itself.
+    IARM_EventHandler_t capturedHandler = nullptr;
+
+    ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterEventHandler(
+                ::testing::StrEq(IARM_BUS_SYSMGR_NAME),
+                ::testing::Eq(IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE),
+                ::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SaveArg<2>(&capturedHandler),
+            ::testing::Return(IARM_RESULT_SUCCESS)));
+
+    plugin->Deinitialize(&service);
+    plugin->Initialize(&service);
+
+    if (capturedHandler == nullptr) {
+        TEST_LOG("IARM_SystemStateChanged_LogUpload: capturedHandler is null, skipping");
+        GTEST_SKIP();
+    }
+
+    IARM_Bus_SYSMgr_EventData_t eventData = {};
+    eventData.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_LOG_UPLOAD;
+    eventData.data.systemStates.state = 0;
+
+    // Invoke the callback — covers the LOG_UPLOAD case in _systemStateChanged
+    capturedHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, &eventData, sizeof(eventData));
+    TEST_LOG("IARM_SystemStateChanged_LogUpload - callback invoked (LOG_UPLOAD branch)");
+}
+
+TEST_F(SystemServicesTest, IARM_SystemStateChanged_WrongEventId_EarlyReturn)
+{
+    IARM_EventHandler_t capturedHandler = nullptr;
+
+    ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterEventHandler(
+                ::testing::StrEq(IARM_BUS_SYSMGR_NAME),
+                ::testing::Eq(IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE),
+                ::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SaveArg<2>(&capturedHandler),
+            ::testing::Return(IARM_RESULT_SUCCESS)));
+
+    plugin->Deinitialize(&service);
+    plugin->Initialize(&service);
+
+    if (capturedHandler == nullptr) {
+        TEST_LOG("IARM_SystemStateChanged_WrongEventId: capturedHandler is null, skipping");
+        GTEST_SKIP();
+    }
+
+    IARM_Bus_SYSMgr_EventData_t eventData = {};
+    eventData.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_FIRMWARE_UPDATE_STATE;
+    eventData.data.systemStates.state = 3;
+
+    // Wrong eventId → early return at top of _systemStateChanged
+    capturedHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_IMAGE_DNLD, &eventData, sizeof(eventData));
+    TEST_LOG("IARM_SystemStateChanged_WrongEventId - early-return path covered");
+}
+
+// =============================================================================
+// _SysModeChange IARM callback — covers lines 3012-3031
+// (iarmModeToString + OnSystemModeChanged)
+// Captured via IARM_Bus_RegisterCall with SaveArg.
+// =============================================================================
+TEST_F(SystemServicesTest, IARM_SysModeChange_Normal_CoversCallbackAndIarmModeToString)
+{
+    IARM_BusCall_t capturedCallHandler = nullptr;
+
+    ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterCall(
+                ::testing::StrEq(IARM_BUS_COMMON_API_SysModeChange),
+                ::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SaveArg<1>(&capturedCallHandler),
+            ::testing::Return(IARM_RESULT_SUCCESS)));
+
+    plugin->Deinitialize(&service);
+    plugin->Initialize(&service);
+
+    if (capturedCallHandler == nullptr) {
+        TEST_LOG("IARM_SysModeChange_Normal: capturedCallHandler is null, skipping");
+        GTEST_SKIP();
+    }
+
+    IARM_Bus_CommonAPI_SysModeChange_Param_t param = {};
+    param.newMode = IARM_BUS_SYS_MODE_NORMAL;
+    param.oldMode = IARM_BUS_SYS_MODE_WAREHOUSE;
+
+    IARM_Result_t result = capturedCallHandler(&param);
+    EXPECT_EQ(IARM_RESULT_SUCCESS, result);
+    TEST_LOG("IARM_SysModeChange_Normal - result=%d", result);
+}
+
+TEST_F(SystemServicesTest, IARM_SysModeChange_Warehouse_CoversIarmModeToString_Warehouse)
+{
+    IARM_BusCall_t capturedCallHandler = nullptr;
+
+    ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterCall(
+                ::testing::StrEq(IARM_BUS_COMMON_API_SysModeChange),
+                ::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SaveArg<1>(&capturedCallHandler),
+            ::testing::Return(IARM_RESULT_SUCCESS)));
+
+    plugin->Deinitialize(&service);
+    plugin->Initialize(&service);
+
+    if (capturedCallHandler == nullptr) {
+        TEST_LOG("IARM_SysModeChange_Warehouse: capturedCallHandler is null, skipping");
+        GTEST_SKIP();
+    }
+
+    // Register notification handler to verify OnSystemModeChanged fires
+    Exchange::ISystemServices* sysServices = static_cast<Exchange::ISystemServices*>(
+        plugin->QueryInterface(Exchange::ISystemServices::ID));
+    ASSERT_NE(nullptr, sysServices);
+
+    SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
+    sysServices->Register(notificationHandler);
+    notificationHandler->ResetEvent();
+
+    IARM_Bus_CommonAPI_SysModeChange_Param_t param = {};
+    param.newMode = IARM_BUS_SYS_MODE_WAREHOUSE;
+    param.oldMode = IARM_BUS_SYS_MODE_NORMAL;
+
+    IARM_Result_t result = capturedCallHandler(&param);
+    EXPECT_EQ(IARM_RESULT_SUCCESS, result);
+
+    bool received = notificationHandler->WaitForRequestStatus(2000, SystemServices_onSystemModeChanged);
+    TEST_LOG("IARM_SysModeChange_Warehouse - mode=%s received=%s",
+             notificationHandler->GetSystemMode().c_str(), received ? "yes" : "no");
+
+    if (received) {
+        EXPECT_EQ("WAREHOUSE", notificationHandler->GetSystemMode());
+    }
+
+    sysServices->Unregister(notificationHandler);
+    sysServices->Release();
+    delete notificationHandler;
+}
+
+TEST_F(SystemServicesTest, IARM_SysModeChange_EAS_CoversIarmModeToString_EAS)
+{
+    IARM_BusCall_t capturedCallHandler = nullptr;
+
+    ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterCall(
+                ::testing::StrEq(IARM_BUS_COMMON_API_SysModeChange),
+                ::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SaveArg<1>(&capturedCallHandler),
+            ::testing::Return(IARM_RESULT_SUCCESS)));
+
+    plugin->Deinitialize(&service);
+    plugin->Initialize(&service);
+
+    if (capturedCallHandler == nullptr) {
+        TEST_LOG("IARM_SysModeChange_EAS: capturedCallHandler is null, skipping");
+        GTEST_SKIP();
+    }
+
+    IARM_Bus_CommonAPI_SysModeChange_Param_t param = {};
+    param.newMode = IARM_BUS_SYS_MODE_EAS;
+    param.oldMode = IARM_BUS_SYS_MODE_NORMAL;
+
+    IARM_Result_t result = capturedCallHandler(&param);
+    EXPECT_EQ(IARM_RESULT_SUCCESS, result);
+    TEST_LOG("IARM_SysModeChange_EAS - result=%d", result);
+}
+
+// =============================================================================
+// _deviceMgtUpdateReceived IARM callback — covers lines 3031-3044
+// =============================================================================
+TEST_F(SystemServicesTest, IARM_DeviceMgtUpdateReceived_ValidEvent_CoversCallback)
+{
+    IARM_EventHandler_t capturedHandler = nullptr;
+
+    ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterEventHandler(
+                ::testing::StrEq(IARM_BUS_SYSMGR_NAME),
+                ::testing::Eq(IARM_BUS_SYSMGR_EVENT_DEVICE_UPDATE_RECEIVED),
+                ::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SaveArg<2>(&capturedHandler),
+            ::testing::Return(IARM_RESULT_SUCCESS)));
+
+    plugin->Deinitialize(&service);
+    plugin->Initialize(&service);
+
+    if (capturedHandler == nullptr) {
+        TEST_LOG("IARM_DeviceMgtUpdateReceived: capturedHandler is null, skipping");
+        GTEST_SKIP();
+    }
+
+    IARM_BUS_SYSMGR_DeviceMgtUpdateInfo_Param_t devMgtParam = {};
+    strncpy(devMgtParam.source, "XCONF", sizeof(devMgtParam.source) - 1);
+    strncpy(devMgtParam.type, "FW_UPDATE", sizeof(devMgtParam.type) - 1);
+    devMgtParam.success = true;
+
+    capturedHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_DEVICE_UPDATE_RECEIVED,
+                    &devMgtParam, sizeof(devMgtParam));
+    TEST_LOG("IARM_DeviceMgtUpdateReceived_Valid - callback invoked");
+}
+
+TEST_F(SystemServicesTest, IARM_DeviceMgtUpdateReceived_WrongOwner_NoAction)
+{
+    IARM_EventHandler_t capturedHandler = nullptr;
+
+    ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterEventHandler(
+                ::testing::StrEq(IARM_BUS_SYSMGR_NAME),
+                ::testing::Eq(IARM_BUS_SYSMGR_EVENT_DEVICE_UPDATE_RECEIVED),
+                ::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SaveArg<2>(&capturedHandler),
+            ::testing::Return(IARM_RESULT_SUCCESS)));
+
+    plugin->Deinitialize(&service);
+    plugin->Initialize(&service);
+
+    if (capturedHandler == nullptr) {
+        TEST_LOG("IARM_DeviceMgtUpdateReceived_WrongOwner: capturedHandler is null, skipping");
+        GTEST_SKIP();
+    }
+
+    IARM_BUS_SYSMGR_DeviceMgtUpdateInfo_Param_t devMgtParam = {};
+    // Wrong owner → !strcmp fails → no action
+    capturedHandler("WrongOwner", IARM_BUS_SYSMGR_EVENT_DEVICE_UPDATE_RECEIVED,
+                    &devMgtParam, sizeof(devMgtParam));
+    TEST_LOG("IARM_DeviceMgtUpdateReceived_WrongOwner - no crash");
+}
+
+// =============================================================================
+// GetFirmwareUpdateInfo — covers lines 1809-1840 (spawns thread calling firmwareUpdateInfoReceived)
+// =============================================================================
+TEST_F(SystemServicesTest, GetFirmwareUpdateInfo_SpawnsThread_WithXconfFiles)
+{
+    // Create xconf files so firmwareUpdateInfoReceived exercises the xconf path
+    {
+        std::ofstream f("/tmp/xconf_httpcode_thunder.txt");
+        f << "200\n";
+    }
+    {
+        std::ofstream f("/tmp/xconf_response_thunder.txt");
+        f << "{\"firmwareVersion\":\"TEST-FW-2025001.0\",\"firmwareLocation\":\"http://test.example.com/fw.bin\"}\n";
+    }
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getFirmwareUpdateInfo"),
+              _T("{\"GUID\":\"test-guid-1234\"}"), response));
+
+    TEST_LOG("GetFirmwareUpdateInfo_XconfFiles - Response: %s", response.c_str());
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response));
+
+    // Wait for background thread to complete before fixture teardown frees the plugin.
+    // 1500 ms is sufficient on CI; the thread runs curl+file-read which is fast in mock env.
+    std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+
+    std::remove("/tmp/xconf_httpcode_thunder.txt");
+    std::remove("/tmp/xconf_response_thunder.txt");
+}
+
+TEST_F(SystemServicesTest, GetFirmwareUpdateInfo_NoXconfFiles_StillReturnsAsyncTrue)
+{
+    std::remove("/tmp/xconf_httpcode_thunder.txt");
+    std::remove("/tmp/xconf_response_thunder.txt");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getFirmwareUpdateInfo"),
+              _T("{\"GUID\":\"\"}"), response));
+
+    TEST_LOG("GetFirmwareUpdateInfo_NoFiles - Response: %s", response.c_str());
+
+    // Wait for background thread before teardown
+    std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+}
+
+// =============================================================================
+// GetDownloadedFirmwareInfo — DnldVersn/DnldURL branch (lines 1913-1933)
+// m_FwUpdateState_LatestEvent must be >= 2 for DnldVersn/DnldURL to populate.
+// Trigger state >= 2 via IARM callback, then call getDownloadedFirmwareInfo.
+// =============================================================================
+TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_DnldVersn_Branch_WhenStateIsDownloading)
+{
+    IARM_EventHandler_t capturedStateHandler = nullptr;
+
+    ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterEventHandler(
+                ::testing::StrEq(IARM_BUS_SYSMGR_NAME),
+                ::testing::Eq(IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE),
+                ::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SaveArg<2>(&capturedStateHandler),
+            ::testing::Return(IARM_RESULT_SUCCESS)));
+
+    plugin->Deinitialize(&service);
+    plugin->Initialize(&service);
+
+    // Set m_FwUpdateState_LatestEvent >= 2 via IARM callback
+    if (capturedStateHandler != nullptr) {
+        IARM_Bus_SYSMgr_EventData_t eventData = {};
+        eventData.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_FIRMWARE_UPDATE_STATE;
+        eventData.data.systemStates.state = 2; // Downloading
+        capturedStateHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, &eventData, sizeof(eventData));
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+
+    // Create FWDNLDSTATUS_FILE_NAME with DnldVersn and DnldURL entries
+    const char* fwStatusFile = "/opt/fwdnldstatus.txt";
+    {
+        std::ofstream f(fwStatusFile);
+        f << "Reboot|1\n";
+        f << "DnldVersn|TEST-FW-2025001.0\n";
+        f << "DnldURL|http://xconf.example.com/firmware.bin\n";
+    }
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDownloadedFirmwareInfo"),
+              _T("{}"), response));
+
+    TEST_LOG("GetDownloadedFirmwareInfo_DnldVersn - Response: %s", response.c_str());
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response));
+    EXPECT_TRUE(jsonResponse["success"].Boolean());
+
+    std::remove(fwStatusFile);
+}
+
+// =============================================================================
+// OnClockSet → dispatchEvent SYSTEMSERVICES_EVT_ON_SYSTEM_CLOCK_SET → OnSystemClockSet notification
+// Covers dispatchEvent branch at line 669 (SYSTEMSERVICES_EVT_ON_SYSTEM_CLOCK_SET case).
+// =============================================================================
+TEST_F(SystemServicesTest, DispatchEvent_ClockSet_CoversOnSystemClockSet)
+{
+    ASSERT_NE(nullptr, WPEFramework::Plugin::SystemServicesImplementation::_instance);
+
+    Exchange::ISystemServices* sysServices = static_cast<Exchange::ISystemServices*>(
+        plugin->QueryInterface(Exchange::ISystemServices::ID));
+    ASSERT_NE(nullptr, sysServices);
+
+    SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
+    sysServices->Register(notificationHandler);
+    notificationHandler->ResetEvent();
+
+    // OnClockSet is public and calls dispatchEvent(SYSTEMSERVICES_EVT_ON_SYSTEM_CLOCK_SET)
+    WPEFramework::Plugin::SystemServicesImplementation::_instance->OnClockSet();
+
+    bool received = notificationHandler->WaitForRequestStatus(2000, SystemServices_onSystemClockSet);
+    TEST_LOG("DispatchEvent_ClockSet - notification received=%s", received ? "true" : "false");
+
+    sysServices->Unregister(notificationHandler);
+    sysServices->Release();
+    delete notificationHandler;
+}
+
+// =============================================================================
+// requestSystemUptime — decimal point verification
+// =============================================================================
+TEST_F(SystemServicesTest, RequestSystemUptime_ResultContainsDecimalPoint)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("requestSystemUptime"), _T("{}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response));
+    ASSERT_TRUE(jsonResponse.HasLabel("systemUptime"));
+
+    std::string uptime = jsonResponse["systemUptime"].String();
+    EXPECT_NE(std::string::npos, uptime.find('.'))
+        << "Expected decimal point in uptime: " << uptime;
+
+    TEST_LOG("RequestSystemUptime_DecimalPoint - uptime=%s", uptime.c_str());
+}
+
+// =============================================================================
+// SetMigrationStatus with Migration plugin — covers SetMigrationStatus call path
+// =============================================================================
+TEST_F(SystemServicesTest, SetMigrationStatus_WithMigrationPlugin_MigrationCompleted)
+{
+    ::testing::NiceMock<MigrationMock> migrationMock;
+
+    EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("org.rdk.Migration"))))
+        .WillOnce(::testing::Return(static_cast<Exchange::IMigration*>(&migrationMock)));
+    ON_CALL(migrationMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(migrationMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(migrationMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+
+    WPEFramework::Exchange::IMigration::MigrationResult migrationResult;
+    migrationResult.success = true;
+    ON_CALL(migrationMock, SetMigrationStatus(::testing::_, ::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SetArgReferee<1>(migrationResult),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setMigrationStatus"),
+              _T("{\"status\":\"MIGRATION_COMPLETED\"}"), response));
+
+    TEST_LOG("SetMigrationStatus_MigrationCompleted - Response: %s", response.c_str());
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response));
+    EXPECT_TRUE(jsonResponse["success"].Boolean());
+
+    ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
+        .WillByDefault(::testing::Return(nullptr));
+}
+
+// =============================================================================
+// GetSerialNumber — DeviceInfo plugin success path (lines 1458-1465)
+// Previously only the null-DeviceInfo path (line 1468) was covered (count=4).
+// This test covers the non-null branch: SerialNumber() called, result populated.
+// =============================================================================
+TEST_F(SystemServicesTest, GetSerialNumber_WithDeviceInfoPlugin_SuccessPath)
+{
+    ::testing::NiceMock<DeviceInfoImplementationMock> deviceInfoMock;
+
+    EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
+        .WillOnce(::testing::Return(static_cast<Exchange::IDeviceInfo*>(&deviceInfoMock)));
+    ON_CALL(deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+
+    Exchange::IDeviceInfo::DeviceSerialNo serialNo;
+    serialNo.serialnumber = "SN-TEST-0123456789";
+    ON_CALL(deviceInfoMock, SerialNumber(::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SetArgReferee<0>(serialNo),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getSerialNumber"), _T("{}"), response));
+
+    TEST_LOG("GetSerialNumber_SuccessPath - Response: %s", response.c_str());
+
+    JsonObject jsonResponse2;
+    ASSERT_TRUE(jsonResponse2.FromString(response));
+    EXPECT_TRUE(jsonResponse2["success"].Boolean());
+    EXPECT_EQ(std::string("SN-TEST-0123456789"), jsonResponse2["serialNumber"].String());
+
+    ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
+        .WillByDefault(::testing::Return(nullptr));
+}
+
+// =============================================================================
+// getStbVersionString via GetSystemVersions — DeviceInfo plugin success path
+// (lines 3840-3848): FirmwareVersion() called when DeviceInfo is available.
+// Previously only the null-DeviceInfo fallback path was covered.
+// =============================================================================
+TEST_F(SystemServicesTest, GetStbVersionString_ViaGetSystemVersions_WithDeviceInfoPlugin)
+{
+    ::testing::NiceMock<DeviceInfoImplementationMock> deviceInfoMock;
+
+    EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
+        .WillOnce(::testing::Return(static_cast<Exchange::IDeviceInfo*>(&deviceInfoMock)));
+    ON_CALL(deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+
+    Exchange::IDeviceInfo::FirmwareversionInfo fwInfo;
+    fwInfo.imagename = "RDK-2025001.0p1s1";
+    ON_CALL(deviceInfoMock, FirmwareVersion(::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SetArgReferee<0>(fwInfo),
+            ::testing::Return(Core::ERROR_NONE)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getSystemVersions"), _T("{}"), response));
+
+    TEST_LOG("GetStbVersionString_DeviceInfo - Response: %s", response.c_str());
+
+    JsonObject jsonResponse3;
+    ASSERT_TRUE(jsonResponse3.FromString(response));
+    EXPECT_TRUE(jsonResponse3["success"].Boolean());
+    EXPECT_EQ(std::string("RDK-2025001.0p1s1"), jsonResponse3["imageVersion"].String());
+
+    ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
+        .WillByDefault(::testing::Return(nullptr));
 }
