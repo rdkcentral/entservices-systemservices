@@ -38,20 +38,6 @@
 #endif
 
 
-/* Simple concrete SleepModeImpl used by LIGHT_SLEEP / DEEP_SLEEP tests.
- * Avoids SleepModeMock.h (gmock header) which caused plugin-load regressions.
- * set with device::SleepMode::setImpl() / reset with setImpl(nullptr) per test. */
-class LocalSleepModeImpl : public device::SleepModeImpl {
-public:
-    explicit LocalSleepModeImpl(const std::string& mode) : m_mode(mode) {}
-    device::SleepMode& getInstanceById(int) override { return device::SleepMode::getInstance(); }
-    device::SleepMode& getInstanceByName(const std::string&) override { return device::SleepMode::getInstance(); }
-    device::List<device::SleepMode> getSleepModes() override { return {}; }
-    const std::string& toString() const override { return m_mode; }
-private:
-    std::string m_mode;
-};
-
 #define JSON_TIMEOUT   (1000)
 #define TEST_LOG(x, ...) fprintf(stderr, "\033[1;32m[%s:%d](%s)<PID:%d><TID:%d>" x "\n\033[0m", __FILE__, __LINE__, __FUNCTION__, getpid(), gettid(), ##__VA_ARGS__); fflush(stderr);
 #define SYSTEM_CALLSIGN  _T("org.rdk.System.1")
@@ -5482,9 +5468,10 @@ TEST_F(SystemService_L2Test, SysImpl_SetPowerState_InvalidState_COMRPC)
 
 /* ------------------------------------------------------------------- *
  * SetPowerState — LIGHT_SLEEP path                                     *
- * getPreferredSleepMode().toString() returns "LIGHT_SLEEP" so          *
- * convert("DEEP_SLEEP","LIGHT_SLEEP") is false → setPowerStateConversion*
- * is called with the original "LIGHT_SLEEP" → POWER_STATE_STANDBY.    *
+ * LIGHT_SLEEP branch calls getPreferredSleepMode().toString(), which   *
+ * requires SleepMode::impl to be non-null (mock devicesettings.cpp     *
+ * crashes with segfault otherwise). A local SleepModeImpl is set up    *
+ * for the duration of the test and reset to nullptr after.             *
  * ------------------------------------------------------------------- */
 TEST_F(SystemService_L2Test, SysImpl_SetPowerState_LightSleep_COMRPC)
 {
@@ -5492,37 +5479,78 @@ TEST_F(SystemService_L2Test, SysImpl_SetPowerState_LightSleep_COMRPC)
         TEST_LOG("Invalid SystemServices_Client");
         return;
     }
-    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("SetPowerState: LIGHT_SLEEP path via getPreferredSleepMode");
+    EXPECT_TRUE(m_controller_SystemServices != nullptr);
 
-    /* Install a concrete SleepModeImpl so SleepMode::toString() works. */
-    LocalSleepModeImpl sleepModeImpl("LIGHT_SLEEP");
-    device::SleepMode::setImpl(&sleepModeImpl);
+    if (m_controller_SystemServices) {
 
-    string powerState    = "LIGHT_SLEEP";
-    string standbyReason = "L2Test";
-    uint32_t sysSrvStatus = 0;
-    string errorMessage;
-    bool success = false;
+        EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
 
-    uint32_t result = m_SystemServicesPlugin->SetPowerState(powerState, standbyReason,
-                                                            sysSrvStatus, errorMessage, success);
-    EXPECT_EQ(result, Core::ERROR_NONE);
-    TEST_LOG("  SetPowerState(LIGHT_SLEEP): result=%u, success=%d, error='%s'",
-             result, success, errorMessage.c_str());
+        if (m_SystemServicesPlugin) {
 
-    device::SleepMode::setImpl(nullptr);
+            TEST_LOG("Testing SetPowerState LIGHT_SLEEP via COM-RPC");
 
-    m_SystemServicesPlugin->Release();
-    m_controller_SystemServices->Release();
+            /* SleepMode::impl is nullptr by default. The LIGHT_SLEEP branch
+             * in SetPowerState calls mode.toString() which dereferences impl.
+             * A local class (no file-scope vtable) is used to avoid .so
+             * symbol collisions that caused 0-test regressions previously. */
+            class SleepModeLocal : public device::SleepModeImpl {
+            public:
+                explicit SleepModeLocal(const std::string& m) : m_mode(m) {}
+                device::SleepMode& getInstanceById(int) override { return device::SleepMode::getInstance(); }
+                device::SleepMode& getInstanceByName(const std::string&) override { return device::SleepMode::getInstance(); }
+                device::List<device::SleepMode> getSleepModes() override { return {}; }
+                const std::string& toString() const override { return m_mode; }
+            private:
+                std::string m_mode;
+            };
+            SleepModeLocal sleepImpl("LIGHT_SLEEP");
+            device::SleepMode::setImpl(&sleepImpl);
+
+            string powerState = "LIGHT_SLEEP";
+            string standbyReason = "L2Test";
+
+            uint32_t sysSrvStatus = 0;
+            string errorMessage;
+            bool success = false;
+
+            uint32_t result =
+                m_SystemServicesPlugin->SetPowerState(
+                    powerState,
+                    standbyReason,
+                    sysSrvStatus,
+                    errorMessage,
+                    success);
+
+            EXPECT_EQ(result, Core::ERROR_NONE);
+
+            TEST_LOG("LIGHT_SLEEP result=%u success=%d status=%u error=%s",
+                     result,
+                     success,
+                     sysSrvStatus,
+                     errorMessage.c_str());
+
+            device::SleepMode::setImpl(nullptr);
+
+            m_SystemServicesPlugin->Release();
+
+        } else {
+            TEST_LOG("m_SystemServicesPlugin is NULL");
+        }
+
+        m_controller_SystemServices->Release();
+
+    } else {
+        TEST_LOG("m_controller_SystemServices is NULL");
+    }
 }
 
 /* ------------------------------------------------------------------- *
  * SetPowerState — DEEP_SLEEP path                                      *
- * getPreferredSleepMode().toString() returns "DEEP_SLEEP" so           *
- * convert("DEEP_SLEEP","DEEP_SLEEP") is true → setPowerStateConversion *
- * is called with "DEEP_SLEEP" → POWER_STATE_STANDBY_DEEP_SLEEP.       *
+ * DEEP_SLEEP branch calls getPreferredSleepMode().toString(), which    *
+ * requires SleepMode::impl to be non-null (same constraint as above).  *
+ * toString() returning "DEEP_SLEEP" makes convert() return true so     *
+ * setPowerStateConversion is called with "DEEP_SLEEP".                 *
  * ------------------------------------------------------------------- */
 TEST_F(SystemService_L2Test, SysImpl_SetPowerState_DeepSleep_COMRPC)
 {
@@ -5530,30 +5558,70 @@ TEST_F(SystemService_L2Test, SysImpl_SetPowerState_DeepSleep_COMRPC)
         TEST_LOG("Invalid SystemServices_Client");
         return;
     }
-    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("SetPowerState: DEEP_SLEEP path via getPreferredSleepMode");
+    EXPECT_TRUE(m_controller_SystemServices != nullptr);
 
-    /* Install a concrete SleepModeImpl so SleepMode::toString() works. */
-    LocalSleepModeImpl sleepModeImpl("DEEP_SLEEP");
-    device::SleepMode::setImpl(&sleepModeImpl);
+    if (m_controller_SystemServices) {
 
-    string powerState    = "DEEP_SLEEP";
-    string standbyReason = "L2Test";
-    uint32_t sysSrvStatus = 0;
-    string errorMessage;
-    bool success = false;
+        EXPECT_TRUE(m_SystemServicesPlugin != nullptr);
 
-    uint32_t result = m_SystemServicesPlugin->SetPowerState(powerState, standbyReason,
-                                                            sysSrvStatus, errorMessage, success);
-    EXPECT_EQ(result, Core::ERROR_NONE);
-    TEST_LOG("  SetPowerState(DEEP_SLEEP): result=%u, success=%d, error='%s'",
-             result, success, errorMessage.c_str());
+        if (m_SystemServicesPlugin) {
 
-    device::SleepMode::setImpl(nullptr);
+            TEST_LOG("Testing SetPowerState DEEP_SLEEP via COM-RPC");
 
-    m_SystemServicesPlugin->Release();
-    m_controller_SystemServices->Release();
+            /* SleepMode::impl is nullptr by default. The DEEP_SLEEP branch
+             * in SetPowerState calls mode.toString() which dereferences impl.
+             * A local class (no file-scope vtable) is used to avoid .so
+             * symbol collisions that caused 0-test regressions previously. */
+            class SleepModeLocal : public device::SleepModeImpl {
+            public:
+                explicit SleepModeLocal(const std::string& m) : m_mode(m) {}
+                device::SleepMode& getInstanceById(int) override { return device::SleepMode::getInstance(); }
+                device::SleepMode& getInstanceByName(const std::string&) override { return device::SleepMode::getInstance(); }
+                device::List<device::SleepMode> getSleepModes() override { return {}; }
+                const std::string& toString() const override { return m_mode; }
+            private:
+                std::string m_mode;
+            };
+            SleepModeLocal sleepImpl("DEEP_SLEEP");
+            device::SleepMode::setImpl(&sleepImpl);
+
+            string powerState = "DEEP_SLEEP";
+            string standbyReason = "L2Test";
+
+            uint32_t sysSrvStatus = 0;
+            string errorMessage;
+            bool success = false;
+
+            uint32_t result =
+                m_SystemServicesPlugin->SetPowerState(
+                    powerState,
+                    standbyReason,
+                    sysSrvStatus,
+                    errorMessage,
+                    success);
+
+            EXPECT_EQ(result, Core::ERROR_NONE);
+
+            TEST_LOG("DEEP_SLEEP result=%u success=%d status=%u error=%s",
+                     result,
+                     success,
+                     sysSrvStatus,
+                     errorMessage.c_str());
+
+            device::SleepMode::setImpl(nullptr);
+
+            m_SystemServicesPlugin->Release();
+
+        } else {
+            TEST_LOG("m_SystemServicesPlugin is NULL");
+        }
+
+        m_controller_SystemServices->Release();
+
+    } else {
+        TEST_LOG("m_controller_SystemServices is NULL");
+    }
 }
 
 /* ------------------------------------------------------------------- *
