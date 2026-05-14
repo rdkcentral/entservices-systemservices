@@ -11617,7 +11617,13 @@ protected:
 
     // Captured IARM callbacks
     IARM_EventHandler_t m_deviceMgtHandler = nullptr;
-    IARM_EventHandler_t m_sysStateHandler  = nullptr;
+    // NOTE: m_sysStateHandler is intentionally absent.
+    // In CI coverage builds, IARM_BUS_SYSTIME_MGR_NAME="SYSMgr"=IARM_BUS_SYSMGR_NAME
+    // and cTIMER_STATUS_UPDATE=0=IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, so
+    // _timerStatusEventHandler (registered after _systemStateChanged) overwrites
+    // any captured m_sysStateHandler. Calling it with IARM_Bus_SYSMgr_EventData_t
+    // causes it to cast data as TimerMsg* with garbage strings → SIGSEGV in JSON
+    // serialization. _systemStateChanged is already covered by existing tests.
 
     SystemServicesIarmCbTest()
         : SystemServicesInitializeTest()
@@ -11640,9 +11646,14 @@ protected:
         ON_CALL(iarmMock, IARM_Bus_RegisterEventHandler(::testing::_, ::testing::_, ::testing::_))
             .WillByDefault(::testing::Invoke(
                 [this](const char* owner, IARM_EventId_t eventId, IARM_EventHandler_t hdlr) -> IARM_Result_t {
-                    if (!strcmp(owner, IARM_BUS_SYSMGR_NAME)) {
-                        if (eventId == IARM_BUS_SYSMGR_EVENT_DEVICE_UPDATE_RECEIVED) m_deviceMgtHandler = hdlr;
-                        if (eventId == IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE)            m_sysStateHandler  = hdlr;
+                    // Only capture DEVICE_UPDATE_RECEIVED (eventId != 0) — safe in all builds.
+                    // Do NOT capture eventId==0 for SYSMGR_NAME: in CI coverage builds,
+                    // IARM_BUS_SYSTIME_MGR_NAME==IARM_BUS_SYSMGR_NAME and cTIMER_STATUS_UPDATE==0,
+                    // so _timerStatusEventHandler overwrites _systemStateChanged capture.
+                    if (!strcmp(owner, IARM_BUS_SYSMGR_NAME) &&
+                        eventId == IARM_BUS_SYSMGR_EVENT_DEVICE_UPDATE_RECEIVED)
+                    {
+                        m_deviceMgtHandler = hdlr;
                     }
                     return IARM_RESULT_SUCCESS;
                 }));
@@ -11744,60 +11755,6 @@ TEST_F(SystemServicesIarmCbTest, IarmCb_DeviceMgtUpdateReceived_WrongOwner_Ignor
     // Call with wrong owner — must NOT crash; covers the !strcmp == false path
     m_deviceMgtHandler("WRONG_OWNER", IARM_BUS_SYSMGR_EVENT_DEVICE_UPDATE_RECEIVED, &data, sizeof(data));
     TEST_LOG("IarmCb_DeviceMgtUpdateReceived_WrongOwner PASSED");
-}
-
-// 2. _systemStateChanged — FIRMWARE_UPDATE_STATE event → OnFirmwareUpdateStateChange
-TEST_F(SystemServicesIarmCbTest, IarmCb_SystemStateChanged_FirmwareUpdateState_NonCritical)
-{
-    ASSERT_NE(nullptr, m_sysStateHandler) << "_systemStateChanged not registered";
-
-    IARM_Bus_SYSMgr_EventData_t evData;
-    memset(&evData, 0, sizeof(evData));
-    evData.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_FIRMWARE_UPDATE_STATE;
-    evData.data.systemStates.state   = 3; // non-critical state → OnFirmwareUpdateStateChange
-
-    m_sysStateHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, &evData, sizeof(evData));
-    TEST_LOG("IarmCb_SystemStateChanged_FirmwareUpdateState PASSED");
-}
-
-// _systemStateChanged — FIRMWARE_UPDATE_STATE_CRITICAL_REBOOT → OnFirmwarePendingReboot
-TEST_F(SystemServicesIarmCbTest, IarmCb_SystemStateChanged_CriticalReboot_TriggersOnFirmwarePendingReboot)
-{
-    ASSERT_NE(nullptr, m_sysStateHandler);
-
-    IARM_Bus_SYSMgr_EventData_t evData;
-    memset(&evData, 0, sizeof(evData));
-    evData.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_FIRMWARE_UPDATE_STATE;
-    evData.data.systemStates.state   = IARM_BUS_SYSMGR_FIRMWARE_UPDATE_STATE_CRITICAL_REBOOT;
-
-    m_sysStateHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, &evData, sizeof(evData));
-    TEST_LOG("IarmCb_SystemStateChanged_CriticalReboot PASSED");
-}
-
-// _systemStateChanged — TIME_SOURCE state → OnClockSet
-TEST_F(SystemServicesIarmCbTest, IarmCb_SystemStateChanged_TimeSource_TriggersOnClockSet)
-{
-    ASSERT_NE(nullptr, m_sysStateHandler);
-
-    IARM_Bus_SYSMgr_EventData_t evData;
-    memset(&evData, 0, sizeof(evData));
-    evData.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_TIME_SOURCE;
-    evData.data.systemStates.state   = 1; // non-zero → OnClockSet
-
-    m_sysStateHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, &evData, sizeof(evData));
-    TEST_LOG("IarmCb_SystemStateChanged_TimeSource PASSED");
-}
-
-// _systemStateChanged — wrong eventId → early return (covers the != SYSTEMSTATE guard)
-TEST_F(SystemServicesIarmCbTest, IarmCb_SystemStateChanged_WrongEventId_EarlyReturn)
-{
-    ASSERT_NE(nullptr, m_sysStateHandler);
-
-    IARM_Bus_SYSMgr_EventData_t evData;
-    memset(&evData, 0, sizeof(evData));
-    // Any eventId != IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE → early return
-    m_sysStateHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_DEVICE_UPDATE_RECEIVED, &evData, sizeof(evData));
-    TEST_LOG("IarmCb_SystemStateChanged_WrongEventId PASSED");
 }
 
 
