@@ -10275,17 +10275,14 @@ TEST_F(SystemServicesTest, Dispatch_OnLogUpload_AbortedStatus_ReachesNotificatio
 TEST_F(SystemServicesTest, Dispatch_OnTimeStatusChanged_ReachesNotification)
 {
 #ifdef ENABLE_SYSTIMEMGR_SUPPORT
-    // Use _timerStatusEventHandler (captured via IARM_Bus_RegisterEventHandler SaveArg in fixture)
-    // instead of calling OnTimeStatusChanged() directly.  Direct calls store a dangling c_str()
-    // pointer inside Thunder's Core::JSON::String: the by-value std::string parameter in
-    // OnTimeStatusChanged() is freed when the function returns, but the WorkerPool Job that runs
-    // asynchronously still references its (freed) heap buffer.  With the IARM-based approach the
-    // TimerMsg fields are 128-byte zero-padded, so even if the freed heap is read later the first
-    // null byte is within a few characters — no 88041-byte stream overflow / SIGSEGV.
-    if (p_timerStatusEventHandler == nullptr) {
-        GTEST_SKIP() << "SYSTIME_MGR handler not captured (ENABLE_SYSTIMEMGR_SUPPORT not active)";
-    }
-
+    // Call OnTimeStatusChanged() directly with short (≤15 char, SSO-eligible) string literals.
+    // SSO keeps the string buffers inside the std::string objects on the stack frame of
+    // OnTimeStatusChanged().  While WaitForRequestStatus() blocks this thread, that stack frame
+    // is not reused, so the pointer stored by Thunder's Core::JSON::String remains readable
+    // until the WorkerPool Job completes — no dangling-pointer SIGSEGV.
+    // NOTE: do NOT go through p_timerStatusEventHandler here: that path creates
+    // std::string(buf, 128) objects (128 chars → heap-allocated) which are freed when
+    // _timerStatusEventHandler returns, producing a dangling c_str() pointer in the Job.
     ASSERT_NE(nullptr, m_sysServices);
     ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
 
@@ -10293,16 +10290,8 @@ TEST_F(SystemServicesTest, Dispatch_OnTimeStatusChanged_ReachesNotification)
     m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
 
-    // Build a zero-padded 128-byte TimerMsg with meaningful content.
-    static TimerMsg timerData;
-    memset(&timerData, 0, sizeof(timerData));
-    strncpy(timerData.message,     "Good",                 sizeof(timerData.message) - 1);
-    strncpy(timerData.timerSrc,    "NTP",                  sizeof(timerData.timerSrc) - 1);
-    strncpy(timerData.currentTime, "2025-01-01T00:00:00Z", sizeof(timerData.currentTime) - 1);
-
-    // Fire _timerStatusEventHandler → OnTimeStatusChanged → dispatchEvent → WorkerPool Job
-    p_timerStatusEventHandler(IARM_BUS_SYSTIME_MGR_NAME, cTIMER_STATUS_UPDATE,
-                               &timerData, sizeof(timerData));
+    Plugin::SystemServicesImplementation::_instance->OnTimeStatusChanged(
+        string("Good"), string("NTP"), string("good"));
 
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onTimeStatusChanged));
 
@@ -10315,10 +10304,7 @@ TEST_F(SystemServicesTest, Dispatch_OnTimeStatusChanged_ReachesNotification)
 TEST_F(SystemServicesTest, Dispatch_OnTimeStatusChanged_PoorQuality_ReachesNotification)
 {
 #ifdef ENABLE_SYSTIMEMGR_SUPPORT
-    if (p_timerStatusEventHandler == nullptr) {
-        GTEST_SKIP() << "SYSTIME_MGR handler not captured (ENABLE_SYSTIMEMGR_SUPPORT not active)";
-    }
-
+    // Same SSO strategy as Dispatch_OnTimeStatusChanged_ReachesNotification above.
     ASSERT_NE(nullptr, m_sysServices);
     ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
 
@@ -10326,14 +10312,8 @@ TEST_F(SystemServicesTest, Dispatch_OnTimeStatusChanged_PoorQuality_ReachesNotif
     m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
 
-    static TimerMsg timerData2;
-    memset(&timerData2, 0, sizeof(timerData2));
-    strncpy(timerData2.message,     "Poor",                  sizeof(timerData2.message) - 1);
-    strncpy(timerData2.timerSrc,    "XCONF",                 sizeof(timerData2.timerSrc) - 1);
-    strncpy(timerData2.currentTime, "2025-06-01T12:00:00Z",  sizeof(timerData2.currentTime) - 1);
-
-    p_timerStatusEventHandler(IARM_BUS_SYSTIME_MGR_NAME, cTIMER_STATUS_UPDATE,
-                               &timerData2, sizeof(timerData2));
+    Plugin::SystemServicesImplementation::_instance->OnTimeStatusChanged(
+        string("Poor"), string("XCONF"), string("poor"));
 
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onTimeStatusChanged));
 
