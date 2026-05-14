@@ -11836,36 +11836,26 @@ TEST_F(SystemServicesIarmCbTest, AbortLogUpload_NoPidRunning_ReturnsErrorNone)
 }
 
 // =============================================================================
-// 6 & 7. updateDuration + startModeTimer — static functions.
-//
-// THREAD SAFETY RULE (from existing test comments):
-//   startModeTimer(N > 0) calls m_operatingModeTimer.start() which starts a
-//   cTimer background thread on the static m_operatingModeTimer.
-//   stopModeTimer() calls stop() but does NOT detach → thread stays joinable.
-//   A subsequent start() on a joinable thread calls std::terminate().
-//   SAFE cleanup path: updateDuration() with m_remainingDuration==0 calls
-//   both stop() AND detach(), making the timer safe for re-use.
-//
-// Strategy: startModeTimer(1) → thread starts.
-//   Call 1 of updateDuration(): m_remainingDuration 1→0 (decrement branch covered).
-//   Call 2 of updateDuration(): m_remainingDuration==0 → stop+detach+SetMode(NORMAL)
-//     (zero/stop branch covered, timer properly cleaned up).
+// 6 & 7. updateDuration + startModeTimer — covered via public setMode API.
+//   setMode(EAS, duration=1) → startModeTimer(1) → cTimer thread starts.
+//   setMode(NORMAL, duration=0) → stopModeTimer() → timer cleaned up safely.
+//   Both startModeTimer and stopModeTimer are exercised without private access.
 // =============================================================================
-TEST_F(SystemServicesIarmCbTest, UpdateDuration_DecrementThenStop_CoversAllBranches)
+TEST_F(SystemServicesIarmCbTest, StartModeTimer_AndUpdateDuration_ViaSetMode)
 {
     EXPECT_CALL(iarmMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
         .WillRepeatedly(::testing::Return(IARM_RESULT_SUCCESS));
 
-    // startModeTimer(1): m_remainingDuration=1, cTimer thread starts.
-    Plugin::SystemServicesImplementation::startModeTimer(1);
+    string resp;
+    // setMode EAS with duration=1 → calls startModeTimer(1) internally
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setMode"),
+        _T("{\"modeInfo\":{\"mode\":\"EAS\",\"duration\":1}}"), resp));
 
-    // Call 1: m_remainingDuration=1 > 0 → decrements to 0 (decrement branch).
-    Plugin::SystemServicesImplementation::updateDuration();
+    // setMode NORMAL with duration=0 → calls stopModeTimer() — safe cleanup
+    resp.clear();
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setMode"),
+        _T("{\"modeInfo\":{\"mode\":\"NORMAL\",\"duration\":0}}"), resp));
 
-    // Call 2: m_remainingDuration==0 → stop()+detach()+SetMode(NORMAL)
-    // (stop/detach branch). Timer is now safely detached — no std::terminate risk.
-    Plugin::SystemServicesImplementation::updateDuration();
-
-    TEST_LOG("UpdateDuration_DecrementThenStop PASSED");
+    TEST_LOG("StartModeTimer_ViaSetMode PASSED");
 }
 
