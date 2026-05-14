@@ -11398,6 +11398,14 @@ TEST_F(SystemServicesTest, GetFirmwareUpdateInfo_SpawnsThread_WithXconfFiles)
         f << "{\"firmwareVersion\":\"TEST-FW-2025001.0\",\"firmwareLocation\":\"http://test.example.com/fw.bin\"}\n";
     }
 
+    // Register notification handler to synchronise with the background thread.
+    // WaitForRequestStatus blocks until OnFirmwareUpdateInfoReceived fires (or timeout),
+    // guaranteeing the WorkerPool Job has completed before fixture teardown releases handlers.
+    SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
+    ASSERT_NE(nullptr, m_sysServices);
+    m_sysServices->Register(notificationHandler);
+    notificationHandler->ResetEvent();
+
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getFirmwareUpdateInfo"),
               _T("{\"GUID\":\"test-guid-1234\"}"), response));
 
@@ -11406,9 +11414,11 @@ TEST_F(SystemServicesTest, GetFirmwareUpdateInfo_SpawnsThread_WithXconfFiles)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response));
 
-    // Wait for background thread to complete before fixture teardown frees the plugin.
-    // 1500 ms is sufficient on CI; the thread runs curl+file-read which is fast in mock env.
-    std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+    // Wait up to 3 s for the background thread to finish and the WorkerPool Job to fire.
+    notificationHandler->WaitForRequestStatus(3000, SystemServices_onFirmwareUpdateInfoReceived);
+
+    m_sysServices->Unregister(notificationHandler);
+    delete notificationHandler;
 
     std::remove("/tmp/xconf_httpcode_thunder.txt");
     std::remove("/tmp/xconf_response_thunder.txt");
@@ -11419,13 +11429,22 @@ TEST_F(SystemServicesTest, GetFirmwareUpdateInfo_NoXconfFiles_StillReturnsAsyncT
     std::remove("/tmp/xconf_httpcode_thunder.txt");
     std::remove("/tmp/xconf_response_thunder.txt");
 
+    // Register notification handler to synchronise with the background thread.
+    SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
+    ASSERT_NE(nullptr, m_sysServices);
+    m_sysServices->Register(notificationHandler);
+    notificationHandler->ResetEvent();
+
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getFirmwareUpdateInfo"),
               _T("{\"GUID\":\"\"}"), response));
 
     TEST_LOG("GetFirmwareUpdateInfo_NoFiles - Response: %s", response.c_str());
 
-    // Wait for background thread before teardown
-    std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+    // Wait up to 3 s for background thread + WorkerPool Job to complete before teardown.
+    notificationHandler->WaitForRequestStatus(3000, SystemServices_onFirmwareUpdateInfoReceived);
+
+    m_sysServices->Unregister(notificationHandler);
+    delete notificationHandler;
 }
 
 // =============================================================================
