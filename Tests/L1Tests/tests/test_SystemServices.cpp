@@ -11454,27 +11454,16 @@ TEST_F(SystemServicesTest, GetFirmwareUpdateInfo_NoXconfFiles_StillReturnsAsyncT
 // =============================================================================
 TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_DnldVersn_Branch_WhenStateIsDownloading)
 {
-    IARM_EventHandler_t capturedStateHandler = nullptr;
+    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
 
-    ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterEventHandler(
-                ::testing::StrEq(IARM_BUS_SYSMGR_NAME),
-                ::testing::Eq(IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE),
-                ::testing::_))
-        .WillByDefault(::testing::DoAll(
-            ::testing::SaveArg<2>(&capturedStateHandler),
-            ::testing::Return(IARM_RESULT_SUCCESS)));
-
-    plugin->Deinitialize(&service);
-    plugin->Initialize(&service);
-
-    // Set m_FwUpdateState_LatestEvent >= 2 via IARM callback
-    if (capturedStateHandler != nullptr) {
-        IARM_Bus_SYSMgr_EventData_t eventData = {};
-        eventData.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_FIRMWARE_UPDATE_STATE;
-        eventData.data.systemStates.state = 2; // Downloading
-        capturedStateHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, &eventData, sizeof(eventData));
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
+    // Set m_FwUpdateState_LatestEvent >= 2 directly via the public API.
+    // Avoid using the IARM handler trick: in CI, IARM_BUS_SYSTIME_MGR_NAME and
+    // IARM_BUS_SYSMGR_NAME are both "SYSMgr", and cTIMER_STATUS_UPDATE and
+    // IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE are both 0, so SaveArg captures
+    // _timerStatusEventHandler instead of _systemStateChanged. Invoking it with
+    // IARM_Bus_SYSMgr_EventData_t data causes _timerStatusEventHandler to cast
+    // the buffer to TimerMsg* and read garbage strings -> SIGSEGV in JSON serialization.
+    Plugin::SystemServicesImplementation::_instance->OnFirmwareUpdateStateChange(2); // FirmwareUpdateStateDownloading
 
     // Create FWDNLDSTATUS_FILE_NAME with DnldVersn and DnldURL entries
     const char* fwStatusFile = "/opt/fwdnldstatus.txt";
