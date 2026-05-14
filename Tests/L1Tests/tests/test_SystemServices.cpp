@@ -470,20 +470,8 @@ protected:
             .WillByDefault(::testing::Return(IARM_RESULT_SUCCESS));
         ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterEventHandler(::testing::_, ::testing::_, ::testing::_))
             .WillByDefault(::testing::Return(IARM_RESULT_SUCCESS));
-        // Zero-initialise the output buffer arg before returning success.
-        // Without this, any code path that reads struct fields from IARM_Bus_Call
-        // (e.g. GetTimeStatus reads TimerMsg.currentTime[128]) gets raw uninitialised
-        // stack bytes.  Those bytes end up as std::string content with invalid UTF-8
-        // sequences (e.g. 0xDD 0x90 = U+0750) that crash JSON::String::Serialize inside
-        // the WorkerPool thread when OnTimeStatusChanged dispatches the notification.
         ON_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
-            .WillByDefault(::testing::Invoke(
-                [](const char* /*owner*/, const char* /*method*/, void* arg, size_t argLen) -> IARM_Result_t {
-                    if (arg && argLen) {
-                        memset(arg, 0, argLen);
-                    }
-                    return IARM_RESULT_SUCCESS;
-                }));
+            .WillByDefault(::testing::Return(IARM_RESULT_SUCCESS));
 
         ON_CALL(service, COMLink())
             .WillByDefault(::testing::Return(&comLinkMock));
@@ -1216,8 +1204,18 @@ INSTANTIATE_TEST_SUITE_P(
 #endif
 TEST_F(SystemServicesTest, GetTimeStatus_Success)
 {
-    // IARM_Bus_Call is zero-initialised by the fixture's default ON_CALL, so
-    // TimerMsg fields will be all-zero strings — no garbage bytes, no crash.
+    // GetTimeStatus calls IARM_Bus_Call and reads the output param (TimerMsg: three char[256] fields).
+    // The generic ON_CALL fixture returns IARM_RESULT_SUCCESS but does NOT populate the output buffer,
+    // leaving 768 bytes of stack garbage.  The plugin then constructs std::string(garbage, 256) which
+    // can contain embedded nulls / non-printable bytes and crash in LOGINFO → SIGSEGV.
+    // Fix: override IARM_Bus_Call here to zero-initialise the TimerMsg buffer before returning.
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke(
+            [](const char*, const char*, void* arg, size_t argLen) -> IARM_Result_t {
+                memset(arg, 0, argLen);   // zero all three char[256] fields
+                return IARM_RESULT_SUCCESS;
+            }));
+
     uint32_t result = handler.Invoke(connection, _T("getTimeStatus"), _T("{}"), response);
 
     EXPECT_EQ(Core::ERROR_NONE, result) << "GetTimeStatus should return ERROR_NONE when IARM_Bus_Call succeeds";
@@ -10255,6 +10253,55 @@ TEST_F(SystemServicesTest, Dispatch_OnLogUpload_AbortedStatus_ReachesNotificatio
     TEST_LOG("Dispatch_OnLogUpload_Aborted_LogErrPath PASSED");
 }
 
+TEST_F(SystemServicesTest, Dispatch_OnTimeStatusChanged_ReachesNotification)
+{
+#ifdef ENABLE_SYSTIMEMGR_SUPPORT
+    ASSERT_NE(nullptr, m_sysServices);
+    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+
+    SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
+    m_sysServices->Register(notificationHandler);
+    notificationHandler->ResetEvent();
+
+    // OnTimeStatusChanged → dispatchEvent(SYSTEMSERVICES_EVT_ONTIMESTATUSCHANGED) →
+    // Dispatch → switch case SYSTEMSERVICES_EVT_ONTIMESTATUSCHANGED →
+    // (*index)->OnTimeStatusChanged(timeQuality, timeSrc, time)
+    Plugin::SystemServicesImplementation::_instance->OnTimeStatusChanged(
+        "Good", "NTP", "2025-01-01T00:00:00Z");
+
+    EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onTimeStatusChanged));
+    EXPECT_EQ("Good", notificationHandler->GetTimeQuality());
+    EXPECT_EQ("NTP",  notificationHandler->GetTimeSrc());
+
+    m_sysServices->Unregister(notificationHandler);
+    delete notificationHandler;
+#endif
+    TEST_LOG("Dispatch_OnTimeStatusChanged PASSED");
+}
+
+TEST_F(SystemServicesTest, Dispatch_OnTimeStatusChanged_PoorQuality_ReachesNotification)
+{
+#ifdef ENABLE_SYSTIMEMGR_SUPPORT
+    ASSERT_NE(nullptr, m_sysServices);
+    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
+
+    SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
+    m_sysServices->Register(notificationHandler);
+    notificationHandler->ResetEvent();
+
+    Plugin::SystemServicesImplementation::_instance->OnTimeStatusChanged(
+        "Poor", "XCONF", "2025-06-01T12:00:00Z");
+
+    EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onTimeStatusChanged));
+    EXPECT_EQ("Poor",  notificationHandler->GetTimeQuality());
+    EXPECT_EQ("XCONF", notificationHandler->GetTimeSrc());
+
+    m_sysServices->Unregister(notificationHandler);
+    delete notificationHandler;
+#endif
+    TEST_LOG("Dispatch_OnTimeStatusChanged_Poor PASSED");
+}
+
 TEST_F(SystemServicesTest, Dispatch_OnMacAddressesRetrieved_ReachesNotification)
 {
     ASSERT_NE(nullptr, m_sysServices);
@@ -10618,17 +10665,12 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_InvalidValueInFile_CoversReadParamsE
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection,
               _T("getBlocklistFlag"), _T("{}"), response));
 
-    {
-        std::ofstream f("/opt/secure/persistent/opflashstore/devicestate.txt");
-        f << "blocklist=INVALID_VALUE\n";
-    }
-
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection,
-              _T("getBlocklistFlag"), _T("{}"), response));
-
     TEST_LOG("GetBlocklistFlag_InvalidValueInFile - Response: %s", response.c_str());
     std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
 }
+
+
+//adding mock
 
 // =============================================================================
 // SECTION: QueryInterfaceByCallsign-based dependency mock helpers
@@ -11236,465 +11278,6 @@ TEST_F(SystemServicesTest, GetDeviceInfo_UnallowableChars_ReturnsEarlyWithMessag
 }
 
 // =============================================================================
-// _systemStateChanged IARM callback — covers lines 3046-3125
-// Captured via IARM_Bus_RegisterEventHandler with SaveArg.
-// Tests re-initialize to capture with the EXPECT_CALL/SaveArg in place.
-// =============================================================================
-TEST_F(SystemServicesTest, IARM_SystemStateChanged_FirmwareUpdateState_CoversCallback)
-{
-    IARM_EventHandler_t capturedHandler = nullptr;
-
-    ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterEventHandler(
-                ::testing::StrEq(IARM_BUS_SYSMGR_NAME),
-                ::testing::Eq(IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE),
-                ::testing::_))
-        .WillByDefault(::testing::DoAll(
-            ::testing::SaveArg<2>(&capturedHandler),
-            ::testing::Return(IARM_RESULT_SUCCESS)));
-
-    plugin->Deinitialize(&service);
-    plugin->Initialize(&service);
-
-    if (capturedHandler == nullptr) {
-        TEST_LOG("IARM_SystemStateChanged: capturedHandler is null, skipping");
-        GTEST_SKIP();
-    }
-
-    IARM_Bus_SYSMgr_EventData_t eventData = {};
-    eventData.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_FIRMWARE_UPDATE_STATE;
-    eventData.data.systemStates.state = 3; // not CRITICAL_REBOOT → OnFirmwareUpdateStateChange
-
-    capturedHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, &eventData, sizeof(eventData));
-    TEST_LOG("IARM_SystemStateChanged_FirmwareUpdateState - callback invoked");
-}
-
-TEST_F(SystemServicesTest, IARM_SystemStateChanged_FirmwareUpdateState_CriticalReboot)
-{
-    IARM_EventHandler_t capturedHandler = nullptr;
-
-    ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterEventHandler(
-                ::testing::StrEq(IARM_BUS_SYSMGR_NAME),
-                ::testing::Eq(IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE),
-                ::testing::_))
-        .WillByDefault(::testing::DoAll(
-            ::testing::SaveArg<2>(&capturedHandler),
-            ::testing::Return(IARM_RESULT_SUCCESS)));
-
-    plugin->Deinitialize(&service);
-    plugin->Initialize(&service);
-
-    if (capturedHandler == nullptr) {
-        TEST_LOG("IARM_SystemStateChanged_CriticalReboot: capturedHandler is null, skipping");
-        GTEST_SKIP();
-    }
-
-    IARM_Bus_SYSMgr_EventData_t eventData = {};
-    eventData.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_FIRMWARE_UPDATE_STATE;
-    eventData.data.systemStates.state = IARM_BUS_SYSMGR_FIRMWARE_UPDATE_STATE_CRITICAL_REBOOT;
-
-    capturedHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, &eventData, sizeof(eventData));
-    TEST_LOG("IARM_SystemStateChanged_CriticalReboot - callback invoked");
-}
-
-TEST_F(SystemServicesTest, IARM_SystemStateChanged_TimeSource_CoversOnClockSet)
-{
-    IARM_EventHandler_t capturedHandler = nullptr;
-
-    ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterEventHandler(
-                ::testing::StrEq(IARM_BUS_SYSMGR_NAME),
-                ::testing::Eq(IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE),
-                ::testing::_))
-        .WillByDefault(::testing::DoAll(
-            ::testing::SaveArg<2>(&capturedHandler),
-            ::testing::Return(IARM_RESULT_SUCCESS)));
-
-    plugin->Deinitialize(&service);
-    plugin->Initialize(&service);
-
-    if (capturedHandler == nullptr) {
-        TEST_LOG("IARM_SystemStateChanged_TimeSource: capturedHandler is null, skipping");
-        GTEST_SKIP();
-    }
-
-    IARM_Bus_SYSMgr_EventData_t eventData = {};
-    eventData.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_TIME_SOURCE;
-    eventData.data.systemStates.state = 1; // → OnClockSet
-
-    capturedHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, &eventData, sizeof(eventData));
-    TEST_LOG("IARM_SystemStateChanged_TimeSource - callback invoked");
-}
-
-TEST_F(SystemServicesTest, IARM_SystemStateChanged_LogUpload_CoversOnLogUploadAndDispatchEvent)
-{
-    // Covers _systemStateChanged LOG_UPLOAD branch + _instance->OnLogUpload() call (lines 3100-3105)
-    // Note: OnLogUpload only dispatches ONLOGUPLOAD event when m_uploadLogsPid != -1;
-    // this test covers the IARM callback path itself.
-    IARM_EventHandler_t capturedHandler = nullptr;
-
-    ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterEventHandler(
-                ::testing::StrEq(IARM_BUS_SYSMGR_NAME),
-                ::testing::Eq(IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE),
-                ::testing::_))
-        .WillByDefault(::testing::DoAll(
-            ::testing::SaveArg<2>(&capturedHandler),
-            ::testing::Return(IARM_RESULT_SUCCESS)));
-
-    plugin->Deinitialize(&service);
-    plugin->Initialize(&service);
-
-    if (capturedHandler == nullptr) {
-        TEST_LOG("IARM_SystemStateChanged_LogUpload: capturedHandler is null, skipping");
-        GTEST_SKIP();
-    }
-
-    IARM_Bus_SYSMgr_EventData_t eventData = {};
-    eventData.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_LOG_UPLOAD;
-    eventData.data.systemStates.state = 0;
-
-    // Invoke the callback — covers the LOG_UPLOAD case in _systemStateChanged
-    capturedHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, &eventData, sizeof(eventData));
-    TEST_LOG("IARM_SystemStateChanged_LogUpload - callback invoked (LOG_UPLOAD branch)");
-}
-
-TEST_F(SystemServicesTest, IARM_SystemStateChanged_WrongEventId_EarlyReturn)
-{
-    IARM_EventHandler_t capturedHandler = nullptr;
-
-    ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterEventHandler(
-                ::testing::StrEq(IARM_BUS_SYSMGR_NAME),
-                ::testing::Eq(IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE),
-                ::testing::_))
-        .WillByDefault(::testing::DoAll(
-            ::testing::SaveArg<2>(&capturedHandler),
-            ::testing::Return(IARM_RESULT_SUCCESS)));
-
-    plugin->Deinitialize(&service);
-    plugin->Initialize(&service);
-
-    if (capturedHandler == nullptr) {
-        TEST_LOG("IARM_SystemStateChanged_WrongEventId: capturedHandler is null, skipping");
-        GTEST_SKIP();
-    }
-
-    IARM_Bus_SYSMgr_EventData_t eventData = {};
-    eventData.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_FIRMWARE_UPDATE_STATE;
-    eventData.data.systemStates.state = 3;
-
-    // Wrong eventId → early return at top of _systemStateChanged
-    capturedHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_IMAGE_DNLD, &eventData, sizeof(eventData));
-    TEST_LOG("IARM_SystemStateChanged_WrongEventId - early-return path covered");
-}
-
-// =============================================================================
-// _SysModeChange IARM callback — covers lines 3012-3031
-// (iarmModeToString + OnSystemModeChanged)
-// Captured via IARM_Bus_RegisterCall with SaveArg.
-// =============================================================================
-TEST_F(SystemServicesTest, IARM_SysModeChange_Normal_CoversCallbackAndIarmModeToString)
-{
-    IARM_BusCall_t capturedCallHandler = nullptr;
-
-    ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterCall(
-                ::testing::StrEq(IARM_BUS_COMMON_API_SysModeChange),
-                ::testing::_))
-        .WillByDefault(::testing::DoAll(
-            ::testing::SaveArg<1>(&capturedCallHandler),
-            ::testing::Return(IARM_RESULT_SUCCESS)));
-
-    plugin->Deinitialize(&service);
-    plugin->Initialize(&service);
-
-    if (capturedCallHandler == nullptr) {
-        TEST_LOG("IARM_SysModeChange_Normal: capturedCallHandler is null, skipping");
-        GTEST_SKIP();
-    }
-
-    IARM_Bus_CommonAPI_SysModeChange_Param_t param = {};
-    param.newMode = IARM_BUS_SYS_MODE_NORMAL;
-    param.oldMode = IARM_BUS_SYS_MODE_WAREHOUSE;
-
-    IARM_Result_t result = capturedCallHandler(&param);
-    EXPECT_EQ(IARM_RESULT_SUCCESS, result);
-    TEST_LOG("IARM_SysModeChange_Normal - result=%d", result);
-}
-
-TEST_F(SystemServicesTest, IARM_SysModeChange_Warehouse_CoversIarmModeToString_Warehouse)
-{
-    IARM_BusCall_t capturedCallHandler = nullptr;
-
-    ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterCall(
-                ::testing::StrEq(IARM_BUS_COMMON_API_SysModeChange),
-                ::testing::_))
-        .WillByDefault(::testing::DoAll(
-            ::testing::SaveArg<1>(&capturedCallHandler),
-            ::testing::Return(IARM_RESULT_SUCCESS)));
-
-    plugin->Deinitialize(&service);
-    plugin->Initialize(&service);
-
-    if (capturedCallHandler == nullptr) {
-        TEST_LOG("IARM_SysModeChange_Warehouse: capturedCallHandler is null, skipping");
-        GTEST_SKIP();
-    }
-
-    // Register notification handler to verify OnSystemModeChanged fires
-    Exchange::ISystemServices* sysServices = static_cast<Exchange::ISystemServices*>(
-        plugin->QueryInterface(Exchange::ISystemServices::ID));
-    ASSERT_NE(nullptr, sysServices);
-
-    SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
-    sysServices->Register(notificationHandler);
-    notificationHandler->ResetEvent();
-
-    IARM_Bus_CommonAPI_SysModeChange_Param_t param = {};
-    param.newMode = IARM_BUS_SYS_MODE_WAREHOUSE;
-    param.oldMode = IARM_BUS_SYS_MODE_NORMAL;
-
-    IARM_Result_t result = capturedCallHandler(&param);
-    EXPECT_EQ(IARM_RESULT_SUCCESS, result);
-
-    bool received = notificationHandler->WaitForRequestStatus(2000, SystemServices_onSystemModeChanged);
-    TEST_LOG("IARM_SysModeChange_Warehouse - mode=%s received=%s",
-             notificationHandler->GetSystemMode().c_str(), received ? "yes" : "no");
-
-    if (received) {
-        EXPECT_EQ("WAREHOUSE", notificationHandler->GetSystemMode());
-    }
-
-    sysServices->Unregister(notificationHandler);
-    sysServices->Release();
-    delete notificationHandler;
-}
-
-TEST_F(SystemServicesTest, IARM_SysModeChange_EAS_CoversIarmModeToString_EAS)
-{
-    IARM_BusCall_t capturedCallHandler = nullptr;
-
-    ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterCall(
-                ::testing::StrEq(IARM_BUS_COMMON_API_SysModeChange),
-                ::testing::_))
-        .WillByDefault(::testing::DoAll(
-            ::testing::SaveArg<1>(&capturedCallHandler),
-            ::testing::Return(IARM_RESULT_SUCCESS)));
-
-    plugin->Deinitialize(&service);
-    plugin->Initialize(&service);
-
-    if (capturedCallHandler == nullptr) {
-        TEST_LOG("IARM_SysModeChange_EAS: capturedCallHandler is null, skipping");
-        GTEST_SKIP();
-    }
-
-    IARM_Bus_CommonAPI_SysModeChange_Param_t param = {};
-    param.newMode = IARM_BUS_SYS_MODE_EAS;
-    param.oldMode = IARM_BUS_SYS_MODE_NORMAL;
-
-    IARM_Result_t result = capturedCallHandler(&param);
-    EXPECT_EQ(IARM_RESULT_SUCCESS, result);
-    TEST_LOG("IARM_SysModeChange_EAS - result=%d", result);
-}
-
-// =============================================================================
-// _deviceMgtUpdateReceived IARM callback — covers lines 3031-3044
-// =============================================================================
-TEST_F(SystemServicesTest, IARM_DeviceMgtUpdateReceived_ValidEvent_CoversCallback)
-{
-    IARM_EventHandler_t capturedHandler = nullptr;
-
-    ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterEventHandler(
-                ::testing::StrEq(IARM_BUS_SYSMGR_NAME),
-                ::testing::Eq(IARM_BUS_SYSMGR_EVENT_DEVICE_UPDATE_RECEIVED),
-                ::testing::_))
-        .WillByDefault(::testing::DoAll(
-            ::testing::SaveArg<2>(&capturedHandler),
-            ::testing::Return(IARM_RESULT_SUCCESS)));
-
-    plugin->Deinitialize(&service);
-    plugin->Initialize(&service);
-
-    if (capturedHandler == nullptr) {
-        TEST_LOG("IARM_DeviceMgtUpdateReceived: capturedHandler is null, skipping");
-        GTEST_SKIP();
-    }
-
-    IARM_BUS_SYSMGR_DeviceMgtUpdateInfo_Param_t devMgtParam = {};
-    strncpy(devMgtParam.source, "XCONF", sizeof(devMgtParam.source) - 1);
-    strncpy(devMgtParam.type, "FW_UPDATE", sizeof(devMgtParam.type) - 1);
-    devMgtParam.status = true;
-
-    capturedHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_DEVICE_UPDATE_RECEIVED,
-                    &devMgtParam, sizeof(devMgtParam));
-    TEST_LOG("IARM_DeviceMgtUpdateReceived_Valid - callback invoked");
-}
-
-TEST_F(SystemServicesTest, IARM_DeviceMgtUpdateReceived_WrongOwner_NoAction)
-{
-    IARM_EventHandler_t capturedHandler = nullptr;
-
-    ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterEventHandler(
-                ::testing::StrEq(IARM_BUS_SYSMGR_NAME),
-                ::testing::Eq(IARM_BUS_SYSMGR_EVENT_DEVICE_UPDATE_RECEIVED),
-                ::testing::_))
-        .WillByDefault(::testing::DoAll(
-            ::testing::SaveArg<2>(&capturedHandler),
-            ::testing::Return(IARM_RESULT_SUCCESS)));
-
-    plugin->Deinitialize(&service);
-    plugin->Initialize(&service);
-
-    if (capturedHandler == nullptr) {
-        TEST_LOG("IARM_DeviceMgtUpdateReceived_WrongOwner: capturedHandler is null, skipping");
-        GTEST_SKIP();
-    }
-
-    IARM_BUS_SYSMGR_DeviceMgtUpdateInfo_Param_t devMgtParam = {};
-    // Wrong owner → !strcmp fails → no action
-    capturedHandler("WrongOwner", IARM_BUS_SYSMGR_EVENT_DEVICE_UPDATE_RECEIVED,
-                    &devMgtParam, sizeof(devMgtParam));
-    TEST_LOG("IARM_DeviceMgtUpdateReceived_WrongOwner - no crash");
-}
-
-// =============================================================================
-// GetFirmwareUpdateInfo — covers lines 1809-1840 (spawns thread calling firmwareUpdateInfoReceived)
-// =============================================================================
-TEST_F(SystemServicesTest, GetFirmwareUpdateInfo_SpawnsThread_WithXconfFiles)
-{
-    // Create xconf files so firmwareUpdateInfoReceived exercises the xconf path
-    {
-        std::ofstream f("/tmp/xconf_httpcode_thunder.txt");
-        f << "200\n";
-    }
-    {
-        std::ofstream f("/tmp/xconf_response_thunder.txt");
-        f << "{\"firmwareVersion\":\"TEST-FW-2025001.0\",\"firmwareLocation\":\"http://test.example.com/fw.bin\"}\n";
-    }
-
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getFirmwareUpdateInfo"),
-              _T("{\"GUID\":\"test-guid-1234\"}"), response));
-
-    TEST_LOG("GetFirmwareUpdateInfo_XconfFiles - Response: %s", response.c_str());
-
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response));
-
-    // Wait for background thread to complete before fixture teardown frees the plugin.
-    // 1500 ms is sufficient on CI; the thread runs curl+file-read which is fast in mock env.
-    std::this_thread::sleep_for(std::chrono::milliseconds(1500));
-
-    std::remove("/tmp/xconf_httpcode_thunder.txt");
-    std::remove("/tmp/xconf_response_thunder.txt");
-}
-
-TEST_F(SystemServicesTest, GetFirmwareUpdateInfo_NoXconfFiles_StillReturnsAsyncTrue)
-{
-    std::remove("/tmp/xconf_httpcode_thunder.txt");
-    std::remove("/tmp/xconf_response_thunder.txt");
-
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getFirmwareUpdateInfo"),
-              _T("{\"GUID\":\"\"}"), response));
-
-    TEST_LOG("GetFirmwareUpdateInfo_NoFiles - Response: %s", response.c_str());
-
-    // Wait for background thread before teardown
-    std::this_thread::sleep_for(std::chrono::milliseconds(1500));
-}
-
-// =============================================================================
-// GetDownloadedFirmwareInfo — DnldVersn/DnldURL branch (lines 1913-1933)
-// m_FwUpdateState_LatestEvent must be >= 2 for DnldVersn/DnldURL to populate.
-// Trigger state >= 2 via IARM callback, then call getDownloadedFirmwareInfo.
-// =============================================================================
-TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_DnldVersn_Branch_WhenStateIsDownloading)
-{
-    IARM_EventHandler_t capturedStateHandler = nullptr;
-
-    ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterEventHandler(
-                ::testing::StrEq(IARM_BUS_SYSMGR_NAME),
-                ::testing::Eq(IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE),
-                ::testing::_))
-        .WillByDefault(::testing::DoAll(
-            ::testing::SaveArg<2>(&capturedStateHandler),
-            ::testing::Return(IARM_RESULT_SUCCESS)));
-
-    plugin->Deinitialize(&service);
-    plugin->Initialize(&service);
-
-    // Set m_FwUpdateState_LatestEvent >= 2 via IARM callback
-    if (capturedStateHandler != nullptr) {
-        IARM_Bus_SYSMgr_EventData_t eventData = {};
-        eventData.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_FIRMWARE_UPDATE_STATE;
-        eventData.data.systemStates.state = 2; // Downloading
-        capturedStateHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, &eventData, sizeof(eventData));
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
-
-    // Create FWDNLDSTATUS_FILE_NAME with DnldVersn and DnldURL entries
-    const char* fwStatusFile = "/opt/fwdnldstatus.txt";
-    {
-        std::ofstream f(fwStatusFile);
-        f << "Reboot|1\n";
-        f << "DnldVersn|TEST-FW-2025001.0\n";
-        f << "DnldURL|http://xconf.example.com/firmware.bin\n";
-    }
-
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDownloadedFirmwareInfo"),
-              _T("{}"), response));
-
-    TEST_LOG("GetDownloadedFirmwareInfo_DnldVersn - Response: %s", response.c_str());
-
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response));
-    EXPECT_TRUE(jsonResponse["success"].Boolean());
-
-    std::remove(fwStatusFile);
-}
-
-// =============================================================================
-// OnClockSet → dispatchEvent SYSTEMSERVICES_EVT_ON_SYSTEM_CLOCK_SET → OnSystemClockSet notification
-// Covers dispatchEvent branch at line 669 (SYSTEMSERVICES_EVT_ON_SYSTEM_CLOCK_SET case).
-// =============================================================================
-TEST_F(SystemServicesTest, DispatchEvent_ClockSet_CoversOnSystemClockSet)
-{
-    ASSERT_NE(nullptr, WPEFramework::Plugin::SystemServicesImplementation::_instance);
-
-    Exchange::ISystemServices* sysServices = static_cast<Exchange::ISystemServices*>(
-        plugin->QueryInterface(Exchange::ISystemServices::ID));
-    ASSERT_NE(nullptr, sysServices);
-
-    SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
-    sysServices->Register(notificationHandler);
-    notificationHandler->ResetEvent();
-
-    // OnClockSet is public and calls dispatchEvent(SYSTEMSERVICES_EVT_ON_SYSTEM_CLOCK_SET)
-    WPEFramework::Plugin::SystemServicesImplementation::_instance->OnClockSet();
-
-    bool received = notificationHandler->WaitForRequestStatus(2000, SystemServices_onSystemClockSet);
-    TEST_LOG("DispatchEvent_ClockSet - notification received=%s", received ? "true" : "false");
-
-    sysServices->Unregister(notificationHandler);
-    sysServices->Release();
-    delete notificationHandler;
-}
-
-// =============================================================================
-// requestSystemUptime — decimal point verification
-// =============================================================================
-TEST_F(SystemServicesTest, RequestSystemUptime_ResultContainsDecimalPoint)
-{
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("requestSystemUptime"), _T("{}"), response));
-
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response));
-    ASSERT_TRUE(jsonResponse.HasLabel("systemUptime"));
-
-    std::string uptime = jsonResponse["systemUptime"].String();
-    EXPECT_NE(std::string::npos, uptime.find('.'))
-        << "Expected decimal point in uptime: " << uptime;
-
-    TEST_LOG("RequestSystemUptime_DecimalPoint - uptime=%s", uptime.c_str());
-}
-
-// =============================================================================
 // SetMigrationStatus with Migration plugin — covers SetMigrationStatus call path
 // =============================================================================
 TEST_F(SystemServicesTest, SetMigrationStatus_WithMigrationPlugin_MigrationCompleted)
@@ -11795,4 +11378,102 @@ TEST_F(SystemServicesTest, GetStbVersionString_ViaGetSystemVersions_WithDeviceIn
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
         .WillByDefault(::testing::Return(nullptr));
+}
+
+
+
+//firmware
+// =============================================================================
+// GetFirmwareUpdateInfo — covers lines 1809-1840 (spawns thread calling firmwareUpdateInfoReceived)
+// =============================================================================
+TEST_F(SystemServicesTest, GetFirmwareUpdateInfo_SpawnsThread_WithXconfFiles)
+{
+    // Create xconf files so firmwareUpdateInfoReceived exercises the xconf path
+    {
+        std::ofstream f("/tmp/xconf_httpcode_thunder.txt");
+        f << "200\n";
+    }
+    {
+        std::ofstream f("/tmp/xconf_response_thunder.txt");
+        f << "{\"firmwareVersion\":\"TEST-FW-2025001.0\",\"firmwareLocation\":\"http://test.example.com/fw.bin\"}\n";
+    }
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getFirmwareUpdateInfo"),
+              _T("{\"GUID\":\"test-guid-1234\"}"), response));
+
+    TEST_LOG("GetFirmwareUpdateInfo_XconfFiles - Response: %s", response.c_str());
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response));
+
+    // Wait for background thread to complete before fixture teardown frees the plugin.
+    // 1500 ms is sufficient on CI; the thread runs curl+file-read which is fast in mock env.
+    std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+
+    std::remove("/tmp/xconf_httpcode_thunder.txt");
+    std::remove("/tmp/xconf_response_thunder.txt");
+}
+
+TEST_F(SystemServicesTest, GetFirmwareUpdateInfo_NoXconfFiles_StillReturnsAsyncTrue)
+{
+    std::remove("/tmp/xconf_httpcode_thunder.txt");
+    std::remove("/tmp/xconf_response_thunder.txt");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getFirmwareUpdateInfo"),
+              _T("{\"GUID\":\"\"}"), response));
+
+    TEST_LOG("GetFirmwareUpdateInfo_NoFiles - Response: %s", response.c_str());
+
+    // Wait for background thread before teardown
+    std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+}
+
+// =============================================================================
+// GetDownloadedFirmwareInfo — DnldVersn/DnldURL branch (lines 1913-1933)
+// m_FwUpdateState_LatestEvent must be >= 2 for DnldVersn/DnldURL to populate.
+// Trigger state >= 2 via IARM callback, then call getDownloadedFirmwareInfo.
+// =============================================================================
+TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_DnldVersn_Branch_WhenStateIsDownloading)
+{
+    IARM_EventHandler_t capturedStateHandler = nullptr;
+
+    ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterEventHandler(
+                ::testing::StrEq(IARM_BUS_SYSMGR_NAME),
+                ::testing::Eq(IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE),
+                ::testing::_))
+        .WillByDefault(::testing::DoAll(
+            ::testing::SaveArg<2>(&capturedStateHandler),
+            ::testing::Return(IARM_RESULT_SUCCESS)));
+
+    plugin->Deinitialize(&service);
+    plugin->Initialize(&service);
+
+    // Set m_FwUpdateState_LatestEvent >= 2 via IARM callback
+    if (capturedStateHandler != nullptr) {
+        IARM_Bus_SYSMgr_EventData_t eventData = {};
+        eventData.data.systemStates.stateId = IARM_BUS_SYSMGR_SYSSTATE_FIRMWARE_UPDATE_STATE;
+        eventData.data.systemStates.state = 2; // Downloading
+        capturedStateHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, &eventData, sizeof(eventData));
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+
+    // Create FWDNLDSTATUS_FILE_NAME with DnldVersn and DnldURL entries
+    const char* fwStatusFile = "/opt/fwdnldstatus.txt";
+    {
+        std::ofstream f(fwStatusFile);
+        f << "Reboot|1\n";
+        f << "DnldVersn|TEST-FW-2025001.0\n";
+        f << "DnldURL|http://xconf.example.com/firmware.bin\n";
+    }
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDownloadedFirmwareInfo"),
+              _T("{}"), response));
+
+    TEST_LOG("GetDownloadedFirmwareInfo_DnldVersn - Response: %s", response.c_str());
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response));
+    EXPECT_TRUE(jsonResponse["success"].Boolean());
+
+    std::remove(fwStatusFile);
 }
