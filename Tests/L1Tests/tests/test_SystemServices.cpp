@@ -11858,11 +11858,6 @@ TEST_F(SystemServicesIarmCbTest, AbortLogUpload_NoPidRunning_ReturnsErrorNone)
 }
 
 // =============================================================================
-// 6. updateDuration — static function
-//    m_remainingDuration > 0 path: decrement
-//    m_remainingDuration == 0 path: stop timer + SetMode("NORMAL")
-// =============================================================================
-// =============================================================================
 // 6 & 7. updateDuration + startModeTimer — static functions.
 //
 // THREAD SAFETY RULE (from existing test comments):
