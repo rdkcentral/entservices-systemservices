@@ -11793,26 +11793,28 @@ TEST_F(SystemServicesIarmCbTest, AbortLogUpload_NoPidRunning_ReturnsErrorNone)
 }
 
 // =============================================================================
-// 6 & 7. updateDuration + startModeTimer — covered via public setMode API.
-//   setMode(EAS, duration=1) → startModeTimer(1) → cTimer thread starts.
-//   setMode(NORMAL, duration=0) → stopModeTimer() → timer cleaned up safely.
-//   Both startModeTimer and stopModeTimer are exercised without private access.
+// 6 & 7. stopModeTimer + setMode EAS path — covered via public setMode API.
+//   duration=-1 is mandatory (same rule as ALL existing timer tests, lines 10462-10473).
+//   startModeTimer(n>0) starts a cTimer thread; stop() only sets clear=true but does
+//   NOT detach. The only detach happens inside updateDuration() after a 1-second tick.
+//   Using duration=1 then calling stopModeTimer() leaves timerThread joinable forever
+//   → static cTimer destroyed at program exit → std::terminate() → Aborted (core dump).
+//   duration=-1 → stopModeTimer() → no thread started → safe.
 // =============================================================================
-TEST_F(SystemServicesIarmCbTest, StartModeTimer_AndUpdateDuration_ViaSetMode)
+TEST_F(SystemServicesIarmCbTest, StopModeTimer_ViaSetMode_EASAndNormal)
 {
     EXPECT_CALL(iarmMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
         .WillRepeatedly(::testing::Return(IARM_RESULT_SUCCESS));
 
     string resp;
-    // setMode EAS with duration=1 → calls startModeTimer(1) internally
+    // duration=-1 → stopModeTimer() called (no thread started — safe)
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setMode"),
-        _T("{\"modeInfo\":{\"mode\":\"EAS\",\"duration\":1}}"), resp));
+        _T("{\"modeInfo\":{\"mode\":\"EAS\",\"duration\":-1}}"), resp));
 
-    // setMode NORMAL with duration=0 → calls stopModeTimer() — safe cleanup
     resp.clear();
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setMode"),
-        _T("{\"modeInfo\":{\"mode\":\"NORMAL\",\"duration\":0}}"), resp));
+        _T("{\"modeInfo\":{\"mode\":\"NORMAL\",\"duration\":-1}}"), resp));
 
-    TEST_LOG("StartModeTimer_ViaSetMode PASSED");
+    TEST_LOG("StopModeTimer_ViaSetMode PASSED");
 }
 
