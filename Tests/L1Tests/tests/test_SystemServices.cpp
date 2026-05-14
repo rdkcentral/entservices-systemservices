@@ -10700,9 +10700,8 @@ public:
 // =============================================================================
 TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_AllSources_True_CoversFieldChecks)
 {
-    EXPECT_CALL(PowerManagerMock::Mock(), SetWakeupSourceConfig(::testing::_))
-        .Times(::testing::AnyNumber())
-        .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
+    ON_CALL(PowerManagerMock::Mock(), SetWakeupSourceConfig(::testing::_))
+        .WillByDefault(::testing::Return(Core::ERROR_NONE));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection,
               _T("setWakeupSrcConfiguration"),
@@ -10988,22 +10987,19 @@ TEST_F(SystemServicesTest, GetBootTypeInfo_AllBootTypes_CoversAllMapEntries)
 // =============================================================================
 TEST_F(SystemServicesTest, GetDeviceInfo_ModelNumber_WithDeviceInfoPlugin)
 {
-    // Use ON_CALL+WillByDefault (not EXPECT_CALL+WillOnce) to avoid storing an
-    // expectation record that holds &deviceInfoMock pointer in GMock's history.
-    // Under valgrind --fair-sched=try the service mock is destroyed after the test
-    // function returns (and deviceInfoMock is already gone), and GMock's destructor
-    // would read the stored EXPECT_CALL record — valgrind flags this as stale-stack access.
-    ::testing::NiceMock<DeviceInfoImplementationMock> deviceInfoMock;
+    // Heap-allocate so service (fixture member, outlives test body) does not hold
+    // a dangling stack pointer in its ON_CALL default-action table.
+    auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
-        .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(&deviceInfoMock)));
-    ON_CALL(deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
-    ON_CALL(deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
-    ON_CALL(deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+        .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
+    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(*deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(*deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
     Exchange::IDeviceInfo::DeviceModelNo modelNo;
     modelNo.sku = "TEST-MODEL-123";
-    ON_CALL(deviceInfoMock, Sku(::testing::_))
+    ON_CALL(*deviceInfoMock, Sku(::testing::_))
         .WillByDefault(::testing::DoAll(
             ::testing::SetArgReferee<0>(modelNo),
             ::testing::Return(Core::ERROR_NONE)));
@@ -11019,21 +11015,22 @@ TEST_F(SystemServicesTest, GetDeviceInfo_ModelNumber_WithDeviceInfoPlugin)
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
         .WillByDefault(::testing::Return(nullptr));
+    delete deviceInfoMock;
 }
 
 TEST_F(SystemServicesTest, GetDeviceInfo_DeviceType_WithDeviceInfoPlugin)
 {
-    ::testing::NiceMock<DeviceInfoImplementationMock> deviceInfoMock;
+    auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
-        .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(&deviceInfoMock)));
-    ON_CALL(deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
-    ON_CALL(deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
-    ON_CALL(deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+        .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
+    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(*deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(*deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
     Exchange::IDeviceInfo::DeviceTypeInfos typeInfos;
     typeInfos.devicetype = Exchange::IDeviceInfo::DEVICE_TYPE_IPSTB;
-    ON_CALL(deviceInfoMock, DeviceType(::testing::_))
+    ON_CALL(*deviceInfoMock, DeviceType(::testing::_))
         .WillByDefault(::testing::DoAll(
             ::testing::SetArgReferee<0>(typeInfos),
             ::testing::Return(Core::ERROR_NONE)));
@@ -11049,21 +11046,22 @@ TEST_F(SystemServicesTest, GetDeviceInfo_DeviceType_WithDeviceInfoPlugin)
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
         .WillByDefault(::testing::Return(nullptr));
+    delete deviceInfoMock;
 }
 
 TEST_F(SystemServicesTest, GetDeviceInfo_EstbMac_WithDeviceInfoPlugin)
 {
-    ::testing::NiceMock<DeviceInfoImplementationMock> deviceInfoMock;
+    auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
-        .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(&deviceInfoMock)));
-    ON_CALL(deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
-    ON_CALL(deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
-    ON_CALL(deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+        .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
+    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(*deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(*deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
     Exchange::IDeviceInfo::StbMac stbMac;
     stbMac.estbMac = "AA:BB:CC:DD:EE:FF";
-    ON_CALL(deviceInfoMock, EstbMac(::testing::_))
+    ON_CALL(*deviceInfoMock, EstbMac(::testing::_))
         .WillByDefault(::testing::DoAll(
             ::testing::SetArgReferee<0>(stbMac),
             ::testing::Return(Core::ERROR_NONE)));
@@ -11079,21 +11077,22 @@ TEST_F(SystemServicesTest, GetDeviceInfo_EstbMac_WithDeviceInfoPlugin)
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
         .WillByDefault(::testing::Return(nullptr));
+    delete deviceInfoMock;
 }
 
 TEST_F(SystemServicesTest, GetDeviceInfo_EthMac_WithDeviceInfoPlugin)
 {
-    ::testing::NiceMock<DeviceInfoImplementationMock> deviceInfoMock;
+    auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
-        .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(&deviceInfoMock)));
-    ON_CALL(deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
-    ON_CALL(deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
-    ON_CALL(deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+        .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
+    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(*deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(*deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
     Exchange::IDeviceInfo::EthernetMac ethMac;
     ethMac.ethMac = "11:22:33:44:55:66";
-    ON_CALL(deviceInfoMock, EthMac(::testing::_))
+    ON_CALL(*deviceInfoMock, EthMac(::testing::_))
         .WillByDefault(::testing::DoAll(
             ::testing::SetArgReferee<0>(ethMac),
             ::testing::Return(Core::ERROR_NONE)));
@@ -11109,21 +11108,22 @@ TEST_F(SystemServicesTest, GetDeviceInfo_EthMac_WithDeviceInfoPlugin)
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
         .WillByDefault(::testing::Return(nullptr));
+    delete deviceInfoMock;
 }
 
 TEST_F(SystemServicesTest, GetDeviceInfo_WifiMac_WithDeviceInfoPlugin)
 {
-    ::testing::NiceMock<DeviceInfoImplementationMock> deviceInfoMock;
+    auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
-        .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(&deviceInfoMock)));
-    ON_CALL(deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
-    ON_CALL(deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
-    ON_CALL(deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+        .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
+    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(*deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(*deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
     Exchange::IDeviceInfo::WiFiMac wifiMac;
     wifiMac.wifiMac = "AA:BB:CC:11:22:33";
-    ON_CALL(deviceInfoMock, WifiMac(::testing::_))
+    ON_CALL(*deviceInfoMock, WifiMac(::testing::_))
         .WillByDefault(::testing::DoAll(
             ::testing::SetArgReferee<0>(wifiMac),
             ::testing::Return(Core::ERROR_NONE)));
@@ -11139,21 +11139,22 @@ TEST_F(SystemServicesTest, GetDeviceInfo_WifiMac_WithDeviceInfoPlugin)
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
         .WillByDefault(::testing::Return(nullptr));
+    delete deviceInfoMock;
 }
 
 TEST_F(SystemServicesTest, GetDeviceInfo_BoxIP_WithDeviceInfoPlugin)
 {
-    ::testing::NiceMock<DeviceInfoImplementationMock> deviceInfoMock;
+    auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
-        .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(&deviceInfoMock)));
-    ON_CALL(deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
-    ON_CALL(deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
-    ON_CALL(deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+        .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
+    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(*deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(*deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
     Exchange::IDeviceInfo::StbIp stbIp;
     stbIp.estbIp = "192.168.1.100";
-    ON_CALL(deviceInfoMock, EstbIp(::testing::_))
+    ON_CALL(*deviceInfoMock, EstbIp(::testing::_))
         .WillByDefault(::testing::DoAll(
             ::testing::SetArgReferee<0>(stbIp),
             ::testing::Return(Core::ERROR_NONE)));
@@ -11169,21 +11170,22 @@ TEST_F(SystemServicesTest, GetDeviceInfo_BoxIP_WithDeviceInfoPlugin)
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
         .WillByDefault(::testing::Return(nullptr));
+    delete deviceInfoMock;
 }
 
 TEST_F(SystemServicesTest, GetDeviceInfo_FirmwareVersion_WithDeviceInfoPlugin)
 {
-    ::testing::NiceMock<DeviceInfoImplementationMock> deviceInfoMock;
+    auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
-        .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(&deviceInfoMock)));
-    ON_CALL(deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
-    ON_CALL(deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
-    ON_CALL(deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+        .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
+    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(*deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(*deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
     Exchange::IDeviceInfo::FirmwareversionInfo fwInfo;
     fwInfo.imagename = "TEST-RDK-2025001.1p1";
-    ON_CALL(deviceInfoMock, FirmwareVersion(::testing::_))
+    ON_CALL(*deviceInfoMock, FirmwareVersion(::testing::_))
         .WillByDefault(::testing::DoAll(
             ::testing::SetArgReferee<0>(fwInfo),
             ::testing::Return(Core::ERROR_NONE)));
@@ -11199,21 +11201,22 @@ TEST_F(SystemServicesTest, GetDeviceInfo_FirmwareVersion_WithDeviceInfoPlugin)
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
         .WillByDefault(::testing::Return(nullptr));
+    delete deviceInfoMock;
 }
 
 TEST_F(SystemServicesTest, GetDeviceInfo_FriendlyId_WithDeviceInfoPlugin)
 {
-    ::testing::NiceMock<DeviceInfoImplementationMock> deviceInfoMock;
+    auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
-        .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(&deviceInfoMock)));
-    ON_CALL(deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
-    ON_CALL(deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
-    ON_CALL(deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+        .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
+    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(*deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(*deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
     Exchange::IDeviceInfo::DeviceModel deviceModel;
     deviceModel.model = "TestFriendlyModel";
-    ON_CALL(deviceInfoMock, Model(::testing::_))
+    ON_CALL(*deviceInfoMock, Model(::testing::_))
         .WillByDefault(::testing::DoAll(
             ::testing::SetArgReferee<0>(deviceModel),
             ::testing::Return(Core::ERROR_NONE)));
@@ -11229,62 +11232,63 @@ TEST_F(SystemServicesTest, GetDeviceInfo_FriendlyId_WithDeviceInfoPlugin)
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
         .WillByDefault(::testing::Return(nullptr));
+    delete deviceInfoMock;
 }
 
 TEST_F(SystemServicesTest, GetDeviceInfo_AllFields_WithDeviceInfoPlugin_CoversAllBranches)
 {
     // Empty params array → queries ALL fields → covers all branches in GetDeviceInfo
-    ::testing::NiceMock<DeviceInfoImplementationMock> deviceInfoMock;
+    auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
-        .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(&deviceInfoMock)));
-    ON_CALL(deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
-    ON_CALL(deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
-    ON_CALL(deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+        .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
+    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(*deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(*deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
     Exchange::IDeviceInfo::DeviceModelNo modelNo;
     modelNo.sku = "SKU-12345";
-    ON_CALL(deviceInfoMock, Sku(::testing::_))
+    ON_CALL(*deviceInfoMock, Sku(::testing::_))
         .WillByDefault(::testing::DoAll(::testing::SetArgReferee<0>(modelNo), ::testing::Return(Core::ERROR_NONE)));
 
     Exchange::IDeviceInfo::DeviceMake deviceMake;
     deviceMake.make = "TestMfg";
-    ON_CALL(deviceInfoMock, Make(::testing::_))
+    ON_CALL(*deviceInfoMock, Make(::testing::_))
         .WillByDefault(::testing::DoAll(::testing::SetArgReferee<0>(deviceMake), ::testing::Return(Core::ERROR_NONE)));
 
     Exchange::IDeviceInfo::FirmwareversionInfo fwInfo;
     fwInfo.imagename = "TEST-IMAGE-001";
-    ON_CALL(deviceInfoMock, FirmwareVersion(::testing::_))
+    ON_CALL(*deviceInfoMock, FirmwareVersion(::testing::_))
         .WillByDefault(::testing::DoAll(::testing::SetArgReferee<0>(fwInfo), ::testing::Return(Core::ERROR_NONE)));
 
     Exchange::IDeviceInfo::DeviceTypeInfos typeInfos;
     typeInfos.devicetype = Exchange::IDeviceInfo::DEVICE_TYPE_IPTV;
-    ON_CALL(deviceInfoMock, DeviceType(::testing::_))
+    ON_CALL(*deviceInfoMock, DeviceType(::testing::_))
         .WillByDefault(::testing::DoAll(::testing::SetArgReferee<0>(typeInfos), ::testing::Return(Core::ERROR_NONE)));
 
     Exchange::IDeviceInfo::DeviceModel deviceModel;
     deviceModel.model = "FriendlyTestModel";
-    ON_CALL(deviceInfoMock, Model(::testing::_))
+    ON_CALL(*deviceInfoMock, Model(::testing::_))
         .WillByDefault(::testing::DoAll(::testing::SetArgReferee<0>(deviceModel), ::testing::Return(Core::ERROR_NONE)));
 
     Exchange::IDeviceInfo::StbMac stbMac;
     stbMac.estbMac = "AA:BB:CC:DD:EE:FF";
-    ON_CALL(deviceInfoMock, EstbMac(::testing::_))
+    ON_CALL(*deviceInfoMock, EstbMac(::testing::_))
         .WillByDefault(::testing::DoAll(::testing::SetArgReferee<0>(stbMac), ::testing::Return(Core::ERROR_NONE)));
 
     Exchange::IDeviceInfo::EthernetMac ethMac;
     ethMac.ethMac = "11:22:33:44:55:66";
-    ON_CALL(deviceInfoMock, EthMac(::testing::_))
+    ON_CALL(*deviceInfoMock, EthMac(::testing::_))
         .WillByDefault(::testing::DoAll(::testing::SetArgReferee<0>(ethMac), ::testing::Return(Core::ERROR_NONE)));
 
     Exchange::IDeviceInfo::WiFiMac wifiMac;
     wifiMac.wifiMac = "77:88:99:AA:BB:CC";
-    ON_CALL(deviceInfoMock, WifiMac(::testing::_))
+    ON_CALL(*deviceInfoMock, WifiMac(::testing::_))
         .WillByDefault(::testing::DoAll(::testing::SetArgReferee<0>(wifiMac), ::testing::Return(Core::ERROR_NONE)));
 
     Exchange::IDeviceInfo::StbIp stbIp;
     stbIp.estbIp = "10.0.0.1";
-    ON_CALL(deviceInfoMock, EstbIp(::testing::_))
+    ON_CALL(*deviceInfoMock, EstbIp(::testing::_))
         .WillByDefault(::testing::DoAll(::testing::SetArgReferee<0>(stbIp), ::testing::Return(Core::ERROR_NONE)));
 
     // Also create device.properties so make/build_type branches can execute
@@ -11299,6 +11303,7 @@ TEST_F(SystemServicesTest, GetDeviceInfo_AllFields_WithDeviceInfoPlugin_CoversAl
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
         .WillByDefault(::testing::Return(nullptr));
+    delete deviceInfoMock;
 }
 
 TEST_F(SystemServicesTest, GetDeviceInfo_UnallowableChars_ReturnsEarlyWithMessage)
@@ -11389,17 +11394,17 @@ TEST_F(SystemServicesTest, GetSerialNumber_WithDeviceInfoPlugin_SuccessPath)
 // =============================================================================
 TEST_F(SystemServicesTest, GetStbVersionString_ViaGetSystemVersions_WithDeviceInfoPlugin)
 {
-    ::testing::NiceMock<DeviceInfoImplementationMock> deviceInfoMock;
+    auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
-        .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(&deviceInfoMock)));
-    ON_CALL(deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
-    ON_CALL(deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
-    ON_CALL(deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+        .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
+    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(*deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(*deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
     Exchange::IDeviceInfo::FirmwareversionInfo fwInfo;
     fwInfo.imagename = "RDK-2025001.0p1s1";
-    ON_CALL(deviceInfoMock, FirmwareVersion(::testing::_))
+    ON_CALL(*deviceInfoMock, FirmwareVersion(::testing::_))
         .WillByDefault(::testing::DoAll(
             ::testing::SetArgReferee<0>(fwInfo),
             ::testing::Return(Core::ERROR_NONE)));
@@ -11415,6 +11420,7 @@ TEST_F(SystemServicesTest, GetStbVersionString_ViaGetSystemVersions_WithDeviceIn
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
         .WillByDefault(::testing::Return(nullptr));
+    delete deviceInfoMock;
 }
 
 
