@@ -440,10 +440,8 @@ protected:
     Exchange::IPowerManager::IModeChangedNotification* m_pmModeNotif = nullptr;
     // Saved during Initialize() to allow tests to trigger OnRebootBegin via IRebootNotification.
     Exchange::IPowerManager::IRebootNotification* m_pmRebootNotif = nullptr;
-    // Captured _timerStatusEventHandler (registered by InitializeIARM when ENABLE_SYSTIMEMGR_SUPPORT
-    // is defined). Used in Dispatch_OnTimeStatusChanged_* tests to fire the real IARM path
-    // rather than calling OnTimeStatusChanged() directly (which stores dangling c_str() in Thunder JSON).
-    IARM_EventHandler_t p_timerStatusEventHandler = nullptr;
+    // (No per-handler captures needed: Dispatch_OnTimeStatusChanged_* tests call
+    //  OnTimeStatusChanged() directly with short SSO strings which are safe with Thunder JSON.)
 
     SystemServicesTest()
         : SystemServicesInitializeTest()
@@ -477,22 +475,10 @@ protected:
             .WillByDefault(::testing::Return(IARM_RESULT_SUCCESS));
         ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterEventHandler(::testing::_, ::testing::_, ::testing::_))
             .WillByDefault(::testing::Return(IARM_RESULT_SUCCESS));
-        // Capture _timerStatusEventHandler so tests can fire it with controlled data.
-        // This prevents Dispatch_OnTimeStatusChanged tests from crashing due to Thunder JSON
-        // storing const char* from by-value std::string params that go out of scope before
-        // the WorkerPool Job runs (produces 14k-char dangling string → offset=88041 SIGSEGV).
-        ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterEventHandler(
-                    ::testing::StrEq(IARM_BUS_SYSTIME_MGR_NAME), ::testing::_, ::testing::_))
-            .WillByDefault(::testing::DoAll(
-                ::testing::SaveArg<2>(&p_timerStatusEventHandler),
-                ::testing::Return(IARM_RESULT_SUCCESS)));
 
-        // Zero-initialise the output buffer arg before returning success.
-        // Without this, any code path that reads struct fields from IARM_Bus_Call
-        // (e.g. GetTimeStatus reads TimerMsg.currentTime[128]) gets raw uninitialised
-        // stack bytes.  Those bytes end up as std::string content with invalid UTF-8
-        // sequences (e.g. 0xDD 0x90 = U+0750) that crash JSON::String::Serialize inside
-        // the WorkerPool thread when OnTimeStatusChanged dispatches the notification.
+        // Zero-initialise every IARM_Bus_Call output buffer so that production code
+        // reading struct fields (e.g. TimerMsg, IARM_Bus_MFRLib_GetSerializedData_Param_t)
+        // never sees garbage stack bytes.
         ON_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
             .WillByDefault(::testing::Invoke(
                 [](const char* /*owner*/, const char* /*method*/, void* arg, size_t argLen) -> IARM_Result_t {
@@ -10275,14 +10261,10 @@ TEST_F(SystemServicesTest, Dispatch_OnLogUpload_AbortedStatus_ReachesNotificatio
 TEST_F(SystemServicesTest, Dispatch_OnTimeStatusChanged_ReachesNotification)
 {
 #ifdef ENABLE_SYSTIMEMGR_SUPPORT
-    // Call OnTimeStatusChanged() directly with short (≤15 char, SSO-eligible) string literals.
-    // SSO keeps the string buffers inside the std::string objects on the stack frame of
-    // OnTimeStatusChanged().  While WaitForRequestStatus() blocks this thread, that stack frame
-    // is not reused, so the pointer stored by Thunder's Core::JSON::String remains readable
-    // until the WorkerPool Job completes — no dangling-pointer SIGSEGV.
-    // NOTE: do NOT go through p_timerStatusEventHandler here: that path creates
-    // std::string(buf, 128) objects (128 chars → heap-allocated) which are freed when
-    // _timerStatusEventHandler returns, producing a dangling c_str() pointer in the Job.
+    // Call OnTimeStatusChanged() directly with short (≤15 char) strings.
+    // Short strings use SSO (stack-local buffer). While WaitForRequestStatus() blocks
+    // this thread, the stack frame is not reused, so Thunder's Core::JSON::String
+    // c_str() pointer remains readable until the WorkerPool Job completes — no SIGSEGV.
     ASSERT_NE(nullptr, m_sysServices);
     ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
 
