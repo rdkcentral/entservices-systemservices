@@ -10700,8 +10700,9 @@ public:
 // =============================================================================
 TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_AllSources_True_CoversFieldChecks)
 {
-    ON_CALL(PowerManagerMock::Mock(), SetWakeupSourceConfig(::testing::_))
-        .WillByDefault(::testing::Return(Core::ERROR_NONE));
+    EXPECT_CALL(PowerManagerMock::Mock(), SetWakeupSourceConfig(::testing::_))
+        .Times(::testing::AnyNumber())
+        .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection,
               _T("setWakeupSrcConfiguration"),
@@ -10991,6 +10992,20 @@ TEST_F(SystemServicesTest, GetDeviceInfo_ModelNumber_WithDeviceInfoPlugin)
     // a dangling stack pointer in its ON_CALL default-action table.
     auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
 
+    // When DeviceInfo plugin is set up, empty queryParam causes ALL fields to be queried,
+    // including bluetooth_mac which calls v_secure_popen. Mock it to return a valid empty
+    // stream so the call succeeds (same pattern as L2 WithDeviceInfo fixture).
+    ON_CALL(*p_wrapsMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_))
+        .WillByDefault(::testing::Invoke(
+            [](const char*, const char*, va_list) -> FILE* {
+                return fopen("/dev/null", "r");
+            }));
+    ON_CALL(*p_wrapsMock, v_secure_pclose(::testing::_))
+        .WillByDefault(::testing::Invoke(
+            [](FILE* f) -> int {
+                return f ? fclose(f) : 0;
+            }));
+
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
         .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
     ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
@@ -11021,6 +11036,11 @@ TEST_F(SystemServicesTest, GetDeviceInfo_ModelNumber_WithDeviceInfoPlugin)
 TEST_F(SystemServicesTest, GetDeviceInfo_DeviceType_WithDeviceInfoPlugin)
 {
     auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
+
+    ON_CALL(*p_wrapsMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_))
+        .WillByDefault(::testing::Invoke([](const char*, const char*, va_list) -> FILE* { return fopen("/dev/null", "r"); }));
+    ON_CALL(*p_wrapsMock, v_secure_pclose(::testing::_))
+        .WillByDefault(::testing::Invoke([](FILE* f) -> int { return f ? fclose(f) : 0; }));
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
         .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
@@ -11053,6 +11073,11 @@ TEST_F(SystemServicesTest, GetDeviceInfo_EstbMac_WithDeviceInfoPlugin)
 {
     auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
 
+    ON_CALL(*p_wrapsMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_))
+        .WillByDefault(::testing::Invoke([](const char*, const char*, va_list) -> FILE* { return fopen("/dev/null", "r"); }));
+    ON_CALL(*p_wrapsMock, v_secure_pclose(::testing::_))
+        .WillByDefault(::testing::Invoke([](FILE* f) -> int { return f ? fclose(f) : 0; }));
+
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
         .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
     ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
@@ -11083,6 +11108,11 @@ TEST_F(SystemServicesTest, GetDeviceInfo_EstbMac_WithDeviceInfoPlugin)
 TEST_F(SystemServicesTest, GetDeviceInfo_EthMac_WithDeviceInfoPlugin)
 {
     auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
+
+    ON_CALL(*p_wrapsMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_))
+        .WillByDefault(::testing::Invoke([](const char*, const char*, va_list) -> FILE* { return fopen("/dev/null", "r"); }));
+    ON_CALL(*p_wrapsMock, v_secure_pclose(::testing::_))
+        .WillByDefault(::testing::Invoke([](FILE* f) -> int { return f ? fclose(f) : 0; }));
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
         .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
@@ -11115,6 +11145,11 @@ TEST_F(SystemServicesTest, GetDeviceInfo_WifiMac_WithDeviceInfoPlugin)
 {
     auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
 
+    ON_CALL(*p_wrapsMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_))
+        .WillByDefault(::testing::Invoke([](const char*, const char*, va_list) -> FILE* { return fopen("/dev/null", "r"); }));
+    ON_CALL(*p_wrapsMock, v_secure_pclose(::testing::_))
+        .WillByDefault(::testing::Invoke([](FILE* f) -> int { return f ? fclose(f) : 0; }));
+
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
         .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
     ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
@@ -11145,6 +11180,11 @@ TEST_F(SystemServicesTest, GetDeviceInfo_WifiMac_WithDeviceInfoPlugin)
 TEST_F(SystemServicesTest, GetDeviceInfo_BoxIP_WithDeviceInfoPlugin)
 {
     auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
+
+    ON_CALL(*p_wrapsMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_))
+        .WillByDefault(::testing::Invoke([](const char*, const char*, va_list) -> FILE* { return fopen("/dev/null", "r"); }));
+    ON_CALL(*p_wrapsMock, v_secure_pclose(::testing::_))
+        .WillByDefault(::testing::Invoke([](FILE* f) -> int { return f ? fclose(f) : 0; }));
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
         .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
@@ -11177,6 +11217,11 @@ TEST_F(SystemServicesTest, GetDeviceInfo_FirmwareVersion_WithDeviceInfoPlugin)
 {
     auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
 
+    ON_CALL(*p_wrapsMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_))
+        .WillByDefault(::testing::Invoke([](const char*, const char*, va_list) -> FILE* { return fopen("/dev/null", "r"); }));
+    ON_CALL(*p_wrapsMock, v_secure_pclose(::testing::_))
+        .WillByDefault(::testing::Invoke([](FILE* f) -> int { return f ? fclose(f) : 0; }));
+
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
         .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
     ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
@@ -11207,6 +11252,11 @@ TEST_F(SystemServicesTest, GetDeviceInfo_FirmwareVersion_WithDeviceInfoPlugin)
 TEST_F(SystemServicesTest, GetDeviceInfo_FriendlyId_WithDeviceInfoPlugin)
 {
     auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
+
+    ON_CALL(*p_wrapsMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_))
+        .WillByDefault(::testing::Invoke([](const char*, const char*, va_list) -> FILE* { return fopen("/dev/null", "r"); }));
+    ON_CALL(*p_wrapsMock, v_secure_pclose(::testing::_))
+        .WillByDefault(::testing::Invoke([](FILE* f) -> int { return f ? fclose(f) : 0; }));
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
         .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
@@ -11239,6 +11289,11 @@ TEST_F(SystemServicesTest, GetDeviceInfo_AllFields_WithDeviceInfoPlugin_CoversAl
 {
     // Empty params array → queries ALL fields → covers all branches in GetDeviceInfo
     auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
+
+    ON_CALL(*p_wrapsMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_))
+        .WillByDefault(::testing::Invoke([](const char*, const char*, va_list) -> FILE* { return fopen("/dev/null", "r"); }));
+    ON_CALL(*p_wrapsMock, v_secure_pclose(::testing::_))
+        .WillByDefault(::testing::Invoke([](FILE* f) -> int { return f ? fclose(f) : 0; }));
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
         .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
@@ -11416,7 +11471,7 @@ TEST_F(SystemServicesTest, GetStbVersionString_ViaGetSystemVersions_WithDeviceIn
     JsonObject jsonResponse3;
     ASSERT_TRUE(jsonResponse3.FromString(response));
     EXPECT_TRUE(jsonResponse3["success"].Boolean());
-    EXPECT_EQ(std::string("RDK-2025001.0p1s1"), jsonResponse3["imageVersion"].String());
+    EXPECT_EQ(std::string("RDK-2025001.0p1s1"), jsonResponse3["stbVersion"].String());
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
         .WillByDefault(::testing::Return(nullptr));
