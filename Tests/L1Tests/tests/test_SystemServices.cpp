@@ -470,10 +470,12 @@ protected:
             .WillByDefault(::testing::Return(IARM_RESULT_SUCCESS));
         ON_CALL(*p_iarmBusMock, IARM_Bus_RegisterEventHandler(::testing::_, ::testing::_, ::testing::_))
             .WillByDefault(::testing::Return(IARM_RESULT_SUCCESS));
-
-        // Zero-initialise every IARM_Bus_Call output buffer so that production code
-        // reading struct fields (e.g. TimerMsg, IARM_Bus_MFRLib_GetSerializedData_Param_t)
-        // never sees garbage stack bytes.
+        // Zero-initialise the output buffer arg before returning success.
+        // Without this, any code path that reads struct fields from IARM_Bus_Call
+        // (e.g. GetTimeStatus reads TimerMsg.currentTime[128]) gets raw uninitialised
+        // stack bytes.  Those bytes end up as std::string content with invalid UTF-8
+        // sequences (e.g. 0xDD 0x90 = U+0750) that crash JSON::String::Serialize inside
+        // the WorkerPool thread when OnTimeStatusChanged dispatches the notification.
         ON_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
             .WillByDefault(::testing::Invoke(
                 [](const char* /*owner*/, const char* /*method*/, void* arg, size_t argLen) -> IARM_Result_t {
@@ -10251,25 +10253,6 @@ TEST_F(SystemServicesTest, Dispatch_OnLogUpload_AbortedStatus_ReachesNotificatio
     ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
     Plugin::SystemServicesImplementation::_instance->OnLogUpload(0 /*LOG_UPLOAD_STATUS_ABORTED*/);
     TEST_LOG("Dispatch_OnLogUpload_Aborted_LogErrPath PASSED");
-}
-
-TEST_F(SystemServicesTest, Dispatch_OnTimeStatusChanged_ReachesNotification)
-{
-    // SKIPPED: OnTimeStatusChanged() takes strings by VALUE, assigns them to
-    // JsonObject params, then dispatches to WorkerPool asynchronously.
-    // Thunder's Core::JSON::String stores raw c_str() pointer from the by-value
-    // local strings.  When OnTimeStatusChanged() returns, the locals are destroyed
-    // and the Job holds dangling pointers → SIGSEGV in WorkerPool thread
-    // (JSON::String::Serialize crashes at offset=79849 reading freed heap/stack).
-    // This is a production code design bug in OnTimeStatusChanged(); cannot be
-    // safely tested at L1 without modifying production code.
-    GTEST_SKIP() << "OnTimeStatusChanged dispatch stores dangling c_str() pointers in WorkerPool Job; SIGSEGV unavoidable";
-}
-
-TEST_F(SystemServicesTest, Dispatch_OnTimeStatusChanged_PoorQuality_ReachesNotification)
-{
-    // SKIPPED: same root cause as Dispatch_OnTimeStatusChanged_ReachesNotification.
-    GTEST_SKIP() << "OnTimeStatusChanged dispatch stores dangling c_str() pointers in WorkerPool Job; SIGSEGV unavoidable";
 }
 
 TEST_F(SystemServicesTest, Dispatch_OnMacAddressesRetrieved_ReachesNotification)
