@@ -338,6 +338,8 @@ namespace WPEFramework
             static void startModeTimer(int duration);
             static void stopModeTimer();
             static void updateDuration();
+
+            friend class SystemServicesIarmCbTest;
             bool processTimeZones(std::string entry, JsonObject& out);
             void InitializePowerManager();
             void registerEventHandlers();

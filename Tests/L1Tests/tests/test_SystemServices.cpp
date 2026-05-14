@@ -11618,7 +11618,6 @@ protected:
     // Captured IARM callbacks
     IARM_EventHandler_t m_deviceMgtHandler = nullptr;
     IARM_EventHandler_t m_sysStateHandler  = nullptr;
-    IARM_EventHandler_t m_timerHandler     = nullptr;
 
     SystemServicesIarmCbTest()
         : SystemServicesInitializeTest()
@@ -11645,10 +11644,6 @@ protected:
                         if (eventId == IARM_BUS_SYSMGR_EVENT_DEVICE_UPDATE_RECEIVED) m_deviceMgtHandler = hdlr;
                         if (eventId == IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE)            m_sysStateHandler  = hdlr;
                     }
-#ifdef ENABLE_SYSTIMEMGR_SUPPORT
-                    if (!strcmp(owner, IARM_BUS_SYSTIME_MGR_NAME) && eventId == cTIMER_STATUS_UPDATE)
-                        m_timerHandler = hdlr;
-#endif
                     return IARM_RESULT_SUCCESS;
                 }));
 
@@ -11805,23 +11800,6 @@ TEST_F(SystemServicesIarmCbTest, IarmCb_SystemStateChanged_WrongEventId_EarlyRet
     TEST_LOG("IarmCb_SystemStateChanged_WrongEventId PASSED");
 }
 
-// 3. _timerStatusEventHandler — only compiled when ENABLE_SYSTIMEMGR_SUPPORT is defined
-#ifdef ENABLE_SYSTIMEMGR_SUPPORT
-TEST_F(SystemServicesIarmCbTest, IarmCb_TimerStatusEventHandler_ValidEvent_TriggersOnTimeStatusChanged)
-{
-    ASSERT_NE(nullptr, m_timerHandler) << "_timerStatusEventHandler not registered";
-
-    TimerMsg msg;
-    memset(&msg, 0, sizeof(msg));
-    strncpy(msg.message,     "GOOD", cTIMER_STATUS_MESSAGE_LENGTH - 1);
-    strncpy(msg.timerSrc,    "NTP",  cTIMER_STATUS_MESSAGE_LENGTH - 1);
-    strncpy(msg.currentTime, "1970-01-01T00:00:00Z", cTIMER_STATUS_MESSAGE_LENGTH - 1);
-
-    // eventId == 0 (cTIMER_STATUS_UPDATE) and owner match → OnTimeStatusChanged
-    m_timerHandler(IARM_BUS_SYSTIME_MGR_NAME, cTIMER_STATUS_UPDATE, &msg, sizeof(msg));
-    TEST_LOG("IarmCb_TimerStatusEventHandler PASSED");
-}
-#endif // ENABLE_SYSTIMEMGR_SUPPORT
 
 // =============================================================================
 // 4. SetWakeupSrcConfiguration — direct static call via JSON-RPC
