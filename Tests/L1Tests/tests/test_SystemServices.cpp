@@ -48,9 +48,6 @@
 #include "DeviceInfoMock.h"
 #include <interfaces/IMigration.h>
 #include "readprocMock.h"
-#include <unistd.h>
-#include <sys/wait.h>
-#include <signal.h>
 #include "ThunderPortability.h"
 #include "WorkerPoolImplementation.h"
 #include "COMLinkMock.h"
@@ -11697,11 +11694,23 @@ protected:
     {
         if (m_sysServices) { m_sysServices->Release(); m_sysServices = nullptr; }
         (void)system("rm -f /opt/secure/persistent/opflashstore/devicestate.txt");
+
         plugin->Deinitialize(&service);
+
+        // *** MUST follow same order as SystemServicesTest destructor ***
+        // Step 1: drop pluginImpl so ~SystemServicesImplementation runs (stops cTimer).
+        pluginImpl = Core::ProxyType<Plugin::SystemServicesImplementation>();
+
+        // Step 2: drain WorkerPool (joins threads, processes pending Jobs).
+        workerPool.Release();
+
+        // Step 3: null global AFTER pool is drained.
+        Core::IWorkerPool::Assign(nullptr);
+
+        dispatcher->Deactivate();
         dispatcher->Release();
         PluginHost::IFactories::Assign(nullptr);
-        Core::IWorkerPool::Assign(nullptr);
-        workerPool->Stop();
+
         IarmBus::setImpl(nullptr);
         Wraps::setImpl(nullptr);
         ProcImpl::setImpl(nullptr);
@@ -11709,6 +11718,8 @@ protected:
         device::SleepMode::setImpl(nullptr);
         TelemetryApi::setImpl(nullptr);
         RfcApi::setImpl(nullptr);
+
+        PowerManagerMock::Delete();
     }
 };
 
@@ -11834,40 +11845,16 @@ TEST_F(SystemServicesIarmCbTest, SetWakeupSrcConfiguration_DirectImpl_VoiceSourc
 }
 
 // =============================================================================
-// 5. AbortLogUpload — m_uploadLogsPid != -1 path (active upload)
-//    Inject a non-(-1) pid by writing directly to the member via a real process.
+// 5. AbortLogUpload — no-upload-running path (m_uploadLogsPid == -1)
+//    Covers the LOGERR branch + ERROR_NONE return at the end of AbortLogUpload.
 // =============================================================================
-TEST_F(SystemServicesIarmCbTest, AbortLogUpload_WithActivePid_KillsAndReturnsSuccess)
+TEST_F(SystemServicesIarmCbTest, AbortLogUpload_NoPidRunning_ReturnsErrorNone)
 {
     ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance);
-
-    // Spawn a real background process whose pid we can inject
-    pid_t sleepPid = fork();
-    if (sleepPid == 0) {
-        // Child: pause indefinitely
-        pause();
-        _exit(0);
-    }
-    ASSERT_GT(sleepPid, 0) << "fork() failed";
-
-    // Inject the pid via the uploadLogsAsync API indirectly: set m_uploadLogsPid
-    // through initialization. Since there's no public setter we use the fact that
-    // AbortLogUpload uses m_uploadLogsPid directly.  We manipulate it by first
-    // setting it to the child pid and then calling abort.
-    // Direct member access is not available — use the atomic path:
-    // call logUploadAsync which sets m_uploadLogsPid but returns fast if binary absent.
-    // The only portable path: expose m_uploadLogsPid via friendship or mem-ptr.
-    // Since that's not available, use the fact that after UploadLogsAsync with a
-    // real binary the pid is set. Instead, we verify the existing -1 path is safe
-    // AND kill the forked child ourselves to avoid zombies.
-    kill(sleepPid, SIGKILL);
-    int status;
-    waitpid(sleepPid, &status, 0);
-
-    // Verify AbortLogUpload still returns ERROR_NONE when no upload is running
+    // m_uploadLogsPid starts as -1 → LOGERR branch → returns ERROR_NONE
     string resp;
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("abortLogUpload"), _T("{}"), resp));
-    TEST_LOG("AbortLogUpload_WithActivePid - Response: %s", resp.c_str());
+    TEST_LOG("AbortLogUpload_NoPidRunning - Response: %s", resp.c_str());
 }
 
 // =============================================================================
@@ -11875,56 +11862,37 @@ TEST_F(SystemServicesIarmCbTest, AbortLogUpload_WithActivePid_KillsAndReturnsSuc
 //    m_remainingDuration > 0 path: decrement
 //    m_remainingDuration == 0 path: stop timer + SetMode("NORMAL")
 // =============================================================================
-TEST_F(SystemServicesIarmCbTest, UpdateDuration_WhenRemainingPositive_Decrements)
+// =============================================================================
+// 6 & 7. updateDuration + startModeTimer — static functions.
+//
+// THREAD SAFETY RULE (from existing test comments):
+//   startModeTimer(N > 0) calls m_operatingModeTimer.start() which starts a
+//   cTimer background thread on the static m_operatingModeTimer.
+//   stopModeTimer() calls stop() but does NOT detach → thread stays joinable.
+//   A subsequent start() on a joinable thread calls std::terminate().
+//   SAFE cleanup path: updateDuration() with m_remainingDuration==0 calls
+//   both stop() AND detach(), making the timer safe for re-use.
+//
+// Strategy: startModeTimer(1) → thread starts.
+//   Call 1 of updateDuration(): m_remainingDuration 1→0 (decrement branch covered).
+//   Call 2 of updateDuration(): m_remainingDuration==0 → stop+detach+SetMode(NORMAL)
+//     (zero/stop branch covered, timer properly cleaned up).
+// =============================================================================
+TEST_F(SystemServicesIarmCbTest, UpdateDuration_DecrementThenStop_CoversAllBranches)
 {
     EXPECT_CALL(iarmMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
         .WillRepeatedly(::testing::Return(IARM_RESULT_SUCCESS));
 
-    // startModeTimer sets m_remainingDuration = duration
-    Plugin::SystemServicesImplementation::startModeTimer(5);
+    // startModeTimer(1): m_remainingDuration=1, cTimer thread starts.
+    Plugin::SystemServicesImplementation::startModeTimer(1);
 
-    // First updateDuration call: m_remainingDuration = 5 > 0 → decrements to 4
+    // Call 1: m_remainingDuration=1 > 0 → decrements to 0 (decrement branch).
     Plugin::SystemServicesImplementation::updateDuration();
 
-    // Cleanup: stop timer before test ends
-    string resp;
-    handler.Invoke(connection, _T("setMode"),
-        _T("{\"modeInfo\":{\"mode\":\"NORMAL\",\"duration\":0}}"), resp);
-    TEST_LOG("UpdateDuration_Decrement PASSED");
-}
-
-TEST_F(SystemServicesIarmCbTest, UpdateDuration_WhenRemainingZero_StopsTimerAndSetsNormal)
-{
-    EXPECT_CALL(iarmMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
-        .WillRepeatedly(::testing::Return(IARM_RESULT_SUCCESS));
-
-    // Set m_remainingDuration = 0 via startModeTimer(0)
-    Plugin::SystemServicesImplementation::startModeTimer(0);
-
-    // updateDuration with m_remainingDuration == 0 → stop + SetMode("NORMAL")
+    // Call 2: m_remainingDuration==0 → stop()+detach()+SetMode(NORMAL)
+    // (stop/detach branch). Timer is now safely detached — no std::terminate risk.
     Plugin::SystemServicesImplementation::updateDuration();
-    TEST_LOG("UpdateDuration_ZeroDuration_StopsTimer PASSED");
-}
 
-// =============================================================================
-// 7. startModeTimer — static function
-//    Positive duration sets m_remainingDuration and starts the timer.
-// =============================================================================
-TEST_F(SystemServicesIarmCbTest, StartModeTimer_PositiveDuration_SetsRemainingDuration)
-{
-    EXPECT_CALL(iarmMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
-        .WillRepeatedly(::testing::Return(IARM_RESULT_SUCCESS));
-
-    // startModeTimer(3) → m_remainingDuration=3, timer started
-    Plugin::SystemServicesImplementation::startModeTimer(3);
-
-    // Immediately call updateDuration to decrement (exercises both functions)
-    Plugin::SystemServicesImplementation::updateDuration(); // 3→2
-
-    // Restore cleanly
-    string resp;
-    handler.Invoke(connection, _T("setMode"),
-        _T("{\"modeInfo\":{\"mode\":\"NORMAL\",\"duration\":0}}"), resp);
-    TEST_LOG("StartModeTimer_PositiveDuration PASSED");
+    TEST_LOG("UpdateDuration_DecrementThenStop PASSED");
 }
 
