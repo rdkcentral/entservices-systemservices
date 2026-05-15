@@ -11617,13 +11617,14 @@ protected:
 
     // Captured IARM callbacks
     IARM_EventHandler_t m_deviceMgtHandler = nullptr;
-    // NOTE: m_sysStateHandler is intentionally absent.
-    // In CI coverage builds, IARM_BUS_SYSTIME_MGR_NAME="SYSMgr"=IARM_BUS_SYSMGR_NAME
-    // and cTIMER_STATUS_UPDATE=0=IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, so
-    // _timerStatusEventHandler (registered after _systemStateChanged) overwrites
-    // any captured m_sysStateHandler. Calling it with IARM_Bus_SYSMgr_EventData_t
-    // causes it to cast data as TimerMsg* with garbage strings → SIGSEGV in JSON
-    // serialization. _systemStateChanged is already covered by existing tests.
+    // m_sysStateHandler: FIRST handler registered for eventId==IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE(0)
+    // = _systemStateChanged. Captured before the second registration can overwrite it.
+    IARM_EventHandler_t m_sysStateHandler  = nullptr;
+    // m_timerHandler: SECOND handler registered for eventId==0. In CI coverage builds,
+    // IARM_BUS_SYSTIME_MGR_NAME=="SYSMgr"==IARM_BUS_SYSMGR_NAME and cTIMER_STATUS_UPDATE==0
+    // so _timerStatusEventHandler arrives second. In non-CI builds m_timerHandler stays
+    // nullptr and the corresponding test skips gracefully.
+    IARM_EventHandler_t m_timerHandler     = nullptr;
 
     SystemServicesIarmCbTest()
         : SystemServicesInitializeTest()
@@ -11646,10 +11647,18 @@ protected:
         ON_CALL(iarmMock, IARM_Bus_RegisterEventHandler(::testing::_, ::testing::_, ::testing::_))
             .WillByDefault(::testing::Invoke(
                 [this](const char* owner, IARM_EventId_t eventId, IARM_EventHandler_t hdlr) -> IARM_Result_t {
-                    // Only capture DEVICE_UPDATE_RECEIVED (eventId != 0) — safe in all builds.
-                    // Do NOT capture eventId==0 for SYSMGR_NAME: in CI coverage builds,
-                    // IARM_BUS_SYSTIME_MGR_NAME==IARM_BUS_SYSMGR_NAME and cTIMER_STATUS_UPDATE==0,
-                    // so _timerStatusEventHandler overwrites _systemStateChanged capture.
+                    // Capture _systemStateChanged as the FIRST handler for eventId==0.
+                    // In CI coverage builds SYSTIME_MGR_NAME==SYSMGR_NAME and
+                    // cTIMER_STATUS_UPDATE==0, so _timerStatusEventHandler arrives as
+                    // the SECOND registration with the same eventId. Distinguishing by
+                    // arrival order avoids overwriting and covers both callbacks.
+                    if (eventId == IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE) {
+                        if (m_sysStateHandler == nullptr) {
+                            m_sysStateHandler = hdlr; // 1st = _systemStateChanged
+                        } else {
+                            m_timerHandler = hdlr;    // 2nd = _timerStatusEventHandler (CI)
+                        }
+                    }
                     if (!strcmp(owner, IARM_BUS_SYSMGR_NAME) &&
                         eventId == IARM_BUS_SYSMGR_EVENT_DEVICE_UPDATE_RECEIVED)
                     {
@@ -11816,5 +11825,98 @@ TEST_F(SystemServicesIarmCbTest, StopModeTimer_ViaSetMode_EASAndNormal)
         _T("{\"modeInfo\":{\"mode\":\"NORMAL\",\"duration\":-1}}"), resp));
 
     TEST_LOG("StopModeTimer_ViaSetMode PASSED");
+}
+
+// =============================================================================
+// 8. _systemStateChanged — call static IARM callback directly.
+//    We capture m_sysStateHandler as the FIRST RegisterEventHandler call for
+//    eventId==IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE(0). In CI builds the second
+//    call for the same eventId carries _timerStatusEventHandler (captured as
+//    m_timerHandler below). Calling m_sysStateHandler with proper
+//    IARM_Bus_SYSMgr_EventData_t covers the body of _systemStateChanged.
+// =============================================================================
+TEST_F(SystemServicesIarmCbTest, IarmCb_SystemStateChanged_FirmwareUpdateState)
+{
+    ASSERT_NE(nullptr, m_sysStateHandler) << "_systemStateChanged not captured";
+
+    IARM_Bus_SYSMgr_EventData_t sysEventData;
+    memset(&sysEventData, 0, sizeof(sysEventData));
+    // stateId = IARM_BUS_SYSMGR_SYSSTATE_FIRMWARE_UPDATE_STATE, state = 1
+    // → triggers OnFirmwareUpdateStateChange(1) inside _systemStateChanged
+    sysEventData.data.systemStates.stateId =
+        IARM_BUS_SYSMGR_SYSSTATE_FIRMWARE_UPDATE_STATE;
+    sysEventData.data.systemStates.state = 1; // non-critical: → OnFirmwareUpdateStateChange
+
+    m_sysStateHandler(IARM_BUS_SYSMGR_NAME,
+                      IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE,
+                      &sysEventData,
+                      sizeof(sysEventData));
+    TEST_LOG("IarmCb_SystemStateChanged_FirmwareUpdateState PASSED");
+}
+
+// =============================================================================
+// 9. _timerStatusEventHandler — call via m_timerHandler (second registered
+//    handler for eventId==0). Only non-null in CI coverage builds where
+//    IARM_BUS_SYSTIME_MGR_NAME==IARM_BUS_SYSMGR_NAME and cTIMER_STATUS_UPDATE==0.
+//    We pass a zeroed 1024-byte buffer so the internal TimerMsg field reads
+//    produce empty strings without any out-of-bounds access.
+// =============================================================================
+TEST_F(SystemServicesIarmCbTest, IarmCb_TimerStatusEventHandler_OnTimeStatusChanged)
+{
+    if (m_timerHandler == nullptr) {
+        TEST_LOG("SKIP: m_timerHandler is nullptr (non-CI build; SYSTIME_MGR_NAME differs)");
+        GTEST_SKIP() << "_timerStatusEventHandler not captured in this build";
+    }
+
+    // Zeroed 4096-byte buffer — TimerMsg has three char[cTIMER_STATUS_MESSAGE_LENGTH] fields.
+    // Stub defines cTIMER_STATUS_MESSAGE_LENGTH=128 → sizeof(TimerMsg)=384. Real CI IARM
+    // headers may use a larger value; 4096 covers cTIMER_STATUS_MESSAGE_LENGTH up to 1365.
+    char timerData[4096] = {};
+
+    // In CI: IARM_BUS_SYSMGR_NAME == IARM_BUS_SYSTIME_MGR_NAME == "SYSMgr".
+    // _timerStatusEventHandler checks !strcmp(IARM_BUS_SYSTIME_MGR_NAME, owner) &&
+    // eventId==0. Both conditions are satisfied here.
+    m_timerHandler(IARM_BUS_SYSMGR_NAME,
+                   IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, // == 0 == cTIMER_STATUS_UPDATE in CI
+                   timerData,
+                   sizeof(timerData));
+    TEST_LOG("IarmCb_TimerStatusEventHandler_OnTimeStatusChanged PASSED");
+}
+
+// =============================================================================
+// 10. startModeTimer + updateDuration — covered via setMode with duration=1.
+//
+// Timeline when setMode("WAREHOUSE", 1) is called:
+//   t=0ms: startModeTimer(1) → m_remainingDuration=1, timer thread starts
+//   t=1000ms: updateDuration() — m_remainingDuration > 0 → decrements to 0
+//   t=2000ms: updateDuration() — m_remainingDuration==0 → stop()+detach()+SetMode(NORMAL)
+//   t=2000ms+ε: timer thread exits (clear==true); thread is detached → no std::terminate
+//
+// We sleep 2500ms to guarantee both updateDuration branches are covered before
+// the fixture destructor runs. The mode timer callback calls SetMode(NORMAL,0)
+// from the timer thread; this goes through the IARM mock (WillRepeatedly).
+// =============================================================================
+TEST_F(SystemServicesIarmCbTest, StartModeTimer_UpdateDuration_ViaSetMode_PositiveDuration)
+{
+    // Allow any number of IARM Bus calls from both main-thread and timer-thread SetMode calls.
+    EXPECT_CALL(iarmMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillRepeatedly(::testing::Return(IARM_RESULT_SUCCESS));
+
+    string resp;
+    // duration=1 → startModeTimer(1) → cTimer thread starts (covers startModeTimer body)
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setMode"),
+        _T("{\"modeInfo\":{\"mode\":\"WAREHOUSE\",\"duration\":1}}"), resp));
+
+    // Wait for two timer ticks (2×1000ms) plus a generous safety margin.
+    // Tick 1 (t≈1000ms): m_remainingDuration 1→0 — covers updateDuration if-branch
+    // Tick 2 (t≈2000ms): m_remainingDuration==0 → else-branch: stop()+detach()+SetMode(NORMAL)
+    // The detached thread then returns from timerFunction. 3500ms gives 1500ms of margin
+    // after the second tick, covering typical CI machine load delays without racing the dtor.
+    std::this_thread::sleep_for(std::chrono::milliseconds(3500));
+
+    // After sleep the timer thread has self-detached; timerThread.joinable()==false.
+    // Fixture destructor is safe: ~cTimer() (called at program exit) sees a non-joinable
+    // thread → no std::terminate.
+    TEST_LOG("StartModeTimer_UpdateDuration_ViaSetMode PASSED");
 }
 
