@@ -70,7 +70,7 @@ inline bool readPropertyFromFile(const char* filename, const string& property, s
                 else
                 {
                     // If it does not start with '$', set propertyValue directly
-                    propertyValue = propertyContent;
+                    propertyValue = std::move(propertyContent);
                     if (!propertyValue.empty())
                     {
                         // Remove new line character from end of the string if it exists
