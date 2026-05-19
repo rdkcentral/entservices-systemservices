@@ -55,7 +55,7 @@ jobs:
             install
             !install/etc/WPEFramework/plugins
             !install/usr/bin/RdkServicesTest
-            !install/usr/include/gmock gdb -batch --return-child-result -ex "set logging file $GITHUB_WORKSPACE/gdb_log.txt" -ex "set logging on" -ex "run" -ex "bt" -ex "info registers" -ex "quit" --args RdkServicesL1Test 2>&1 | tee $GITHUB_WORKSPACE/gdb_output.log &&
+            !install/usr/include/gmock 
             !install/usr/include/gtest
             !install/usr/lib/libgmockd.a
             !install/usr/lib/libgmock_maind.a
@@ -135,7 +135,7 @@ jobs:
           path: entservices-systemservices
 
       - name: Checkout entservices-systemservices-testframework
-        if: ${{ inputs.caller_source == 'testframework' }} gdb -batch --return-child-result -ex "set logging file $GITHUB_WORKSPACE/gdb_log.txt" -ex "set logging on" -ex "run" -ex "bt" -ex "info registers" -ex "quit" --args RdkServicesL1Test 2>&1 | tee $GITHUB_WORKSPACE/gdb_output.log &&
+        if: ${{ inputs.caller_source == 'testframework' }}
         uses: actions/checkout@v3
         with:
           repository: rdkcentral/entservices-systemservices
