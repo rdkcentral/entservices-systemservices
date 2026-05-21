@@ -32,7 +32,7 @@
 #define ENABLE_THERMAL_PROTECTION
 #endif
 
-#include "SystemServices.h"
+#include "SystemServicesImplementation.h"
 
 /**
  * This class defines the functionalities for thermal monitoring.
@@ -44,8 +44,8 @@ namespace WPEFramework {
             public:
                 static CThermalMonitor* instance();
 
-                void addEventObserver(WPEFramework::Plugin::SystemServices* service);
-                void removeEventObserver(WPEFramework::Plugin::SystemServices* service);
+                void addEventObserver(WPEFramework::Plugin::SystemServicesImplementation* service);
+                void removeEventObserver(WPEFramework::Plugin::SystemServicesImplementation* service);
 
                 bool getCoreTemperature(float& temperature) const;
                 void emitTemperatureThresholdChange(std::string thresholdType, bool isAboveThreshold, float temperature);
