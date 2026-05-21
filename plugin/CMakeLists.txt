@@ -17,11 +17,14 @@
 
 set(PLUGIN_NAME SystemServices)
 set(MODULE_NAME ${NAMESPACE}${PLUGIN_NAME})
+set(PLUGIN_IMPLEMENTATION ${MODULE_NAME}Implementation)
 
 set(PLUGIN_SYSTEM_AUTOSTART false CACHE STRING "To automatically start System plugin.")
 set(PLUGIN_SYSTEMSERVICE_STARTUPORDER "" CACHE STRING "To configure startup order of SystemServices plugin")
 
 find_package(${NAMESPACE}Plugins REQUIRED)
+find_package(${NAMESPACE}Definitions REQUIRED)
+find_package(CompileSettingsDebug CONFIG REQUIRED)
 find_library(PROCPS_LIBRARIES NAMES procps)
 
 find_package(Telemetry)
@@ -32,6 +35,26 @@ endif()
 
 add_library(${MODULE_NAME} SHARED
         SystemServices.cpp
+        Module.cpp)
+
+set_target_properties(${MODULE_NAME} PROPERTIES
+        CXX_STANDARD 11
+        CXX_STANDARD_REQUIRED YES)
+
+include_directories(
+        ../helpers)
+
+target_link_libraries(${MODULE_NAME}
+    PRIVATE
+        CompileSettingsDebug::CompileSettingsDebug
+        ${NAMESPACE}Plugins::${NAMESPACE}Plugins
+        ${NAMESPACE}Definitions::${NAMESPACE}Definitions)
+
+install(TARGETS ${MODULE_NAME}
+    DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/${STORAGE_DIRECTORY}/plugins)
+
+add_library(${PLUGIN_IMPLEMENTATION} SHARED
+        SystemServicesImplementation.cpp
         Module.cpp
         cTimer.cpp
         thermonitor.cpp
@@ -41,15 +64,15 @@ add_library(${MODULE_NAME} SHARED
         platformcaps/platformcapsdata.cpp
         platformcaps/platformcapsdatarpc.cpp
         )
-set_source_files_properties(SystemServices.cpp thermonitor.cpp platformcaps/platformcapsdata.cpp PROPERTIES COMPILE_FLAGS "-fexceptions")
-set_target_properties(${MODULE_NAME} PROPERTIES
+set_source_files_properties(SystemServicesImplementation.cpp thermonitor.cpp platformcaps/platformcapsdata.cpp PROPERTIES COMPILE_FLAGS "-fexceptions")
+set_target_properties(${PLUGIN_IMPLEMENTATION} PROPERTIES
         CXX_STANDARD 11
         CXX_STANDARD_REQUIRED YES)
 
-target_compile_definitions(${MODULE_NAME} PRIVATE MODULE_NAME=Plugin_${PLUGIN_NAME})
+target_compile_definitions(${PLUGIN_IMPLEMENTATION} PRIVATE MODULE_NAME=Plugin_${PLUGIN_NAME})
 
 if (NOT RDK_SERVICES_L1_TEST)
-    target_compile_options(${MODULE_NAME} PRIVATE -Wno-error)
+    target_compile_options(${PLUGIN_IMPLEMENTATION} PRIVATE -Wno-error)
 endif ()
 
 list(APPEND CMAKE_MODULE_PATH
@@ -57,41 +80,41 @@ list(APPEND CMAKE_MODULE_PATH
 
 find_package(IARMBus)
 if (IARMBus_FOUND)
-    target_include_directories(${MODULE_NAME} PRIVATE ${IARMBUS_INCLUDE_DIRS})
-    target_link_libraries(${MODULE_NAME} PRIVATE ${NAMESPACE}Plugins::${NAMESPACE}Plugins ${IARMBUS_LIBRARIES})
+    target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ${IARMBUS_INCLUDE_DIRS})
+    target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${NAMESPACE}Plugins::${NAMESPACE}Plugins ${IARMBUS_LIBRARIES})
 else (IARMBus_FOUND)
     message ("Module IARMBus required.")
-    target_include_directories(${MODULE_NAME} PRIVATE ${IARMBUS_INCLUDE_DIRS})
-    target_link_libraries(${MODULE_NAME} PRIVATE ${NAMESPACE}Plugins::${NAMESPACE}Plugins ${IARMBUS_LIBRARIES})
+    target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ${IARMBUS_INCLUDE_DIRS})
+    target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${NAMESPACE}Plugins::${NAMESPACE}Plugins ${IARMBUS_LIBRARIES})
 endif(IARMBus_FOUND)
 
 if(PROCPS_LIBRARIES)
-    target_link_libraries(${MODULE_NAME} PRIVATE ${PROCPS_LIBRARIES})
+    target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${PROCPS_LIBRARIES})
 endif(PROCPS_LIBRARIES)
 
 find_package(DS)
 if (DS_FOUND)
 	find_package(IARMBus)
     add_definitions(-DDS_FOUND)
-    target_include_directories(${MODULE_NAME} PRIVATE ${IARMBUS_INCLUDE_DIRS})
-    target_include_directories(${MODULE_NAME} PRIVATE ${DS_INCLUDE_DIRS})
-    target_link_libraries(${MODULE_NAME} PRIVATE ${NAMESPACE}Plugins::${NAMESPACE}Plugins ${IARMBUS_LIBRARIES} ${DS_LIBRARIES})
+    target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ${IARMBUS_INCLUDE_DIRS})
+    target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ${DS_INCLUDE_DIRS})
+    target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${NAMESPACE}Plugins::${NAMESPACE}Plugins ${IARMBUS_LIBRARIES} ${DS_LIBRARIES})
 else (DS_FOUND)
-    target_link_libraries(${MODULE_NAME} PRIVATE ${NAMESPACE}Plugins::${NAMESPACE}Plugins)
+    target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${NAMESPACE}Plugins::${NAMESPACE}Plugins)
 endif(DS_FOUND)
 
 find_package(CURL)
 if (CURL_FOUND)
 	include_directories(${CURL_INCLUDE_DIRS})
-	target_link_libraries(${MODULE_NAME} PRIVATE ${CURL_LIBRARIES})
+	target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${CURL_LIBRARIES})
 else (CURL_FOUND)
 	message ("Curl/libcurl required.")
 endif (CURL_FOUND)
 
 find_package(RFC)
 if (RFC_FOUND)
-	target_include_directories(${MODULE_NAME} PRIVATE ${RFC_INCLUDE_DIRS})
-	target_link_libraries(${MODULE_NAME} PRIVATE ${RFC_LIBRARIES})
+	target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ${RFC_INCLUDE_DIRS})
+	target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${RFC_LIBRARIES})
 else (RFC_FOUND)
 	message ("RFC lib required.")
 endif (RFC_FOUND)
@@ -101,7 +124,7 @@ if (RDK_SERVICE_L2_TEST)
     find_library(TESTMOCKLIB_LIBRARIES NAMES TestMocklib)
     if (TESTMOCKLIB_LIBRARIES)
         message ("linking mock libraries ${TESTMOCKLIB_LIBRARIES} library")
-        target_link_libraries(${MODULE_NAME} PRIVATE ${TESTMOCKLIB_LIBRARIES})
+        target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${TESTMOCKLIB_LIBRARIES})
     else (TESTMOCKLIB_LIBRARIES)
         message ("Require ${TESTMOCKLIB_LIBRARIES} library")
     endif (TESTMOCKLIB_LIBRARIES)
@@ -112,10 +135,10 @@ if(TELEMETRY_FOUND)
     target_include_directories(${MODULE_NAME} PRIVATE ${TELEMETRY_INCLUDE_DIRS})
 endif()
 
-target_include_directories(${MODULE_NAME} PRIVATE ../helpers)
-target_include_directories(${MODULE_NAME} PRIVATE ./)
+target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ../helpers)
+target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ./)
 
-install(TARGETS ${MODULE_NAME}
+install(TARGETS ${PLUGIN_IMPLEMENTATION}
         DESTINATION lib/${STORAGE_DIRECTORY}/plugins)
 
 write_config(${PLUGIN_NAME})

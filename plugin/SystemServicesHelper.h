@@ -149,7 +149,7 @@ namespace WPEFramework {
          * @param2[out]: "response" JSON Object which is returned by the API
          with updated module error status.
          */
-        void populateResponseWithError(int errorCode, JsonObject& response);
+        void populateResponseWithError(int errorCode, uint32_t &SysSrv_Status , std::string &errorMessage);
         string caseInsensitive(string str7);
         string ltrim(const string& s);
         string rtrim(const string& s);
