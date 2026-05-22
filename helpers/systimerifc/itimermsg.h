@@ -5,10 +5,21 @@
  */
 #pragma once
 
-#define IARM_BUS_SYSTIME_MGR_NAME    "SYSTIME_MGR"
+#ifndef IARM_BUS_SYSTIME_MGR_NAME
+#define IARM_BUS_SYSTIME_MGR_NAME    "SYSTEMTIME"
+#endif
+
+#ifndef TIMER_STATUS_MSG
 #define TIMER_STATUS_MSG             "TimerStatus"
+#endif
+
+#ifndef cTIMER_STATUS_UPDATE
 #define cTIMER_STATUS_UPDATE         0
-#define cTIMER_STATUS_MESSAGE_LENGTH 128
+#endif
+
+#ifndef cTIMER_STATUS_MESSAGE_LENGTH
+#define cTIMER_STATUS_MESSAGE_LENGTH 256
+#endif
 
 typedef struct {
     char message[cTIMER_STATUS_MESSAGE_LENGTH];
