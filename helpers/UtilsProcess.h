@@ -38,6 +38,12 @@ namespace Utils
 */
 bool killProcess(const string& input_pname)
 {
+    if (input_pname.empty())
+    {
+        LOGERR("Empty process name provided");
+        return false;
+    }
+    
     PROCTAB* proc = openproc(PROC_FILLMEM | PROC_FILLSTAT | PROC_FILLSTATUS );
     proc_t proc_info = {0};
     bool ret_value = false;
@@ -47,12 +53,16 @@ bool killProcess(const string& input_pname)
         memset(&proc_info, 0, sizeof(proc_info));
         while (readproc(proc, &proc_info) != NULL)
         {
-            if (proc_info.cmd != nullptr && strcmp(proc_info.cmd, input_pname.c_str()) == 0)
+            if (proc_info.cmd != nullptr && strstr(proc_info.cmd, input_pname.c_str()) != nullptr)
             {
                 if (0 == kill(proc_info.tid, SIGTERM))
                 {
                     ret_value = true;
                     LOGINFO("Killed the process [%d] process name [%s]", proc_info.tid, proc_info.cmd);
+                }
+                else
+                {
+                    LOGERR("Failed to kill process [%d] process name [%s]: %s", proc_info.tid, proc_info.cmd, strerror(errno));
                 }
             }
         }
