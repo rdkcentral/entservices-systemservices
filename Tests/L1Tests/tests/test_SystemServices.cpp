@@ -877,7 +877,7 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_Success)
     
     TEST_LOG("GetDownloadedFirmwareInfo test PASSED - Response: %s", response.c_str());
     
-    std::remove("/opt/fwdnldstatus.txt");
+    (void)std::remove("/opt/fwdnldstatus.txt");
 }
 
 TEST_F(SystemServicesTest, GetFirmwareDownloadPercent_Success)
@@ -1170,7 +1170,7 @@ TEST_F(SystemServicesTest, GetSystemVersions_Success)
     
     TEST_LOG("GetSystemVersions test PASSED - Response: %s", response.c_str());
     
-    std::remove("/version.txt");
+    (void)std::remove("/version.txt");
 }
 #if 0
 class TerritoryTest : public SystemServicesTest, public ::testing::WithParamInterface<const char*> {};
@@ -1352,7 +1352,7 @@ TEST_F(SystemServicesTest, SetBootLoaderSplashScreen_Success)
     
     TEST_LOG("SetBootLoaderSplashScreen test PASSED - Response: %s", response.c_str());
     
-    std::remove("/tmp/test_splash.png");
+    (void)std::remove("/tmp/test_splash.png");
 }
 // TODO: Implement SetWakeupSrcConfiguration in SystemServicesImplementation before enabling this test
 /*
@@ -1475,7 +1475,7 @@ TEST_F(SystemServicesTest, SetBootLoaderSplashScreen_IarmFailure)
     
     TEST_LOG("SetBootLoaderSplashScreen IARM failure test - Response: %s", response.c_str());
     
-    std::remove("/tmp/test_splash_fail.png");
+    (void)std::remove("/tmp/test_splash_fail.png");
 }
 
 TEST_F(SystemServicesTest, Reboot_PowerManagerFailure)
@@ -1756,7 +1756,7 @@ TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_Success)
     
     TEST_LOG("GetLastFirmwareFailureReason test - Response: %s", response.c_str());
     
-    std::remove("/opt/persistent/.lastswupdatestatus");
+    (void)std::remove("/opt/persistent/.lastswupdatestatus");
 }
 
 TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_NoFile)
@@ -1858,7 +1858,7 @@ TEST_F(SystemServicesTest, SetFriendlyName_SpecialCharacters)
 
 TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_NoFile)
 {
-    std::remove("/version.txt");
+    (void)std::remove("/version.txt");
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDownloadedFirmwareInfo"), _T("{}"), response));
     
@@ -1886,7 +1886,7 @@ TEST_F(SystemServicesTest, GetSystemVersions_AllFields)
     
     TEST_LOG("GetSystemVersions all fields test - Response: %s", response.c_str());
     
-    std::remove("/version.txt");
+    (void)std::remove("/version.txt");
 }
 
 TEST_F(SystemServicesTest, GetFirmwareUpdateState_AllStates)
@@ -1949,7 +1949,7 @@ TEST_F(SystemServicesTest, SetBootLoaderSplashScreen_ValidFile)
     
     TEST_LOG("SetBootLoaderSplashScreen valid file test - Response: %s", response.c_str());
     
-    std::remove("/tmp/test_splash_valid.png");
+    (void)std::remove("/tmp/test_splash_valid.png");
 }
 
 TEST_F(SystemServicesTest, UpdateFirmware_Execute)
@@ -2573,7 +2573,7 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_MultipleFields)
     
     TEST_LOG("GetDownloadedFirmwareInfo multiple fields test - Response: %s", response.c_str());
     
-    std::remove("/version.txt");
+    (void)std::remove("/version.txt");
 }
 
 TEST_F(SystemServicesTest, SetFriendlyName_MaxLength)
@@ -2642,7 +2642,7 @@ TEST_F(SystemServicesTest, GetFirmwareDownloadPercent_InProgress)
     
     TEST_LOG("GetFirmwareDownloadPercent in progress test - Response: %s", response.c_str());
     
-    std::remove("/opt/curl_progress");
+    (void)std::remove("/opt/curl_progress");
 }
 
 TEST_F(SystemServicesTest, GetTerritory_NoFile)
@@ -2675,7 +2675,7 @@ TEST_F(SystemServicesTest, SetTerritory_ValidRegion)
 TEST_F(SystemServicesTest, GetTimeZoneDST_NoAccuracyFile)
 {
     // Remove accuracy file to test fallback behavior
-    std::remove("/opt/persistent/timeZoneAccuracy");
+    (void)std::remove("/opt/persistent/timeZoneAccuracy");
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTimeZoneDST"), _T("{}"), response));
     
@@ -2774,7 +2774,7 @@ TEST_F(SystemServicesTest, GetPlatformConfiguration_SpecificCapability)
 TEST_F(SystemServicesTest, GetFirmwareDownloadPercent_NoProgressFile)
 {
     // Remove progress file
-    std::remove("/opt/curl_progress");
+    (void)std::remove("/opt/curl_progress");
     
     uint32_t result = handler.Invoke(connection, _T("getFirmwareDownloadPercent"), _T("{}"), response);
     
@@ -2808,13 +2808,13 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_AllFields)
     
     TEST_LOG("GetDownloadedFirmwareInfo all fields test - Response: %s", response.c_str());
     
-    std::remove("/opt/fwdnldstatus.txt");
+    (void)std::remove("/opt/fwdnldstatus.txt");
 }
 
 TEST_F(SystemServicesTest, GetMigrationStatus_FileNotExists)
 {
     // Remove migration status file
-    std::remove("/opt/secure/persistent/MigrationStatus");
+    (void)std::remove("/opt/secure/persistent/MigrationStatus");
     
     uint32_t result = handler.Invoke(connection, _T("getMigrationStatus"), _T("{}"), response);
     
@@ -3699,12 +3699,12 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_WithCompleteData)
     
     TEST_LOG("GetDownloadedFirmwareInfo complete data test - Response: %s", response.c_str());
     
-    std::remove("/version.txt");
+    (void)std::remove("/version.txt");
 }
 
 TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_FileReadError)
 {
-    std::remove("/version.txt");
+    (void)std::remove("/version.txt");
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDownloadedFirmwareInfo"), _T("{}"), response));
     
@@ -4198,9 +4198,9 @@ TEST_F(SystemServicesTest, Notification_OnBlocklistChanged_MultipleChanges)
     (void)system("mkdir -p /opt/secure/persistent/opflashstore");
     createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "blocklist=false");
 
+	ASSERT_NE(nullptr, m_sysServices) << "ISystemServices not available";
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
 
-    ASSERT_NE(nullptr, m_sysServices) << "ISystemServices not available";
     m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
 
@@ -4779,7 +4779,7 @@ TEST_F(SystemServicesTest, GetSystemVersions_VersionFieldPattern)
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
     EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Should succeed: " << response;
 
-    std::remove("/version.txt");
+    (void)std::remove("/version.txt");
     TEST_LOG("GetSystemVersions_VersionFieldPattern - Response: %s", response.c_str());
 }
 
@@ -4795,13 +4795,13 @@ TEST_F(SystemServicesTest, GetSystemVersions_BuildTimeField)
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
 
-    std::remove("/version.txt");
+    (void)std::remove("/version.txt");
     TEST_LOG("GetSystemVersions_BuildTimeField - Response: %s", response.c_str());
 }
 
 TEST_F(SystemServicesTest, GetSystemVersions_NoFile_DefaultStrings)
 {
-    std::remove("/version.txt");
+    (void)std::remove("/version.txt");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getSystemVersions"), _T("{}"), response));
 
@@ -4834,8 +4834,8 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_WithStatusFile)
     ASSERT_TRUE(jsonResponse.HasLabel("currentFWVersion")) << "Missing currentFWVersion: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
 
-    std::remove("/opt/fwdnldstatus.txt");
-    std::remove("/version.txt");
+    (void)std::remove("/opt/fwdnldstatus.txt");
+    (void)std::remove("/version.txt");
     TEST_LOG("GetDownloadedFirmwareInfo_WithStatusFile - Response: %s", response.c_str());
 }
 
@@ -4851,7 +4851,7 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_RebootImmediateOne)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
 
-    std::remove("/opt/fwdnldstatus.txt");
+    (void)std::remove("/opt/fwdnldstatus.txt");
     TEST_LOG("GetDownloadedFirmwareInfo_RebootImmediateOne - Response: %s", response.c_str());
 }
 
@@ -4872,13 +4872,13 @@ TEST_F(SystemServicesTest, GetFirmwareDownloadPercent_ProgressFile_Returns50)
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("downloadPercent")) << "Missing downloadPercent: " << response;
 
-    std::remove("/opt/curl_progress");
+    (void)std::remove("/opt/curl_progress");
     TEST_LOG("GetFirmwareDownloadPercent_ProgressFile_Returns50 - Response: %s", response.c_str());
 }
 
 TEST_F(SystemServicesTest, GetFirmwareDownloadPercent_NoFile_ReturnsMinus1)
 {
-    std::remove("/opt/curl_progress");
+    (void)std::remove("/opt/curl_progress");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getFirmwareDownloadPercent"), _T("{}"), response));
 
@@ -4910,7 +4910,7 @@ TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_SigVerifyFailed)
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
     EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Should succeed: " << response;
 
-    std::remove("/opt/persistent/.lastswupdatestatus");
+    (void)std::remove("/opt/persistent/.lastswupdatestatus");
     TEST_LOG("GetLastFirmwareFailureReason_SigVerifyFailed - Response: %s", response.c_str());
 }
 
@@ -4924,7 +4924,7 @@ TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_EmptyFile)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
 
-    std::remove("/opt/persistent/.lastswupdatestatus");
+    (void)std::remove("/opt/persistent/.lastswupdatestatus");
     TEST_LOG("GetLastFirmwareFailureReason_EmptyFile - Response: %s", response.c_str());
 }
 
@@ -5021,7 +5021,7 @@ TEST_F(SystemServicesTest, GetBuildType_QA)
 
 TEST_F(SystemServicesTest, GetBuildType_FileAbsent_SuccessFalse)
 {
-    std::remove("/etc/device.properties");
+    (void)std::remove("/etc/device.properties");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBuildType"), _T("{}"), response));
 
@@ -5595,7 +5595,7 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_SameValueAsFile_NoEventDispatched)
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
     EXPECT_TRUE(jr["success"].Boolean()) << response;
 
-    std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
+    (void)std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
 
     TEST_LOG("SetBlocklistFlag_SameValueAsFile_NoEventDispatched - Response: %s", response.c_str());
 }
@@ -5613,7 +5613,7 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_DifferentValueFromFile_EventDispatch
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
     EXPECT_TRUE(jr["success"].Boolean()) << response;
 
-    std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
+    (void)std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
 
     TEST_LOG("SetBlocklistFlag_DifferentValueFromFile_EventDispatched - Response: %s", response.c_str());
 }
@@ -5629,7 +5629,7 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_DifferentValueFromFile_EventDispatch
 TEST_F(SystemServicesTest, GetBlocklistFlag_FileAbsent_SuccessFalse)
 {
     (void)system("mkdir -p /opt/secure/persistent/opflashstore");
-    std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
+    (void)std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBlocklistFlag"), _T("{}"), response));
 
@@ -5653,7 +5653,7 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_FilePresent_BlocklistTrue)
     EXPECT_TRUE(jr["success"].Boolean()) << response;
     EXPECT_TRUE(jr["blocklist"].Boolean()) << "Expected blocklist=true: " << response;
 
-    std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
+    (void)std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
 
     TEST_LOG("GetBlocklistFlag_FilePresent_BlocklistTrue - Response: %s", response.c_str());
 }
@@ -5671,7 +5671,7 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_FilePresent_BlocklistFalse)
     EXPECT_TRUE(jr["success"].Boolean()) << response;
     EXPECT_FALSE(jr["blocklist"].Boolean()) << "Expected blocklist=false: " << response;
 
-    std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
+    (void)std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
 
     TEST_LOG("GetBlocklistFlag_FilePresent_BlocklistFalse - Response: %s", response.c_str());
 }
@@ -5862,7 +5862,7 @@ TEST_F(SystemServicesTest, SetTerritory_Length2_ReturnsErrorGeneral)
 TEST_F(SystemServicesTest, SetTerritory_ValidUSA_EmptyRegion_Succeeds)
 {
     (void)system("mkdir -p /opt/secure/persistent/System");
-    std::remove("/opt/secure/persistent/System/Territory.txt");
+    (void)std::remove("/opt/secure/persistent/System/Territory.txt");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
               _T("{\"territory\":\"USA\"}"), response));
@@ -5870,7 +5870,7 @@ TEST_F(SystemServicesTest, SetTerritory_ValidUSA_EmptyRegion_Succeeds)
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
     EXPECT_TRUE(jr["success"].Boolean()) << "Valid territory should succeed: " << response;
 
-    std::remove("/opt/secure/persistent/System/Territory.txt");
+    (void)std::remove("/opt/secure/persistent/System/Territory.txt");
 
     TEST_LOG("SetTerritory_ValidUSA_EmptyRegion_Succeeds - Response: %s", response.c_str());
 }
@@ -5878,7 +5878,7 @@ TEST_F(SystemServicesTest, SetTerritory_ValidUSA_EmptyRegion_Succeeds)
 TEST_F(SystemServicesTest, SetTerritory_ValidUSA_ValidRegion_Succeeds)
 {
     (void)system("mkdir -p /opt/secure/persistent/System");
-    std::remove("/opt/secure/persistent/System/Territory.txt");
+    (void)std::remove("/opt/secure/persistent/System/Territory.txt");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
               _T("{\"territory\":\"USA\",\"region\":\"US-TX\"}"), response));
@@ -5886,7 +5886,7 @@ TEST_F(SystemServicesTest, SetTerritory_ValidUSA_ValidRegion_Succeeds)
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
     EXPECT_TRUE(jr["success"].Boolean()) << "Valid territory+region should succeed: " << response;
 
-    std::remove("/opt/secure/persistent/System/Territory.txt");
+    (void)std::remove("/opt/secure/persistent/System/Territory.txt");
 
     TEST_LOG("SetTerritory_ValidUSA_ValidRegion_Succeeds - Response: %s", response.c_str());
 }
@@ -6092,7 +6092,7 @@ TEST_F(SystemServicesTest, GetFirmwareDownloadPercent_FileExistsButEmpty)
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
     ASSERT_TRUE(jr.HasLabel("downloadPercent")) << response;
 
-    std::remove("/opt/curl_progress");
+    (void)std::remove("/opt/curl_progress");
 
     TEST_LOG("GetFirmwareDownloadPercent_FileExistsButEmpty - Response: %s", response.c_str());
 }
@@ -6220,7 +6220,7 @@ TEST_F(SystemServicesTest, GetTimeZoneDST_AfterSet_ReturnsSetValue)
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
     EXPECT_TRUE(jr["success"].Boolean()) << response;
 
-    std::remove("/opt/persistent/timeZoneDST");
+    (void)std::remove("/opt/persistent/timeZoneDST");
 
     TEST_LOG("GetTimeZoneDST_AfterSet_ReturnsSetValue - Response: %s", response.c_str());
 }
@@ -6454,7 +6454,7 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_AllFields_Read)
     ASSERT_TRUE(jr.HasLabel("currentFWVersion")) << response;
     ASSERT_TRUE(jr.HasLabel("success")) << response;
 
-    std::remove("/opt/fwdnldstatus.txt");
+    (void)std::remove("/opt/fwdnldstatus.txt");
 
     TEST_LOG("GetDownloadedFirmwareInfo_AllFields_Read - Response: %s", response.c_str());
 }
@@ -6466,7 +6466,7 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_AllFields_Read)
 TEST_F(SystemServicesTest, GetTerritory_FileAbsent_SuccessFalseOrEmpty)
 {
     (void)system("mkdir -p /opt/secure/persistent/System");
-    std::remove("/opt/secure/persistent/System/Territory.txt");
+    (void)std::remove("/opt/secure/persistent/System/Territory.txt");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTerritory"), _T("{}"), response));
 
@@ -6490,7 +6490,7 @@ TEST_F(SystemServicesTest, GetTerritory_FilePresent_ReturnsTerritory)
     EXPECT_EQ("AUS", jr["territory"].String()) << response;
     EXPECT_EQ("AU-NSW", jr["region"].String()) << response;
 
-    std::remove("/opt/secure/persistent/System/Territory.txt");
+    (void)std::remove("/opt/secure/persistent/System/Territory.txt");
 
     TEST_LOG("GetTerritory_FilePresent_ReturnsTerritory - Response: %s", response.c_str());
 }
@@ -7464,7 +7464,7 @@ TEST_F(SystemServicesTest, Helper_ReadFromFile_PresentFile_ReturnsTrueWithConten
     std::string content;
     EXPECT_TRUE(readFromFile("/tmp/helper_readfile.txt", content));
     EXPECT_EQ("hello world", content);
-    std::remove("/tmp/helper_readfile.txt");
+    (void)std::remove("/tmp/helper_readfile.txt");
 }
 
 // ------------------------------------------------------------------
@@ -7484,7 +7484,7 @@ TEST_F(SystemServicesTest, Helper_GetFileContent_Vector_PresentFile_ReturnsLines
     EXPECT_EQ(3u, lines.size());
     EXPECT_EQ("line1", lines[0]);
     EXPECT_EQ("line3", lines[2]);
-    std::remove("/tmp/helper_vec.txt");
+    (void)std::remove("/tmp/helper_vec.txt");
 }
 TEST_F(SystemServicesTest, Helper_GetFileContent_Vector_EmptyLinesSkipped)
 {
@@ -7493,7 +7493,7 @@ TEST_F(SystemServicesTest, Helper_GetFileContent_Vector_EmptyLinesSkipped)
     EXPECT_TRUE(getFileContent("/tmp/helper_vec_empty.txt", lines));
     // Lines with size==0 are not pushed
     EXPECT_EQ(2u, lines.size());
-    std::remove("/tmp/helper_vec_empty.txt");
+    (void)std::remove("/tmp/helper_vec_empty.txt");
 }
 
 // ------------------------------------------------------------------
@@ -7552,7 +7552,7 @@ TEST_F(SystemServicesTest, Helper_FindCaseInsensitive_NotFound_ReturnsFalse)
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, Helper_GetXconfOverrideUrl_FileAbsent)
 {
-    std::remove("/opt/swupdate.conf");
+    (void)std::remove("/opt/swupdate.conf");
     bool fileExists = true;
     std::string url = getXconfOverrideUrl(fileExists);
     EXPECT_FALSE(fileExists);
@@ -7565,7 +7565,7 @@ TEST_F(SystemServicesTest, Helper_GetXconfOverrideUrl_FilePresent_WithUrl)
     std::string url = getXconfOverrideUrl(fileExists);
     EXPECT_TRUE(fileExists);
     EXPECT_EQ("http://xconf.example.com/override", url);
-    std::remove("/opt/swupdate.conf");
+    (void)std::remove("/opt/swupdate.conf");
 }
 TEST_F(SystemServicesTest, Helper_GetXconfOverrideUrl_FilePresent_OnlyComments)
 {
@@ -7574,7 +7574,7 @@ TEST_F(SystemServicesTest, Helper_GetXconfOverrideUrl_FilePresent_OnlyComments)
     std::string url = getXconfOverrideUrl(fileExists);
     EXPECT_TRUE(fileExists);
     EXPECT_TRUE(url.empty());
-    std::remove("/opt/swupdate.conf");
+    (void)std::remove("/opt/swupdate.conf");
 }
 
 // ------------------------------------------------------------------
@@ -7587,32 +7587,32 @@ TEST_F(SystemServicesTest, Helper_GetXconfOverrideUrl_FilePresent_OnlyComments)
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, Helper_GetTimeZoneAccuracyDSTHelper_FileAbsent_INITIAL)
 {
-    std::remove("/opt/persistent/timeZoneDSTAccuracy");
+    (void)std::remove("/opt/persistent/timeZoneDSTAccuracy");
     EXPECT_EQ("INITIAL", getTimeZoneAccuracyDSTHelper());
 }
 TEST_F(SystemServicesTest, Helper_GetTimeZoneAccuracyDSTHelper_INITIAL_Value)
 {
     createFile("/opt/persistent/timeZoneDSTAccuracy", "INITIAL");
     EXPECT_EQ("INITIAL", getTimeZoneAccuracyDSTHelper());
-    std::remove("/opt/persistent/timeZoneDSTAccuracy");
+    (void)std::remove("/opt/persistent/timeZoneDSTAccuracy");
 }
 TEST_F(SystemServicesTest, Helper_GetTimeZoneAccuracyDSTHelper_INTERIM_Value)
 {
     createFile("/opt/persistent/timeZoneDSTAccuracy", "INTERIM");
     EXPECT_EQ("INTERIM", getTimeZoneAccuracyDSTHelper());
-    std::remove("/opt/persistent/timeZoneDSTAccuracy");
+    (void)std::remove("/opt/persistent/timeZoneDSTAccuracy");
 }
 TEST_F(SystemServicesTest, Helper_GetTimeZoneAccuracyDSTHelper_FINAL_Value)
 {
     createFile("/opt/persistent/timeZoneDSTAccuracy", "FINAL");
     EXPECT_EQ("FINAL", getTimeZoneAccuracyDSTHelper());
-    std::remove("/opt/persistent/timeZoneDSTAccuracy");
+    (void)std::remove("/opt/persistent/timeZoneDSTAccuracy");
 }
 TEST_F(SystemServicesTest, Helper_GetTimeZoneAccuracyDSTHelper_InvalidValue_FallsBackToINITIAL)
 {
     createFile("/opt/persistent/timeZoneDSTAccuracy", "BOGUS_VALUE");
     EXPECT_EQ("INITIAL", getTimeZoneAccuracyDSTHelper());
-    std::remove("/opt/persistent/timeZoneDSTAccuracy");
+    (void)std::remove("/opt/persistent/timeZoneDSTAccuracy");
 }
 
 // ------------------------------------------------------------------
@@ -7653,17 +7653,17 @@ TEST_F(SystemServicesTest, Helper_UrlEncode_AlphanumericUnchanged)
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, Helper_EnableXRERetention_Enable_FileAbsent_CreatesFile)
 {
-    std::remove("/tmp/retainConnection");
+    (void)std::remove("/tmp/retainConnection");
     uint32_t result = enableXREConnectionRetentionHelper(true);
     EXPECT_EQ(static_cast<uint32_t>(SysSrv_OK), result);
-    std::remove("/tmp/retainConnection");
+    (void)std::remove("/tmp/retainConnection");
 }
 TEST_F(SystemServicesTest, Helper_EnableXRERetention_Enable_FileExists_ReturnsOK)
 {
     { std::ofstream f("/tmp/retainConnection"); }   // create empty
     uint32_t result = enableXREConnectionRetentionHelper(true);
     EXPECT_EQ(static_cast<uint32_t>(SysSrv_OK), result);
-    std::remove("/tmp/retainConnection");
+    (void)std::remove("/tmp/retainConnection");
 }
 TEST_F(SystemServicesTest, Helper_EnableXRERetention_Disable_FileExists_RemovesFile)
 {
@@ -7673,7 +7673,7 @@ TEST_F(SystemServicesTest, Helper_EnableXRERetention_Disable_FileExists_RemovesF
 }
 TEST_F(SystemServicesTest, Helper_EnableXRERetention_Disable_FileAbsent_ReturnsOK)
 {
-    std::remove("/tmp/retainConnection");
+    (void)std::remove("/tmp/retainConnection");
     uint32_t result = enableXREConnectionRetentionHelper(false);
     EXPECT_EQ(static_cast<uint32_t>(SysSrv_OK), result);
 }
@@ -7725,14 +7725,14 @@ TEST_F(SystemServicesTest, Helper_ParseConfigFile_KeyFound)
     std::string value;
     EXPECT_TRUE(parseConfigFile("/tmp/test_cfg.conf", "KEY1", value));
     EXPECT_EQ("value1", value);
-    std::remove("/tmp/test_cfg.conf");
+    (void)std::remove("/tmp/test_cfg.conf");
 }
 TEST_F(SystemServicesTest, Helper_ParseConfigFile_KeyNotFound)
 {
     createFile("/tmp/test_cfg2.conf", "KEY1=value1\n");
     std::string value;
     EXPECT_FALSE(parseConfigFile("/tmp/test_cfg2.conf", "NONEXISTENT", value));
-    std::remove("/tmp/test_cfg2.conf");
+    (void)std::remove("/tmp/test_cfg2.conf");
 }
 TEST_F(SystemServicesTest, Helper_ParseConfigFile_FileAbsent)
 {
@@ -7813,7 +7813,7 @@ TEST_F(SystemServicesTest, Helper_WriteCurlResponse_ReturnsCorrectSize)
 {
     const char data[] = "test data";
     std::string stream;
-    size_t result = writeCurlResponse((void*)data, 1, strlen(data), stream);
+    size_t result = writeCurlResponse((void*)data, 1, strlen(data), std::move(stream));
     EXPECT_EQ(strlen(data), result);
 }
 
@@ -7824,14 +7824,14 @@ TEST_F(SystemServicesTest, Helper_FindMacInString_ValidMac_Extracted)
 {
     std::string totalStr = "ESTB_MAC=AA:BB:CC:DD:EE:FF extra";
     std::string mac;
-    findMacInString(totalStr, "ESTB_MAC=", mac);
+    findMacInString(std::move(totalStr), "ESTB_MAC=", mac);
     EXPECT_EQ("AA:BB:CC:DD:EE:FF", mac);
 }
 TEST_F(SystemServicesTest, Helper_FindMacInString_InvalidMac_ReturnsDefault)
 {
     std::string totalStr = "ETH_MAC=notamac12345 other";
     std::string mac;
-    findMacInString(totalStr, "ETH_MAC=", mac);
+    findMacInString(std::move(totalStr), "ETH_MAC=", mac);
     EXPECT_EQ("00:00:00:00:00:00", mac);
 }
 
@@ -8010,7 +8010,7 @@ TEST_F(SystemServicesTest, SetMode_IarmFailure_Path)
 TEST_F(SystemServicesTest, GetBlocklistFlag_FileMissing)
 {
     (void)system("mkdir -p /opt/secure/persistent/opflashstore");
-    std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
+    (void)std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
 
     EXPECT_EQ(Core::ERROR_NONE,
         handler.Invoke(connection, _T("getBlocklistFlag"), _T("{}"), response));
@@ -8247,7 +8247,7 @@ TEST_F(SystemServicesTest, Dispatch_OnTerritoryChanged_ReachesNotification)
     // This avoids the race where the first setTerritory call queues an async
     // WorkerPool job that fires AFTER ResetEvent(), causing stale data.
     (void)system("mkdir -p /opt/secure/persistent/System");
-    std::remove("/opt/secure/persistent/System/Territory.txt");
+    (void)std::remove("/opt/secure/persistent/System/Territory.txt");
 
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     m_sysServices->Register(notificationHandler);
@@ -8266,7 +8266,7 @@ TEST_F(SystemServicesTest, Dispatch_OnTerritoryChanged_ReachesNotification)
     m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
 
-    std::remove("/opt/secure/persistent/System/Territory.txt");
+    (void)std::remove("/opt/secure/persistent/System/Territory.txt");
 }
 
 TEST_F(SystemServicesTest, Dispatch_OnTimeZoneDSTChanged_ReachesNotification)
@@ -8276,7 +8276,7 @@ TEST_F(SystemServicesTest, Dispatch_OnTimeZoneDSTChanged_ReachesNotification)
 
     // Remove TZ file first so the impl starts from an empty state, avoiding
     // the async race where the first setTimeZoneDST job fires after ResetEvent().
-    std::remove("/opt/persistent/timeZoneDST");
+    (void)std::remove("/opt/persistent/timeZoneDST");
 
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     m_sysServices->Register(notificationHandler);
@@ -8295,7 +8295,7 @@ TEST_F(SystemServicesTest, Dispatch_OnTimeZoneDSTChanged_ReachesNotification)
     m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
 
-    std::remove("/opt/persistent/timeZoneDST");
+    (void)std::remove("/opt/persistent/timeZoneDST");
 }
 
 TEST_F(SystemServicesTest, Dispatch_OnDeviceMgtUpdateReceived_ReachesNotification)
@@ -8781,7 +8781,7 @@ TEST_F(SystemServicesTest, Notification_OnTimeZoneDSTChanged_ViaSetTimeZoneDST)
     delete notificationHandler;
 
     // Cleanup
-    std::remove("/opt/persistent/timeZoneDST");
+    (void)std::remove("/opt/persistent/timeZoneDST");
 }
 
 TEST_F(SystemServicesTest, Notification_OnTimeZoneDSTChanged_TwoDifferentTimezones)
@@ -8790,7 +8790,7 @@ TEST_F(SystemServicesTest, Notification_OnTimeZoneDSTChanged_TwoDifferentTimezon
 
     // Remove TZ file to start from a clean state — avoids the async race where
     // the first setTimeZoneDST WorkerPool job fires after ResetEvent().
-    std::remove("/opt/persistent/timeZoneDST");
+    (void)std::remove("/opt/persistent/timeZoneDST");
 
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     m_sysServices->Register(notificationHandler);
@@ -8815,7 +8815,7 @@ TEST_F(SystemServicesTest, Notification_OnTimeZoneDSTChanged_TwoDifferentTimezon
     m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
 
-    std::remove("/opt/persistent/timeZoneDST");
+    (void)std::remove("/opt/persistent/timeZoneDST");
 }
 
 // =============================================================================
@@ -8829,7 +8829,7 @@ TEST_F(SystemServicesTest, Notification_OnTerritoryChanged_ViaSetTerritory)
     // Remove territory file first to start from clean state — avoids the async
     // race where the first setTerritory WorkerPool job fires after ResetEvent().
     (void)system("mkdir -p /opt/secure/persistent/System");
-    std::remove("/opt/secure/persistent/System/Territory.txt");
+    (void)std::remove("/opt/secure/persistent/System/Territory.txt");
 
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     m_sysServices->Register(notificationHandler);
@@ -8848,7 +8848,7 @@ TEST_F(SystemServicesTest, Notification_OnTerritoryChanged_ViaSetTerritory)
     m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
 
-    std::remove("/opt/secure/persistent/System/Territory.txt");
+    (void)std::remove("/opt/secure/persistent/System/Territory.txt");
 }
 
 // =============================================================================
@@ -8957,7 +8957,7 @@ TEST_F(SystemServicesTest, Dispatch_TerritoryChanged_WithRegion)
     // Remove territory file for clean state; valid region format: "XY-ZW" (2 + "-" + 2+).
     // "LON"/"NYC" are invalid regions (no "-"), causing ERROR_GENERAL.
     (void)system("mkdir -p /opt/secure/persistent/System");
-    std::remove("/opt/secure/persistent/System/Territory.txt");
+    (void)std::remove("/opt/secure/persistent/System/Territory.txt");
 
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     m_sysServices->Register(notificationHandler);
@@ -8979,7 +8979,7 @@ TEST_F(SystemServicesTest, Dispatch_TerritoryChanged_WithRegion)
     m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
 
-    std::remove("/opt/secure/persistent/System/Territory.txt");
+    (void)std::remove("/opt/secure/persistent/System/Territory.txt");
 }
 
 
@@ -9044,7 +9044,7 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_DefaultFalse_WhenFileExists)
     EXPECT_TRUE(res.HasLabel("success"));
     TEST_LOG("GetBlocklistFlag default false - Response: %s", response.c_str());
 
-    std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
+    (void)std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
 }
 
 // =============================================================================
@@ -9432,7 +9432,7 @@ TEST_F(SystemServicesTest, Utils_String_Trim_ViaGetBuildType_TrailingWhitespace)
     bool emptyResult = Utils::String::removeExtraWhitespaces(emptyIn, emptyOut);
     EXPECT_FALSE(emptyResult);
 
-    std::remove(testFile);
+    (void)std::remove(testFile);
     TEST_LOG("Utils_String_Trim tests PASSED");
 }
 
@@ -9456,7 +9456,7 @@ TEST_F(SystemServicesTest, Utils_MoveFile_SourcePresent_DestAbsent_ReturnsTrue)
     const char* dst = "/tmp/move_dst_test.txt";
 
     // Ensure dst doesn't exist
-    std::remove(dst);
+    (void)std::remove(dst);
 
     // Create source
     {
@@ -9471,7 +9471,7 @@ TEST_F(SystemServicesTest, Utils_MoveFile_SourcePresent_DestAbsent_ReturnsTrue)
     EXPECT_TRUE(Utils::fileExists(dst));
     EXPECT_FALSE(Utils::fileExists(src));
 
-    std::remove(dst);
+    (void)std::remove(dst);
     TEST_LOG("Utils_MoveFile_SourcePresent_DestAbsent_ReturnsTrue PASSED");
 }
 
@@ -9484,7 +9484,7 @@ TEST_F(SystemServicesTest, Utils_MoveFile_SourcePresent_DestAbsent_ReturnsTrue)
 TEST_F(SystemServicesTest, Utils_UpdateSystemModeFile_AddAndDelete)
 {
     // Remove any leftover system mode file from previous tests
-    std::remove("/tmp/SystemMode.txt");
+    (void)std::remove("/tmp/SystemMode.txt");
 
     // "add" creates file and adds DEVICE_OPTIMIZE_currentstate=VIDEO
     Utils::String::updateSystemModeFile("TESTMODE", "currentstate", "VIDEO", "add");
@@ -9512,32 +9512,32 @@ TEST_F(SystemServicesTest, Utils_UpdateSystemModeFile_AddAndDelete)
     found = Utils::String::getSystemModePropertyValue("TESTMODE", "currentstate", val);
     EXPECT_FALSE(found);
 
-    std::remove("/tmp/SystemMode.txt");
+    (void)std::remove("/tmp/SystemMode.txt");
     TEST_LOG("Utils_UpdateSystemModeFile_AddAndDelete PASSED");
 }
 
 TEST_F(SystemServicesTest, Utils_UpdateSystemModeFile_InvalidAction_NoOp)
 {
-    std::remove("/tmp/SystemMode.txt");
+    (void)std::remove("/tmp/SystemMode.txt");
     // Invalid action → returns early, no file created
     Utils::String::updateSystemModeFile("TESTMODE", "currentstate", "VIDEO", "invalid");
     // File should not have been created with data (it may be created empty)
-    std::remove("/tmp/SystemMode.txt");
+    (void)std::remove("/tmp/SystemMode.txt");
     TEST_LOG("Utils_UpdateSystemModeFile_InvalidAction_NoOp PASSED");
 }
 
 TEST_F(SystemServicesTest, Utils_UpdateSystemModeFile_EmptySystemMode_NoOp)
 {
-    std::remove("/tmp/SystemMode.txt");
+    (void)std::remove("/tmp/SystemMode.txt");
     // Empty systemMode → returns early
     Utils::String::updateSystemModeFile("", "currentstate", "VIDEO", "add");
-    std::remove("/tmp/SystemMode.txt");
+    (void)std::remove("/tmp/SystemMode.txt");
     TEST_LOG("Utils_UpdateSystemModeFile_EmptySystemMode_NoOp PASSED");
 }
 
 TEST_F(SystemServicesTest, Utils_GetSystemModePropertyValue_FileAbsent_ReturnsFalse)
 {
-    std::remove("/tmp/SystemMode.txt");
+    (void)std::remove("/tmp/SystemMode.txt");
     std::string val;
     bool result = Utils::String::getSystemModePropertyValue("TESTMODE", "currentstate", val);
     EXPECT_FALSE(result);
@@ -9587,7 +9587,7 @@ TEST_F(SystemServicesTest, PlatformCapsData_getProperties_ParsesKeyValue)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
 
-    std::remove(testPropFile);
+    (void)std::remove(testPropFile);
     TEST_LOG("PlatformCapsData_getProperties test PASSED - Response: %s", response.c_str());
 }
 
@@ -9907,7 +9907,7 @@ TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_VersionsMatch_CoversKnow
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
     EXPECT_TRUE(jsonResponse.HasLabel("failReason"));
 
-    std::remove("/opt/fwdnldstatus.txt");
+    (void)std::remove("/opt/fwdnldstatus.txt");
     TEST_LOG("GetLastFirmwareFailureReason_VersionsMatch - Response: %s", response.c_str());
 }
 
@@ -9925,7 +9925,7 @@ TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_NetworkFailure_CoversKno
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
     EXPECT_TRUE(jsonResponse.HasLabel("failReason"));
 
-    std::remove("/opt/fwdnldstatus.txt");
+    (void)std::remove("/opt/fwdnldstatus.txt");
     TEST_LOG("GetLastFirmwareFailureReason_NetworkFailure - Response: %s", response.c_str());
 }
 
@@ -9952,7 +9952,7 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_RebootDeferred_CoversIsRebo
     EXPECT_TRUE(jsonResponse.HasLabel("isRebootDeferred"));
     EXPECT_TRUE(jsonResponse["isRebootDeferred"].Boolean());
 
-    std::remove("/opt/fwdnldstatus.txt");
+    (void)std::remove("/opt/fwdnldstatus.txt");
     TEST_LOG("GetDownloadedFirmwareInfo_RebootDeferred - Response: %s", response.c_str());
 }
 
@@ -9970,7 +9970,7 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_RebootDeferredTrue_Value)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
 
-    std::remove("/opt/fwdnldstatus.txt");
+    (void)std::remove("/opt/fwdnldstatus.txt");
     TEST_LOG("GetDownloadedFirmwareInfo_RebootDeferredTrue - Response: %s", response.c_str());
 }
 
@@ -10097,7 +10097,7 @@ TEST_F(SystemServicesTest, GetFirmwareDownloadPercent_WithProgressFile_CoversFil
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
     EXPECT_TRUE(jsonResponse.HasLabel("downloadPercent"));
 
-    std::remove(progressFile);
+    (void)std::remove(progressFile);
     TEST_LOG("GetFirmwareDownloadPercent_WithFile - Response: %s", response.c_str());
 }
 
@@ -10199,7 +10199,7 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_WithDnldVersnAndUrl_CoversA
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
 
-    std::remove("/opt/fwdnldstatus.txt");
+    (void)std::remove("/opt/fwdnldstatus.txt");
     TEST_LOG("GetDownloadedFirmwareInfo_AllBranches - Response: %s", response.c_str());
 }
 
@@ -10221,7 +10221,7 @@ TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_ESTBDownload_CoversFromT
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
     EXPECT_TRUE(jsonResponse.HasLabel("failReason"));
 
-    std::remove("/opt/fwdnldstatus.txt");
+    (void)std::remove("/opt/fwdnldstatus.txt");
     TEST_LOG("GetLastFirmwareFailureReason_ESTB - Response: %s", response.c_str());
 }
 
@@ -10322,7 +10322,7 @@ TEST_F(SystemServicesTest, Dispatch_OnMacAddressesRetrieved_ReachesNotification)
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(3000, SystemServices_onMacAddressesRetreived))
         << "OnMacAddressesRetreived event not received within timeout";
 
-    std::remove("/lib/rdk/getDeviceDetails.sh");
+    (void)std::remove("/lib/rdk/getDeviceDetails.sh");
     m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
     TEST_LOG("Dispatch_OnMacAddressesRetrieved PASSED - Response: %s", response.c_str());
@@ -10645,7 +10645,7 @@ TEST_F(SystemServicesTest, GetFirmwareDownloadPercent_WithMegabyteProgress_Cover
               _T("getFirmwareDownloadPercent"), _T("{}"), response));
 
     TEST_LOG("GetFirmwareDownloadPercent_WithMegabyteProgress - Response: %s", response.c_str());
-    std::remove("/opt/curl_progress");
+    (void)std::remove("/opt/curl_progress");
 }
 
 // =============================================================================
@@ -10666,7 +10666,7 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_InvalidValueInFile_CoversReadParamsE
               _T("getBlocklistFlag"), _T("{}"), response));
 
     TEST_LOG("GetBlocklistFlag_InvalidValueInFile - Response: %s", response.c_str());
-    std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
+    (void)std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
 }
 
 
@@ -11502,8 +11502,8 @@ TEST_F(SystemServicesTest, GetFirmwareUpdateInfo_SpawnsThread_WithXconfFiles)
     // Register notification handler to synchronise with the background thread.
     // WaitForRequestStatus blocks until OnFirmwareUpdateInfoReceived fires (or timeout),
     // guaranteeing the WorkerPool Job has completed before fixture teardown releases handlers.
-    SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     ASSERT_NE(nullptr, m_sysServices);
+	SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
 
@@ -11521,18 +11521,18 @@ TEST_F(SystemServicesTest, GetFirmwareUpdateInfo_SpawnsThread_WithXconfFiles)
     m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
 
-    std::remove("/tmp/xconf_httpcode_thunder.txt");
-    std::remove("/tmp/xconf_response_thunder.txt");
+    (void)std::remove("/tmp/xconf_httpcode_thunder.txt");
+    (void)std::remove("/tmp/xconf_response_thunder.txt");
 }
 
 TEST_F(SystemServicesTest, GetFirmwareUpdateInfo_NoXconfFiles_StillReturnsAsyncTrue)
 {
-    std::remove("/tmp/xconf_httpcode_thunder.txt");
-    std::remove("/tmp/xconf_response_thunder.txt");
+    (void)std::remove("/tmp/xconf_httpcode_thunder.txt");
+    (void)std::remove("/tmp/xconf_response_thunder.txt");
 
     // Register notification handler to synchronise with the background thread.
-    SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     ASSERT_NE(nullptr, m_sysServices);
+	SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
 
@@ -11584,7 +11584,7 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_DnldVersn_Branch_WhenStateI
     ASSERT_TRUE(jsonResponse.FromString(response));
     EXPECT_TRUE(jsonResponse["success"].Boolean());
 
-    std::remove(fwStatusFile);
+    (void)std::remove(fwStatusFile);
 }
 
 
