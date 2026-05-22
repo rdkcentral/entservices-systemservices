@@ -18,7 +18,7 @@ env:
   INTERFACES_REF: "develop"
   AUTOMATICS_UNAME: ${{ secrets.AUTOMATICS_UNAME}}
   AUTOMATICS_PASSCODE: ${{ secrets. AUTOMATICS_PASSCODE}}
-  RDK_SERVICES_L1_TEST: "OFF"
+  RDK_SERVICES_L1_TEST: "ON"
   ENABLE_CACHE: "false"
 
 jobs:
@@ -54,7 +54,7 @@ jobs:
             install
             !install/etc/WPEFramework/plugins
             !install/usr/bin/RdkServicesTest
-            !install/usr/include/gmock
+            !install/usr/include/gmock 
             !install/usr/include/gtest
             !install/usr/lib/libgmockd.a
             !install/usr/lib/libgmock_maind.a
@@ -125,7 +125,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-testframework
           path: entservices-testframework
-          ref: 1.0.4
+          ref: feature/RDKEMW-16053
 
       - name: Checkout entservices-systemservices
         if: ${{ inputs.caller_source == 'local' }}
@@ -243,6 +243,7 @@ jobs:
           headers/rdk/halif/deepsleep-manager
           headers/ccec/drivers
           headers/network
+          headers/systimerifc
           headers/proc
           &&
           cd headers
@@ -300,6 +301,8 @@ jobs:
           systemaudioplatform.h
           gdialservice.h
           gdialservicecommon.h
+          &&
+          echo "typedef struct { char message[256]; char timerSrc[256]; char currentTime[256]; } TimerMsg;" > systimerifc/itimermsg.h
           &&
           cp -r /usr/include/gstreamer-1.0/gst /usr/include/glib-2.0/* /usr/lib/x86_64-linux-gnu/glib-2.0/include/* /usr/local/include/trower-base64/base64.h /usr/include/libdrm/drm.h /usr/include/libdrm/drm_mode.h /usr/include/xf86drm.h .
 
@@ -385,7 +388,12 @@ jobs:
           -DHAS_API_POWERSTATE
           -DHAS_RBUS
           -D_DRM_MODE_H
-          -DENABLE_DEVICE_MANUFACTURER_INFO"
+          -DENABLE_DEVICE_MANUFACTURER_INFO
+          -DENABLE_SYSTIMEMGR_SUPPORT
+          -DIARM_BUS_SYSTIME_MGR_NAME=\"SYSMgr\"
+          -DTIMER_STATUS_MSG=\"GetTimeStatus\"
+          -DcTIMER_STATUS_UPDATE=0
+          -DcTIMER_STATUS_MESSAGE_LENGTH=256"
           -D_DRM_MODE_H=ON
           &&
           cmake --build build/mocks -j8
@@ -449,8 +457,14 @@ jobs:
           -DHAS_API_POWERSTATE
           -D_DRM_MODE_H=ON
           -DHAS_RBUS
-          -DENABLE_DEVICE_MANUFACTURER_INFO"
+          -DENABLE_DEVICE_MANUFACTURER_INFO
+          -DENABLE_SYSTIMEMGR_SUPPORT
+          -DIARM_BUS_SYSTIME_MGR_NAME=\\\"SYSMgr\\\"
+          -DTIMER_STATUS_MSG=\\\"GetTimeStatus\\\"
+          -DcTIMER_STATUS_UPDATE=0
+          -DcTIMER_STATUS_MESSAGE_LENGTH=256"
           -DCOMCAST_CONFIG=OFF
+          -DBUILD_ENABLE_SYSTIMEMGR_SUPPORT=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_DS=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_IARMBus=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_Udev=ON
@@ -527,8 +541,10 @@ jobs:
           -DHAS_API_POWERSTATE
           -D_DRM_MODE_H=ON
           -DHAS_RBUS
-          -DENABLE_DEVICE_MANUFACTURER_INFO"
+          -DENABLE_DEVICE_MANUFACTURER_INFO
+          -DENABLE_SYSTIMEMGR_SUPPORT"
           -DCOMCAST_CONFIG=OFF
+          -DBUILD_ENABLE_SYSTIMEMGR_SUPPORT=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_DS=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_IARMBus=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_Udev=ON
@@ -668,6 +684,7 @@ jobs:
           lcov -c
           -o coverage.info
           -d build/entservices-systemservices
+          -d $GITHUB_WORKSPACE/entservices-systemservices/plugin
           &&
           lcov
           -r coverage.info

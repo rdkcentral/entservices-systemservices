@@ -95,6 +95,13 @@ jobs:
           path: entservices-powermanager
           ref: develop
 
+      - name: Checkout entservices-migration
+        uses: actions/checkout@v3
+        with:
+          repository: rdkcentral/entservices-migration
+          path: entservices-migration
+          ref: develop
+
       - name: Checkout entservices-systemservices
         if: ${{ inputs.caller_source == 'local' }}
         uses: actions/checkout@v3
@@ -114,7 +121,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-testframework
           path: entservices-testframework
-          ref: 1.0.4
+          ref: 1.0.1
 
       - name: Checkout googletest
         if: steps.cache.outputs.cache-hit != 'true'
@@ -211,8 +218,10 @@ jobs:
           headers/rdk/ds
           headers/rdk/iarmbus
           headers/rdk/iarmmgrs-hal
+          headers/rdk/halif/deepsleep-manager
           headers/systemservices
           headers/systemservices/proc
+          headers/systimerifc
           &&
           cd headers
           &&
@@ -246,6 +255,7 @@ jobs:
           rdk/iarmmgrs-hal/pwrMgr.h
           rdk/iarmmgrs-hal/sysMgr.h
           rdk/iarmbus/iarmUtil.h
+          rdk/halif/deepsleep-manager/deepSleepMgr.h
           rfcapi.h
           rbus.h
           libudev.h
@@ -256,6 +266,7 @@ jobs:
           systemservices/proc/readproc.h
           systemservices/secure_wrapper.h
           systemaudioplatform.h
+          systimerifc/itimermsg.h
           maintenanceMGR.h
           pkg.h
           edid-parser.hpp
@@ -274,6 +285,8 @@ jobs:
           rdk/ds/VideoDFC.hpp
           dsRpc.h
           telemetry_busmessage_sender.h
+          &&
+          printf '#ifndef __ITIMERMSG_H__\n#define __ITIMERMSG_H__\n#define IARM_BUS_SYSTIME_MGR_NAME "SYSTEMTIME"\n#define cTIMER_STATUS_UPDATE 0\n#define TIMER_STATUS_MSG "TimerStatus"\n#define cTIMER_STATUS_MESSAGE_LENGTH 256\ntypedef struct _TimerMsg {\n    char message[256];\n    char timerSrc[256];\n    char currentTime[256];\n} TimerMsg;\n#endif\n' > systimerifc/itimermsg.h
           &&
           cp -r /usr/include/gstreamer-1.0/gst /usr/include/glib-2.0/* /usr/lib/x86_64-linux-gnu/glib-2.0/include/* /usr/local/include/trower-base64/base64.h /usr/include/libdrm/drm.h /usr/include/libdrm/drm_mode.h /usr/include/xf86drm.h .
 
@@ -398,6 +411,333 @@ jobs:
           &&
           cmake --install build/entservices-powermanager
 
+      - name: Build entservices-migration
+        run: >
+          cmake
+          -S "$GITHUB_WORKSPACE/entservices-migration"
+          -B build/entservices-migration
+          -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
+          -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/install/usr"
+          -DCMAKE_MODULE_PATH="$GITHUB_WORKSPACE/install/tools/cmake"
+          -DHIDE_NON_EXTERNAL_SYMBOLS=OFF
+          -DPLUGIN_CLOUDSTORE_URI="localhost:50051"
+          -DCMAKE_CXX_FLAGS="
+          -DEXCEPTIONS_ENABLE=ON
+          -fprofile-arcs
+          -ftest-coverage
+          -DUSE_THUNDER_R4=ON
+          -DTHUNDER_VERSION=4
+          -DTHUNDER_VERSION_MAJOR=4
+          -DTHUNDER_VERSION_MINOR=4
+          -DDEVICE_TYPE=AVOutputTV
+          -DPLUGIN_PERSISTENTSTORE_PATH="/tmp/secure/persistent/rdkservicestore"
+          -DPLUGIN_PERSISTENTSTORE_LEGACYPATH="/tmp/persistent/rdkservicestore"
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/ds
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmbus
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmmgrs-hal
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systemservices
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systemservices/proc
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/libusb
+          -I $GITHUB_WORKSPACE/install/usr/include
+          -I $GITHUB_WORKSPACE/build/mocks
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/devicesettings.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Iarm.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Rfc.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/RBus.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Udev.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Wraps.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/libusb/libusb.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/maintenanceMGR.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/pkg.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/secure_wrappermock.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/wpa_ctrl_mock.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/readprocMockInterface.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/btmgr.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tr181api.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvSettings.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvError.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvSettingsExtODM.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvSettingsODM.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvTypes.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/essos-resmgr.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Telemetry.h
+          -Werror -Wall -Wno-unused-result -Wno-deprecated-declarations -Wno-error=format=
+          -DUSE_IARMBUS
+          -DHAS_RBUS
+          -DRDK_SERVICE_L2_TEST
+          -DDISABLE_SECURITY_TOKEN
+          -DENABLE_THERMAL_PROTECTION"
+          -DPLUGIN_PERSISTENTSTORE_PATH="/tmp/secure/persistent/rdkservicestore"
+          -DPLUGIN_PERSISTENTSTORE_LEGACYPATH="/tmp/persistent/rdkservicestore"
+          -DPLUGIN_STORAGE_MANAGER_PATH="/tmp/persistent/storageManager"
+          -DCOMCAST_CONFIG=OFF
+          -DCMAKE_DISABLE_FIND_PACKAGE_DS=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_IARMBus=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_Udev=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_RFC=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_RBus=ON
+          -DPLUGIN_MIGRATION=ON
+          -DUSE_THUNDER_R4=ON
+          -DPLUGIN_L2Tests=ON
+          -DRDK_SERVICE_L2_TEST=ON
+          -DDS_FOUND=ON
+          -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+          &&
+          cmake --build build/entservices-migration 
+          &&
+          cmake --install build/entservices-migration
+
+      - name: Checkout entservices-telemetry
+        uses: actions/checkout@v3
+        with:
+          repository: rdkcentral/entservices-telemetry
+          path: entservices-telemetry
+          ref: develop
+
+      - name: Build entservices-telemetry
+        run: >
+          cmake
+          -S "$GITHUB_WORKSPACE/entservices-telemetry"
+          -B build/entservices-telemetry
+          -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
+          -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/install/usr"
+          -DCMAKE_MODULE_PATH="$GITHUB_WORKSPACE/install/tools/cmake"
+          -DHIDE_NON_EXTERNAL_SYMBOLS=OFF
+          -DPLUGIN_CLOUDSTORE_URI="localhost:50051"
+          -DCMAKE_CXX_FLAGS="
+          -DEXCEPTIONS_ENABLE=ON
+          -fprofile-arcs
+          -ftest-coverage
+          -DUSE_THUNDER_R4=ON
+          -DTHUNDER_VERSION=4
+          -DTHUNDER_VERSION_MAJOR=4
+          -DTHUNDER_VERSION_MINOR=4
+          -DDEVICE_TYPE=AVOutputTV
+          -DPLUGIN_PERSISTENTSTORE_PATH="/tmp/secure/persistent/rdkservicestore"
+          -DPLUGIN_PERSISTENTSTORE_LEGACYPATH="/tmp/persistent/rdkservicestore"
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/ds
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmbus
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmmgrs-hal
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systemservices
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systemservices/proc
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/libusb
+          -I $GITHUB_WORKSPACE/install/usr/include
+          -I $GITHUB_WORKSPACE/build/mocks
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/devicesettings.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Iarm.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Rfc.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/RBus.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Telemetry.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Udev.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Wraps.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/libusb/libusb.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/maintenanceMGR.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/pkg.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/secure_wrappermock.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/wpa_ctrl_mock.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/readprocMockInterface.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/btmgr.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tr181api.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvSettings.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvError.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvSettingsExtODM.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvSettingsODM.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvTypes.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/essos-resmgr.h
+          -Werror -Wall -Wno-unused-result -Wno-deprecated-declarations -Wno-error=format=
+          -DUSE_IARMBUS
+          -DHAS_RBUS
+          -DRDK_SERVICE_L2_TEST
+          -DDISABLE_SECURITY_TOKEN
+          -DENABLE_THERMAL_PROTECTION"
+          -DPLUGIN_PERSISTENTSTORE_PATH="/tmp/secure/persistent/rdkservicestore"
+          -DPLUGIN_PERSISTENTSTORE_LEGACYPATH="/tmp/persistent/rdkservicestore"
+          -DPLUGIN_STORAGE_MANAGER_PATH="/tmp/persistent/storageManager"
+          -DCOMCAST_CONFIG=OFF
+          -DCMAKE_DISABLE_FIND_PACKAGE_DS=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_IARMBus=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_Udev=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_RFC=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_RBus=ON
+          -DPLUGIN_TELEMETRY=ON
+          -DUSE_THUNDER_R4=ON
+          -DPLUGIN_L2Tests=ON
+          -DRDK_SERVICE_L2_TEST=ON
+          -DDS_FOUND=ON
+          -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+          &&
+          cmake --build build/entservices-telemetry -j6
+          &&
+          cmake --install build/entservices-telemetry
+
+      - name: Checkout entservices-deviceinfo
+        uses: actions/checkout@v3
+        with:
+          repository: rdkcentral/entservices-deviceinfo
+          path: entservices-deviceinfo
+          ref: develop
+
+      - name: Build entservices-deviceinfo
+        run: >
+          cmake
+          -S "$GITHUB_WORKSPACE/entservices-deviceinfo"
+          -B build/entservices-deviceinfo
+          -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
+          -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/install/usr"
+          -DCMAKE_MODULE_PATH="$GITHUB_WORKSPACE/install/tools/cmake"
+          -DHIDE_NON_EXTERNAL_SYMBOLS=OFF
+          -DCMAKE_CXX_FLAGS="
+          -DEXCEPTIONS_ENABLE=ON
+          -fprofile-arcs
+          -ftest-coverage
+          -DUSE_THUNDER_R4=ON
+          -DTHUNDER_VERSION=4
+          -DTHUNDER_VERSION_MAJOR=4
+          -DTHUNDER_VERSION_MINOR=4
+          -DDEVICE_TYPE=AVOutputTV
+          -DPLUGIN_PERSISTENTSTORE_PATH="/tmp/secure/persistent/rdkservicestore"
+          -DPLUGIN_PERSISTENTSTORE_LEGACYPATH="/tmp/persistent/rdkservicestore"
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/ds
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmbus
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmmgrs-hal
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systemservices
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systemservices/proc
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks
+          -I $GITHUB_WORKSPACE/entservices-deviceinfo/helpers
+          -I $GITHUB_WORKSPACE/install/usr/include
+          -I ./usr/include/libdrm
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/devicesettings.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Iarm.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Rfc.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/RBus.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Udev.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Wraps.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/maintenanceMGR.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/pkg.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/secure_wrappermock.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/wpa_ctrl_mock.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/readprocMockInterface.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/btmgr.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tr181api.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvSettings.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvError.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvSettingsExtODM.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvSettingsODM.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvTypes.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/essos-resmgr.h
+          -Wall -Wno-unused-result -Wno-deprecated-declarations -Wno-error=format=
+          -Wl,-wrap,system -Wl,-wrap,popen -Wl,-wrap,syslog -Wl,-wrap,v_secure_system -Wl,-wrap,v_secure_popen -Wl,-wrap,v_secure_pclose -Wl,-wrap,unlink
+          -DUSE_IARMBUS
+          -DUSE_DEVICESETTINGS
+          -DENABLE_ERM
+          -DRDK_LOG_MILESTONE
+          -DRDK_SERVICE_L2_TEST
+          -DDISABLE_SECURITY_TOKEN
+          -DHAS_API_POWERSTATE
+          -DENABLE_THERMAL_PROTECTION"
+          -DPLUGIN_PERSISTENTSTORE_PATH="/tmp/secure/persistent/rdkservicestore"
+          -DPLUGIN_PERSISTENTSTORE_LEGACYPATH="/tmp/persistent/rdkservicestore"
+          -DCOMCAST_CONFIG=OFF
+          -DCMAKE_DISABLE_FIND_PACKAGE_DS=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_IARMBus=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_Udev=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_RFC=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_RBus=ON
+          -DPLUGIN_DEVICEINFO=ON
+          -DUSE_THUNDER_R4=ON
+          -DPLUGIN_L2Tests=ON
+          -DRDK_SERVICE_L2_TEST=ON
+          -DDS_FOUND=ON
+          -DUSE_DEVICESETTINGS=ON
+          -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+          &&
+          cmake --build build/entservices-deviceinfo -j8
+          &&
+          cmake --install build/entservices-deviceinfo
+
+      - name: Checkout entservices-firmwareupdate
+        uses: actions/checkout@v3
+        with:
+          repository: rdkcentral/entservices-firmwareupdate
+          path: entservices-firmwareupdate
+          ref: develop
+
+      - name: Build entservices-firmwareupdate
+        run: >
+          cmake
+          -S "$GITHUB_WORKSPACE/entservices-firmwareupdate"
+          -B build/entservices-firmwareupdate
+          -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
+          -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/install/usr"
+          -DCMAKE_MODULE_PATH="$GITHUB_WORKSPACE/install/tools/cmake"
+          -DHIDE_NON_EXTERNAL_SYMBOLS=OFF
+          -DCMAKE_CXX_FLAGS="
+          -DEXCEPTIONS_ENABLE=ON
+          -fprofile-arcs
+          -ftest-coverage
+          -DUSE_THUNDER_R4=ON
+          -DTHUNDER_VERSION=4
+          -DTHUNDER_VERSION_MAJOR=4
+          -DTHUNDER_VERSION_MINOR=4
+          -DDEVICE_TYPE=AVOutputTV
+          -DPLUGIN_PERSISTENTSTORE_PATH="/tmp/secure/persistent/rdkservicestore"
+          -DPLUGIN_PERSISTENTSTORE_LEGACYPATH="/tmp/persistent/rdkservicestore"
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/ds
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmbus
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmmgrs-hal
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systemservices
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systemservices/proc
+          -I $GITHUB_WORKSPACE/install/usr/include
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/devicesettings.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Iarm.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Rfc.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/RBus.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Udev.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Wraps.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/maintenanceMGR.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/pkg.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/secure_wrappermock.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/wpa_ctrl_mock.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/readprocMockInterface.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/btmgr.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tr181api.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvSettings.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvError.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvSettingsExtODM.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvSettingsODM.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvTypes.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/essos-resmgr.h
+          -Werror -Wall -Wno-unused-result -Wno-deprecated-declarations -Wno-error=format=
+          -Wl,-wrap,system -Wl,-wrap,popen -Wl,-wrap,syslog -Wl,-wrap,v_secure_system -Wl,-wrap,v_secure_popen -Wl,-wrap,v_secure_pclose -Wl,-wrap,unlink
+          -DUSE_IARMBUS
+          -DRDK_SERVICE_L2_TEST
+          -DDISABLE_SECURITY_TOKEN
+          -DENABLE_THERMAL_PROTECTION"
+          -DPLUGIN_PERSISTENTSTORE_PATH="/tmp/secure/persistent/rdkservicestore"
+          -DPLUGIN_PERSISTENTSTORE_LEGACYPATH="/tmp/persistent/rdkservicestore"
+          -DCOMCAST_CONFIG=OFF
+          -DCMAKE_DISABLE_FIND_PACKAGE_DS=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_IARMBus=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_Udev=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_RFC=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_RBus=ON
+          -DPLUGIN_FIRMWAREUPDATE=ON
+          -DUSE_THUNDER_R4=ON
+          -DPLUGIN_L2Tests=ON
+          -DRDK_SERVICE_L2_TEST=ON
+          -DDS_FOUND=ON
+          -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+          &&
+          cmake --build build/entservices-firmwareupdate -j8
+          &&
+          cmake --install build/entservices-firmwareupdate
+
       - name: Build entservices-systemservices
         run: >
           cmake
@@ -424,6 +764,7 @@ jobs:
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmmgrs-hal
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systemservices
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systemservices/proc
+          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systimerifc
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks
           -I $GITHUB_WORKSPACE/entservices-systemservices/helpers
           -I $GITHUB_WORKSPACE/install/usr/include
@@ -452,8 +793,12 @@ jobs:
           -Wl,-wrap,popen -Wl,-wrap,syslog -Wl,-wrap,v_secure_system -Wl,-wrap,v_secure_popen -Wl,-wrap,v_secure_pclose -Wl,-wrap,unlink
           -DUSE_IARMBUS
           -DRDK_SERVICE_L2_TEST
+          -DHAS_API_SYSTEM
           -DHAS_API_POWERSTATE
-          -DENABLE_THERMAL_PROTECTION"
+          -DENABLE_THERMAL_PROTECTION
+          -DENABLE_DEEP_SLEEP
+          -DENABLE_DEVICE_MANUFACTURER_INFO
+          -DENABLE_SYSTIMEMGR_SUPPORT"
           -DPLUGIN_PERSISTENTSTORE_PATH="/tmp/secure/persistent/rdkservicestore"
           -DPLUGIN_PERSISTENTSTORE_LEGACYPATH="/tmp/persistent/rdkservicestore"
           -DCOMCAST_CONFIG=OFF
@@ -565,6 +910,7 @@ jobs:
           /opt/secure/reboot
           /opt/secure/persistent
           /opt/secure/persistent/System
+          /opt/secure/persistent/opflashstore
           /tmp/secure/persistent
           /tmp/persistent
           /tmp/persistent/rdkservicestore
@@ -641,6 +987,8 @@ jobs:
           /tmp/block/sdb/device/vendor
           /tmp/block/sdb/device/model
           &&
+          echo "BUILD_TYPE=VBN" | sudo tee /etc/device.properties
+          &&
           cd /dev/disk/by-id/
           &&
           sudo ln -s ../../sda /dev/disk/by-id/usb-Generic_Flash_Disk_B32FD507-0
@@ -657,28 +1005,35 @@ jobs:
           $GITHUB_WORKSPACE/entservices-testframework/Tests/L2Tests/pact/install-verifier-cli.sh
 
       - name: Run unit tests without valgrind
-        run: >
-          PATH=$GITHUB_WORKSPACE/install/usr/bin:${PATH}
-          LD_LIBRARY_PATH=$GITHUB_WORKSPACE/install/usr/lib:$GITHUB_WORKSPACE/install/usr/lib/wpeframework/plugins:${LD_LIBRARY_PATH}
-          RdkServicesL2Test &&
-          cp -rf $(pwd)/rdkL2TestResults.json $GITHUB_WORKSPACE/rdkL2TestResultsWithoutValgrind.json &&
-          rm -rf $(pwd)/rdkL2TestResults.json
+        run: |
+          export PATH=$GITHUB_WORKSPACE/install/usr/bin:${PATH}
+          export LD_LIBRARY_PATH=$GITHUB_WORKSPACE/install/usr/lib:$GITHUB_WORKSPACE/install/usr/lib/wpeframework/plugins:${LD_LIBRARY_PATH}
+          RdkServicesL2Test
+          TEST_EXIT=$?
+          JSON_FILE=$(find "$GITHUB_WORKSPACE" /tmp /root -maxdepth 5 -name "rdkL2TestResults.json" 2>/dev/null | head -1)
+          if [ -n "$JSON_FILE" ]; then
+            cp -rf "$JSON_FILE" $GITHUB_WORKSPACE/rdkL2TestResultsWithoutValgrind.json
+            rm -rf "$JSON_FILE"
+          else
+            echo '{"tests":0,"failures":0,"errors":0,"timestamp":"","time":"0","name":"AllTests","testsuites":[]}' > $GITHUB_WORKSPACE/rdkL2TestResultsWithoutValgrind.json
+          fi
+          exit $TEST_EXIT
 
       - name: Run unit tests with valgrind
         if: ${{ !env.ACT && inputs.caller_source != 'testframework' }}
-        run: >
-          PATH=$GITHUB_WORKSPACE/install/usr/bin:${PATH}
-          LD_LIBRARY_PATH=$GITHUB_WORKSPACE/install/usr/lib:$GITHUB_WORKSPACE/install/usr/lib/wpeframework/plugins:${LD_LIBRARY_PATH}
-          valgrind
-          --tool=memcheck
-          --log-file=valgrind_log
-          --leak-check=yes
-          --show-reachable=yes
-          --track-fds=yes
-          --fair-sched=try
-          RdkServicesL2Test &&
-          cp -rf $(pwd)/rdkL2TestResults.json $GITHUB_WORKSPACE/rdkL2TestResultsWithValgrind.json &&
-          rm -rf $(pwd)/rdkL2TestResults.json
+        run: |
+          export PATH=$GITHUB_WORKSPACE/install/usr/bin:${PATH}
+          export LD_LIBRARY_PATH=$GITHUB_WORKSPACE/install/usr/lib:$GITHUB_WORKSPACE/install/usr/lib/wpeframework/plugins:${LD_LIBRARY_PATH}
+          valgrind --tool=memcheck --log-file=valgrind_log --leak-check=yes --show-reachable=yes --track-fds=yes --fair-sched=try RdkServicesL2Test
+          TEST_EXIT=$?
+          JSON_FILE=$(find "$GITHUB_WORKSPACE" /tmp /root -maxdepth 5 -name "rdkL2TestResults.json" 2>/dev/null | head -1)
+          if [ -n "$JSON_FILE" ]; then
+            cp -rf "$JSON_FILE" $GITHUB_WORKSPACE/rdkL2TestResultsWithValgrind.json
+            rm -rf "$JSON_FILE"
+          else
+            echo '{"tests":0,"failures":0,"errors":0,"timestamp":"","time":"0","name":"AllTests","testsuites":[]}' > $GITHUB_WORKSPACE/rdkL2TestResultsWithValgrind.json
+          fi
+          exit $TEST_EXIT
 
       - name: Generate coverage
         if: ${{ matrix.coverage == 'with-coverage' && !env.ACT && inputs.caller_source != 'testframework' }}
@@ -719,4 +1074,3 @@ jobs:
             rdkL2TestResultsWithoutValgrind.json
             rdkL2TestResultsWithValgrind.json
           if-no-files-found: warn
-

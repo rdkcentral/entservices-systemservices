@@ -103,7 +103,8 @@ endmacro()
 
 # PLUGIN_SYSTEMSERVICES
 set (SYSTEMSERVICES_INC ../../plugin ../../helpers)
-add_plugin_test_ex(PLUGIN_SYSTEMSERVICES tests/test_SystemServices.cpp "${SYSTEMSERVICES_INC}" "${NAMESPACE}SystemServices")
+set (SYSTEMSERVICES_LIBS ${NAMESPACE}SystemServices ${NAMESPACE}SystemServicesImplementation)
+add_plugin_test_ex(PLUGIN_SYSTEMSERVICES tests/test_SystemServices.cpp "${SYSTEMSERVICES_INC}" "${SYSTEMSERVICES_LIBS}")
 
 add_library(${MODULE_NAME} SHARED ${TEST_SRC})
 
