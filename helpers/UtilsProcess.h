@@ -36,9 +36,9 @@ namespace Utils
 * @param[in] input_pname - The given process name
 * @return true if any process with the given name was killed, otherwise false is returned
 */
-bool killProcess(string& input_pname)
+bool killProcess(const string& input_pname)
 {
-    PROCTAB* proc = openproc(PROC_FILLMEM | PROC_FILLSTAT | PROC_FILLSTATUS);
+    PROCTAB* proc = openproc(PROC_FILLMEM | PROC_FILLSTAT | PROC_FILLSTATUS | PROC_FILLCOM);
     proc_t proc_info = {0};
     bool ret_value = false;
 
@@ -47,7 +47,7 @@ bool killProcess(string& input_pname)
         memset(&proc_info, 0, sizeof(proc_info));
         while (readproc(proc, &proc_info) != NULL)
         {
-            if (proc_info.cmd == input_pname)
+            if (proc_info.cmd != nullptr && strcmp(proc_info.cmd, input_pname.c_str()) == 0)
             {
                 if (0 == kill(proc_info.tid, SIGTERM))
                 {
