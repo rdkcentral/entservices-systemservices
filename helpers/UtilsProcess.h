@@ -38,7 +38,7 @@ namespace Utils
 */
 bool killProcess(const string& input_pname)
 {
-    PROCTAB* proc = openproc(PROC_FILLMEM | PROC_FILLSTAT | PROC_FILLSTATUS | PROC_FILLCOM);
+    PROCTAB* proc = openproc(PROC_FILLMEM | PROC_FILLSTAT | PROC_FILLSTATUS );
     proc_t proc_info = {0};
     bool ret_value = false;
 
