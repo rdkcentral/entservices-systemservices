@@ -1761,7 +1761,7 @@ TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_Success)
 
 TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_NoFile)
 {
-    std::remove("/opt/persistent/.lastswupdatestatus");
+    (void)std::remove("/opt/persistent/.lastswupdatestatus");
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getLastFirmwareFailureReason"), _T("{}"), response));
     
@@ -4021,9 +4021,9 @@ TEST_F(SystemServicesTest, Notification_OnBlocklistChanged_ViaSetBlocklistFlag)
     (void)system("mkdir -p /opt/secure/persistent/opflashstore");
     createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "blocklist=false");
 
+    ASSERT_NE(nullptr, m_sysServices) << "ISystemServices not available";
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
 
-    ASSERT_NE(nullptr, m_sysServices) << "ISystemServices not available";
     m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
 
@@ -6194,7 +6194,7 @@ TEST_F(SystemServicesTest, GetFirmwareUpdateState_Returns0_Uninitialized)
 
 TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_NoFile_ReturnsNoneAndSuccess)
 {
-    std::remove("/opt/fwdnldstatus.txt");
+    (void)std::remove("/opt/fwdnldstatus.txt");
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getLastFirmwareFailureReason"), _T("{}"), response));
 
