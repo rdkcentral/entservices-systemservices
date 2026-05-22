@@ -54,7 +54,7 @@ jobs:
             install
             !install/etc/WPEFramework/plugins
             !install/usr/bin/RdkServicesTest
-            !install/usr/include/gmock 
+            !install/usr/include/gmock
             !install/usr/include/gtest
             !install/usr/lib/libgmockd.a
             !install/usr/lib/libgmock_maind.a
