@@ -32,9 +32,9 @@ using namespace std;
 namespace Utils
 {
 /**
-* @brief Kill all the processes with the given process name
-* @param[in] input_pname - The given process name
-* @return true if any process with the given name was killed, otherwise false is returned
+* @brief Kill all the processes whose command contains the given substring
+* @param[in] input_pname - The process name substring to match
+* @return true if any process matching the substring was killed, otherwise false is returned
 */
 bool killProcess(const string& input_pname)
 {
@@ -53,7 +53,7 @@ bool killProcess(const string& input_pname)
         memset(&proc_info, 0, sizeof(proc_info));
         while (readproc(proc, &proc_info) != NULL)
         {
-            if (proc_info.cmd != nullptr && strstr(proc_info.cmd, input_pname.c_str()) != nullptr)
+            if (proc_info.cmd[0] != '\0' && strstr(proc_info.cmd, input_pname.c_str()) != nullptr)
             {
                 if (0 == kill(proc_info.tid, SIGTERM))
                 {
