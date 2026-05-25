@@ -23,6 +23,7 @@ set(PLUGIN_SYSTEM_AUTOSTART false CACHE STRING "To automatically start System pl
 set(PLUGIN_SYSTEMSERVICE_STARTUPORDER "" CACHE STRING "To configure startup order of SystemServices plugin")
 
 find_package(${NAMESPACE}Plugins REQUIRED)
+find_package(${NAMESPACE}Helpers REQUIRED)
 find_package(${NAMESPACE}Definitions REQUIRED)
 find_package(CompileSettingsDebug CONFIG REQUIRED)
 find_library(PROCPS_LIBRARIES NAMES procps)
@@ -40,9 +41,6 @@ add_library(${MODULE_NAME} SHARED
 set_target_properties(${MODULE_NAME} PROPERTIES
         CXX_STANDARD 11
         CXX_STANDARD_REQUIRED YES)
-
-include_directories(
-        ../helpers)
 
 target_link_libraries(${MODULE_NAME}
     PRIVATE
@@ -135,8 +133,9 @@ if(TELEMETRY_FOUND)
     target_include_directories(${MODULE_NAME} PRIVATE ${TELEMETRY_INCLUDE_DIRS})
 endif()
 
-target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ../helpers)
-target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ./)
+target_include_directories(${MODULE_NAME} PRIVATE ./)
+target_link_libraries(${MODULE_NAME} PRIVATE ${NAMESPACE}::${NAMESPACE}Helpers)  
+target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${NAMESPACE}::${NAMESPACE}Helpers)
 
 install(TARGETS ${PLUGIN_IMPLEMENTATION}
         DESTINATION lib/${STORAGE_DIRECTORY}/plugins)
