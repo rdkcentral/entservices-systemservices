@@ -134,6 +134,7 @@ if(TELEMETRY_FOUND)
 endif()
 
 target_include_directories(${MODULE_NAME} PRIVATE ./)
+target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ${CMAKE_SOURCE_DIR}/helpers)
 target_link_libraries(${MODULE_NAME} PRIVATE ${NAMESPACE}::${NAMESPACE}Helpers)  
 target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${NAMESPACE}::${NAMESPACE}Helpers)
 
