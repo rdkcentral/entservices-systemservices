@@ -42,9 +42,6 @@ set_target_properties(${MODULE_NAME} PROPERTIES
         CXX_STANDARD 11
         CXX_STANDARD_REQUIRED YES)
 
-include_directories(
-        ../helpers)
-
 target_link_libraries(${MODULE_NAME}
     PRIVATE
         CompileSettingsDebug::CompileSettingsDebug
@@ -138,6 +135,7 @@ endif()
 
 target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ./)
 target_link_libraries(${MODULE_NAME} PRIVATE ${NAMESPACE}::${NAMESPACE}Helpers)
+target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${NAMESPACE}::${NAMESPACE}Helpers)
 
 #Add mock headers and SYSTIMEMGR support for L1 and L2 tests only
 if (RDK_SERVICES_L1_TEST OR RDK_SERVICE_L2_TEST)
