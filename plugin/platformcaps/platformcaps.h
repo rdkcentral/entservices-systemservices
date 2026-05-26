@@ -20,6 +20,7 @@
 #pragma once
 
 #include "../Module.h"
+#include "../SystemServices.h"
 
 namespace WPEFramework {
 namespace Plugin {
@@ -88,7 +89,7 @@ public:
    * @param query - e.g. "AccountInfo.accountId", "DeviceInfo", "" (all)
    * @return
    */
-  bool Load(PluginHost::IShell* service, const string &query = string());
+  bool Load(PluginHost::IShell* service, const string &query, Exchange::ISystemServices::PlatformConfig& platformConfig);
 
   AccountInfo accountInfo;
   DeviceInfo deviceInfo;
