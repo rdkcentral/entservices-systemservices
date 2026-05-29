@@ -2951,12 +2951,13 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_AllFields)
 {
     // Create firmware info file with all fields using pipe-delimited format
     (void)system("mkdir -p /opt");
-    std::ofstream fwInfo("/opt/fwdnldstatus.txt");
+    std::ofstream fwInfo("/opt/fwdnldstatus.txt", std::ios::out | std::ios::trunc);
     fwInfo << "Method|https\n";
     fwInfo << "Status|Successful\n";
-    fwInfo << "DnldFile|/tmp/test_firmware.bin\n";
     fwInfo << "DnldVersn|1.2.3.4\n";
+    fwInfo << "DnldURL|http://example.com/firmware.bin\n";
     fwInfo << "Reboot|false\n";
+    fwInfo.flush();
     fwInfo.close();
 
 	// Set firmware update state to Downloading (2) so the implementation returns downloadedFWVersion
