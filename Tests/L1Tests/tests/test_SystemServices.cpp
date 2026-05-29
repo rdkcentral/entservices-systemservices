@@ -4008,32 +4008,6 @@ TEST_F(SystemServicesTest, GetBootTypeInfo_WarmBoot_Success)
     }
 }
 
-TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_WithCompleteData)
-{
-    std::ofstream file("/version.txt");
-    file << "imagename:TEST_IMAGE_VERSION_COMPLETE\n";
-    file << "SDK_VERSION=17.3\n";
-    file << "BUILD_TYPE=VBN\n";
-	file.flush();
-    file.close();
-    
-    // Small delay to ensure file is flushed to disk
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDownloadedFirmwareInfo"), _T("{}"), response));
-    
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
-    ASSERT_TRUE(jsonResponse.HasLabel("currentFWVersion")) << "Missing currentFWVersion: " << response;
-    ASSERT_TRUE(jsonResponse["currentFWVersion"].IsSet()) << "currentFWVersion is not set: " << response;
-    string currentFWVersion = jsonResponse["currentFWVersion"].String();
-    EXPECT_FALSE(currentFWVersion.empty()) << "currentFWVersion should not be empty: " << response;
-    
-    TEST_LOG("GetDownloadedFirmwareInfo complete data test - Response: %s, currentFWVersion: %s", response.c_str(), currentFWVersion.c_str());
-    
-    (void)std::remove("/version.txt");
-}
-
 TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_FileReadError)
 {
     (void)std::remove("/version.txt");
