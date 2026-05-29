@@ -1321,7 +1321,7 @@ TEST_F(SystemServicesTest, GetWakeupReason_Success)
     ASSERT_TRUE(jsonResponse["wakeupReason"].IsSet()) << "wakeupReason is not set: " << response;
     std::string wakeupReason = jsonResponse["wakeupReason"].String();
     EXPECT_FALSE(wakeupReason.empty()) << "wakeupReason should not be empty: " << response;
-	EXPECT_EQ("TIMER", wakeupReason) << "Expected TIMER wakeup reason, got: " << wakeupReason;
+	EXPECT_EQ("WAKEUP_REASON_TIMER", wakeupReason) << "Expected WAKEUP_REASON_TIMER wakeup reason: " << response;
     
     TEST_LOG("GetWakeupReason test PASSED - Response: %s, wakeupReason: %s", response.c_str(), wakeupReason.c_str());
 }
@@ -5182,11 +5182,11 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_RebootImmediateOne)
 TEST_F(SystemServicesTest, GetFirmwareDownloadPercent_ProgressFile_Returns50)
 {
     // Create curl progress file with proper format
-    // Format: percentage total downloaded uploaded 0 0 0 0
-    // For 50%: 50 100 50000000 100000000 0 0 0 0
+    // Format: "UP: <uploaded> of <total_up>  DOWN: <downloaded> of <total_down>"
+    // For 50%: DOWN: 50000000 of 100000000
     (void)system("mkdir -p /opt");
     std::ofstream f("/opt/curl_progress");
-    f << "50 100 50000000 100000000 0 0 0 0\n";
+    f << "UP: 0 of 0  DOWN: 50000000 of 100000000\n";
     f.close();
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getFirmwareDownloadPercent"), _T("{}"), response));
@@ -6992,9 +6992,8 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_AllFields_Read)
     f << "Reboot|1\nDnldVersn|TEST_FW_1.0\nDnldURL|http://cdn.example.com/TEST_FW_1.0.bin\n";
     f.close();
 
-    // Set m_FwUpdateState_LatestEvent >= 2 by invoking an IARM event (use a stub)
-    // The implementation only populates DnldVersn if m_FwUpdateState_LatestEvent >= 2.
-    // Use handler to call getFirmwareUpdateState first to confirm default then move on.
+    // Set m_FwUpdateState_LatestEvent >= 2 so the implementation populates DnldVersn and DnldURL
+    Plugin::SystemServicesImplementation::_instance->OnFirmwareUpdateStateChange(2);
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDownloadedFirmwareInfo"), _T("{}"), response));
 
