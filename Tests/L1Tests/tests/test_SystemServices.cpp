@@ -1257,33 +1257,33 @@ TEST_F(SystemServicesTest, GetTimeStatus_Success)
 
 TEST_F(SystemServicesTest, GetTimeZoneDST_Success)
 {
-	// First, set a known timezone
+	// Create the timezone file with a known timezone (since setTimeZoneDST might not write in test env)
+    (void)system("mkdir -p /opt/persistent");
+    std::ofstream tzFile("/opt/persistent/timeZoneDST");
+    tzFile << "America/New_York";
+    tzFile.close();
+    
+    // Mock RFC parameter set - implementation may not call this if file write succeeds
     ON_CALL(*p_rfcApiMock, setRFCParameter(::testing::_, ::testing::_, ::testing::_, ::testing::_))
         .WillByDefault(::testing::Return(WDMP_SUCCESS));
-
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTimeZoneDST"), _T("{\"timeZone\":\"America/New_York\"}"), response));
     
-    JsonObject setResponse;
-    ASSERT_TRUE(setResponse.FromString(response)) << "Failed to parse setTimeZoneDST response: " << response;
-    ASSERT_TRUE(setResponse.HasLabel("success")) << "Missing success field in setTimeZoneDST: " << response;
-    EXPECT_TRUE(setResponse["success"].Boolean()) << "setTimeZoneDST should succeed: " << response;
-    
-    // Now, get the timezone and verify it matches what we set
+    // Now, get the timezone and verify it matches what we set in the file
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTimeZoneDST"), _T("{}"), response));
     
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
     
-    // Validate timeZone field if present
-    if (jsonResponse.HasLabel("timeZone")) {
-        ASSERT_TRUE(jsonResponse["timeZone"].IsSet()) << "timeZone is not set: " << response;
-        std::string timeZone = jsonResponse["timeZone"].String();
-        EXPECT_EQ("America/New_York", timeZone) << "Expected America/New_York, got: " << timeZone;
-        TEST_LOG("GetTimeZoneDST test PASSED - Response: %s, timeZone: %s", response.c_str(), timeZone.c_str());
-    } else {
-        TEST_LOG("GetTimeZoneDST test PASSED - Response: %s", response.c_str());
-    }
+    // Validate timeZone field
+    ASSERT_TRUE(jsonResponse.HasLabel("timeZone")) << "Missing timeZone field: " << response;
+    ASSERT_TRUE(jsonResponse["timeZone"].IsSet()) << "timeZone is not set: " << response;
+    std::string timeZone = jsonResponse["timeZone"].String();
+    EXPECT_EQ("America/New_York", timeZone) << "Expected America/New_York, got: " << timeZone;
+    
+    TEST_LOG("GetTimeZoneDST test PASSED - Response: %s, timeZone: %s", response.c_str(), timeZone.c_str());
+    
+    // Cleanup
+    (void)std::remove("/opt/persistent/timeZoneDST");
 }
 
 TEST_F(SystemServicesTest, SetTimeZoneDST_Success)
@@ -2711,23 +2711,52 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_MultipleFields)
     std::ofstream fwf("/opt/fwdnldstatus.txt");
     fwf << "Method|https\n";
     fwf << "Status|Successful\n";
+    fwf << "DnldVersn|MULTI_FW_2.5.0\n";
+    fwf << "DnldURL|https://cdn.example.org/multi.bin\n";
     fwf << "Reboot|false\n";
     fwf.close();
+
+    // Set firmware update state to Downloading (2) so the implementation returns downloadedFWVersion/Location
+    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance) << "SystemServicesImplementation instance should be initialized";
+    Plugin::SystemServicesImplementation::_instance->OnFirmwareUpdateStateChange(2); // FirmwareUpdateStateDownloading
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDownloadedFirmwareInfo"), _T("{}"), response));
     
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
-    ASSERT_TRUE(jsonResponse.HasLabel("currentFWVersion")) << "Missing currentFWVersion: " << response;
-    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
-    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Request should succeed: " << response;
     
-    // Validate currentFWVersion data
+    // Validate success
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "Request should succeed: " << response;
+    
+    // Validate currentFWVersion
+    ASSERT_TRUE(jsonResponse.HasLabel("currentFWVersion")) << "Missing currentFWVersion: " << response;
     ASSERT_TRUE(jsonResponse["currentFWVersion"].IsSet()) << "currentFWVersion is not set: " << response;
     std::string currentFWVersion = jsonResponse["currentFWVersion"].String();
     EXPECT_FALSE(currentFWVersion.empty()) << "currentFWVersion should not be empty: " << response;
     
-    TEST_LOG("GetDownloadedFirmwareInfo multiple fields test - Response: %s, currentFWVersion: %s", response.c_str(), currentFWVersion.c_str());
+    // Validate downloadedFWVersion
+    ASSERT_TRUE(jsonResponse.HasLabel("downloadedFWVersion")) << "Missing downloadedFWVersion: " << response;
+    ASSERT_TRUE(jsonResponse["downloadedFWVersion"].IsSet()) << "downloadedFWVersion is not set: " << response;
+    std::string downloadedFWVersion = jsonResponse["downloadedFWVersion"].String();
+    EXPECT_EQ("MULTI_FW_2.5.0", downloadedFWVersion) << "Expected 'MULTI_FW_2.5.0': " << response;
+    
+    // Validate downloadedFWLocation
+    ASSERT_TRUE(jsonResponse.HasLabel("downloadedFWLocation")) << "Missing downloadedFWLocation: " << response;
+    ASSERT_TRUE(jsonResponse["downloadedFWLocation"].IsSet()) << "downloadedFWLocation is not set: " << response;
+    std::string downloadedFWLocation = jsonResponse["downloadedFWLocation"].String();
+    EXPECT_EQ("https://cdn.example.org/multi.bin", downloadedFWLocation) << "Expected URL: " << response;
+    
+    // Validate isRebootDeferred
+    ASSERT_TRUE(jsonResponse.HasLabel("isRebootDeferred")) << "Missing isRebootDeferred: " << response;
+    ASSERT_TRUE(jsonResponse["isRebootDeferred"].IsSet()) << "isRebootDeferred is not set: " << response;
+    bool isRebootDeferred = jsonResponse["isRebootDeferred"].Boolean();
+    EXPECT_FALSE(isRebootDeferred) << "Expected isRebootDeferred=false for Reboot|false: " << response;
+    
+    TEST_LOG("GetDownloadedFirmwareInfo multiple fields test - success: %d, currentFWVersion: %s, downloadedFWVersion: %s, downloadedFWLocation: %s, isRebootDeferred: %d", 
+             success, currentFWVersion.c_str(), downloadedFWVersion.c_str(), downloadedFWLocation.c_str(), isRebootDeferred);
     
     (void)std::remove("/opt/fwdnldstatus.txt");
 }
@@ -3311,9 +3340,16 @@ TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_CriticalFailure)
 TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_CompleteData)
 {
     (void)system("mkdir -p /opt");
-    (void)system("echo 'DnldVersn|1.2.3.4' > /opt/fwdnldstatus.txt");
-    (void)system("echo 'DnldFile|/tmp/firmware.bin' >> /opt/fwdnldstatus.txt");
-    (void)system("echo 'Status|200' >> /opt/fwdnldstatus.txt");
+    std::ofstream fw("/opt/fwdnldstatus.txt");
+    fw << "DnldVersn|1.2.3.4\n";
+    fw << "DnldURL|http://server.example.com/firmware.bin\n";
+    fw << "Status|200\n";
+    fw << "Reboot|0\n";
+    fw.close();
+    
+    // Set firmware update state to Downloading (2) so the implementation returns downloadedFWVersion/Location
+    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance) << "SystemServicesImplementation instance should be initialized";
+    Plugin::SystemServicesImplementation::_instance->OnFirmwareUpdateStateChange(2); // FirmwareUpdateStateDownloading
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDownloadedFirmwareInfo"), _T("{}"), response));
     
@@ -3325,7 +3361,23 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_CompleteData)
     ASSERT_TRUE(jsonResponse["currentFWVersion"].IsSet()) << "currentFWVersion is not set: " << response;
     std::string currentFWVersion = jsonResponse["currentFWVersion"].String();
     EXPECT_FALSE(currentFWVersion.empty()) << "currentFWVersion should not be empty: " << response;
-    TEST_LOG("GetDownloadedFirmwareInfo_CompleteData - currentFWVersion: %s", currentFWVersion.c_str());
+    
+    // Validate downloadedFWVersion
+    ASSERT_TRUE(jsonResponse.HasLabel("downloadedFWVersion")) << response;
+    ASSERT_TRUE(jsonResponse["downloadedFWVersion"].IsSet()) << response;
+    std::string downloadedFWVersion = jsonResponse["downloadedFWVersion"].String();
+    EXPECT_EQ("1.2.3.4", downloadedFWVersion) << "Expected '1.2.3.4': " << response;
+    
+    // Validate downloadedFWLocation
+    ASSERT_TRUE(jsonResponse.HasLabel("downloadedFWLocation")) << response;
+    ASSERT_TRUE(jsonResponse["downloadedFWLocation"].IsSet()) << response;
+    std::string downloadedFWLocation = jsonResponse["downloadedFWLocation"].String();
+    EXPECT_EQ("http://server.example.com/firmware.bin", downloadedFWLocation) << "Expected URL: " << response;
+    
+    TEST_LOG("GetDownloadedFirmwareInfo_CompleteData - currentFWVersion: %s, downloadedFWVersion: %s, downloadedFWLocation: %s", 
+             currentFWVersion.c_str(), downloadedFWVersion.c_str(), downloadedFWLocation.c_str());
+    
+    (void)std::remove("/opt/fwdnldstatus.txt");
 }
 
 TEST_F(SystemServicesTest, AbortLogUpload_NoActiveUpload)
@@ -7005,6 +7057,23 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_AllFields_Read)
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
     ASSERT_TRUE(jr.HasLabel("currentFWVersion")) << response;
     ASSERT_TRUE(jr.HasLabel("success")) << response;
+	EXPECT_TRUE(jr["success"].Boolean()) << "Request should succeed: " << response;
+    
+    // Validate downloadedFWVersion
+    ASSERT_TRUE(jr.HasLabel("downloadedFWVersion")) << response;
+    ASSERT_TRUE(jr["downloadedFWVersion"].IsSet()) << response;
+    std::string downloadedFWVersion = jr["downloadedFWVersion"].String();
+    EXPECT_EQ("TEST_FW_1.0", downloadedFWVersion) << "Expected 'TEST_FW_1.0': " << response;
+    
+    // Validate downloadedFWLocation
+    ASSERT_TRUE(jr.HasLabel("downloadedFWLocation")) << response;
+    ASSERT_TRUE(jr["downloadedFWLocation"].IsSet()) << response;
+    std::string downloadedFWLocation = jr["downloadedFWLocation"].String();
+    EXPECT_EQ("http://cdn.example.com/TEST_FW_1.0.bin", downloadedFWLocation) << "Expected URL: " << response;
+    
+    // Validate isRebootDeferred
+    ASSERT_TRUE(jr.HasLabel("isRebootDeferred")) << response;
+    EXPECT_TRUE(jr["isRebootDeferred"].Boolean()) << "Expected isRebootDeferred=true for Reboot|1: " << response;
 
     (void)std::remove("/opt/fwdnldstatus.txt");
 
@@ -10348,8 +10417,13 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_RebootDeferred_CoversIsRebo
     std::ofstream fw("/opt/fwdnldstatus.txt");
     fw << "CurrentVersion|3.14.15.0\n";
     fw << "DnldVersn|4.0.0.0\n";
+    fw << "DnldURL|http://update.example.com/v4.bin\n";
     fw << "Reboot|yes\n";
     fw.close();
+
+    // Set firmware update state to Downloading (2) so the implementation returns downloadedFWVersion/Location
+    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance) << "SystemServicesImplementation instance should be initialized";
+    Plugin::SystemServicesImplementation::_instance->OnFirmwareUpdateStateChange(2); // FirmwareUpdateStateDownloading
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDownloadedFirmwareInfo"),
               _T("{}"), response));
@@ -10357,7 +10431,12 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_RebootDeferred_CoversIsRebo
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
     EXPECT_TRUE(jsonResponse.HasLabel("isRebootDeferred"));
-    EXPECT_TRUE(jsonResponse["isRebootDeferred"].Boolean());
+    EXPECT_TRUE(jsonResponse["isRebootDeferred"].Boolean()) << "Expected isRebootDeferred=true for Reboot|yes: " << response;
+    
+    // Validate downloadedFWVersion
+    ASSERT_TRUE(jsonResponse.HasLabel("downloadedFWVersion")) << response;
+    std::string downloadedFWVersion = jsonResponse["downloadedFWVersion"].String();
+    EXPECT_EQ("4.0.0.0", downloadedFWVersion) << "Expected '4.0.0.0': " << response;
 
     (void)std::remove("/opt/fwdnldstatus.txt");
     TEST_LOG("GetDownloadedFirmwareInfo_RebootDeferred - Response: %s", response.c_str());
@@ -10368,14 +10447,29 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_RebootDeferredTrue_Value)
     // "Reboot|true" → isRebootDeferred = true (strncasecmp("true","true",...)==0)
     std::ofstream fw("/opt/fwdnldstatus.txt");
     fw << "DnldVersn|5.0.0.0\n";
+    fw << "DnldURL|http://repo.example.net/v5.bin\n";
     fw << "Reboot|true\n";
     fw.close();
+
+    // Set firmware update state to Downloading (2) so the implementation returns downloadedFWVersion/Location
+    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance) << "SystemServicesImplementation instance should be initialized";
+    Plugin::SystemServicesImplementation::_instance->OnFirmwareUpdateStateChange(2); // FirmwareUpdateStateDownloading
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDownloadedFirmwareInfo"),
               _T("{}"), response));
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Request should succeed: " << response;
+    
+    // Validate isRebootDeferred
+    ASSERT_TRUE(jsonResponse.HasLabel("isRebootDeferred")) << response;
+    EXPECT_TRUE(jsonResponse["isRebootDeferred"].Boolean()) << "Expected isRebootDeferred=true for Reboot|true: " << response;
+    
+    // Validate downloadedFWVersion
+    ASSERT_TRUE(jsonResponse.HasLabel("downloadedFWVersion")) << response;
+    std::string downloadedFWVersion = jsonResponse["downloadedFWVersion"].String();
+    EXPECT_EQ("5.0.0.0", downloadedFWVersion) << "Expected '5.0.0.0': " << response;
 
     (void)std::remove("/opt/fwdnldstatus.txt");
     TEST_LOG("GetDownloadedFirmwareInfo_RebootDeferredTrue - Response: %s", response.c_str());
@@ -10584,11 +10678,32 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_WithDnldVersnAndUrl_CoversA
     fw << "Reboot|yes\n";
     fw.close();
 
+    // Set firmware update state to Downloading (2) so the implementation returns downloadedFWVersion/Location
+    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance) << "SystemServicesImplementation instance should be initialized";
+    Plugin::SystemServicesImplementation::_instance->OnFirmwareUpdateStateChange(2); // FirmwareUpdateStateDownloading
+
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDownloadedFirmwareInfo"),
               _T("{}"), response));
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Request should succeed: " << response;
+    
+    // Validate downloadedFWVersion
+    ASSERT_TRUE(jsonResponse.HasLabel("downloadedFWVersion")) << response;
+    ASSERT_TRUE(jsonResponse["downloadedFWVersion"].IsSet()) << response;
+    std::string downloadedFWVersion = jsonResponse["downloadedFWVersion"].String();
+    EXPECT_EQ("MyFirmware-4.0.0", downloadedFWVersion) << "Expected 'MyFirmware-4.0.0': " << response;
+    
+    // Validate downloadedFWLocation
+    ASSERT_TRUE(jsonResponse.HasLabel("downloadedFWLocation")) << response;
+    ASSERT_TRUE(jsonResponse["downloadedFWLocation"].IsSet()) << response;
+    std::string downloadedFWLocation = jsonResponse["downloadedFWLocation"].String();
+    EXPECT_EQ("http://example.com/fw.bin", downloadedFWLocation) << "Expected URL: " << response;
+    
+    // Validate isRebootDeferred
+    ASSERT_TRUE(jsonResponse.HasLabel("isRebootDeferred")) << response;
+    EXPECT_TRUE(jsonResponse["isRebootDeferred"].Boolean()) << "Expected isRebootDeferred=true for Reboot|yes: " << response;
 
     (void)std::remove("/opt/fwdnldstatus.txt");
     TEST_LOG("GetDownloadedFirmwareInfo_AllBranches - Response: %s", response.c_str());
@@ -12025,11 +12140,27 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_DnldVersn_Branch_WhenStateI
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDownloadedFirmwareInfo"),
               _T("{}"), response));
 
-    TEST_LOG("GetDownloadedFirmwareInfo_DnldVersn - Response: %s", response.c_str());
-
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response));
-    EXPECT_TRUE(jsonResponse["success"].Boolean());
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Request should succeed: " << response;
+    
+    // Validate downloadedFWVersion
+    ASSERT_TRUE(jsonResponse.HasLabel("downloadedFWVersion")) << response;
+    ASSERT_TRUE(jsonResponse["downloadedFWVersion"].IsSet()) << response;
+    std::string downloadedFWVersion = jsonResponse["downloadedFWVersion"].String();
+    EXPECT_EQ("TEST-FW-2025001.0", downloadedFWVersion) << "Expected 'TEST-FW-2025001.0': " << response;
+    
+    // Validate downloadedFWLocation
+    ASSERT_TRUE(jsonResponse.HasLabel("downloadedFWLocation")) << response;
+    ASSERT_TRUE(jsonResponse["downloadedFWLocation"].IsSet()) << response;
+    std::string downloadedFWLocation = jsonResponse["downloadedFWLocation"].String();
+    EXPECT_EQ("http://xconf.example.com/firmware.bin", downloadedFWLocation) << "Expected URL: " << response;
+    
+    // Validate isRebootDeferred
+    ASSERT_TRUE(jsonResponse.HasLabel("isRebootDeferred")) << response;
+    EXPECT_TRUE(jsonResponse["isRebootDeferred"].Boolean()) << "Expected isRebootDeferred=true for Reboot|1: " << response;
+
+    TEST_LOG("GetDownloadedFirmwareInfo_DnldVersn - Response: %s", response.c_str());
 
     (void)std::remove(fwStatusFile);
 }
