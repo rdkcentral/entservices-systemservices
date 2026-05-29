@@ -4014,7 +4014,11 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_WithCompleteData)
     file << "imagename:TEST_IMAGE_VERSION_COMPLETE\n";
     file << "SDK_VERSION=17.3\n";
     file << "BUILD_TYPE=VBN\n";
+	file.flush();
     file.close();
+    
+    // Small delay to ensure file is flushed to disk
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDownloadedFirmwareInfo"), _T("{}"), response));
     
