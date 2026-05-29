@@ -3340,11 +3340,17 @@ TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_CriticalFailure)
 TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_CompleteData)
 {
     (void)system("mkdir -p /opt");
+
+	// Create /version.txt so getStbVersionString() returns a valid version instead of "unknown"
+    std::ofstream versionFile("/version.txt");
+    versionFile << "imagename:COMPLETE_DATA_FW_1.0\n";
+    versionFile.close();
+	
     std::ofstream fw("/opt/fwdnldstatus.txt");
     fw << "DnldVersn|1.2.3.4\n";
     fw << "DnldURL|http://server.example.com/firmware.bin\n";
     fw << "Status|200\n";
-    fw << "Reboot|0\n";
+    fw << "Reboot|no\n";
     fw.close();
     
     // Set firmware update state to Downloading (2) so the implementation returns downloadedFWVersion/Location
@@ -3378,6 +3384,7 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_CompleteData)
              currentFWVersion.c_str(), downloadedFWVersion.c_str(), downloadedFWLocation.c_str());
     
     (void)std::remove("/opt/fwdnldstatus.txt");
+	(void)std::remove("/version.txt");
 }
 
 TEST_F(SystemServicesTest, AbortLogUpload_NoActiveUpload)
@@ -7046,7 +7053,7 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_AllFields_Read)
 {
     // Write a complete status file matching the file's expected format
     std::ofstream f("/opt/fwdnldstatus.txt");
-    f << "Reboot|1\nDnldVersn|TEST_FW_1.0\nDnldURL|http://cdn.example.com/TEST_FW_1.0.bin\n";
+    f << "Reboot|yes\nDnldVersn|TEST_FW_1.0\nDnldURL|http://cdn.example.com/TEST_FW_1.0.bin\n";
     f.close();
 
     // Set m_FwUpdateState_LatestEvent >= 2 so the implementation populates DnldVersn and DnldURL
@@ -7073,7 +7080,7 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_AllFields_Read)
     
     // Validate isRebootDeferred
     ASSERT_TRUE(jr.HasLabel("isRebootDeferred")) << response;
-    EXPECT_TRUE(jr["isRebootDeferred"].Boolean()) << "Expected isRebootDeferred=true for Reboot|1: " << response;
+    EXPECT_TRUE(jr["isRebootDeferred"].Boolean()) << "Expected isRebootDeferred=true for Reboot|yes: " << response;
 
     (void)std::remove("/opt/fwdnldstatus.txt");
 
@@ -12132,7 +12139,7 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_DnldVersn_Branch_WhenStateI
     const char* fwStatusFile = "/opt/fwdnldstatus.txt";
     {
         std::ofstream f(fwStatusFile);
-        f << "Reboot|1\n";
+        f << "Reboot|yes\n";
         f << "DnldVersn|TEST-FW-2025001.0\n";
         f << "DnldURL|http://xconf.example.com/firmware.bin\n";
     }
@@ -12158,7 +12165,7 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_DnldVersn_Branch_WhenStateI
     
     // Validate isRebootDeferred
     ASSERT_TRUE(jsonResponse.HasLabel("isRebootDeferred")) << response;
-    EXPECT_TRUE(jsonResponse["isRebootDeferred"].Boolean()) << "Expected isRebootDeferred=true for Reboot|1: " << response;
+    EXPECT_TRUE(jsonResponse["isRebootDeferred"].Boolean()) << "Expected isRebootDeferred=true for Reboot|yes: " << response;
 
     TEST_LOG("GetDownloadedFirmwareInfo_DnldVersn - Response: %s", response.c_str());
 
