@@ -2281,10 +2281,10 @@ TEST_F(SystemServicesTest, GetTimeZones_AllTimeZones)
     
     // Validate zoneinfo data
     ASSERT_TRUE(jsonResponse["zoneinfo"].IsSet()) << "zoneinfo is not set: " << response;
-    const JsonObject& zoneinfo = jsonResponse["zoneinfo"].Object();
-    EXPECT_TRUE(zoneinfo.Length() > 0) << "zoneinfo should not be empty: " << response;
+    std::string zoneinfo = jsonResponse["zoneinfo"].String();
+    EXPECT_FALSE(zoneinfo.empty()) << "zoneinfo should not be empty: " << response;
     
-    TEST_LOG("GetTimeZones all zones test - Response: %s", response.c_str());
+    TEST_LOG("GetTimeZones all zones test - Response: %s, zoneinfo length: %zu", response.c_str(), zoneinfo.length());
 
     // Cleanup created timezone files and directories
     (void)system("rm -f /usr/share/zoneinfo/America/New_York /usr/share/zoneinfo/Europe/London");
