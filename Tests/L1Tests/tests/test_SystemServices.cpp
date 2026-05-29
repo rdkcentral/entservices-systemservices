@@ -2958,7 +2958,11 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_AllFields)
     fwInfo << "DnldVersn|1.2.3.4\n";
     fwInfo << "Reboot|false\n";
     fwInfo.close();
-    
+
+	// Set firmware update state to Downloading (2) so the implementation returns downloadedFWVersion
+    ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance) << "SystemServicesImplementation instance should be initialized";
+    Plugin::SystemServicesImplementation::_instance->OnFirmwareUpdateStateChange(2); // FirmwareUpdateStateDownloading
+	
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDownloadedFirmwareInfo"), _T("{}"), response));
     
     JsonObject jsonResponse;
