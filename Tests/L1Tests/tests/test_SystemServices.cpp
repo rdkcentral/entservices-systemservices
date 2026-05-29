@@ -740,28 +740,14 @@ TEST_F(SystemServicesTest, RequestSystemUptime_Success)
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
     EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Request failed: " << response;
     
-    TEST_LOG("RequestSystemUptime test PASSED - Response: %s", response.c_str());
+    // Validate systemUptime data
+    ASSERT_TRUE(jsonResponse["systemUptime"].IsSet()) << "systemUptime is not set: " << response;
+    double uptime = std::stod(jsonResponse["systemUptime"].String());
+    EXPECT_GT(uptime, 0.0) << "systemUptime must be positive: " << response;
+    
+    TEST_LOG("RequestSystemUptime test PASSED - Response: %s, systemUptime: %.3f", response.c_str(), uptime);
 }
-#if 0
-TEST_F(SystemServicesTest, GetBlocklistFlag_Success)
-{
-    // Create the opflashstore directory and devicestate file for blocklist tests
-    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
-    createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "BLOCKLIST=false");
 
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBlocklistFlag"), _T("{}"), response));
-    
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
-    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
-    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Request failed: " << response;
-    
-    TEST_LOG("GetBlocklistFlag test PASSED - Response: %s", response.c_str());
-    
-    // Cleanup
-    removeFile("/opt/secure/persistent/opflashstore/devicestate.txt");
-}
-#endif
 TEST_F(SystemServicesTest, SetBlocklistFlag_Success)
 {
     // Create the opflashstore directory for blocklist tests
@@ -780,25 +766,7 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_Success)
     // Cleanup
     removeFile("/opt/secure/persistent/opflashstore/devicestate.txt");
 }
-#if 0
-TEST_F(SystemServicesTest, SetBlocklistFlag_Failure_MissingParameter)
-{
-    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
-    
-    handler.Invoke(connection, _T("setBlocklistFlag"), _T("{}"), response);
-    
-    // The JSON-RPC call succeeds, but the response should indicate failure
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
-    
-    // Check if success is false or error exists
-    if (jsonResponse.HasLabel("success")) {
-        EXPECT_FALSE(jsonResponse["success"].Boolean()) << "Should fail with missing parameter, response: " << response;
-    }
-    
-    TEST_LOG("SetBlocklistFlag missing parameter test - Response: %s", response.c_str());
-}
-#endif
+
 TEST_F(SystemServicesTest, GetBootTypeInfo_Success)
 {
     // This may return ERROR_GENERAL if boot type cannot be determined
@@ -809,7 +777,10 @@ TEST_F(SystemServicesTest, GetBootTypeInfo_Success)
     
     // Boot type info may not be available in test environment
     if (result == Core::ERROR_NONE && jsonResponse.HasLabel("bootType")) {
-        TEST_LOG("GetBootTypeInfo test PASSED - Response: %s", response.c_str());
+        ASSERT_TRUE(jsonResponse["bootType"].IsSet()) << "bootType is not set: " << response;
+        std::string bootType = jsonResponse["bootType"].String();
+        EXPECT_FALSE(bootType.empty()) << "bootType should not be empty: " << response;
+        TEST_LOG("GetBootTypeInfo test PASSED - Response: %s, bootType: %s", response.c_str(), bootType.c_str());
     } else {
         TEST_LOG("GetBootTypeInfo not available in test environment - Response: %s", response.c_str());
     }
@@ -828,7 +799,13 @@ TEST_F(SystemServicesTest, GetBuildType_Success)
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
     EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Request failed: " << response;
     
-    TEST_LOG("GetBuildType test PASSED - Response: %s", response.c_str());
+    // Validate build_type data
+    ASSERT_TRUE(jsonResponse["build_type"].IsSet()) << "build_type is not set: " << response;
+    std::string buildType = jsonResponse["build_type"].String();
+    EXPECT_FALSE(buildType.empty()) << "build_type should not be empty: " << response;
+    EXPECT_EQ(buildType, "dev") << "build_type should be 'dev': " << response;
+    
+    TEST_LOG("GetBuildType test PASSED - Response: %s, build_type: %s", response.c_str(), buildType.c_str());
 
     // Truncate rather than delete — CI runner can write but not unlink /etc/device.properties
     std::ofstream("/etc/device.properties").close();
@@ -875,7 +852,12 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_Success)
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
     EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Request failed: " << response;
     
-    TEST_LOG("GetDownloadedFirmwareInfo test PASSED - Response: %s", response.c_str());
+    // Validate currentFWVersion data
+    ASSERT_TRUE(jsonResponse["currentFWVersion"].IsSet()) << "currentFWVersion is not set: " << response;
+    std::string currentFWVersion = jsonResponse["currentFWVersion"].String();
+    EXPECT_FALSE(currentFWVersion.empty()) << "currentFWVersion should not be empty: " << response;
+    
+    TEST_LOG("GetDownloadedFirmwareInfo test PASSED - Response: %s, currentFWVersion: %s", response.c_str(), currentFWVersion.c_str());
     
     (void)std::remove("/opt/fwdnldstatus.txt");
 }
@@ -889,7 +871,13 @@ TEST_F(SystemServicesTest, GetFirmwareDownloadPercent_Success)
     ASSERT_TRUE(jsonResponse.HasLabel("downloadPercent")) << "Missing downloadPercent: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
     
-    TEST_LOG("GetFirmwareDownloadPercent test PASSED - Response: %s", response.c_str());
+    // Validate downloadPercent data
+    ASSERT_TRUE(jsonResponse["downloadPercent"].IsSet()) << "downloadPercent is not set: " << response;
+    int downloadPercent = jsonResponse["downloadPercent"].Number();
+    EXPECT_GE(downloadPercent, -1) << "downloadPercent should be >= -1: " << response;
+    EXPECT_LE(downloadPercent, 100) << "downloadPercent should be <= 100: " << response;
+    
+    TEST_LOG("GetFirmwareDownloadPercent test PASSED - Response: %s, downloadPercent: %d", response.c_str(), downloadPercent);
 }
 
 TEST_F(SystemServicesTest, GetFirmwareUpdateState_Success)
@@ -901,7 +889,12 @@ TEST_F(SystemServicesTest, GetFirmwareUpdateState_Success)
     ASSERT_TRUE(jsonResponse.HasLabel("firmwareUpdateState")) << "Missing firmwareUpdateState: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
     
-    TEST_LOG("GetFirmwareUpdateState test PASSED - Response: %s", response.c_str());
+    // Validate firmwareUpdateState data
+    ASSERT_TRUE(jsonResponse["firmwareUpdateState"].IsSet()) << "firmwareUpdateState is not set: " << response;
+    int firmwareUpdateState = jsonResponse["firmwareUpdateState"].Number();
+    EXPECT_GE(firmwareUpdateState, 0) << "firmwareUpdateState should be >= 0: " << response;
+    
+    TEST_LOG("GetFirmwareUpdateState test PASSED - Response: %s, firmwareUpdateState: %d", response.c_str(), firmwareUpdateState);
 }
 
 TEST_F(SystemServicesTest, GetFSRFlag_Success)
@@ -916,7 +909,11 @@ TEST_F(SystemServicesTest, GetFSRFlag_Success)
     ASSERT_TRUE(jsonResponse.HasLabel("fsrFlag")) << "Missing fsrFlag: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
     
-    TEST_LOG("GetFSRFlag test PASSED - Response: %s", response.c_str());
+    // Validate fsrFlag data
+    ASSERT_TRUE(jsonResponse["fsrFlag"].IsSet()) << "fsrFlag is not set: " << response;
+    bool fsrFlag = jsonResponse["fsrFlag"].Boolean();
+    
+    TEST_LOG("GetFSRFlag test PASSED - Response: %s, fsrFlag: %s", response.c_str(), fsrFlag ? "true" : "false");
 }
 
 TEST_F(SystemServicesTest, SetFSRFlag_Success)
@@ -958,7 +955,12 @@ TEST_F(SystemServicesTest, GetFriendlyName_Success)
     ASSERT_TRUE(jsonResponse.HasLabel("friendlyName")) << "Missing friendlyName: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
     
-    TEST_LOG("GetFriendlyName test PASSED - Response: %s", response.c_str());
+    // Validate friendlyName data
+    ASSERT_TRUE(jsonResponse["friendlyName"].IsSet()) << "friendlyName is not set: " << response;
+    std::string friendlyName = jsonResponse["friendlyName"].String();
+    EXPECT_FALSE(friendlyName.empty()) << "friendlyName should not be empty: " << response;
+    
+    TEST_LOG("GetFriendlyName test PASSED - Response: %s, friendlyName: %s", response.c_str(), friendlyName.c_str());
 }
 
 TEST_F(SystemServicesTest, SetFriendlyName_Success)
@@ -1003,37 +1005,13 @@ TEST_F(SystemServicesTest, GetMfgSerialNumber_Success)
     ASSERT_TRUE(jsonResponse.HasLabel("mfgSerialNumber")) << "Missing mfgSerialNumber: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
     
-    TEST_LOG("GetMfgSerialNumber test PASSED - Response: %s", response.c_str());
+    // Validate mfgSerialNumber data
+    ASSERT_TRUE(jsonResponse["mfgSerialNumber"].IsSet()) << "mfgSerialNumber is not set: " << response;
+    std::string mfgSerialNumber = jsonResponse["mfgSerialNumber"].String();
+    // Serial number can be empty in test environment
+    
+    TEST_LOG("GetMfgSerialNumber test PASSED - Response: %s, mfgSerialNumber: %s", response.c_str(), mfgSerialNumber.c_str());
 }
-#if 0
-TEST_F(SystemServicesTest, GetMigrationStatus_Success)
-{
-    // Create migration file
-    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
-    createFile("/opt/secure/persistent/opflashstore/migrationStatus.txt", "MIGRATION_STATUS=NOT_STARTED");
-    
-    EXPECT_CALL(*p_rfcApiMock, getRFCParameter(::testing::_, ::testing::_, ::testing::_))
-        .WillOnce(::testing::Invoke(
-            [](char* pcCallerID, const char* pcParameterName, RFC_ParamData_t* pstParamData) {
-                pstParamData->type = WDMP_STRING;
-                strncpy(pstParamData->value, "NOT_STARTED", sizeof(pstParamData->value));
-                return WDMP_SUCCESS;
-            }));
-
-    uint32_t result = handler.Invoke(connection, _T("getMigrationStatus"), _T("{}"), response);
-    
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
-    
-    if (result == Core::ERROR_NONE && jsonResponse.HasLabel("migrationStatus")) {
-        TEST_LOG("GetMigrationStatus test PASSED - Response: %s", response.c_str());
-    } else {
-        TEST_LOG("GetMigrationStatus - Response: %s", response.c_str());
-    }
-    
-    removeFile("/opt/secure/persistent/opflashstore/migrationStatus.txt");
-}
-#endif
 
 TEST_F(SystemServicesTest, SetMigrationStatus_MigrationPluginNotAvailable)
 {
@@ -1069,7 +1047,11 @@ TEST_F(SystemServicesTest, GetNetworkStandbyMode_Success)
     ASSERT_TRUE(jsonResponse.HasLabel("nwStandby")) << "Missing nwStandby: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
     
-    TEST_LOG("GetNetworkStandbyMode test PASSED - Response: %s", response.c_str());
+    // Validate nwStandby data
+    ASSERT_TRUE(jsonResponse["nwStandby"].IsSet()) << "nwStandby is not set: " << response;
+    bool nwStandby = jsonResponse["nwStandby"].Boolean();
+    
+    TEST_LOG("GetNetworkStandbyMode test PASSED - Response: %s, nwStandby: %s", response.c_str(), nwStandby ? "true" : "false");
 }
 
 TEST_F(SystemServicesTest, SetNetworkStandbyMode_Success)
@@ -1093,7 +1075,16 @@ TEST_F(SystemServicesTest, GetPowerState_Success)
     ASSERT_TRUE(jsonResponse.HasLabel("powerState")) << "Missing powerState: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
     
-    TEST_LOG("GetPowerState test PASSED - Response: %s", response.c_str());
+    // Validate powerState data
+    ASSERT_TRUE(jsonResponse["powerState"].IsSet()) << "powerState is not set: " << response;
+    std::string powerState = jsonResponse["powerState"].String();
+    EXPECT_FALSE(powerState.empty()) << "powerState should not be empty: " << response;
+    // Valid power states: ON, STANDBY, LIGHT_SLEEP, DEEP_SLEEP
+    EXPECT_TRUE(powerState == "ON" || powerState == "STANDBY" || 
+                powerState == "LIGHT_SLEEP" || powerState == "DEEP_SLEEP")
+        << "Invalid powerState value: " << powerState;
+    
+    TEST_LOG("GetPowerState test PASSED - Response: %s, powerState: %s", response.c_str(), powerState.c_str());
 }
 
 class PowerStateTest : public SystemServicesTest, public ::testing::WithParamInterface<const char*> {};
@@ -1137,7 +1128,14 @@ TEST_F(SystemServicesTest, GetRFCConfig_Success)
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
     
-    TEST_LOG("GetRFCConfig test PASSED - Response: %s", response.c_str());
+    // Validate RFC response structure
+    if (jsonResponse.HasLabel("RFCConfig")) {
+        ASSERT_TRUE(jsonResponse["RFCConfig"].IsSet()) << "RFCConfig is not set: " << response;
+        const JsonObject& rfcConfig = jsonResponse["RFCConfig"].Object();
+        TEST_LOG("GetRFCConfig test PASSED - Response: %s", response.c_str());
+    } else {
+        TEST_LOG("GetRFCConfig test PASSED - Response: %s", response.c_str());
+    }
 }
 
 TEST_F(SystemServicesTest, GetSerialNumber_ExternalPluginNotAvailable)
@@ -1168,40 +1166,28 @@ TEST_F(SystemServicesTest, GetSystemVersions_Success)
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
     
+    // Validate system version fields
+    if (jsonResponse.HasLabel("stbVersion")) {
+        ASSERT_TRUE(jsonResponse["stbVersion"].IsSet()) << "stbVersion is not set: " << response;
+        std::string stbVersion = jsonResponse["stbVersion"].String();
+        TEST_LOG("stbVersion: %s", stbVersion.c_str());
+    }
+    if (jsonResponse.HasLabel("receiverVersion")) {
+        ASSERT_TRUE(jsonResponse["receiverVersion"].IsSet()) << "receiverVersion is not set: " << response;
+        std::string receiverVersion = jsonResponse["receiverVersion"].String();
+        TEST_LOG("receiverVersion: %s", receiverVersion.c_str());
+    }
+    if (jsonResponse.HasLabel("stbTimestamp")) {
+        ASSERT_TRUE(jsonResponse["stbTimestamp"].IsSet()) << "stbTimestamp is not set: " << response;
+        std::string stbTimestamp = jsonResponse["stbTimestamp"].String();
+        TEST_LOG("stbTimestamp: %s", stbTimestamp.c_str());
+    }
+    
     TEST_LOG("GetSystemVersions test PASSED - Response: %s", response.c_str());
     
     (void)std::remove("/version.txt");
 }
-#if 0
-class TerritoryTest : public SystemServicesTest, public ::testing::WithParamInterface<const char*> {};
-TEST_P(TerritoryTest, SetTerritory_Success)
-{
-    const char* territory = GetParam();
-    
-    EXPECT_CALL(*p_rfcApiMock, setRFCParameter(::testing::_, ::testing::_, ::testing::_, ::testing::_))
-        .WillOnce(::testing::Return(WDMP_SUCCESS));
 
-    std::string request = std::string("{\"territory\":\"") + territory + "\"}";
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"), Core::ToString(request), response));
-    
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response for " << territory << ": " << response;
-    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field for " << territory << ": " << response;
-    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "SetTerritory failed for " << territory << ": " << response;
-    
-    TEST_LOG("SetTerritory %s test PASSED - Response: %s", territory, response.c_str());
-}
-INSTANTIATE_TEST_SUITE_P(
-    Territories,
-    TerritoryTest,
-    ::testing::Values(
-        "USA",
-        "GBR",
-        "AUS",
-        "CAN"
-    )
-);
-#endif
 TEST_F(SystemServicesTest, GetTimeStatus_Success)
 {
     // GetTimeStatus calls IARM_Bus_Call and reads the output param (TimerMsg: three char[256] fields).
@@ -1219,6 +1205,23 @@ TEST_F(SystemServicesTest, GetTimeStatus_Success)
     uint32_t result = handler.Invoke(connection, _T("getTimeStatus"), _T("{}"), response);
 
     EXPECT_EQ(Core::ERROR_NONE, result) << "GetTimeStatus should return ERROR_NONE when IARM_Bus_Call succeeds";
+    
+    // Validate response structure if result is success
+    JsonObject jsonResponse;
+    if (jsonResponse.FromString(response)) {
+        if (jsonResponse.HasLabel("time_source")) {
+            std::string timeSource = jsonResponse["time_source"].String();
+            TEST_LOG("time_source: %s", timeSource.c_str());
+        }
+        if (jsonResponse.HasLabel("time_zone")) {
+            std::string timeZone = jsonResponse["time_zone"].String();
+            TEST_LOG("time_zone: %s", timeZone.c_str());
+        }
+        if (jsonResponse.HasLabel("current_time")) {
+            std::string currentTime = jsonResponse["current_time"].String();
+            TEST_LOG("current_time: %s", currentTime.c_str());
+        }
+    }
 
     TEST_LOG("GetTimeStatus test - Result: %u, Response: %s", result, response.c_str());
 }
@@ -1231,7 +1234,15 @@ TEST_F(SystemServicesTest, GetTimeZoneDST_Success)
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
     
-    TEST_LOG("GetTimeZoneDST test PASSED - Response: %s", response.c_str());
+    // Validate timeZone field if present
+    if (jsonResponse.HasLabel("timeZone")) {
+        ASSERT_TRUE(jsonResponse["timeZone"].IsSet()) << "timeZone is not set: " << response;
+        std::string timeZone = jsonResponse["timeZone"].String();
+        EXPECT_FALSE(timeZone.empty()) << "timeZone should not be empty: " << response;
+        TEST_LOG("GetTimeZoneDST test PASSED - Response: %s, timeZone: %s", response.c_str(), timeZone.c_str());
+    } else {
+        TEST_LOG("GetTimeZoneDST test PASSED - Response: %s", response.c_str());
+    }
 }
 
 TEST_F(SystemServicesTest, SetTimeZoneDST_Success)
@@ -1258,7 +1269,12 @@ TEST_F(SystemServicesTest, GetWakeupReason_Success)
     ASSERT_TRUE(jsonResponse.HasLabel("wakeupReason")) << "Missing wakeupReason: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
     
-    TEST_LOG("GetWakeupReason test PASSED - Response: %s", response.c_str());
+    // Validate wakeupReason data
+    ASSERT_TRUE(jsonResponse["wakeupReason"].IsSet()) << "wakeupReason is not set: " << response;
+    std::string wakeupReason = jsonResponse["wakeupReason"].String();
+    EXPECT_FALSE(wakeupReason.empty()) << "wakeupReason should not be empty: " << response;
+    
+    TEST_LOG("GetWakeupReason test PASSED - Response: %s, wakeupReason: %s", response.c_str(), wakeupReason.c_str());
 }
 
 TEST_F(SystemServicesTest, GetLastWakeupKeyCode_Success)
@@ -1270,7 +1286,12 @@ TEST_F(SystemServicesTest, GetLastWakeupKeyCode_Success)
     ASSERT_TRUE(jsonResponse.HasLabel("wakeupKeyCode")) << "Missing wakeupKeyCode: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
     
-    TEST_LOG("GetLastWakeupKeyCode test PASSED - Response: %s", response.c_str());
+    // Validate wakeupKeyCode data
+    ASSERT_TRUE(jsonResponse["wakeupKeyCode"].IsSet()) << "wakeupKeyCode is not set: " << response;
+    uint32_t wakeupKeyCode = jsonResponse["wakeupKeyCode"].Number();
+    EXPECT_GE(wakeupKeyCode, 0) << "wakeupKeyCode should be >= 0: " << response;
+    
+    TEST_LOG("GetLastWakeupKeyCode test PASSED - Response: %s, wakeupKeyCode: %u", response.c_str(), wakeupKeyCode);
 }
 
 TEST_F(SystemServicesTest, IsOptOutTelemetry_ExternalPluginNotAvailable)
@@ -1294,46 +1315,6 @@ TEST_F(SystemServicesTest, SetOptOutTelemetry_ExternalPluginNotAvailable)
     
     TEST_LOG("SetOptOutTelemetry correctly reports Telemetry plugin not available - Response: %s", response.c_str());
 }
-#if 0
-TEST_F(SystemServicesTest, GetSetBlocklistCombined)
-{
-    // Combined test like the old test file - set and get blocklist
-    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
-    createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "BLOCKLIST=false");
-    
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"), _T("{\"blocklist\":true}"), response));
-    EXPECT_EQ(response, string("{\"success\":true}"));
-    
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBlocklistFlag"), _T("{}"), response));
-    EXPECT_EQ(response, string("{\"blocklist\":true,\"success\":true}"));
-    
-    TEST_LOG("GetSetBlocklistCombined test PASSED - Response: %s", response.c_str());
-    
-    removeFile("/opt/secure/persistent/opflashstore/devicestate.txt");
-}
-
-TEST_F(SystemServicesTest, SetBlocklist_ParamTrue)
-{
-    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
-    createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "BLOCKLIST=false");
-    
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"), _T("{\"blocklist\":true}"), response));
-    EXPECT_EQ(response, string("{\"success\":true}"));
-    
-    removeFile("/opt/secure/persistent/opflashstore/devicestate.txt");
-}
-
-TEST_F(SystemServicesTest, SetBlocklist_ParamFalse)
-{
-    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
-    createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "BLOCKLIST=true");
-    
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"), _T("{\"blocklist\":false}"), response));
-    EXPECT_EQ(response, string("{\"success\":true}"));
-    
-    removeFile("/opt/secure/persistent/opflashstore/devicestate.txt");
-}
-#endif
 
 TEST_F(SystemServicesTest, SetBootLoaderSplashScreen_Success)
 {
@@ -1601,7 +1582,12 @@ TEST_F(SystemServicesTest, GetPowerStateBeforeReboot_Success)
     ASSERT_TRUE(jsonResponse.HasLabel("state")) << "Missing state field: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
     
-    TEST_LOG("GetPowerStateBeforeReboot test - Response: %s", response.c_str());
+    // Validate state data
+    ASSERT_TRUE(jsonResponse["state"].IsSet()) << "state is not set: " << response;
+    std::string state = jsonResponse["state"].String();
+    EXPECT_FALSE(state.empty()) << "state should not be empty: " << response;
+    
+    TEST_LOG("GetPowerStateBeforeReboot test - Response: %s, state: %s", response.c_str(), state.c_str());
 }
 
 TEST_F(SystemServicesTest, GetTerritory_Success)
@@ -1617,7 +1603,13 @@ TEST_F(SystemServicesTest, GetTerritory_Success)
     ASSERT_TRUE(jsonResponse.HasLabel("territory")) << "Missing territory field: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
     
-    TEST_LOG("GetTerritory test - Response: %s", response.c_str());
+    // Validate territory data
+    ASSERT_TRUE(jsonResponse["territory"].IsSet()) << "territory is not set: " << response;
+    std::string territory = jsonResponse["territory"].String();
+    EXPECT_FALSE(territory.empty()) << "territory should not be empty: " << response;
+    EXPECT_EQ(territory, "USA") << "territory should be 'USA': " << response;
+    
+    TEST_LOG("GetTerritory test - Response: %s, territory: %s", response.c_str(), territory.c_str());
     
     removeFile(TERRITORYFILE);
 }
@@ -1656,7 +1648,14 @@ TEST_F(SystemServicesTest, GetPlatformConfiguration_Success)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     
-    TEST_LOG("GetPlatformConfiguration test - Response: %s", response.c_str());
+    // Validate payload field if present
+    if (jsonResponse.HasLabel("payload")) {
+        ASSERT_TRUE(jsonResponse["payload"].IsSet()) << "payload is not set: " << response;
+        std::string payload = jsonResponse["payload"].String();
+        TEST_LOG("GetPlatformConfiguration test - Response: %s, payload length: %zu", response.c_str(), payload.length());
+    } else {
+        TEST_LOG("GetPlatformConfiguration test - Response: %s", response.c_str());
+    }
 }
 
 TEST_F(SystemServicesTest, GetTimeZones_Success)
@@ -1667,6 +1666,10 @@ TEST_F(SystemServicesTest, GetTimeZones_Success)
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("zoneinfo")) << "Missing zoneinfo field: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
+    
+    // Validate zoneinfo data
+    ASSERT_TRUE(jsonResponse["zoneinfo"].IsSet()) << "zoneinfo is not set: " << response;
+    const JsonObject& zoneinfo = jsonResponse["zoneinfo"].Object();
     
     TEST_LOG("GetTimeZones test - Response: %s", response.c_str());
 }
@@ -1754,7 +1757,12 @@ TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_Success)
     ASSERT_TRUE(jsonResponse.HasLabel("failReason")) << "Missing failReason field: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
     
-    TEST_LOG("GetLastFirmwareFailureReason test - Response: %s", response.c_str());
+    // Validate failReason data
+    ASSERT_TRUE(jsonResponse["failReason"].IsSet()) << "failReason is not set: " << response;
+    std::string failReason = jsonResponse["failReason"].String();
+    EXPECT_FALSE(failReason.empty()) << "failReason should not be empty: " << response;
+    
+    TEST_LOG("GetLastFirmwareFailureReason test - Response: %s, failReason: %s", response.c_str(), failReason.c_str());
     
     (void)std::remove("/opt/persistent/.lastswupdatestatus");
 }
@@ -2067,7 +2075,13 @@ TEST_F(SystemServicesTest, GetTerritory_WithRegion)
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("territory")) << "Missing territory field: " << response;
     
-    TEST_LOG("GetTerritory with region test - Response: %s", response.c_str());
+    // Validate territory data
+    ASSERT_TRUE(jsonResponse["territory"].IsSet()) << "territory is not set: " << response;
+    std::string territory = jsonResponse["territory"].String();
+    EXPECT_FALSE(territory.empty()) << "territory should not be empty: " << response;
+    EXPECT_EQ(territory, "USA") << "Expected territory 'USA': " << response;
+    
+    TEST_LOG("GetTerritory with region test - Response: %s, territory: %s", response.c_str(), territory.c_str());
     
     removeFile(TERRITORYFILE);
 }
@@ -2094,6 +2108,13 @@ TEST_F(SystemServicesTest, GetPlatformConfiguration_DeviceInfo)
     
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    
+    // Validate payload field if present
+    if (jsonResponse.HasLabel("payload")) {
+        ASSERT_TRUE(jsonResponse["payload"].IsSet()) << "payload is not set: " << response;
+        std::string payload = jsonResponse["payload"].String();
+        TEST_LOG("GetPlatformConfiguration DeviceInfo test - Response length: %zu", payload.length());
+    }
     
     TEST_LOG("GetPlatformConfiguration DeviceInfo test - Response: %s", response.c_str());
 }
@@ -2151,7 +2172,11 @@ TEST_F(SystemServicesTest, GetFSRFlag_Enabled)
     ASSERT_TRUE(jsonResponse.HasLabel("fsrFlag")) << "Missing fsrFlag: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
     
-    TEST_LOG("GetFSRFlag enabled test - Response: %s", response.c_str());
+    // Validate fsrFlag data
+    ASSERT_TRUE(jsonResponse["fsrFlag"].IsSet()) << "fsrFlag is not set: " << response;
+    bool fsrFlag = jsonResponse["fsrFlag"].Boolean();
+    
+    TEST_LOG("GetFSRFlag enabled test - Response: %s, fsrFlag: %s", response.c_str(), fsrFlag ? "true" : "false");
 }
 
 TEST_F(SystemServicesTest, SetFSRFlag_Enable)
@@ -2254,6 +2279,11 @@ TEST_F(SystemServicesTest, GetTimeZones_AllTimeZones)
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("zoneinfo")) << "Missing zoneinfo field: " << response;
     
+    // Validate zoneinfo data
+    ASSERT_TRUE(jsonResponse["zoneinfo"].IsSet()) << "zoneinfo is not set: " << response;
+    const JsonObject& zoneinfo = jsonResponse["zoneinfo"].Object();
+    EXPECT_TRUE(zoneinfo.Length() > 0) << "zoneinfo should not be empty: " << response;
+    
     TEST_LOG("GetTimeZones all zones test - Response: %s", response.c_str());
 
     // Cleanup created timezone files and directories
@@ -2290,6 +2320,13 @@ TEST_F(SystemServicesTest, GetPlatformConfiguration_AllQueries)
         JsonObject jsonResponse;
         ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response for " << query;
         
+        // Validate payload if present
+        if (jsonResponse.HasLabel("payload")) {
+            ASSERT_TRUE(jsonResponse["payload"].IsSet()) << "payload is not set for " << query;
+            std::string payload = jsonResponse["payload"].String();
+            TEST_LOG("GetPlatformConfiguration %s test - payload length: %zu", query.c_str(), payload.length());
+        }
+        
         TEST_LOG("GetPlatformConfiguration %s test - Response: %s", query.c_str(), response.c_str());
     }
 }
@@ -2303,7 +2340,11 @@ TEST_F(SystemServicesTest, GetMacAddresses_WithGUID)
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("asyncResponse")) << "Missing asyncResponse field: " << response;
     
-    TEST_LOG("GetMacAddresses with GUID test - Response: %s", response.c_str());
+    // Validate asyncResponse data
+    ASSERT_TRUE(jsonResponse["asyncResponse"].IsSet()) << "asyncResponse is not set: " << response;
+    bool asyncResponse = jsonResponse["asyncResponse"].Boolean();
+    
+    TEST_LOG("GetMacAddresses with GUID test - Response: %s, asyncResponse: %s", response.c_str(), asyncResponse ? "true" : "false");
 }
 
 TEST_F(SystemServicesTest, Reboot_WithDelay)
@@ -2335,7 +2376,13 @@ TEST_F(SystemServicesTest, GetWakeupReason_IRWakeup)
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("wakeupReason")) << "Missing wakeupReason: " << response;
     
-    TEST_LOG("GetWakeupReason IR test - Response: %s", response.c_str());
+    // Validate wakeupReason data
+    ASSERT_TRUE(jsonResponse["wakeupReason"].IsSet()) << "wakeupReason is not set: " << response;
+    std::string wakeupReason = jsonResponse["wakeupReason"].String();
+    EXPECT_FALSE(wakeupReason.empty()) << "wakeupReason should not be empty: " << response;
+    EXPECT_EQ(wakeupReason, "WAKEUP_REASON_IR") << "Expected IR wakeup reason: " << response;
+    
+    TEST_LOG("GetWakeupReason IR test - Response: %s, wakeupReason: %s", response.c_str(), wakeupReason.c_str());
 }
 
 TEST_F(SystemServicesTest, GetWakeupReason_PowerKeyWakeup)
@@ -2351,7 +2398,13 @@ TEST_F(SystemServicesTest, GetWakeupReason_PowerKeyWakeup)
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("wakeupReason")) << "Missing wakeupReason: " << response;
     
-    TEST_LOG("GetWakeupReason power key test - Response: %s", response.c_str());
+    // Validate wakeupReason data
+    ASSERT_TRUE(jsonResponse["wakeupReason"].IsSet()) << "wakeupReason is not set: " << response;
+    std::string wakeupReason = jsonResponse["wakeupReason"].String();
+    EXPECT_FALSE(wakeupReason.empty()) << "wakeupReason should not be empty: " << response;
+    EXPECT_EQ(wakeupReason, "WAKEUP_REASON_FRONTPANEL") << "Expected FRONTPANEL wakeup reason: " << response;
+    
+    TEST_LOG("GetWakeupReason power key test - Response: %s, wakeupReason: %s", response.c_str(), wakeupReason.c_str());
 }
 
 TEST_F(SystemServicesTest, GetWakeupReason_CECWakeup)
@@ -2367,7 +2420,13 @@ TEST_F(SystemServicesTest, GetWakeupReason_CECWakeup)
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("wakeupReason")) << "Missing wakeupReason: " << response;
     
-    TEST_LOG("GetWakeupReason CEC test - Response: %s", response.c_str());
+    // Validate wakeupReason data
+    ASSERT_TRUE(jsonResponse["wakeupReason"].IsSet()) << "wakeupReason is not set: " << response;
+    std::string wakeupReason = jsonResponse["wakeupReason"].String();
+    EXPECT_FALSE(wakeupReason.empty()) << "wakeupReason should not be empty: " << response;
+    EXPECT_EQ(wakeupReason, "WAKEUP_REASON_CEC") << "Expected CEC wakeup reason: " << response;
+    
+    TEST_LOG("GetWakeupReason CEC test - Response: %s, wakeupReason: %s", response.c_str(), wakeupReason.c_str());
 }
 
 TEST_F(SystemServicesTest, GetWakeupReason_TimerWakeup)
@@ -2383,7 +2442,13 @@ TEST_F(SystemServicesTest, GetWakeupReason_TimerWakeup)
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("wakeupReason")) << "Missing wakeupReason: " << response;
     
-    TEST_LOG("GetWakeupReason timer test - Response: %s", response.c_str());
+    // Validate wakeupReason data
+    ASSERT_TRUE(jsonResponse["wakeupReason"].IsSet()) << "wakeupReason is not set: " << response;
+    std::string wakeupReason = jsonResponse["wakeupReason"].String();
+    EXPECT_FALSE(wakeupReason.empty()) << "wakeupReason should not be empty: " << response;
+    EXPECT_EQ(wakeupReason, "WAKEUP_REASON_TIMER") << "Expected TIMER wakeup reason: " << response;
+    
+    TEST_LOG("GetWakeupReason timer test - Response: %s, wakeupReason: %s", response.c_str(), wakeupReason.c_str());
 }
 
 TEST_F(SystemServicesTest, GetLastWakeupKeyCode_ZeroCode)
@@ -2458,7 +2523,13 @@ TEST_F(SystemServicesTest, GetBuildType_VBN)
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("build_type")) << "Missing build_type: " << response;
     
-    TEST_LOG("GetBuildType VBN test - Response: %s", response.c_str());
+    // Validate build_type data
+    ASSERT_TRUE(jsonResponse["build_type"].IsSet()) << "build_type is not set: " << response;
+    std::string buildType = jsonResponse["build_type"].String();
+    EXPECT_FALSE(buildType.empty()) << "build_type should not be empty: " << response;
+    EXPECT_EQ(buildType, "vbn") << "Expected build_type 'vbn': " << response;
+    
+    TEST_LOG("GetBuildType VBN test - Response: %s, build_type: %s", response.c_str(), buildType.c_str());
 
     std::ofstream("/etc/device.properties").close();
 }
@@ -2473,7 +2544,13 @@ TEST_F(SystemServicesTest, GetBuildType_Sprint)
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("build_type")) << "Missing build_type: " << response;
     
-    TEST_LOG("GetBuildType sprint test - Response: %s", response.c_str());
+    // Validate build_type data
+    ASSERT_TRUE(jsonResponse["build_type"].IsSet()) << "build_type is not set: " << response;
+    std::string buildType = jsonResponse["build_type"].String();
+    EXPECT_FALSE(buildType.empty()) << "build_type should not be empty: " << response;
+    EXPECT_EQ(buildType, "sprint") << "Expected build_type 'sprint': " << response;
+    
+    TEST_LOG("GetBuildType sprint test - Response: %s, build_type: %s", response.c_str(), buildType.c_str());
 
     std::ofstream("/etc/device.properties").close();
 }
@@ -2495,6 +2572,13 @@ TEST_F(SystemServicesTest, GetDeviceInfo_MultipleParams)
     
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    
+    // DeviceInfo plugin is not available in unit test environment, so we just check response structure
+    if (jsonResponse.HasLabel("message")) {
+        ASSERT_TRUE(jsonResponse["message"].IsSet()) << "message is not set: " << response;
+        std::string message = jsonResponse["message"].String();
+        TEST_LOG("GetDeviceInfo message: %s", message.c_str());
+    }
     
     TEST_LOG("GetDeviceInfo multiple params test - Response: %s", response.c_str());
 }
@@ -2571,7 +2655,12 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_MultipleFields)
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("currentFWVersion")) << "Missing currentFWVersion: " << response;
     
-    TEST_LOG("GetDownloadedFirmwareInfo multiple fields test - Response: %s", response.c_str());
+    // Validate currentFWVersion data
+    ASSERT_TRUE(jsonResponse["currentFWVersion"].IsSet()) << "currentFWVersion is not set: " << response;
+    std::string currentFWVersion = jsonResponse["currentFWVersion"].String();
+    EXPECT_FALSE(currentFWVersion.empty()) << "currentFWVersion should not be empty: " << response;
+    
+    TEST_LOG("GetDownloadedFirmwareInfo multiple fields test - Response: %s, currentFWVersion: %s", response.c_str(), currentFWVersion.c_str());
     
     (void)std::remove("/version.txt");
 }
@@ -2712,7 +2801,13 @@ TEST_F(SystemServicesTest, GetWakeupReason_Unknown)
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("wakeupReason")) << "Missing wakeupReason: " << response;
     
-    TEST_LOG("GetWakeupReason unknown test - Response: %s", response.c_str());
+    // Validate wakeupReason data
+    ASSERT_TRUE(jsonResponse["wakeupReason"].IsSet()) << "wakeupReason is not set: " << response;
+    std::string wakeupReason = jsonResponse["wakeupReason"].String();
+    EXPECT_FALSE(wakeupReason.empty()) << "wakeupReason should not be empty: " << response;
+    EXPECT_EQ(wakeupReason, "WAKEUP_REASON_UNKNOWN") << "Expected UNKNOWN wakeup reason: " << response;
+    
+    TEST_LOG("GetWakeupReason unknown test - Response: %s, wakeupReason: %s", response.c_str(), wakeupReason.c_str());
 }
 
 TEST_F(SystemServicesTest, GetWakeupReason_LAN)
@@ -2728,7 +2823,13 @@ TEST_F(SystemServicesTest, GetWakeupReason_LAN)
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("wakeupReason")) << "Missing wakeupReason: " << response;
     
-    TEST_LOG("GetWakeupReason LAN test - Response: %s", response.c_str());
+    // Validate wakeupReason data
+    ASSERT_TRUE(jsonResponse["wakeupReason"].IsSet()) << "wakeupReason is not set: " << response;
+    std::string wakeupReason = jsonResponse["wakeupReason"].String();
+    EXPECT_FALSE(wakeupReason.empty()) << "wakeupReason should not be empty: " << response;
+    EXPECT_EQ(wakeupReason, "WAKEUP_REASON_LAN") << "Expected LAN wakeup reason: " << response;
+    
+    TEST_LOG("GetWakeupReason LAN test - Response: %s, wakeupReason: %s", response.c_str(), wakeupReason.c_str());
 }
 
 TEST_F(SystemServicesTest, SetBootLoaderSplashScreen_EmptyPath)
@@ -2739,21 +2840,7 @@ TEST_F(SystemServicesTest, SetBootLoaderSplashScreen_EmptyPath)
     // Should handle empty path gracefully
     TEST_LOG("SetBootLoaderSplashScreen empty path test - Result: %u, Response: %s", result, response.c_str());
 }
-#if 0
-TEST_F(SystemServicesTest, GetBootTypeInfo_WarmBoot)
-{
-    uint32_t result = handler.Invoke(connection, _T("getBootTypeInfo"), _T("{}"), response);
-    
-    JsonObject jsonResponse;
-    if (result == Core::ERROR_NONE && jsonResponse.FromString(response)) {
-        if (jsonResponse.HasLabel("bootType")) {
-            TEST_LOG("GetBootTypeInfo warm boot test - Boot type: %s", jsonResponse["bootType"].String().c_str());
-        }
-    }
-    
-    TEST_LOG("GetBootTypeInfo test - Result: %u, Response: %s", result, response.c_str());
-}
-#endif
+
 TEST_F(SystemServicesTest, GetPlatformConfiguration_EmptyQuery)
 {
     uint32_t result = handler.Invoke(connection, _T("getPlatformConfiguration"),
@@ -2805,6 +2892,12 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_AllFields)
     ASSERT_TRUE(jsonResponse.HasLabel("downloadedFWVersion")) << "Missing downloadedFWVersion: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("downloadedFWLocation")) << "Missing downloadedFWLocation: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("isRebootDeferred")) << "Missing isRebootDeferred: " << response;
+    
+    // Validate all field data
+    ASSERT_TRUE(jsonResponse["currentFWVersion"].IsSet()) << "currentFWVersion is not set: " << response;
+    ASSERT_TRUE(jsonResponse["downloadedFWVersion"].IsSet()) << "downloadedFWVersion is not set: " << response;
+    std::string downloadedFWVersion = jsonResponse["downloadedFWVersion"].String();
+    EXPECT_EQ(downloadedFWVersion, "1.2.3.4") << "Unexpected downloadedFWVersion: " << response;
     
     TEST_LOG("GetDownloadedFirmwareInfo all fields test - Response: %s", response.c_str());
     
@@ -2974,6 +3067,11 @@ TEST_F(SystemServicesTest, GetTerritory_TerritoryFilePresent)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response));
     EXPECT_TRUE(jsonResponse.HasLabel("territory"));
+    
+    // Validate territory data
+    ASSERT_TRUE(jsonResponse["territory"].IsSet()) << "territory is not set: " << response;
+    std::string territory = jsonResponse["territory"].String();
+    EXPECT_FALSE(territory.empty()) << "territory should not be empty: " << response;
 }
 
 TEST_F(SystemServicesTest, SetTerritory_ValidAUS)
@@ -3024,7 +3122,13 @@ TEST_F(SystemServicesTest, GetNetworkStandbyMode_TrueState)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response));
     EXPECT_TRUE(jsonResponse.HasLabel("nwStandby"));
-    EXPECT_TRUE(jsonResponse["nwStandby"].Boolean());
+    
+    // Validate nwStandby data
+    ASSERT_TRUE(jsonResponse["nwStandby"].IsSet()) << "nwStandby is not set: " << response;
+    bool nwStandby = jsonResponse["nwStandby"].Boolean();
+    EXPECT_TRUE(nwStandby) << "Expected nwStandby to be true: " << response;
+    
+    TEST_LOG("GetNetworkStandbyMode_TrueState - nwStandby: %s", nwStandby ? "true" : "false");
 }
 
 TEST_F(SystemServicesTest, GetNetworkStandbyMode_FalseState)
@@ -3037,7 +3141,13 @@ TEST_F(SystemServicesTest, GetNetworkStandbyMode_FalseState)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response));
     EXPECT_TRUE(jsonResponse.HasLabel("nwStandby"));
-    EXPECT_FALSE(jsonResponse["nwStandby"].Boolean());
+    
+    // Validate nwStandby data
+    ASSERT_TRUE(jsonResponse["nwStandby"].IsSet()) << "nwStandby is not set: " << response;
+    bool nwStandby = jsonResponse["nwStandby"].Boolean();
+    EXPECT_FALSE(nwStandby) << "Expected nwStandby to be false: " << response;
+    
+    TEST_LOG("GetNetworkStandbyMode_FalseState - nwStandby: %s", nwStandby ? "true" : "false");
 }
 
 TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_DownloadFailed)
@@ -3051,6 +3161,11 @@ TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_DownloadFailed)
     ASSERT_TRUE(jsonResponse.FromString(response));
     EXPECT_TRUE(jsonResponse.HasLabel("failReason"));
     EXPECT_TRUE(jsonResponse["success"].Boolean());
+    
+    // Validate failReason data
+    ASSERT_TRUE(jsonResponse["failReason"].IsSet()) << "failReason is not set: " << response;
+    std::string failReason = jsonResponse["failReason"].String();
+    EXPECT_FALSE(failReason.empty()) << "failReason should not be empty: " << response;
 }
 
 TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_CriticalFailure)
@@ -3064,6 +3179,11 @@ TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_CriticalFailure)
     ASSERT_TRUE(jsonResponse.FromString(response));
     EXPECT_TRUE(jsonResponse.HasLabel("failReason"));
     EXPECT_TRUE(jsonResponse["success"].Boolean());
+    
+    // Validate failReason data
+    ASSERT_TRUE(jsonResponse["failReason"].IsSet()) << "failReason is not set: " << response;
+    std::string failReason = jsonResponse["failReason"].String();
+    EXPECT_FALSE(failReason.empty()) << "failReason should not be empty: " << response;
 }
 
 TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_CompleteData)
@@ -3078,6 +3198,12 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_CompleteData)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response));
     EXPECT_TRUE(jsonResponse.HasLabel("currentFWVersion"));
+    
+    // Validate currentFWVersion data
+    ASSERT_TRUE(jsonResponse["currentFWVersion"].IsSet()) << "currentFWVersion is not set: " << response;
+    std::string currentFWVersion = jsonResponse["currentFWVersion"].String();
+    EXPECT_FALSE(currentFWVersion.empty()) << "currentFWVersion should not be empty: " << response;
+    TEST_LOG("GetDownloadedFirmwareInfo_CompleteData - currentFWVersion: %s", currentFWVersion.c_str());
 }
 
 TEST_F(SystemServicesTest, AbortLogUpload_NoActiveUpload)
@@ -3223,6 +3349,16 @@ TEST_F(SystemServicesTest, GetTimeZoneDST_DefaultAccuracy)
     ASSERT_TRUE(jsonResponse.FromString(response));
     EXPECT_TRUE(jsonResponse.HasLabel("timeZone"));
     EXPECT_TRUE(jsonResponse.HasLabel("accuracy"));
+    
+    // Validate timeZone and accuracy data
+    if (jsonResponse["timeZone"].IsSet()) {
+        std::string timeZone = jsonResponse["timeZone"].String();
+        TEST_LOG("timeZone: %s", timeZone.c_str());
+    }
+    if (jsonResponse["accuracy"].IsSet()) {
+        std::string accuracy = jsonResponse["accuracy"].String();
+        TEST_LOG("accuracy: %s", accuracy.c_str());
+    }
 }
 
 TEST_F(SystemServicesTest, GetPowerState_CurrentState)
@@ -3235,6 +3371,11 @@ TEST_F(SystemServicesTest, GetPowerState_CurrentState)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response));
     EXPECT_TRUE(jsonResponse.HasLabel("powerState"));
+    
+    // Validate powerState data
+    ASSERT_TRUE(jsonResponse["powerState"].IsSet()) << "powerState is not set: " << response;
+    std::string powerState = jsonResponse["powerState"].String();
+    EXPECT_FALSE(powerState.empty()) << "powerState should not be empty: " << response;
 }
 
 TEST_F(SystemServicesTest, GetFirmwareUpdateState_InitialState)
@@ -3244,6 +3385,11 @@ TEST_F(SystemServicesTest, GetFirmwareUpdateState_InitialState)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response));
     EXPECT_TRUE(jsonResponse.HasLabel("firmwareUpdateState"));
+    
+    // Validate firmwareUpdateState data
+    ASSERT_TRUE(jsonResponse["firmwareUpdateState"].IsSet()) << "firmwareUpdateState is not set: " << response;
+    int firmwareUpdateState = jsonResponse["firmwareUpdateState"].Number();
+    EXPECT_GE(firmwareUpdateState, 0) << "firmwareUpdateState should be >= 0: " << response;
 }
 
 TEST_F(SystemServicesTest, GetWakeupReason_DefaultReason)
@@ -3256,6 +3402,11 @@ TEST_F(SystemServicesTest, GetWakeupReason_DefaultReason)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response));
     EXPECT_TRUE(jsonResponse.HasLabel("wakeupReason"));
+    
+    // Validate wakeupReason data
+    ASSERT_TRUE(jsonResponse["wakeupReason"].IsSet()) << "wakeupReason is not set: " << response;
+    std::string wakeupReason = jsonResponse["wakeupReason"].String();
+    EXPECT_FALSE(wakeupReason.empty()) << "wakeupReason should not be empty: " << response;
 }
 
 TEST_F(SystemServicesTest, GetWakeupReason_VoiceWakeup)
@@ -3302,6 +3453,12 @@ TEST_F(SystemServicesTest, GetPowerStateBeforeReboot_ValidState)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response));
     EXPECT_TRUE(jsonResponse.HasLabel("state"));
+    
+    // Validate state data
+    ASSERT_TRUE(jsonResponse["state"].IsSet()) << "state is not set: " << response;
+    std::string state = jsonResponse["state"].String();
+    EXPECT_FALSE(state.empty()) << "state should not be empty: " << response;
+    TEST_LOG("GetPowerStateBeforeReboot_ValidState - state: %s", state.c_str());
 }
 
 TEST_F(SystemServicesTest, GetSystemVersions_AllVersions)
@@ -3311,6 +3468,18 @@ TEST_F(SystemServicesTest, GetSystemVersions_AllVersions)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response));
     EXPECT_TRUE(jsonResponse.HasLabel("stbVersion") || jsonResponse.HasLabel("receiverVersion"));
+    
+    // Validate version data
+    if (jsonResponse.HasLabel("stbVersion") && jsonResponse["stbVersion"].IsSet()) {
+        std::string stbVersion = jsonResponse["stbVersion"].String();
+        EXPECT_FALSE(stbVersion.empty()) << "stbVersion should not be empty: " << response;
+        TEST_LOG("stbVersion: %s", stbVersion.c_str());
+    }
+    if (jsonResponse.HasLabel("receiverVersion") && jsonResponse["receiverVersion"].IsSet()) {
+        std::string receiverVersion = jsonResponse["receiverVersion"].String();
+        EXPECT_FALSE(receiverVersion.empty()) << "receiverVersion should not be empty: " << response;
+        TEST_LOG("receiverVersion: %s", receiverVersion.c_str());
+    }
 }
 
 TEST_F(SystemServicesTest, GetPlatformConfiguration_QueryEmpty)
@@ -3320,6 +3489,11 @@ TEST_F(SystemServicesTest, GetPlatformConfiguration_QueryEmpty)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response));
     EXPECT_TRUE(jsonResponse.HasLabel("success"));
+    
+    // Validate success data
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    TEST_LOG("GetPlatformConfiguration_QueryEmpty - success: %s", success ? "true" : "false");
 }
 
 TEST_F(SystemServicesTest, GetPlatformConfiguration_QueryCapabilities)
@@ -3329,6 +3503,11 @@ TEST_F(SystemServicesTest, GetPlatformConfiguration_QueryCapabilities)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response));
     EXPECT_TRUE(jsonResponse.HasLabel("success"));
+    
+    // Validate success data
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    TEST_LOG("GetPlatformConfiguration_QueryCapabilities - success: %s", success ? "true" : "false");
 }
 // ======================================
 // PLUGIN DEPENDENCY TESTS - DeviceInfo
@@ -3341,8 +3520,11 @@ TEST_F(SystemServicesTest, GetDeviceInfo_ModelName_Success)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "GetDeviceInfo should succeed: " << response;
     
-    TEST_LOG("GetDeviceInfo modelName test - Response: %s", response.c_str());
+    TEST_LOG("GetDeviceInfo modelName test - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, GetDeviceInfo_HardwareID_Success)
@@ -3352,8 +3534,11 @@ TEST_F(SystemServicesTest, GetDeviceInfo_HardwareID_Success)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "GetDeviceInfo should succeed: " << response;
     
-    TEST_LOG("GetDeviceInfo hardwareID test - Response: %s", response.c_str());
+    TEST_LOG("GetDeviceInfo hardwareID test - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, GetDeviceInfo_FriendlyID_Success)
@@ -3363,8 +3548,11 @@ TEST_F(SystemServicesTest, GetDeviceInfo_FriendlyID_Success)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "GetDeviceInfo should succeed: " << response;
     
-    TEST_LOG("GetDeviceInfo friendly_id test - Response: %s", response.c_str());
+    TEST_LOG("GetDeviceInfo friendly_id test - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, GetDeviceInfo_MultipleParams_Success)
@@ -3374,8 +3562,11 @@ TEST_F(SystemServicesTest, GetDeviceInfo_MultipleParams_Success)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "GetDeviceInfo should succeed: " << response;
     
-    TEST_LOG("GetDeviceInfo multiple params test - Response: %s", response.c_str());
+    TEST_LOG("GetDeviceInfo multiple params test - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, GetDeviceInfo_InvalidParam)
@@ -3462,52 +3653,6 @@ TEST_F(SystemServicesTest, GetPowerState_PowerManagerFailure)
 }
 
 // ======================================
-// PLUGIN DEPENDENCY TESTS - Migration
-// ======================================
-#if 0
-TEST_F(SystemServicesTest, GetMigrationStatus_PluginNotAvailable)
-{
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getMigrationStatus"), _T("{}"), response));
-    
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
-    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
-    
-    TEST_LOG("GetMigrationStatus plugin not available test - Response: %s", response.c_str());
-}
-
-TEST_F(SystemServicesTest, GetMigrationStatus_FileExists)
-{
-    (void)system("mkdir -p /opt/secure/persistent");
-    createFile("/opt/secure/persistent/MigrationStatus", "2");
-    
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getMigrationStatus"), _T("{}"), response));
-    
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
-    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
-    
-    TEST_LOG("GetMigrationStatus file exists test - Response: %s", response.c_str());
-    
-    removeFile("/opt/secure/persistent/MigrationStatus");
-}
-
-TEST_F(SystemServicesTest, GetMigrationStatus_InvalidFileContent)
-{
-    (void)system("mkdir -p /opt/secure/persistent");
-    createFile("/opt/secure/persistent/MigrationStatus", "invalid_content");
-    
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getMigrationStatus"), _T("{}"), response));
-    
-    JsonObject jsonResponse;
-    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
-    
-    TEST_LOG("GetMigrationStatus invalid content test - Response: %s", response.c_str());
-    
-    removeFile("/opt/secure/persistent/MigrationStatus");
-}
-#endif
-// ======================================
 // UPLOAD LOGS ASYNC TESTS
 // ======================================
 
@@ -3518,8 +3663,11 @@ TEST_F(SystemServicesTest, UploadLogsAsync_ValidUrl_Success)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "UploadLogsAsync should succeed: " << response;
     
-    TEST_LOG("UploadLogsAsync valid URL test - Response: %s", response.c_str());
+    TEST_LOG("UploadLogsAsync valid URL test - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, UploadLogsAsync_MissingUrlParameter)
@@ -3565,7 +3713,11 @@ TEST_F(SystemServicesTest, SetPowerState_Empty_Params)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
-    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "Empty params should fail: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_FALSE(success) << "Empty params should fail: " << response;
+    
+    TEST_LOG("SetPowerState_Empty_Params - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetPowerState_Invalid_PowerState)
@@ -3575,7 +3727,11 @@ TEST_F(SystemServicesTest, SetPowerState_Invalid_PowerState)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
-    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "Invalid power state should fail: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_FALSE(success) << "Invalid power state should fail: " << response;
+    
+    TEST_LOG("SetPowerState_Invalid_PowerState - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetPowerState_ON_Success)
@@ -3588,7 +3744,11 @@ TEST_F(SystemServicesTest, SetPowerState_ON_Success)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
-    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "SetPowerState ON should succeed: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "SetPowerState ON should succeed: " << response;
+    
+    TEST_LOG("SetPowerState_ON_Success - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetPowerState_STANDBY_Success)
@@ -3601,7 +3761,11 @@ TEST_F(SystemServicesTest, SetPowerState_STANDBY_Success)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
-    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "SetPowerState STANDBY should succeed: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "SetPowerState STANDBY should succeed: " << response;
+    
+    TEST_LOG("SetPowerState_STANDBY_Success - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetPowerState_PowerManager_Failure)
@@ -3614,7 +3778,11 @@ TEST_F(SystemServicesTest, SetPowerState_PowerManager_Failure)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
-    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "PowerManager failure should result in success=false: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_FALSE(success) << "PowerManager failure should result in success=false: " << response;
+    
+    TEST_LOG("SetPowerState_PowerManager_Failure - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, GetPowerState_STANDBY_Success)
@@ -3662,8 +3830,10 @@ TEST_F(SystemServicesTest, AbortLogUpload_WhenUploadInProgress)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
     
-    TEST_LOG("AbortLogUpload test - Response: %s", response.c_str());
+    TEST_LOG("AbortLogUpload test - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, GetBootTypeInfo_WarmBoot_Success)
@@ -3696,8 +3866,11 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_WithCompleteData)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("currentFWVersion")) << "Missing currentFWVersion: " << response;
+    ASSERT_TRUE(jsonResponse["currentFWVersion"].IsSet()) << "currentFWVersion is not set: " << response;
+    string currentFWVersion = jsonResponse["currentFWVersion"].String();
+    EXPECT_FALSE(currentFWVersion.empty()) << "currentFWVersion should not be empty: " << response;
     
-    TEST_LOG("GetDownloadedFirmwareInfo complete data test - Response: %s", response.c_str());
+    TEST_LOG("GetDownloadedFirmwareInfo complete data test - Response: %s, currentFWVersion: %s", response.c_str(), currentFWVersion.c_str());
     
     (void)std::remove("/version.txt");
 }
@@ -3749,7 +3922,11 @@ TEST_F(SystemServicesTest, SetPowerState_WithStandbyReason)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
-    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "SetPowerState with reason should succeed: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "SetPowerState with reason should succeed: " << response;
+    
+    TEST_LOG("SetPowerState_WithStandbyReason - Response: %s, success: %d", response.c_str(), success);
 }
 TEST_F(SystemServicesTest, SetPowerState_LIGHT_SLEEP_Success)
 {
@@ -4264,20 +4441,8 @@ TEST_F(SystemServicesTest, Notification_ReRegisterHandler_ReceivesNotifications)
     delete notificationHandler;
 }
 
-//my added test cases for code coverage
-//adding more tests for zero-coverage APIs to improve coverage metrics, even if they are not fully functional in the L1 test environment due to missing plugins or dependencies.
-
 // ======================================
-// getFirmwareUpdateInfo — REMOVED: spawns firmwareUpdateInfoReceived() in a
-// background thread that races with test fixture teardown under Valgrind.
-// Race: Worker pool Job calls (*index)->OnFirmwareUpdateInfoReceived() while
-// Deinitialize concurrently calls (*itr)->Release() → vtable reset to
-// pure-virtual base → "pure virtual method called" → SIGABRT.
-// The race cannot be fixed without modifying production code.
-// ======================================
-
-// ======================================
-// setFirmwareAutoReboot — zero-coverage API
+// setFirmwareAutoReboot — API
 // ======================================
 
 TEST_F(SystemServicesTest, SetFirmwareAutoReboot_PluginNotAvailable_Enable)
@@ -4301,7 +4466,7 @@ TEST_F(SystemServicesTest, SetFirmwareAutoReboot_PluginNotAvailable_Disable)
 }
 
 // ======================================
-// setMode — zero-coverage API
+// setMode — API
 // ======================================
 
 TEST_F(SystemServicesTest, SetMode_Normal_NoDuration)
@@ -4311,8 +4476,11 @@ TEST_F(SystemServicesTest, SetMode_Normal_NoDuration)
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
 
-    TEST_LOG("SetMode_Normal_NoDuration - Response: %s", response.c_str());
+    TEST_LOG("SetMode_Normal_NoDuration - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetMode_EmptyMode_SuccessFalse)
@@ -4323,9 +4491,11 @@ TEST_F(SystemServicesTest, SetMode_EmptyMode_SuccessFalse)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "Empty mode should fail: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_FALSE(success) << "Empty mode should fail: " << response;
 
-    TEST_LOG("SetMode_EmptyMode_SuccessFalse - Response: %s", response.c_str());
+    TEST_LOG("SetMode_EmptyMode_SuccessFalse - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetMode_InvalidMode_SuccessFalse)
@@ -4336,9 +4506,11 @@ TEST_F(SystemServicesTest, SetMode_InvalidMode_SuccessFalse)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "Invalid mode should fail: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_FALSE(success) << "Invalid mode should fail: " << response;
 
-    TEST_LOG("SetMode_InvalidMode_SuccessFalse - Response: %s", response.c_str());
+    TEST_LOG("SetMode_InvalidMode_SuccessFalse - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetMode_Warehouse_IarmSuccess)
@@ -4388,8 +4560,11 @@ TEST_F(SystemServicesTest, SetMode_Normal_WithDuration)
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
 
-    TEST_LOG("SetMode_Normal_WithDuration - Response: %s", response.c_str());
+    TEST_LOG("SetMode_Normal_WithDuration - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ======================================
@@ -4406,10 +4581,14 @@ TEST_F(SystemServicesTest, GetPowerStateBeforeReboot_PowerManagerFailure)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("state")) << "Missing state: " << response;
+    ASSERT_TRUE(jsonResponse["state"].IsSet()) << "state is not set: " << response;
+    string state = jsonResponse["state"].String();
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "PM failure should yield success=false: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_FALSE(success) << "PM failure should yield success=false: " << response;
 
-    TEST_LOG("GetPowerStateBeforeReboot_PowerManagerFailure - Response: %s", response.c_str());
+    TEST_LOG("GetPowerStateBeforeReboot_PowerManagerFailure - Response: %s, state: %s, success: %d", response.c_str(), state.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, GetPowerStateBeforeReboot_CachedAfterFirstCall)
@@ -4424,17 +4603,25 @@ TEST_F(SystemServicesTest, GetPowerStateBeforeReboot_CachedAfterFirstCall)
 
     JsonObject jsonResponse1;
     ASSERT_TRUE(jsonResponse1.FromString(response));
-    EXPECT_TRUE(jsonResponse1["success"].Boolean()) << "First call should succeed: " << response;
+    ASSERT_TRUE(jsonResponse1["success"].IsSet()) << "success is not set in first call: " << response;
+    bool success1 = jsonResponse1["success"].Boolean();
+    EXPECT_TRUE(success1) << "First call should succeed: " << response;
+    ASSERT_TRUE(jsonResponse1["state"].IsSet()) << "state is not set in first call: " << response;
     string state1 = jsonResponse1["state"].String();
+    EXPECT_FALSE(state1.empty()) << "state should not be empty: " << response;
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getPowerStateBeforeReboot"), _T("{}"), response));
 
     JsonObject jsonResponse2;
     ASSERT_TRUE(jsonResponse2.FromString(response));
-    EXPECT_TRUE(jsonResponse2["success"].Boolean()) << "Cached call should succeed: " << response;
-    EXPECT_EQ(state1, jsonResponse2["state"].String()) << "Cached state should match first call";
+    ASSERT_TRUE(jsonResponse2["success"].IsSet()) << "success is not set in cached call: " << response;
+    bool success2 = jsonResponse2["success"].Boolean();
+    EXPECT_TRUE(success2) << "Cached call should succeed: " << response;
+    ASSERT_TRUE(jsonResponse2["state"].IsSet()) << "state is not set in cached call: " << response;
+    string state2 = jsonResponse2["state"].String();
+    EXPECT_EQ(state1, state2) << "Cached state should match first call";
 
-    TEST_LOG("GetPowerStateBeforeReboot_CachedAfterFirstCall - Response: %s", response.c_str());
+    TEST_LOG("GetPowerStateBeforeReboot_CachedAfterFirstCall - Response: %s, state1: %s, state2: %s", response.c_str(), state1.c_str(), state2.c_str());
 }
 
 // ======================================
@@ -4495,8 +4682,10 @@ TEST_F(SystemServicesTest, SetTimeZoneDST_ValidZone_ExistingFile)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
 
-    TEST_LOG("SetTimeZoneDST_ValidZone_ExistingFile - Response: %s", response.c_str());
+    TEST_LOG("SetTimeZoneDST_ValidZone_ExistingFile - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetTimeZoneDST_ValidZone_AccuracyINITIAL)
@@ -4572,10 +4761,14 @@ TEST_F(SystemServicesTest, GetTimeZoneDST_FileAbsent_ReturnsDefault)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("timeZone")) << "Missing timeZone: " << response;
+    ASSERT_TRUE(jsonResponse["timeZone"].IsSet()) << "timeZone is not set: " << response;
+    string timeZone = jsonResponse["timeZone"].String();
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Absent file should return default: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "Absent file should return default: " << response;
 
-    TEST_LOG("GetTimeZoneDST_FileAbsent_ReturnsDefault - Response: %s", response.c_str());
+    TEST_LOG("GetTimeZoneDST_FileAbsent_ReturnsDefault - Response: %s, timeZone: %s, success: %d", response.c_str(), timeZone.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, GetTimeZoneDST_FilePresent_ReturnsContents)
@@ -4590,11 +4783,16 @@ TEST_F(SystemServicesTest, GetTimeZoneDST_FilePresent_ReturnsContents)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("timeZone")) << "Missing timeZone: " << response;
-    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "File present should succeed: " << response;
+    ASSERT_TRUE(jsonResponse["timeZone"].IsSet()) << "timeZone is not set: " << response;
+    string timeZone = jsonResponse["timeZone"].String();
+    EXPECT_FALSE(timeZone.empty()) << "timeZone should not be empty: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "File present should succeed: " << response;
 
     (void)system("rm -f /opt/persistent/timeZoneDST");
 
-    TEST_LOG("GetTimeZoneDST_FilePresent_ReturnsContents - Response: %s", response.c_str());
+    TEST_LOG("GetTimeZoneDST_FilePresent_ReturnsContents - Response: %s, timeZone: %s, success: %d", response.c_str(), timeZone.c_str(), success);
 }
 
 // ======================================
@@ -4610,8 +4808,10 @@ TEST_F(SystemServicesTest, GetTerritory_FileAbsent_SuccessFalse)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
 
-    TEST_LOG("GetTerritory_FileAbsent_SuccessFalse - Response: %s", response.c_str());
+    TEST_LOG("GetTerritory_FileAbsent_SuccessFalse - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, GetTerritory_FileWithTerritoryAndRegion)
@@ -4624,13 +4824,17 @@ TEST_F(SystemServicesTest, GetTerritory_FileWithTerritoryAndRegion)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("territory")) << "Missing territory: " << response;
+    ASSERT_TRUE(jsonResponse["territory"].IsSet()) << "territory is not set: " << response;
+    string territory = jsonResponse["territory"].String();
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Should succeed with file: " << response;
-    EXPECT_EQ("USA", jsonResponse["territory"].String()) << "Territory mismatch: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "Should succeed with file: " << response;
+    EXPECT_EQ("USA", territory) << "Territory mismatch: " << response;
 
     removeFile(TERRITORYFILE);
 
-    TEST_LOG("GetTerritory_FileWithTerritoryAndRegion - Response: %s", response.c_str());
+    TEST_LOG("GetTerritory_FileWithTerritoryAndRegion - Response: %s, territory: %s, success: %d", response.c_str(), territory.c_str(), success);
 }
 
 // ======================================
@@ -4647,11 +4851,13 @@ TEST_F(SystemServicesTest, SetTerritory_ValidGBR)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "GBR should succeed: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "GBR should succeed: " << response;
 
     removeFile(TERRITORYFILE);
 
-    TEST_LOG("SetTerritory_ValidGBR - Response: %s", response.c_str());
+    TEST_LOG("SetTerritory_ValidGBR - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetTerritory_TooShort_Invalid)
@@ -4680,9 +4886,11 @@ TEST_F(SystemServicesTest, SetTerritory_EmptyTerritory_SuccessFalse)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "Empty territory should fail: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_FALSE(success) << "Empty territory should fail: " << response;
 
-    TEST_LOG("SetTerritory_EmptyTerritory_SuccessFalse - Response: %s", response.c_str());
+    TEST_LOG("SetTerritory_EmptyTerritory_SuccessFalse - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetTerritory_ValidRegion_US_CA)
@@ -4695,10 +4903,12 @@ TEST_F(SystemServicesTest, SetTerritory_ValidRegion_US_CA)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
 
     removeFile(TERRITORYFILE);
 
-    TEST_LOG("SetTerritory_ValidRegion_US_CA - Response: %s", response.c_str());
+    TEST_LOG("SetTerritory_ValidRegion_US_CA - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ======================================
@@ -4715,11 +4925,19 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_LowercaseKey_SuccessTrue)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Lowercase key should succeed: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "Lowercase key should succeed: " << response;
+    
+    if (jsonResponse.HasLabel("blocklist")) {
+        ASSERT_TRUE(jsonResponse["blocklist"].IsSet()) << "blocklist is not set: " << response;
+        bool blocklist = jsonResponse["blocklist"].Boolean();
+        TEST_LOG("GetBlocklistFlag_LowercaseKey_SuccessTrue - Response: %s, success: %d, blocklist: %d", response.c_str(), success, blocklist);
+    } else {
+        TEST_LOG("GetBlocklistFlag_LowercaseKey_SuccessTrue - Response: %s, success: %d", response.c_str(), success);
+    }
 
     removeFile("/opt/secure/persistent/opflashstore/devicestate.txt");
-
-    TEST_LOG("GetBlocklistFlag_LowercaseKey_SuccessTrue - Response: %s", response.c_str());
 }
 
 // ======================================
@@ -4737,11 +4955,13 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_SameValue_NoEvent)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Same-value set should succeed: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "Same-value set should succeed: " << response;
 
     removeFile("/opt/secure/persistent/opflashstore/devicestate.txt");
 
-    TEST_LOG("SetBlocklistFlag_SameValue_NoEvent - Response: %s", response.c_str());
+    TEST_LOG("SetBlocklistFlag_SameValue_NoEvent - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetBlocklistFlag_DifferentValue_FiresEvent)
@@ -4755,11 +4975,13 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_DifferentValue_FiresEvent)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Different-value set should succeed: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "Different-value set should succeed: " << response;
 
     removeFile("/opt/secure/persistent/opflashstore/devicestate.txt");
 
-    TEST_LOG("SetBlocklistFlag_DifferentValue_FiresEvent - Response: %s", response.c_str());
+    TEST_LOG("SetBlocklistFlag_DifferentValue_FiresEvent - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ======================================
@@ -4777,10 +4999,12 @@ TEST_F(SystemServicesTest, GetSystemVersions_VersionFieldPattern)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Should succeed: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "Should succeed: " << response;
 
     (void)std::remove("/version.txt");
-    TEST_LOG("GetSystemVersions_VersionFieldPattern - Response: %s", response.c_str());
+    TEST_LOG("GetSystemVersions_VersionFieldPattern - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, GetSystemVersions_BuildTimeField)
@@ -4794,9 +5018,11 @@ TEST_F(SystemServicesTest, GetSystemVersions_BuildTimeField)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
 
     (void)std::remove("/version.txt");
-    TEST_LOG("GetSystemVersions_BuildTimeField - Response: %s", response.c_str());
+    TEST_LOG("GetSystemVersions_BuildTimeField - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, GetSystemVersions_NoFile_DefaultStrings)
@@ -4808,8 +5034,10 @@ TEST_F(SystemServicesTest, GetSystemVersions_NoFile_DefaultStrings)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
 
-    TEST_LOG("GetSystemVersions_NoFile_DefaultStrings - Response: %s", response.c_str());
+    TEST_LOG("GetSystemVersions_NoFile_DefaultStrings - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ======================================
@@ -4832,11 +5060,15 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_WithStatusFile)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("currentFWVersion")) << "Missing currentFWVersion: " << response;
+    ASSERT_TRUE(jsonResponse["currentFWVersion"].IsSet()) << "currentFWVersion is not set: " << response;
+    string currentFWVersion = jsonResponse["currentFWVersion"].String();
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
 
     (void)std::remove("/opt/fwdnldstatus.txt");
     (void)std::remove("/version.txt");
-    TEST_LOG("GetDownloadedFirmwareInfo_WithStatusFile - Response: %s", response.c_str());
+    TEST_LOG("GetDownloadedFirmwareInfo_WithStatusFile - Response: %s, currentFWVersion: %s, success: %d", response.c_str(), currentFWVersion.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_RebootImmediateOne)
@@ -4871,9 +5103,12 @@ TEST_F(SystemServicesTest, GetFirmwareDownloadPercent_ProgressFile_Returns50)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("downloadPercent")) << "Missing downloadPercent: " << response;
+    ASSERT_TRUE(jsonResponse["downloadPercent"].IsSet()) << "downloadPercent is not set: " << response;
+    int downloadPercent = static_cast<int>(jsonResponse["downloadPercent"].Number());
+    EXPECT_EQ(50, downloadPercent) << "downloadPercent should be 50: " << response;
 
     (void)std::remove("/opt/curl_progress");
-    TEST_LOG("GetFirmwareDownloadPercent_ProgressFile_Returns50 - Response: %s", response.c_str());
+    TEST_LOG("GetFirmwareDownloadPercent_ProgressFile_Returns50 - Response: %s, downloadPercent: %d", response.c_str(), downloadPercent);
 }
 
 TEST_F(SystemServicesTest, GetFirmwareDownloadPercent_NoFile_ReturnsMinus1)
@@ -4885,10 +5120,12 @@ TEST_F(SystemServicesTest, GetFirmwareDownloadPercent_NoFile_ReturnsMinus1)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("downloadPercent")) << "Missing downloadPercent: " << response;
-    EXPECT_EQ(-1, static_cast<int>(jsonResponse["downloadPercent"].Number()))
+    ASSERT_TRUE(jsonResponse["downloadPercent"].IsSet()) << "downloadPercent is not set: " << response;
+    int downloadPercent = static_cast<int>(jsonResponse["downloadPercent"].Number());
+    EXPECT_EQ(-1, downloadPercent)
         << "No file should return -1: " << response;
 
-    TEST_LOG("GetFirmwareDownloadPercent_NoFile_ReturnsMinus1 - Response: %s", response.c_str());
+    TEST_LOG("GetFirmwareDownloadPercent_NoFile_ReturnsMinus1 - Response: %s, downloadPercent: %d", response.c_str(), downloadPercent);
 }
 
 // ======================================
@@ -4907,11 +5144,15 @@ TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_SigVerifyFailed)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("failReason")) << "Missing failReason: " << response;
+    ASSERT_TRUE(jsonResponse["failReason"].IsSet()) << "failReason is not set: " << response;
+    string failReason = jsonResponse["failReason"].String();
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Should succeed: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "Should succeed: " << response;
 
     (void)std::remove("/opt/persistent/.lastswupdatestatus");
-    TEST_LOG("GetLastFirmwareFailureReason_SigVerifyFailed - Response: %s", response.c_str());
+    TEST_LOG("GetLastFirmwareFailureReason_SigVerifyFailed - Response: %s, failReason: %s, success: %d", response.c_str(), failReason.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_EmptyFile)
@@ -4944,10 +5185,14 @@ TEST_F(SystemServicesTest, GetNetworkStandbyMode_PMSuccess_True)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("nwStandby")) << "Missing nwStandby: " << response;
-    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Should succeed: " << response;
-    EXPECT_TRUE(jsonResponse["nwStandby"].Boolean()) << "nwStandby should be true: " << response;
+    ASSERT_TRUE(jsonResponse["nwStandby"].IsSet()) << "nwStandby is not set: " << response;
+    bool nwStandby = jsonResponse["nwStandby"].Boolean();
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "Should succeed: " << response;
+    EXPECT_TRUE(nwStandby) << "nwStandby should be true: " << response;
 
-    TEST_LOG("GetNetworkStandbyMode_PMSuccess_True - Response: %s", response.c_str());
+    TEST_LOG("GetNetworkStandbyMode_PMSuccess_True - Response: %s, nwStandby: %d, success: %d", response.c_str(), nwStandby, success);
 }
 
 TEST_F(SystemServicesTest, GetNetworkStandbyMode_PMSuccess_False)
@@ -4962,9 +5207,11 @@ TEST_F(SystemServicesTest, GetNetworkStandbyMode_PMSuccess_False)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("nwStandby")) << "Missing nwStandby: " << response;
-    EXPECT_FALSE(jsonResponse["nwStandby"].Boolean()) << "nwStandby should be false: " << response;
+    ASSERT_TRUE(jsonResponse["nwStandby"].IsSet()) << "nwStandby is not set: " << response;
+    bool nwStandby = jsonResponse["nwStandby"].Boolean();
+    EXPECT_FALSE(nwStandby) << "nwStandby should be false: " << response;
 
-    TEST_LOG("GetNetworkStandbyMode_PMSuccess_False - Response: %s", response.c_str());
+    TEST_LOG("GetNetworkStandbyMode_PMSuccess_False - Response: %s, nwStandby: %d", response.c_str(), nwStandby);
 }
 
 TEST_F(SystemServicesTest, GetNetworkStandbyMode_PMFailure_SuccessFalse)
@@ -4977,9 +5224,11 @@ TEST_F(SystemServicesTest, GetNetworkStandbyMode_PMFailure_SuccessFalse)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "PM failure should yield success=false: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_FALSE(success) << "PM failure should yield success=false: " << response;
 
-    TEST_LOG("GetNetworkStandbyMode_PMFailure_SuccessFalse - Response: %s", response.c_str());
+    TEST_LOG("GetNetworkStandbyMode_PMFailure_SuccessFalse - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ======================================
@@ -5013,10 +5262,12 @@ TEST_F(SystemServicesTest, GetBuildType_QA)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("build_type")) << "Missing build_type: " << response;
-    EXPECT_EQ("qa", jsonResponse["build_type"].String()) << "Unexpected build type: " << response;
+    ASSERT_TRUE(jsonResponse["build_type"].IsSet()) << "build_type is not set: " << response;
+    string buildType = jsonResponse["build_type"].String();
+    EXPECT_EQ("qa", buildType) << "Unexpected build type: " << response;
 
     std::ofstream("/etc/device.properties").close();
-    TEST_LOG("GetBuildType_QA - Response: %s", response.c_str());
+    TEST_LOG("GetBuildType_QA - Response: %s, build_type: %s", response.c_str(), buildType.c_str());
 }
 
 TEST_F(SystemServicesTest, GetBuildType_FileAbsent_SuccessFalse)
@@ -5028,9 +5279,11 @@ TEST_F(SystemServicesTest, GetBuildType_FileAbsent_SuccessFalse)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "Missing file should fail: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_FALSE(success) << "Missing file should fail: " << response;
 
-    TEST_LOG("GetBuildType_FileAbsent_SuccessFalse - Response: %s", response.c_str());
+    TEST_LOG("GetBuildType_FileAbsent_SuccessFalse - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ======================================
@@ -5044,8 +5297,11 @@ TEST_F(SystemServicesTest, GetRFCConfig_NameWithSpecialChars_Error)
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
 
-    TEST_LOG("GetRFCConfig_NameWithSpecialChars_Error - Response: %s", response.c_str());
+    TEST_LOG("GetRFCConfig_NameWithSpecialChars_Error - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, GetRFCConfig_TwoValidNames_BothSucceed)
@@ -5064,8 +5320,11 @@ TEST_F(SystemServicesTest, GetRFCConfig_TwoValidNames_BothSucceed)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "getRFCConfig should succeed: " << response;
 
-    TEST_LOG("GetRFCConfig_TwoValidNames_BothSucceed - Response: %s", response.c_str());
+    TEST_LOG("GetRFCConfig_TwoValidNames_BothSucceed - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ======================================
@@ -5095,9 +5354,11 @@ TEST_F(SystemServicesTest, SetDeepSleepTimer_Oversized_ClampedToZero)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Clamped call should succeed: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "Clamped call should succeed: " << response;
 
-    TEST_LOG("SetDeepSleepTimer_Oversized_ClampedToZero - Response: %s", response.c_str());
+    TEST_LOG("SetDeepSleepTimer_Oversized_ClampedToZero - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ======================================
@@ -5130,9 +5391,11 @@ TEST_F(SystemServicesTest, Reboot_EmptyReason_DefaultUsed)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Empty reason reboot should succeed: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "Empty reason reboot should succeed: " << response;
 
-    TEST_LOG("Reboot_EmptyReason_DefaultUsed - Response: %s", response.c_str());
+    TEST_LOG("Reboot_EmptyReason_DefaultUsed - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ======================================
@@ -5156,9 +5419,14 @@ TEST_F(SystemServicesTest, GetMfgSerialNumber_BufferPopulated)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("mfgSerialNumber")) << "Missing mfgSerialNumber: " << response;
-    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Should succeed: " << response;
+    ASSERT_TRUE(jsonResponse["mfgSerialNumber"].IsSet()) << "mfgSerialNumber is not set: " << response;
+    string mfgSerialNumber = jsonResponse["mfgSerialNumber"].String();
+    EXPECT_FALSE(mfgSerialNumber.empty()) << "mfgSerialNumber should not be empty: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "Should succeed: " << response;
 
-    TEST_LOG("GetMfgSerialNumber_BufferPopulated - Response: %s", response.c_str());
+    TEST_LOG("GetMfgSerialNumber_BufferPopulated - Response: %s, mfgSerialNumber: %s, success: %d", response.c_str(), mfgSerialNumber.c_str(), success);
 }
 
 // ======================================
@@ -5179,9 +5447,14 @@ TEST_F(SystemServicesTest, GetFSRFlag_FlagSet)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("fsrFlag")) << "Missing fsrFlag: " << response;
-    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Should succeed: " << response;
+    ASSERT_TRUE(jsonResponse["fsrFlag"].IsSet()) << "fsrFlag is not set: " << response;
+    bool fsrFlag = jsonResponse["fsrFlag"].Boolean();
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "Should succeed: " << response;
 
-    TEST_LOG("GetFSRFlag_FlagSet - Response: %s", response.c_str());
+    TEST_LOG("GetFSRFlag_FlagSet - Response: %s, fsrFlag: %d, success: %d", response.c_str(), fsrFlag, success);
 }
 
 // ======================================
@@ -5233,14 +5506,18 @@ TEST_F(SystemServicesTest, UploadLogsAsync_ThenAbort)
     JsonObject jsonResponse1;
     ASSERT_TRUE(jsonResponse1.FromString(response)) << "Failed to parse first response: " << response;
     ASSERT_TRUE(jsonResponse1.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse1["success"].IsSet()) << "success is not set: " << response;
+    bool success1 = jsonResponse1["success"].Boolean();
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("abortLogUpload"), _T("{}"), response));
 
     JsonObject jsonResponse2;
     ASSERT_TRUE(jsonResponse2.FromString(response)) << "Failed to parse abort response: " << response;
     ASSERT_TRUE(jsonResponse2.HasLabel("success")) << "Missing success in abort: " << response;
+    ASSERT_TRUE(jsonResponse2["success"].IsSet()) << "success is not set in abort: " << response;
+    bool success2 = jsonResponse2["success"].Boolean();
 
-    TEST_LOG("UploadLogsAsync_ThenAbort - Response: %s", response.c_str());
+    TEST_LOG("UploadLogsAsync_ThenAbort - Response: %s, uploadSuccess: %d, abortSuccess: %d", response.c_str(), success1, success2);
 }
 
 // ======================================
@@ -5254,9 +5531,11 @@ TEST_F(SystemServicesTest, GetMacAddresses_NoGUID_ScriptAbsent)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "Script absent should yield false: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_FALSE(success) << "Script absent should yield false: " << response;
 
-    TEST_LOG("GetMacAddresses_NoGUID_ScriptAbsent - Response: %s", response.c_str());
+    TEST_LOG("GetMacAddresses_NoGUID_ScriptAbsent - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ======================================
@@ -5276,11 +5555,16 @@ TEST_F(SystemServicesTest, GetFriendlyName_ReturnsCachedValue)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("friendlyName")) << "Missing friendlyName: " << response;
-    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Should succeed: " << response;
-    EXPECT_EQ("CachedDevice", jsonResponse["friendlyName"].String())
+    ASSERT_TRUE(jsonResponse["friendlyName"].IsSet()) << "friendlyName is not set: " << response;
+    string friendlyName = jsonResponse["friendlyName"].String();
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "Should succeed: " << response;
+    EXPECT_EQ("CachedDevice", friendlyName)
         << "Friendly name mismatch: " << response;
 
-    TEST_LOG("GetFriendlyName_ReturnsCachedValue - Response: %s", response.c_str());
+    TEST_LOG("GetFriendlyName_ReturnsCachedValue - Response: %s, friendlyName: %s, success: %d", response.c_str(), friendlyName.c_str(), success);
 }
 
 // ======================================
@@ -5294,11 +5578,14 @@ TEST_F(SystemServicesTest, RequestSystemUptime_ReturnsPositiveValue)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("systemUptime")) << "Missing systemUptime: " << response;
+    ASSERT_TRUE(jsonResponse["systemUptime"].IsSet()) << "systemUptime is not set: " << response;
+    string systemUptimeStr = jsonResponse["systemUptime"].String();
+    EXPECT_FALSE(systemUptimeStr.empty()) << "systemUptime should not be empty: " << response;
 
-    double uptime = std::stod(jsonResponse["systemUptime"].String());
+    double uptime = std::stod(systemUptimeStr);
     EXPECT_GT(uptime, 0.0) << "Uptime must be positive: " << response;
 
-    TEST_LOG("RequestSystemUptime_ReturnsPositiveValue - Response: %s", response.c_str());
+    TEST_LOG("RequestSystemUptime_ReturnsPositiveValue - Response: %s, systemUptime: %s", response.c_str(), systemUptimeStr.c_str());
 }
 
 // ======================================
@@ -5315,10 +5602,12 @@ TEST_F(SystemServicesTest, GetWakeupReason_PMFailure_ReturnsUnknown)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("wakeupReason")) << "Missing wakeupReason: " << response;
-    EXPECT_EQ("WAKEUP_REASON_UNKNOWN", jsonResponse["wakeupReason"].String())
+    ASSERT_TRUE(jsonResponse["wakeupReason"].IsSet()) << "wakeupReason is not set: " << response;
+    string wakeupReason = jsonResponse["wakeupReason"].String();
+    EXPECT_EQ("WAKEUP_REASON_UNKNOWN", wakeupReason)
         << "Failure should return UNKNOWN: " << response;
 
-    TEST_LOG("GetWakeupReason_PMFailure_ReturnsUnknown - Response: %s", response.c_str());
+    TEST_LOG("GetWakeupReason_PMFailure_ReturnsUnknown - Response: %s, wakeupReason: %s", response.c_str(), wakeupReason.c_str());
 }
 
 // ======================================
@@ -5358,10 +5647,12 @@ TEST_F(SystemServicesTest, SetFriendlyName_RfcFails_SuccessStillTrue)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    EXPECT_TRUE(jsonResponse["success"].Boolean())
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success)
         << "setFriendlyName always returns success=true: " << response;
 
-    TEST_LOG("SetFriendlyName_RfcFails_SuccessStillTrue - Response: %s", response.c_str());
+    TEST_LOG("SetFriendlyName_RfcFails_SuccessStillTrue - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ======================================
@@ -5381,9 +5672,11 @@ TEST_F(SystemServicesTest, SetPowerState_PMFailure_ReturnsError)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "PM failure should give success=false: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_FALSE(success) << "PM failure should give success=false: " << response;
 
-    TEST_LOG("SetPowerState_PMFailure_ReturnsError - Response: %s", response.c_str());
+    TEST_LOG("SetPowerState_PMFailure_ReturnsError - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ======================================
@@ -5403,9 +5696,15 @@ TEST_F(SystemServicesTest, GetPowerState_PMReturnsStandby)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("powerState")) << "Missing powerState: " << response;
-    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Should succeed: " << response;
+    ASSERT_TRUE(jsonResponse["powerState"].IsSet()) << "powerState is not set: " << response;
+    string powerState = jsonResponse["powerState"].String();
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "Should succeed: " << response;
+    EXPECT_EQ("STANDBY", powerState) << "Power state should be STANDBY: " << response;
 
-    TEST_LOG("GetPowerState_PMReturnsStandby - Response: %s", response.c_str());
+    TEST_LOG("GetPowerState_PMReturnsStandby - Response: %s, powerState: %s, success: %d", response.c_str(), powerState.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, GetPowerState_PMFailure_SuccessFalse)
@@ -5432,9 +5731,12 @@ TEST_F(SystemServicesTest, GetTimeZones_NullIterator_ProcessAll)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
     ASSERT_TRUE(jsonResponse.HasLabel("zoneinfo")) << "Missing zoneinfo: " << response;
+    ASSERT_TRUE(jsonResponse["zoneinfo"].IsSet()) << "zoneinfo is not set: " << response;
 
-    TEST_LOG("GetTimeZones_NullIterator_ProcessAll - Response: %s", response.c_str());
+    TEST_LOG("GetTimeZones_NullIterator_ProcessAll - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ======================================
@@ -5481,12 +5783,12 @@ TEST_F(SystemServicesTest, UpdateFirmware_ReturnsSuccess)
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "updateFirmware should always succeed: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "updateFirmware should always succeed: " << response;
 
-    TEST_LOG("UpdateFirmware_ReturnsSuccess - Response: %s", response.c_str());
+    TEST_LOG("UpdateFirmware_ReturnsSuccess - Response: %s, success: %d", response.c_str(), success);
 }
-
-//added test cases for systemservices
 
 // =====================================================================
 // TARGETED BRANCH COVERAGE TESTS — SystemServicesImplementation.cpp
@@ -5517,9 +5819,12 @@ TEST_F(SystemServicesTest, SetFriendlyName_SameName_NoBranchTaken)
               _T("{\"friendlyName\":\"DupeDevice\"}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_TRUE(jr["success"].Boolean()) << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << response;
 
-    TEST_LOG("SetFriendlyName_SameName_NoBranchTaken - Response: %s", response.c_str());
+    TEST_LOG("SetFriendlyName_SameName_NoBranchTaken - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetFriendlyName_DifferentName_RfcSuccess_LogsSuccess)
@@ -5531,9 +5836,12 @@ TEST_F(SystemServicesTest, SetFriendlyName_DifferentName_RfcSuccess_LogsSuccess)
               _T("{\"friendlyName\":\"NewDev\"}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_TRUE(jr["success"].Boolean()) << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << response;
 
-    TEST_LOG("SetFriendlyName_DifferentName_RfcSuccess_LogsSuccess - Response: %s", response.c_str());
+    TEST_LOG("SetFriendlyName_DifferentName_RfcSuccess_LogsSuccess - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetFriendlyName_DifferentName_RfcFailure_StillSuccess)
@@ -5545,10 +5853,13 @@ TEST_F(SystemServicesTest, SetFriendlyName_DifferentName_RfcFailure_StillSuccess
               _T("{\"friendlyName\":\"FailRFCDev\"}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
     // Even when RFC write fails, SetFriendlyName always returns success=true
-    EXPECT_TRUE(jr["success"].Boolean()) << response;
+    EXPECT_TRUE(success) << response;
 
-    TEST_LOG("SetFriendlyName_DifferentName_RfcFailure_StillSuccess - Response: %s", response.c_str());
+    TEST_LOG("SetFriendlyName_DifferentName_RfcFailure_StillSuccess - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ------------------------------------------------------------------
@@ -5593,11 +5904,14 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_SameValueAsFile_NoEventDispatched)
               _T("{\"blocklist\":true}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_TRUE(jr["success"].Boolean()) << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << response;
 
     (void)std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
 
-    TEST_LOG("SetBlocklistFlag_SameValueAsFile_NoEventDispatched - Response: %s", response.c_str());
+    TEST_LOG("SetBlocklistFlag_SameValueAsFile_NoEventDispatched - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetBlocklistFlag_DifferentValueFromFile_EventDispatched)
@@ -5611,11 +5925,14 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_DifferentValueFromFile_EventDispatch
               _T("{\"blocklist\":true}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_TRUE(jr["success"].Boolean()) << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << response;
 
     (void)std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
 
-    TEST_LOG("SetBlocklistFlag_DifferentValueFromFile_EventDispatched - Response: %s", response.c_str());
+    TEST_LOG("SetBlocklistFlag_DifferentValueFromFile_EventDispatched - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ------------------------------------------------------------------
@@ -5634,10 +5951,12 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_FileAbsent_SuccessFalse)
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBlocklistFlag"), _T("{}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    ASSERT_TRUE(jr.HasLabel("success"));
-    EXPECT_FALSE(jr["success"].Boolean()) << "No file should yield success=false: " << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_FALSE(success) << "No file should yield success=false: " << response;
 
-    TEST_LOG("GetBlocklistFlag_FileAbsent_SuccessFalse - Response: %s", response.c_str());
+    TEST_LOG("GetBlocklistFlag_FileAbsent_SuccessFalse - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, GetBlocklistFlag_FilePresent_BlocklistTrue)
@@ -5649,13 +5968,18 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_FilePresent_BlocklistTrue)
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBlocklistFlag"), _T("{}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    ASSERT_TRUE(jr.HasLabel("success"));
-    EXPECT_TRUE(jr["success"].Boolean()) << response;
-    EXPECT_TRUE(jr["blocklist"].Boolean()) << "Expected blocklist=true: " << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << response;
+    ASSERT_TRUE(jr.HasLabel("blocklist")) << "Missing blocklist: " << response;
+    ASSERT_TRUE(jr["blocklist"].IsSet()) << "blocklist is not set: " << response;
+    bool blocklist = jr["blocklist"].Boolean();
+    EXPECT_TRUE(blocklist) << "Expected blocklist=true: " << response;
 
     (void)std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
 
-    TEST_LOG("GetBlocklistFlag_FilePresent_BlocklistTrue - Response: %s", response.c_str());
+    TEST_LOG("GetBlocklistFlag_FilePresent_BlocklistTrue - Response: %s, success: %d, blocklist: %d", response.c_str(), success, blocklist);
 }
 
 TEST_F(SystemServicesTest, GetBlocklistFlag_FilePresent_BlocklistFalse)
@@ -5667,13 +5991,18 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_FilePresent_BlocklistFalse)
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBlocklistFlag"), _T("{}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    ASSERT_TRUE(jr.HasLabel("success"));
-    EXPECT_TRUE(jr["success"].Boolean()) << response;
-    EXPECT_FALSE(jr["blocklist"].Boolean()) << "Expected blocklist=false: " << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << response;
+    ASSERT_TRUE(jr.HasLabel("blocklist")) << "Missing blocklist: " << response;
+    ASSERT_TRUE(jr["blocklist"].IsSet()) << "blocklist is not set: " << response;
+    bool blocklist = jr["blocklist"].Boolean();
+    EXPECT_FALSE(blocklist) << "Expected blocklist=false: " << response;
 
     (void)std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
 
-    TEST_LOG("GetBlocklistFlag_FilePresent_BlocklistFalse - Response: %s", response.c_str());
+    TEST_LOG("GetBlocklistFlag_FilePresent_BlocklistFalse - Response: %s, success: %d, blocklist: %d", response.c_str(), success, blocklist);
 }
 
 // ------------------------------------------------------------------
@@ -5691,10 +6020,12 @@ TEST_F(SystemServicesTest, SetPowerState_EmptyState_SuccessFalse)
               _T("{\"powerState\":\"\"}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    ASSERT_TRUE(jr.HasLabel("success"));
-    EXPECT_FALSE(jr["success"].Boolean()) << "Empty powerState should fail: " << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_FALSE(success) << "Empty powerState should fail: " << response;
 
-    TEST_LOG("SetPowerState_EmptyState_SuccessFalse - Response: %s", response.c_str());
+    TEST_LOG("SetPowerState_EmptyState_SuccessFalse - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetPowerState_ON_PMSuccess_SuccessTrue)
@@ -5706,9 +6037,12 @@ TEST_F(SystemServicesTest, SetPowerState_ON_PMSuccess_SuccessTrue)
               _T("{\"powerState\":\"ON\"}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_TRUE(jr["success"].Boolean()) << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << response;
 
-    TEST_LOG("SetPowerState_ON_PMSuccess_SuccessTrue - Response: %s", response.c_str());
+    TEST_LOG("SetPowerState_ON_PMSuccess_SuccessTrue - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetPowerState_STANDBY_PMSuccess_SuccessTrue)
@@ -5720,9 +6054,12 @@ TEST_F(SystemServicesTest, SetPowerState_STANDBY_PMSuccess_SuccessTrue)
               _T("{\"powerState\":\"STANDBY\"}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_TRUE(jr["success"].Boolean()) << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << response;
 
-    TEST_LOG("SetPowerState_STANDBY_PMSuccess_SuccessTrue - Response: %s", response.c_str());
+    TEST_LOG("SetPowerState_STANDBY_PMSuccess_SuccessTrue - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetPowerState_ON_PMFailure_SuccessFalse)
@@ -5735,9 +6072,12 @@ TEST_F(SystemServicesTest, SetPowerState_ON_PMFailure_SuccessFalse)
               _T("{\"powerState\":\"ON\"}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_FALSE(jr["success"].Boolean()) << "PM failure should give success=false: " << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_FALSE(success) << "PM failure should give success=false: " << response;
 
-    TEST_LOG("SetPowerState_ON_PMFailure_SuccessFalse - Response: %s", response.c_str());
+    TEST_LOG("SetPowerState_ON_PMFailure_SuccessFalse - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetPowerState_WithStandbyReason_PMSuccess)
@@ -5749,9 +6089,12 @@ TEST_F(SystemServicesTest, SetPowerState_WithStandbyReason_PMSuccess)
               _T("{\"powerState\":\"ON\",\"standbyReason\":\"test-reason\"}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_TRUE(jr["success"].Boolean()) << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << response;
 
-    TEST_LOG("SetPowerState_WithStandbyReason_PMSuccess - Response: %s", response.c_str());
+    TEST_LOG("SetPowerState_WithStandbyReason_PMSuccess - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ------------------------------------------------------------------
@@ -5778,7 +6121,10 @@ TEST_F(SystemServicesTest, SetNetworkStandbyMode_Success_CacheInvalidated)
               _T("{\"nwStandby\":true}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_TRUE(jr["success"].Boolean()) << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << response;
 
     // Second get → PM called again (cache was invalidated by the set above)
     EXPECT_CALL(PowerManagerMock::Mock(), GetNetworkStandbyMode(::testing::_))
@@ -5789,9 +6135,12 @@ TEST_F(SystemServicesTest, SetNetworkStandbyMode_Success_CacheInvalidated)
 
     handler.Invoke(connection, _T("getNetworkStandbyMode"), _T("{}"), response);
     JsonObject jr2; ASSERT_TRUE(jr2.FromString(response));
-    EXPECT_TRUE(jr2["nwStandby"].Boolean()) << "Cache should be invalidated: " << response;
+    ASSERT_TRUE(jr2.HasLabel("nwStandby")) << "Missing nwStandby: " << response;
+    ASSERT_TRUE(jr2["nwStandby"].IsSet()) << "nwStandby is not set: " << response;
+    bool nwStandby = jr2["nwStandby"].Boolean();
+    EXPECT_TRUE(nwStandby) << "Cache should be invalidated: " << response;
 
-    TEST_LOG("SetNetworkStandbyMode_Success_CacheInvalidated - Response: %s", response.c_str());
+    TEST_LOG("SetNetworkStandbyMode_Success_CacheInvalidated - Response: %s, success: %d, nwStandby: %d", response.c_str(), success, nwStandby);
 }
 
 // ------------------------------------------------------------------
@@ -5816,9 +6165,12 @@ TEST_F(SystemServicesTest, GetNetworkStandbyMode_ReturnsCachedValue)
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getNetworkStandbyMode"), _T("{}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_TRUE(jr["nwStandby"].Boolean()) << "Should return cached true: " << response;
+    ASSERT_TRUE(jr.HasLabel("nwStandby")) << "Missing nwStandby: " << response;
+    ASSERT_TRUE(jr["nwStandby"].IsSet()) << "nwStandby is not set: " << response;
+    bool nwStandby = jr["nwStandby"].Boolean();
+    EXPECT_TRUE(nwStandby) << "Should return cached true: " << response;
 
-    TEST_LOG("GetNetworkStandbyMode_ReturnsCachedValue - Response: %s", response.c_str());
+    TEST_LOG("GetNetworkStandbyMode_ReturnsCachedValue - Response: %s, nwStandby: %d", response.c_str(), nwStandby);
 }
 
 // ------------------------------------------------------------------
@@ -5836,9 +6188,12 @@ TEST_F(SystemServicesTest, SetTerritory_EmptyTerritory_SuccessFalse_ErrorNone)
               _T("{\"territory\":\"\"}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_FALSE(jr["success"].Boolean()) << "Empty territory should fail: " << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_FALSE(success) << "Empty territory should fail: " << response;
 
-    TEST_LOG("SetTerritory_EmptyTerritory_SuccessFalse_ErrorNone - Response: %s", response.c_str());
+    TEST_LOG("SetTerritory_EmptyTerritory_SuccessFalse_ErrorNone - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetTerritory_Length4_ReturnsErrorGeneral)
@@ -5868,11 +6223,14 @@ TEST_F(SystemServicesTest, SetTerritory_ValidUSA_EmptyRegion_Succeeds)
               _T("{\"territory\":\"USA\"}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_TRUE(jr["success"].Boolean()) << "Valid territory should succeed: " << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << "Valid territory should succeed: " << response;
 
     (void)std::remove("/opt/secure/persistent/System/Territory.txt");
 
-    TEST_LOG("SetTerritory_ValidUSA_EmptyRegion_Succeeds - Response: %s", response.c_str());
+    TEST_LOG("SetTerritory_ValidUSA_EmptyRegion_Succeeds - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetTerritory_ValidUSA_ValidRegion_Succeeds)
@@ -5884,11 +6242,14 @@ TEST_F(SystemServicesTest, SetTerritory_ValidUSA_ValidRegion_Succeeds)
               _T("{\"territory\":\"USA\",\"region\":\"US-TX\"}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_TRUE(jr["success"].Boolean()) << "Valid territory+region should succeed: " << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << "Valid territory+region should succeed: " << response;
 
     (void)std::remove("/opt/secure/persistent/System/Territory.txt");
 
-    TEST_LOG("SetTerritory_ValidUSA_ValidRegion_Succeeds - Response: %s", response.c_str());
+    TEST_LOG("SetTerritory_ValidUSA_ValidRegion_Succeeds - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetTerritory_ValidUSA_InvalidRegion_ErrorGeneral)
@@ -5914,9 +6275,11 @@ TEST_F(SystemServicesTest, SetTimeZoneDST_NullString_HandledGracefully)
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
     // result depends on filesystem; just check it completes without crash
-    ASSERT_TRUE(jr.HasLabel("success")) << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
 
-    TEST_LOG("SetTimeZoneDST_NullString_HandledGracefully - Response: %s", response.c_str());
+    TEST_LOG("SetTimeZoneDST_NullString_HandledGracefully - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetTimeZoneDST_Universal_ProcessedCorrectly)
@@ -5928,9 +6291,11 @@ TEST_F(SystemServicesTest, SetTimeZoneDST_Universal_ProcessedCorrectly)
               _T("{\"timeZone\":\"Universal\"}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    ASSERT_TRUE(jr.HasLabel("success")) << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
 
-    TEST_LOG("SetTimeZoneDST_Universal_ProcessedCorrectly - Response: %s", response.c_str());
+    TEST_LOG("SetTimeZoneDST_Universal_ProcessedCorrectly - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ------------------------------------------------------------------
@@ -5959,7 +6324,11 @@ TEST_F(SystemServicesTest, GetRFCConfig_InvalidCharset_HashContainsError)
               _T("{\"rfcList\":[\"Device.Bad Name!\"]}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    TEST_LOG("GetRFCConfig_InvalidCharset_HashContainsError - Response: %s", response.c_str());
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+
+    TEST_LOG("GetRFCConfig_InvalidCharset_HashContainsError - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, GetRFCConfig_EmptyRFCValue_HashContainsEmptyMsg)
@@ -5977,10 +6346,13 @@ TEST_F(SystemServicesTest, GetRFCConfig_EmptyRFCValue_HashContainsEmptyMsg)
               _T("{\"rfcList\":[\"Device.DeviceInfo.Empty\"]}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
     // success=false because no non-empty value was set
-    EXPECT_FALSE(jr["success"].Boolean()) << "Empty value should leave success=false: " << response;
+    EXPECT_FALSE(success) << "Empty value should leave success=false: " << response;
 
-    TEST_LOG("GetRFCConfig_EmptyRFCValue_HashContainsEmptyMsg - Response: %s", response.c_str());
+    TEST_LOG("GetRFCConfig_EmptyRFCValue_HashContainsEmptyMsg - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, GetRFCConfig_RFCFailure_HashContainsFailedMsg)
@@ -5992,9 +6364,12 @@ TEST_F(SystemServicesTest, GetRFCConfig_RFCFailure_HashContainsFailedMsg)
               _T("{\"rfcList\":[\"Device.DeviceInfo.FailParam\"]}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_FALSE(jr["success"].Boolean()) << "RFC failure should give success=false: " << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_FALSE(success) << "RFC failure should give success=false: " << response;
 
-    TEST_LOG("GetRFCConfig_RFCFailure_HashContainsFailedMsg - Response: %s", response.c_str());
+    TEST_LOG("GetRFCConfig_RFCFailure_HashContainsFailedMsg - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, GetRFCConfig_DefaultValueSuccess_HashContainsValue)
@@ -6012,9 +6387,12 @@ TEST_F(SystemServicesTest, GetRFCConfig_DefaultValueSuccess_HashContainsValue)
               _T("{\"rfcList\":[\"Device.DeviceInfo.DefaultParam\"]}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_TRUE(jr["success"].Boolean()) << "WDMP_ERR_DEFAULT_VALUE should still succeed: " << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << "WDMP_ERR_DEFAULT_VALUE should still succeed: " << response;
 
-    TEST_LOG("GetRFCConfig_DefaultValueSuccess_HashContainsValue - Response: %s", response.c_str());
+    TEST_LOG("GetRFCConfig_DefaultValueSuccess_HashContainsValue - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ------------------------------------------------------------------
@@ -6044,9 +6422,12 @@ TEST_F(SystemServicesTest, SetDeepSleepTimer_ValidRange_PMSuccess)
               _T("{\"seconds\":300}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_TRUE(jr["success"].Boolean()) << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << response;
 
-    TEST_LOG("SetDeepSleepTimer_ValidRange_PMSuccess - Response: %s", response.c_str());
+    TEST_LOG("SetDeepSleepTimer_ValidRange_PMSuccess - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetDeepSleepTimer_NegativeSeconds_ClampedTo0)
@@ -6058,9 +6439,12 @@ TEST_F(SystemServicesTest, SetDeepSleepTimer_NegativeSeconds_ClampedTo0)
               _T("{\"seconds\":-5}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_TRUE(jr["success"].Boolean()) << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << response;
 
-    TEST_LOG("SetDeepSleepTimer_NegativeSeconds_ClampedTo0 - Response: %s", response.c_str());
+    TEST_LOG("SetDeepSleepTimer_NegativeSeconds_ClampedTo0 - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetDeepSleepTimer_Exceeds864000_ClampedTo0)
@@ -6072,9 +6456,12 @@ TEST_F(SystemServicesTest, SetDeepSleepTimer_Exceeds864000_ClampedTo0)
               _T("{\"seconds\":864001}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_TRUE(jr["success"].Boolean()) << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << response;
 
-    TEST_LOG("SetDeepSleepTimer_Exceeds864000_ClampedTo0 - Response: %s", response.c_str());
+    TEST_LOG("SetDeepSleepTimer_Exceeds864000_ClampedTo0 - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ------------------------------------------------------------------
@@ -6129,9 +6516,12 @@ TEST_F(SystemServicesTest, Reboot_WithReasonString_PMSuccess)
     EXPECT_EQ(Core::ERROR_NONE, result) << response;
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_TRUE(jr["success"].Boolean()) << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << response;
 
-    TEST_LOG("Reboot_WithReasonString_PMSuccess - Response: %s", response.c_str());
+    TEST_LOG("Reboot_WithReasonString_PMSuccess - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ------------------------------------------------------------------
@@ -6153,9 +6543,12 @@ TEST_F(SystemServicesTest, GetPowerStateBeforeReboot_SecondCall_UsesCachedValue)
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getPowerStateBeforeReboot"), _T("{}"), response));
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_TRUE(jr["success"].Boolean()) << "Cached call should succeed: " << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << "Cached call should succeed: " << response;
 
-    TEST_LOG("GetPowerStateBeforeReboot_SecondCall_UsesCachedValue - Response: %s", response.c_str());
+    TEST_LOG("GetPowerStateBeforeReboot_SecondCall_UsesCachedValue - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ------------------------------------------------------------------
@@ -6180,12 +6573,17 @@ TEST_F(SystemServicesTest, GetFirmwareUpdateState_Returns0_Uninitialized)
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getFirmwareUpdateState"), _T("{}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_TRUE(jr["success"].Boolean()) << response;
-    ASSERT_TRUE(jr.HasLabel("firmwareUpdateState")) << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << response;
+    ASSERT_TRUE(jr.HasLabel("firmwareUpdateState")) << "Missing firmwareUpdateState: " << response;
+    ASSERT_TRUE(jr["firmwareUpdateState"].IsSet()) << "firmwareUpdateState is not set: " << response;
+    int firmwareUpdateState = static_cast<int>(jr["firmwareUpdateState"].Number());
     // Default is FirmwareUpdateStateUninitialized = 0
-    EXPECT_EQ(0, static_cast<int>(jr["firmwareUpdateState"].Number())) << response;
+    EXPECT_EQ(0, firmwareUpdateState) << response;
 
-    TEST_LOG("GetFirmwareUpdateState_Returns0_Uninitialized - Response: %s", response.c_str());
+    TEST_LOG("GetFirmwareUpdateState_Returns0_Uninitialized - Response: %s, firmwareUpdateState: %d, success: %d", response.c_str(), firmwareUpdateState, success);
 }
 
 // ------------------------------------------------------------------
@@ -6199,10 +6597,15 @@ TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_NoFile_ReturnsNoneAndSuc
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getLastFirmwareFailureReason"), _T("{}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    ASSERT_TRUE(jr.HasLabel("failReason")) << response;
-    EXPECT_TRUE(jr["success"].Boolean()) << "No file should still return success=true: " << response;
+    ASSERT_TRUE(jr.HasLabel("failReason")) << "Missing failReason: " << response;
+    ASSERT_TRUE(jr["failReason"].IsSet()) << "failReason is not set: " << response;
+    string failReason = jr["failReason"].String();
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << "No file should still return success=true: " << response;
 
-    TEST_LOG("GetLastFirmwareFailureReason_NoFile_ReturnsNoneAndSuccess - Response: %s", response.c_str());
+    TEST_LOG("GetLastFirmwareFailureReason_NoFile_ReturnsNoneAndSuccess - Response: %s, failReason: %s, success: %d", response.c_str(), failReason.c_str(), success);
 }
 
 // ------------------------------------------------------------------
@@ -6218,11 +6621,14 @@ TEST_F(SystemServicesTest, GetTimeZoneDST_AfterSet_ReturnsSetValue)
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTimeZoneDST"), _T("{}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_TRUE(jr["success"].Boolean()) << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << response;
 
     (void)std::remove("/opt/persistent/timeZoneDST");
 
-    TEST_LOG("GetTimeZoneDST_AfterSet_ReturnsSetValue - Response: %s", response.c_str());
+    TEST_LOG("GetTimeZoneDST_AfterSet_ReturnsSetValue - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ------------------------------------------------------------------
@@ -6253,12 +6659,18 @@ TEST_F(SystemServicesTest, GetSystemVersions_ThreeFieldsPresent)
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getSystemVersions"), _T("{}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_TRUE(jr.HasLabel("stbVersion"))     << "Missing stbVersion: "     << response;
-    EXPECT_TRUE(jr.HasLabel("receiverVersion")) << "Missing receiverVersion: " << response;
-    EXPECT_TRUE(jr.HasLabel("stbTimestamp"))   << "Missing stbTimestamp: "   << response;
-    EXPECT_TRUE(jr["success"].Boolean())       << response;
+    ASSERT_TRUE(jr.HasLabel("stbVersion")) << "Missing stbVersion: " << response;
+    ASSERT_TRUE(jr["stbVersion"].IsSet()) << "stbVersion is not set: " << response;
+    ASSERT_TRUE(jr.HasLabel("receiverVersion")) << "Missing receiverVersion: " << response;
+    ASSERT_TRUE(jr["receiverVersion"].IsSet()) << "receiverVersion is not set: " << response;
+    ASSERT_TRUE(jr.HasLabel("stbTimestamp")) << "Missing stbTimestamp: " << response;
+    ASSERT_TRUE(jr["stbTimestamp"].IsSet()) << "stbTimestamp is not set: " << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << response;
 
-    TEST_LOG("GetSystemVersions_ThreeFieldsPresent - Response: %s", response.c_str());
+    TEST_LOG("GetSystemVersions_ThreeFieldsPresent - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ------------------------------------------------------------------
@@ -6275,10 +6687,16 @@ TEST_F(SystemServicesTest, GetWakeupReason_IRReason_Success)
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getWakeupReason"), _T("{}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_TRUE(jr["success"].Boolean()) << response;
-    EXPECT_EQ("WAKEUP_REASON_IR", jr["wakeupReason"].String()) << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << response;
+    ASSERT_TRUE(jr.HasLabel("wakeupReason")) << "Missing wakeupReason: " << response;
+    ASSERT_TRUE(jr["wakeupReason"].IsSet()) << "wakeupReason is not set: " << response;
+    string wakeupReason = jr["wakeupReason"].String();
+    EXPECT_EQ("WAKEUP_REASON_IR", wakeupReason) << response;
 
-    TEST_LOG("GetWakeupReason_IRReason_Success - Response: %s", response.c_str());
+    TEST_LOG("GetWakeupReason_IRReason_Success - Response: %s, wakeupReason: %s, success: %d", response.c_str(), wakeupReason.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, GetWakeupReason_TimerReason_Success)
@@ -6291,9 +6709,12 @@ TEST_F(SystemServicesTest, GetWakeupReason_TimerReason_Success)
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getWakeupReason"), _T("{}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_EQ("WAKEUP_REASON_TIMER", jr["wakeupReason"].String()) << response;
+    ASSERT_TRUE(jr.HasLabel("wakeupReason")) << "Missing wakeupReason: " << response;
+    ASSERT_TRUE(jr["wakeupReason"].IsSet()) << "wakeupReason is not set: " << response;
+    string wakeupReason = jr["wakeupReason"].String();
+    EXPECT_EQ("WAKEUP_REASON_TIMER", wakeupReason) << response;
 
-    TEST_LOG("GetWakeupReason_TimerReason_Success - Response: %s", response.c_str());
+    TEST_LOG("GetWakeupReason_TimerReason_Success - Response: %s, wakeupReason: %s", response.c_str(), wakeupReason.c_str());
 }
 
 // ------------------------------------------------------------------
@@ -6308,9 +6729,12 @@ TEST_F(SystemServicesTest, GetLastWakeupKeyCode_PMFailure_SuccessFalse)
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getLastWakeupKeyCode"), _T("{}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_FALSE(jr["success"].Boolean()) << "PM failure should give success=false: " << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_FALSE(success) << "PM failure should give success=false: " << response;
 
-    TEST_LOG("GetLastWakeupKeyCode_PMFailure_SuccessFalse - Response: %s", response.c_str());
+    TEST_LOG("GetLastWakeupKeyCode_PMFailure_SuccessFalse - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, GetLastWakeupKeyCode_PMSuccess_ReturnsKey)
@@ -6323,10 +6747,16 @@ TEST_F(SystemServicesTest, GetLastWakeupKeyCode_PMSuccess_ReturnsKey)
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getLastWakeupKeyCode"), _T("{}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_TRUE(jr["success"].Boolean()) << response;
-    EXPECT_EQ(42, static_cast<int>(jr["wakeupKeyCode"].Number())) << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << response;
+    ASSERT_TRUE(jr.HasLabel("wakeupKeyCode")) << "Missing wakeupKeyCode: " << response;
+    ASSERT_TRUE(jr["wakeupKeyCode"].IsSet()) << "wakeupKeyCode is not set: " << response;
+    int wakeupKeyCode = static_cast<int>(jr["wakeupKeyCode"].Number());
+    EXPECT_EQ(42, wakeupKeyCode) << response;
 
-    TEST_LOG("GetLastWakeupKeyCode_PMSuccess_ReturnsKey - Response: %s", response.c_str());
+    TEST_LOG("GetLastWakeupKeyCode_PMSuccess_ReturnsKey - Response: %s, wakeupKeyCode: %d, success: %d", response.c_str(), wakeupKeyCode, success);
 }
 
 // ------------------------------------------------------------------
@@ -6363,12 +6793,18 @@ TEST_F(SystemServicesTest, GetBuildType_VBN_Success)
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBuildType"), _T("{}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_TRUE(jr["success"].Boolean()) << response;
-    EXPECT_EQ("vbn", jr["build_type"].String()) << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << response;
+    ASSERT_TRUE(jr.HasLabel("build_type")) << "Missing build_type: " << response;
+    ASSERT_TRUE(jr["build_type"].IsSet()) << "build_type is not set: " << response;
+    string buildType = jr["build_type"].String();
+    EXPECT_EQ("vbn", buildType) << response;
 
     std::ofstream("/etc/device.properties").close(); // leave empty for next test
 
-    TEST_LOG("GetBuildType_VBN_Success - Response: %s", response.c_str());
+    TEST_LOG("GetBuildType_VBN_Success - Response: %s, build_type: %s, success: %d", response.c_str(), buildType.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, GetBuildType_PROD_Success)
@@ -6378,12 +6814,18 @@ TEST_F(SystemServicesTest, GetBuildType_PROD_Success)
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBuildType"), _T("{}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_TRUE(jr["success"].Boolean()) << response;
-    EXPECT_EQ("prod", jr["build_type"].String()) << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << response;
+    ASSERT_TRUE(jr.HasLabel("build_type")) << "Missing build_type: " << response;
+    ASSERT_TRUE(jr["build_type"].IsSet()) << "build_type is not set: " << response;
+    string buildType = jr["build_type"].String();
+    EXPECT_EQ("prod", buildType) << response;
 
     std::ofstream("/etc/device.properties").close();
 
-    TEST_LOG("GetBuildType_PROD_Success - Response: %s", response.c_str());
+    TEST_LOG("GetBuildType_PROD_Success - Response: %s, build_type: %s, success: %d", response.c_str(), buildType.c_str(), success);
 }
 
 // ------------------------------------------------------------------
@@ -6414,9 +6856,12 @@ TEST_F(SystemServicesTest, SetFSRFlag_IARMSuccess_SuccessTrue)
               _T("{\"fsrFlag\":true}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_TRUE(jr["success"].Boolean()) << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << response;
 
-    TEST_LOG("SetFSRFlag_IARMSuccess_SuccessTrue - Response: %s", response.c_str());
+    TEST_LOG("SetFSRFlag_IARMSuccess_SuccessTrue - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetFSRFlag_IARMFailure_SuccessFalse)
@@ -6428,9 +6873,12 @@ TEST_F(SystemServicesTest, SetFSRFlag_IARMFailure_SuccessFalse)
               _T("{\"fsrFlag\":false}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_FALSE(jr["success"].Boolean()) << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_FALSE(success) << response;
 
-    TEST_LOG("SetFSRFlag_IARMFailure_SuccessFalse - Response: %s", response.c_str());
+    TEST_LOG("SetFSRFlag_IARMFailure_SuccessFalse - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ------------------------------------------------------------------
@@ -6486,13 +6934,22 @@ TEST_F(SystemServicesTest, GetTerritory_FilePresent_ReturnsTerritory)
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTerritory"), _T("{}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    EXPECT_TRUE(jr["success"].Boolean()) << response;
-    EXPECT_EQ("AUS", jr["territory"].String()) << response;
-    EXPECT_EQ("AU-NSW", jr["region"].String()) << response;
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << response;
+    ASSERT_TRUE(jr.HasLabel("territory")) << "Missing territory: " << response;
+    ASSERT_TRUE(jr["territory"].IsSet()) << "territory is not set: " << response;
+    string territory = jr["territory"].String();
+    EXPECT_EQ("AUS", territory) << response;
+    ASSERT_TRUE(jr.HasLabel("region")) << "Missing region: " << response;
+    ASSERT_TRUE(jr["region"].IsSet()) << "region is not set: " << response;
+    string region = jr["region"].String();
+    EXPECT_EQ("AU-NSW", region) << response;
 
     (void)std::remove("/opt/secure/persistent/System/Territory.txt");
 
-    TEST_LOG("GetTerritory_FilePresent_ReturnsTerritory - Response: %s", response.c_str());
+    TEST_LOG("GetTerritory_FilePresent_ReturnsTerritory - Response: %s, territory: %s, region: %s, success: %d", response.c_str(), territory.c_str(), region.c_str(), success);
 }
 
 // ------------------------------------------------------------------
@@ -6510,12 +6967,12 @@ TEST_F(SystemServicesTest, GetTimeZones_NullParam_ProcessesAllZones)
 }
 
 // =====================================================================
-// thermonitor.cpp — CThermalMonitor unit tests
+// CThermalMonitor unit tests
 //
 // All CThermalMonitor methods delegate to PowerManager via
 // SystemServicesImplementation::_instance->getPwrMgrPluginInstance().
 // The SystemServicesTest fixture initialises _instance and provides
-// PowerManagerMock::Mock() for mocking PM calls.
+// PowerManagerMock::Mock() for mocking PowerManager calls.
 // =====================================================================
 
 // ------------------------------------------------------------------
@@ -6996,12 +7453,6 @@ TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_CriticalToCritic
 }
 
 // ===================== Upload Logs Coverage Tests =====================
-// These tests call uploadlogs.cpp internal functions DIRECTLY (via forward declarations)
-// to avoid the /usr/bin/logupload binary gate that blocks coverage in CI.
-// The system() call is wrapped/mocked in this test binary so chmod commands
-// are no-ops; and /usr/bin/ is not writable as non-root in CI environments.
-// Direct calls cover all branches without that limitation.
-
 // ------------------------------------------------------------------
 // checkmTlsLogUploadFlag — always returns true, just logs
 // ------------------------------------------------------------------
@@ -7015,7 +7466,6 @@ TEST_F(SystemServicesTest, UploadLogs_CheckMtlsFlag_AlwaysReturnsTrue)
 
 // ------------------------------------------------------------------
 // getDCMconfigDetails — /tmp/DCMSettings.conf absent
-// Covers: line 52-53: !getFileContent(TMP_DCM_SETTINGS) → return false
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, UploadLogs_GetDCMconfigDetails_FileAbsent_ReturnsFalse)
 {
@@ -7029,7 +7479,6 @@ TEST_F(SystemServicesTest, UploadLogs_GetDCMconfigDetails_FileAbsent_ReturnsFals
 
 // ------------------------------------------------------------------
 // getDCMconfigDetails — /tmp/DCMSettings.conf present but empty
-// Covers: line 55-57: dcminfo.length() < 1 → return false
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, UploadLogs_GetDCMconfigDetails_EmptyFile_ReturnsFalse)
 {
@@ -7043,8 +7492,6 @@ TEST_F(SystemServicesTest, UploadLogs_GetDCMconfigDetails_EmptyFile_ReturnsFalse
 
 // ------------------------------------------------------------------
 // getDCMconfigDetails — content present, no keys match any regex
-// Covers: lines 61-71 (all 3 regex_search calls, all if(temp.size()>0) = false)
-//         returns true with empty output fields
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, UploadLogs_GetDCMconfigDetails_NoKeyMatch_ReturnsTrue)
 {
@@ -7060,7 +7507,6 @@ TEST_F(SystemServicesTest, UploadLogs_GetDCMconfigDetails_NoKeyMatch_ReturnsTrue
 
 // ------------------------------------------------------------------
 // getDCMconfigDetails — all 3 keys present and matched
-// Covers: all 3 regex_search hit path (if(temp.size()>0) = true for all)
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, UploadLogs_GetDCMconfigDetails_AllKeysMatch_FieldsPopulated)
 {
@@ -7080,7 +7526,6 @@ TEST_F(SystemServicesTest, UploadLogs_GetDCMconfigDetails_AllKeysMatch_FieldsPop
 
 // ------------------------------------------------------------------
 // getUploadLogParameters — no DEVICE_PROPERTIES (BUILD_TYPE absent)
-// Covers: line 88-90: !parseConfigFile(DEVICE_PROPERTIES, "BUILD_TYPE") → return E_NOK
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_NoBuildType_ReturnsENOK)
 {
@@ -7094,7 +7539,6 @@ TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_NoBuildType_ReturnsENOK
 
 // ------------------------------------------------------------------
 // getUploadLogParameters — BUILD_TYPE=prod → ETC_DCM, no LOG_SERVER
-// Covers: line 95 else branch (prod → ETC_DCM) + line 97-99 LOG_SERVER fail → E_NOK
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_ProdNoLogServer_ReturnsENOK)
 {
@@ -7110,8 +7554,6 @@ TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_ProdNoLogServer_Returns
 
 // ------------------------------------------------------------------
 // getUploadLogParameters — BUILD_TYPE=dev, OPT_DCM exists → OPT_DCM path
-// Covers: line 92-93: BUILD_TYPE!=prod && fileExists(OPT_DCM) → dcmFile=OPT_DCM
-//         getDCMconfigDetails fails (no /tmp/DCMSettings.conf) → E_NOK
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_DevOptDCMPath_ReturnsENOK)
 {
@@ -7128,7 +7570,6 @@ TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_DevOptDCMPath_ReturnsEN
 
 // ------------------------------------------------------------------
 // getUploadLogParameters — BUILD_TYPE=dev, OPT_DCM absent → ETC_DCM fallback
-// Covers: line 95 else branch when BUILD_TYPE!=prod BUT OPT_DCM absent
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_DevOptDCMAbsent_EtcFallback)
 {
@@ -7145,10 +7586,6 @@ TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_DevOptDCMAbsent_EtcFall
 
 // ------------------------------------------------------------------
 // getUploadLogParameters — full success path, no FORCE_MTLS key
-// Covers: lines 103-104 parseConfigFile(FORCE_MTLS) returns false (key absent)  
-//         getDCMconfigDetails → true → E_OK
-//         mTlsLogUpload=true (from checkmTlsLogUploadFlag), force_mtls=""
-//         → "true" != "" → regex_replace("cgi-bin") is called on URL
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_SuccessPath_RegexReplaceApplied)
 {
@@ -7173,8 +7610,6 @@ TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_SuccessPath_RegexReplac
 
 // ------------------------------------------------------------------
 // getUploadLogParameters — FORCE_MTLS=true → mTlsLogUpload=true, skip regex_replace
-// Covers: lines 104-106: if("true"==force_mtls) mTlsLogUpload=true
-//         lines 117-121: mTlsLogUpload=true BUT "true"==force_mtls → skip replace
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_ForceMTLS_True_SkipsReplace)
 {
@@ -7197,9 +7632,6 @@ TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_ForceMTLS_True_SkipsRep
 
 // ------------------------------------------------------------------
 // getUploadLogParameters — FORCE_MTLS=false (present but not "true")
-// Covers: lines 103-107: parseConfigFile returns true, but "true"!="false"
-//         → mTlsLogUpload stays true, force_mtls="false"
-//         → "true" != "false" → regex_replace IS called
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_ForceMTLS_False_RegexApplied)
 {
@@ -7222,7 +7654,6 @@ TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_ForceMTLS_False_RegexAp
 
 // ------------------------------------------------------------------
 // getUploadLogParameters — URL without "cgi-bin" — regex_replace has no effect
-// Covers: same mTlsLogUpload=true path, force_mtls="" → regex called but no-op
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_URLNoCgiBin_ReplaceNoEffect)
 {
@@ -7244,7 +7675,6 @@ TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_URLNoCgiBin_ReplaceNoEf
 
 // ------------------------------------------------------------------
 // logUploadAsync — binary absent gate (fileExists == false → return -1)
-// Covers: uploadlogs.cpp lines 131-133
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, UploadLogs_LogUploadAsync_BinaryAbsent_ReturnsMinus1)
 {
@@ -7253,19 +7683,15 @@ TEST_F(SystemServicesTest, UploadLogs_LogUploadAsync_BinaryAbsent_ReturnsMinus1)
         handler.Invoke(connection, _T("uploadLogsAsync"), _T("{}"), response));
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << response;
-    ASSERT_TRUE(jsonResponse.HasLabel("success")) << response;
-    TEST_LOG("UploadLogs_LogUploadAsync_BinaryAbsent - PASSED");
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+
+    TEST_LOG("UploadLogs_LogUploadAsync_BinaryAbsent - Response: %s, success: %d", response.c_str(), success);
 }
 
 // =====================================================================
 // cTimer.cpp — Unit Tests
-//
-// cTimer is a simple repeating timer that runs a callback in a thread.
-// Public methods: constructor, destructor, setInterval, start, stop,
-//                 detach, join
-// Branches in start(): interval<=0 && callback==NULL → return false
-//                      otherwise → start thread → return true
-// Branch in join():    timerThread.joinable() → true/false
 // =====================================================================
 
 namespace {
@@ -7276,8 +7702,7 @@ namespace {
 }
 
 // ------------------------------------------------------------------
-// Test 1: start() with no interval and no callback → returns false
-// Covers: cTimer.cpp line 63-65: interval<=0 && callBack_function==NULL → return false
+// CTimer- Start_NoIntervalNoCallback 
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, CTimer_Start_NoIntervalNoCallback_ReturnsFalse)
 {
@@ -7290,9 +7715,7 @@ TEST_F(SystemServicesTest, CTimer_Start_NoIntervalNoCallback_ReturnsFalse)
 }
 
 // ------------------------------------------------------------------
-// Test 2: setInterval + start() → returns true, then stop + join
-// Covers: cTimer.cpp lines 98-102 (setInterval), lines 66-68 (start success path),
-//         lines 75-78 (stop sets clear=true), lines 87-89 (join: joinable=true branch)
+//  CTimer- SetInterval_Start_Stop
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, CTimer_SetInterval_Start_Stop_Join_Success)
 {
@@ -7308,9 +7731,7 @@ TEST_F(SystemServicesTest, CTimer_SetInterval_Start_Stop_Join_Success)
 }
 
 // ------------------------------------------------------------------
-// Test 3: stop() without start — no crash (stop just sets clear=true)
-// Covers: lines 75-78 (stop): verifies stop is safe to call on unstarted timer
-//         join() with non-joinable thread — covers line 87: joinable()==false branch
+// CTimer- Stop_WithoutStart
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, CTimer_Stop_WithoutStart_NoCrash)
 {
@@ -7321,9 +7742,7 @@ TEST_F(SystemServicesTest, CTimer_Stop_WithoutStart_NoCrash)
 }
 
 // ------------------------------------------------------------------
-// Test 4: start() with interval>0 but callback=NULL
-// Covers: line 63: condition interval<=0 is false, callBack==NULL is true
-//         → overall condition false (AND) → does NOT return false → starts thread
+// CTimer- Start_WithInterval_Null
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, CTimer_Start_WithInterval_NullCallback_StartsThread)
 {
@@ -7340,10 +7759,7 @@ TEST_F(SystemServicesTest, CTimer_Start_WithInterval_NullCallback_StartsThread)
 }
 
 // ------------------------------------------------------------------
-// Test 5: callback actually fires — timer runs, callback is invoked, then stop+join
-// Covers: timerFunction lines 44-56: while(true), both clear checks,
-//         sleep_for, and callBack_function() call
-// Uses a very short interval and waits minimally for the callback to fire
+// CTimer- Callback Atleastonce
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, CTimer_Callback_FiresAtLeastOnce)
 {
@@ -7367,16 +7783,9 @@ TEST_F(SystemServicesTest, CTimer_Callback_FiresAtLeastOnce)
 }
 
 // =====================================================================
-// SystemServicesHelper.cpp — Direct-Call Unit Tests
-//
-// These tests call helper utility functions directly (declared in
-// SystemServicesHelper.h) to cover branches that are never reached
-// through handler.Invoke() in the existing suite.
-// =====================================================================
-
-// ------------------------------------------------------------------
+// SystemServicesHelper — Direct-Call Unit Tests
 // getErrorDescription — every known error code + unknown code
-// ------------------------------------------------------------------
+// =====================================================================
 TEST_F(SystemServicesTest, Helper_GetErrorDescription_OK)
 {
     EXPECT_EQ("Processed Successfully", getErrorDescription(SysSrv_OK));
@@ -7837,15 +8246,7 @@ TEST_F(SystemServicesTest, Helper_FindMacInString_InvalidMac_ReturnsDefault)
 
 // =====================================================================
 // SystemServicesImplementation.cpp — SetMode Branch Tests
-//
-// These cover the branches that existing tests miss:
-//   empty mode → populateResponseWithError (MissingKeyValues)
-//   invalid mode → success=false, return ERROR_NONE
-//   EAS/WAREHOUSE with duration>0 → startModeTimer + IARM call
-//   negative duration → stopModeTimer + IARM call
-//   IARM failure path → stopModeTimer, m_currentMode reverted
 // =====================================================================
-
 // ------------------------------------------------------------------
 // SetMode — empty mode string → MissingKeyValues, success=false
 // ------------------------------------------------------------------
@@ -7879,9 +8280,6 @@ TEST_F(SystemServicesTest, SetMode_InvalidModeString_SuccessFalse)
 
 // ------------------------------------------------------------------
 // SetMode — WAREHOUSE mode, duration=-1, IARM success
-// Covers: m_currentMode = WAREHOUSE → fopen(WAREHOUSE_MODE_FILE, "w+")
-// Uses duration=-1 → stopModeTimer() path to avoid starting the static
-// m_operatingModeTimer thread (re-assigning a joinable thread calls terminate).
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, SetMode_WarehouseMode_Duration5_IarmSuccess)
 {
@@ -7904,7 +8302,6 @@ TEST_F(SystemServicesTest, SetMode_WarehouseMode_Duration5_IarmSuccess)
 
 // ------------------------------------------------------------------
 // SetMode — EAS mode, duration=-1 (negative) → stopModeTimer() called
-// Covers: duration < 0 ? stopModeTimer() : startModeTimer(duration)
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, SetMode_EASMode_NegativeDuration_StopsModeTimer)
 {
@@ -7926,9 +8323,6 @@ TEST_F(SystemServicesTest, SetMode_EASMode_NegativeDuration_StopsModeTimer)
 
 // ------------------------------------------------------------------
 // SetMode — EAS mode, IARM failure path
-// Covers: stopModeTimer() in failure branch, m_currentMode = MODE_NORMAL
-// Uses duration=-1 to avoid startModeTimer() which would start a thread
-// on the static m_operatingModeTimer (re-assigning joinable thread = terminate).
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, SetMode_EASMode_IarmFailure_RevertedToNormal)
 {
@@ -7949,11 +8343,9 @@ TEST_F(SystemServicesTest, SetMode_EASMode_IarmFailure_RevertedToNormal)
 // =====================================================================
 // Additional branch coverage tests (5 scenarios)
 // =====================================================================
-
+// ------------------------------------------------------------------
 // 1. RFC FAILURE — SetFriendlyName with WDMP_FAILURE
-// SetFriendlyName always returns success=true even when RFC write fails
-// (the implementation only logs the failure, never sets result.success=false).
-// This test covers the "else" log branch in SetFriendlyName (line ~1111).
+// ------------------------------------------------------------------
 TEST_F(SystemServicesTest, SetFriendlyName_RfcFailure_ReturnsError)
 {
     EXPECT_CALL(*p_rfcApiMock, setRFCParameter(::testing::_, ::testing::_, ::testing::_, ::testing::_))
@@ -7969,10 +8361,9 @@ TEST_F(SystemServicesTest, SetFriendlyName_RfcFailure_ReturnsError)
     TEST_LOG("SetFriendlyName_RfcFailure_ReturnsError - Response: %s", response.c_str());
 }
 
+// ------------------------------------------------------------------
 // 2. RFC EXCEPTION — no try/catch exists in SetFriendlyName, so we instead
-// test the RFC success-log branch with a different friendly name to cover
-// the WDMP_SUCCESS "if" branch (line ~1108). Using a unique name ensures
-// the guard (m_friendlyName != friendlyName) is satisfied.
+// ------------------------------------------------------------------
 TEST_F(SystemServicesTest, SetFriendlyName_RfcThrowsException)
 {
     EXPECT_CALL(*p_rfcApiMock, setRFCParameter(::testing::_, ::testing::_, ::testing::_, ::testing::_))
@@ -7987,9 +8378,9 @@ TEST_F(SystemServicesTest, SetFriendlyName_RfcThrowsException)
     TEST_LOG("SetFriendlyName_RfcThrowsException - Response: %s", response.c_str());
 }
 
+// ------------------------------------------------------------------
 // 3. IARM FAILURE PATH — SetMode with IARM_RESULT_IPCCORE_FAIL
-// Covers: failure branch inside changeMode block (stopModeTimer, mode reverted).
-// Uses duration=-1 to avoid startModeTimer() thread-start crash on static timer.
+// ------------------------------------------------------------------
 TEST_F(SystemServicesTest, SetMode_IarmFailure_Path)
 {
     EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
@@ -8005,8 +8396,9 @@ TEST_F(SystemServicesTest, SetMode_IarmFailure_Path)
     TEST_LOG("SetMode_IarmFailure_Path - Response: %s", response.c_str());
 }
 
+// ------------------------------------------------------------------
 // 4. FILE MISSING — GetBlocklistFlag with no devicestate file
-// Covers: read_parameters returns false → success=false branch.
+// ------------------------------------------------------------------
 TEST_F(SystemServicesTest, GetBlocklistFlag_FileMissing)
 {
     (void)system("mkdir -p /opt/secure/persistent/opflashstore");
@@ -8021,12 +8413,9 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_FileMissing)
     TEST_LOG("GetBlocklistFlag_FileMissing - Response: %s", response.c_str());
 }
 
+// ------------------------------------------------------------------
 // 5. EMPTY INPUT — SetFriendlyName with empty string
-// Configure() calls getRFCParameter(TR181_SYSTEM_FRIENDLY_NAME); if the mock
-// returns an empty value, m_friendlyName is already "". In that case the guard
-// (m_friendlyName != friendlyName) is false → RFC is skipped, success=true.
-// If m_friendlyName is "Living Room" (default), RFC is called, success=true.
-// Either way success=true is the invariant. No RFC mock needed here.
+// ------------------------------------------------------------------
 TEST_F(SystemServicesTest, SetFriendlyName_EmptyInput_Failure)
 {
     EXPECT_EQ(Core::ERROR_NONE,
@@ -8041,8 +8430,6 @@ TEST_F(SystemServicesTest, SetFriendlyName_EmptyInput_Failure)
 
 // =============================================================================
 // DISPATCH() EVENT COVERAGE TESTS
-// Each test directly invokes a public On*() method on _instance to trigger the
-// corresponding Dispatch() event path and verifies the notification fires.
 // =============================================================================
 
 TEST_F(SystemServicesTest, Dispatch_OnSystemPowerStateChanged_ReachesNotification)
@@ -8327,7 +8714,6 @@ TEST_F(SystemServicesTest, Dispatch_OnDeviceMgtUpdateReceived_ReachesNotificatio
 
 // =============================================================================
 // OnPowerModeChanged() COVERAGE — trigger via IModeChangedNotification callback
-// Covers: OnPowerModeChanged → OnSystemPowerStateChanged → dispatchEvent
 // =============================================================================
 
 TEST_F(SystemServicesTest, OnPowerModeChanged_ON_to_LIGHT_SLEEP_TriggersNotification)
@@ -8408,7 +8794,6 @@ TEST_F(SystemServicesTest, OnPowerModeChanged_OFF_State_TriggersNotification)
 
 // =============================================================================
 // OnRebootBegin() COVERAGE — trigger via IRebootNotification callback
-// Covers: OnRebootBegin → OnPwrMgrReboot → dispatchEvent(ONREBOOTREQUEST)
 // =============================================================================
 
 TEST_F(SystemServicesTest, OnRebootBegin_TriggersRebootRequestNotification)
@@ -8432,29 +8817,6 @@ TEST_F(SystemServicesTest, OnRebootBegin_TriggersRebootRequestNotification)
 
 // =============================================================================
 // GetValueFromPropertiesFile() COVERAGE TESTS
-// Covered via getDeviceInfo("make") which calls GetValueFromPropertiesFile.
-// DeviceInfo plugin returns nullptr → returns before make lookup; need to call
-// getDeviceInfo with no DeviceInfo plugin. But the function is called BEFORE
-// the DeviceInfo plugin check only for getBuildType (via buildtype tests) and
-// in getDeviceInfo the DEVICE_NAME/MFG_NAME reads happen only if DeviceInfo
-// plugin is not null. So we need an alternative approach.
-//
-// GetValueFromPropertiesFile is a free function in the Plugin namespace.
-// Best approach: write a test file that exercises getDeviceInfo when PLATCO
-// device name is set → needs DeviceInfo plugin. Alternatively, exercise
-// via getBuildType which calls parseConfigFile (not same function).
-//
-// Since QueryInterfaceByCallsign returns nullptr in tests, DeviceInfo plugin
-// is never available. The deviceInfo.message = "DeviceInfo plugin is not
-// activated" branch is hit, and we return before GetValueFromPropertiesFile.
-//
-// However, GetBuildType calls parseConfigFile (different function).
-// The coverage gap for GetValueFromPropertiesFile must be closed via
-// a direct test that creates /etc/device.properties with the right content
-// AND sets up QueryInterfaceByCallsign to return a non-null DeviceInfo proxy.
-//
-// Since that requires complex mocking, instead we directly test via
-// getDeviceInfo with params=[] (empty) which also hits the make branch.
 // =============================================================================
 
 TEST_F(SystemServicesTest, GetValueFromPropertiesFile_ViaDeviceName_PLATCO_Path)
@@ -8521,20 +8883,7 @@ TEST_F(SystemServicesTest, GetValueFromPropertiesFile_FileMissing_Path)
 }
 
 // =============================================================================
-// AbortLogUpload() WITH ACTIVE UPLOAD — covers pid != -1 path
-// The AbortLogUpload code calls Utils::getChildProcessIDs → openproc → readproc
-// To cover the "upload in progress" branch: set m_uploadLogsPid via an API that
-// triggers it. uploadLogsAsync → UploadLogs::logUploadAsync() which returns -1
-// (no /usr/bin/logupload in test env). So the active-pid path requires a child
-// process to actually be running.
-//
-// We can't directly set m_uploadLogsPid from tests (it's private). The only way
-// to get a non-(-1) pid is to have logUploadAsync succeed. Since /usr/bin/logupload
-// does not exist in test env, logUploadAsync returns -1. Therefore abortLogUpload
-// always hits the "pid == -1" path in tests. This is already covered.
-//
-// The getChildProcessIDs path can be covered by calling the helper directly via
-// the readproc mock (already set up as NiceMock with defaults returning null).
+// AbortLogUpload() WITH ACTIVE UPLOAD
 // =============================================================================
 
 TEST_F(SystemServicesTest, AbortLogUpload_NoPidActive_ReturnsSuccess)
@@ -8550,8 +8899,6 @@ TEST_F(SystemServicesTest, AbortLogUpload_NoPidActive_ReturnsSuccess)
 
 // =============================================================================
 // OnSystemPowerStateChanged() — LIGHT_SLEEP path triggers UploadLogsAsync check
-// Test: currentPowerState="ON", powerState="LIGHT_SLEEP" → tries RFC lookup
-// then calls UploadLogsAsync (which calls logUploadAsync → returns -1 in test env)
 // =============================================================================
 
 TEST_F(SystemServicesTest, Dispatch_OnSystemPowerStateChanged_LIGHT_SLEEP_RFCCheck)
@@ -8639,11 +8986,7 @@ TEST_F(SystemServicesTest, PowerModeEnumToString_POWER_STATE_STANDBY_viaGetPower
 }
 
 // =============================================================================
-// conv() + getWakeupSrcString() COVERAGE
-// These functions are called via SetWakeupSrcConfiguration API handler.
-// The API passes wakeupSrc strings like "WAKEUPSRC_VOICE" directly to internal
-// logic. The conv() and getWakeupSrcString() free functions are exercised by
-// calling SetWakeupSrcConfiguration with all supported wakeup sources.
+// getWakeupSrcString() COVERAGE
 // =============================================================================
 
 TEST_F(SystemServicesTest, SetWakeupSrcConfig_AllSources_InvokesConvAndGetWakeupSrcString)
@@ -8684,10 +9027,6 @@ TEST_F(SystemServicesTest, SetWakeupSrcConfig_UnknownSource_HandledGracefully)
 
 // =============================================================================
 // getWakeupSrcString() COVERAGE — via GetLastWakeupReason
-// GetLastWakeupReason calls PowerManager::GetLastWakeupReason() which fills a
-// WakeupReason. The string is built via getWakeupReasonString() (different from
-// getWakeupSrcString). getWakeupSrcString is called nowhere publicly — it is
-// dead code in the current codebase. We exercise it to the extent possible.
 // =============================================================================
 
 TEST_F(SystemServicesTest, GetLastWakeupReason_MultipleWakeupSources)
@@ -8729,8 +9068,7 @@ TEST_F(SystemServicesTest, GetLastWakeupReason_MultipleWakeupSources)
 }
 
 // =============================================================================
-// iarmModeToString() COVERAGE via OnSystemModeChanged (which is the public path)
-// The actual iarmModeToString is called from _SysModeChange IARM callback.
+// iarmModeToString() COVERAGE via OnSystemModeChanged.
 // =============================================================================
 
 TEST_F(SystemServicesTest, iarmModeToString_AllModes_ViaOnSystemModeChanged)
@@ -8755,8 +9093,7 @@ TEST_F(SystemServicesTest, iarmModeToString_AllModes_ViaOnSystemModeChanged)
 }
 
 // =============================================================================
-// SetTimeZoneDST — triggers OnTimeZoneDSTChanged if timezone actually changes
-// This covers SetTimeZoneDST success path AND OnTimeZoneDSTChanged dispatch.
+// SetTimeZoneDST — triggers OnTimeZoneDSTChanged 
 // =============================================================================
 
 TEST_F(SystemServicesTest, Notification_OnTimeZoneDSTChanged_ViaSetTimeZoneDST)
@@ -8852,17 +9189,7 @@ TEST_F(SystemServicesTest, Notification_OnTerritoryChanged_ViaSetTerritory)
 }
 
 // =============================================================================
-// updateDuration() COVERAGE — static function called by cTimer callback.
-// updateDuration() directly calls m_remainingDuration-- or resets to NORMAL.
-// We can cover the decrement path by calling updateDuration() directly via the
-// static function pointer. However it's a private static method.
-// The only public path is via startModeTimer which starts a thread that calls
-// updateDuration via cTimer callback after 1 second — unsafe due to static timer.
-// The safest test: verify m_remainingDuration starts at 0, and updateDuration
-// in the "duration==0" branch calls SetMode("NORMAL"). We can trigger
-// updateDuration by calling _instance's set-mode methods. Since _instance's
-// updateDuration is static and accesses m_remainingDuration (also static),
-// we can observe the m_remainingDuration changes via the temp settings file.
+// updateDuration() COVERAGE 
 // =============================================================================
 
 TEST_F(SystemServicesTest, SetMode_WarehouseMode_NegativeDuration_StopsModeTimer)
@@ -8982,8 +9309,6 @@ TEST_F(SystemServicesTest, Dispatch_TerritoryChanged_WithRegion)
     (void)std::remove("/opt/secure/persistent/System/Territory.txt");
 }
 
-
-
 TEST_F(SystemServicesTest, Dispatch_DeviceMgtUpdateReceived_FailStatus)
 {
     ASSERT_NE(nullptr, m_sysServices);
@@ -9066,7 +9391,6 @@ TEST_F(SystemServicesTest, GetDeviceInfo_NoParams_AllFieldsRequested)
 
 // =============================================================================
 // reportFirmwareUpdateInfoReceived() — all 5 httpStatus branches
-// This is a public method called directly to cover Dispatch()
 // SYSTEMSERVICES_EVT_ONFIRMWAREUPDATEINFORECEIVED and all httpStatus logic.
 // =============================================================================
 
@@ -9202,8 +9526,6 @@ TEST_F(SystemServicesTest, ReportFirmwareUpdateInfo_WithRebootImmediatelyRespons
 
 // =============================================================================
 // OnSystemPowerStateChanged — RFC log-upload branch
-// When powerState == LIGHT_SLEEP and currentPowerState == ON,
-// if RFC_LOG_UPLOAD returns "true", UploadLogsAsync is called.
 // =============================================================================
 
 TEST_F(SystemServicesTest, OnPowerModeChanged_ON_to_LIGHTSLEEEP_RFCLogUploadEnabled)
@@ -9231,12 +9553,10 @@ TEST_F(SystemServicesTest, OnPowerModeChanged_ON_to_LIGHTSLEEEP_RFCLogUploadEnab
 }
 
 // =============================================================================
-// TARGETED COVERAGE TESTS — Boost SystemServicesImplementation.cpp to ≥75%
+// TARGETED COVERAGE TESTS TO IMPROVE COVERAGE.
 // =============================================================================
-
 // ------------------------------------------------------------------
 // Register duplicate notification — covers the "already registered" LOGERR path
-// (SystemServicesImplementation.cpp ~line 316)
 // ------------------------------------------------------------------
 
 TEST_F(SystemServicesTest, Register_DuplicateNotification_LogsError)
@@ -9260,7 +9580,6 @@ TEST_F(SystemServicesTest, Register_DuplicateNotification_LogsError)
 
 // ------------------------------------------------------------------
 // Unregister notification that was never registered → hits LOGERR path
-// (SystemServicesImplementation.cpp ~line 342)
 // ------------------------------------------------------------------
 
 TEST_F(SystemServicesTest, Unregister_UnknownNotification_LogsError)
@@ -9279,9 +9598,6 @@ TEST_F(SystemServicesTest, Unregister_UnknownNotification_LogsError)
 
 // ------------------------------------------------------------------
 // Utils::killProcess — Reboot triggers killProcess("nrdPluginApp").
-// Configure readproc mock to return a matching process entry so the
-// kill path and related logging are covered.
-// (UtilsProcess.h lines: openproc, readproc returns entry, kill, closeproc)
 // ------------------------------------------------------------------
 
 TEST_F(SystemServicesTest, Reboot_WithNetflixRunning_KillsProcess)
@@ -9323,7 +9639,6 @@ TEST_F(SystemServicesTest, Reboot_WithNetflixRunning_KillsProcess)
 //   param2 → WDMP_SUCCESS with ""     (hits: "Empty response received")
 //   param3 → WDMP_FAILURE             (hits: "Failed to read RFC")
 //   param4 → invalid charset !@#      (hits: "Invalid charset found" + continue)
-// (Covers lines 3500–3640 in GetRFCConfig function)
 // ------------------------------------------------------------------
 
 TEST_F(SystemServicesTest, GetRFCConfig_AllBranchesInOneCall)
@@ -9356,13 +9671,15 @@ TEST_F(SystemServicesTest, GetRFCConfig_AllBranchesInOneCall)
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
 
-    TEST_LOG("GetRFCConfig_AllBranchesInOneCall - Response: %s", response.c_str());
+    TEST_LOG("GetRFCConfig_AllBranchesInOneCall - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ------------------------------------------------------------------
 // GetRFCConfig — WDMP_ERR_DEFAULT_VALUE triggers same success path
-// as WDMP_SUCCESS (covers the OR-branch in the condition check)
 // ------------------------------------------------------------------
 
 TEST_F(SystemServicesTest, GetRFCConfig_DefaultValueBranch_Covered)
@@ -9381,15 +9698,15 @@ TEST_F(SystemServicesTest, GetRFCConfig_DefaultValueBranch_Covered)
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
 
-    TEST_LOG("GetRFCConfig_DefaultValueBranch_Covered - Response: %s", response.c_str());
+    TEST_LOG("GetRFCConfig_DefaultValueBranch_Covered - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ------------------------------------------------------------------
-// Utils::String functions (UtilsString.h) — rtrim/trim/split are
-// called indirectly via GetValueFromPropertiesFile which is triggered
-// by getBuildType. Force it via a device.properties file with trailing
-// whitespace around the value.
+// Utils::String functions — rtrim/trim/split are
 // ------------------------------------------------------------------
 
 TEST_F(SystemServicesTest, Utils_String_Trim_ViaGetBuildType_TrailingWhitespace)
@@ -9476,9 +9793,7 @@ TEST_F(SystemServicesTest, Utils_MoveFile_SourcePresent_DestAbsent_ReturnsTrue)
 }
 
 // ------------------------------------------------------------------
-// UtilsString.h — updateSystemModeFile all action branches:
-//   "add" with new key, "checkandadd", "delete", "deleteall"
-// This exercises the complex file-update logic in updateSystemModeFile
+// UtilsString.h — updateSystemModeFile all action branches
 // ------------------------------------------------------------------
 
 TEST_F(SystemServicesTest, Utils_UpdateSystemModeFile_AddAndDelete)
@@ -9555,13 +9870,7 @@ TEST_F(SystemServicesTest, Utils_GetSystemModePropertyValue_EmptyArgs_ReturnsFal
 }
 
 // ------------------------------------------------------------------
-// platformcapsdata.cpp getProperties() — parse key=value from a real
-// properties file. Triggered via getPlatformConfiguration which calls
-// getDeviceProperties() → getProperties(DeviceProperties).
-// To hit the "line contains '='" branch, create /etc/device.properties
-// (can't — no write access; the file may already exist in test env).
-// Instead, exercise via SetTerritory which calls getTerritory which
-// reads the territory file with "=" separators.
+// platformcapsdata getProperties() — parse key
 // ------------------------------------------------------------------
 
 TEST_F(SystemServicesTest, PlatformCapsData_getProperties_ParsesKeyValue)
@@ -9586,14 +9895,16 @@ TEST_F(SystemServicesTest, PlatformCapsData_getProperties_ParsesKeyValue)
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
 
     (void)std::remove(testPropFile);
-    TEST_LOG("PlatformCapsData_getProperties test PASSED - Response: %s", response.c_str());
+    TEST_LOG("PlatformCapsData_getProperties test PASSED - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ------------------------------------------------------------------
 // Utils::String::contains() / find_substr_ci() — exercise the template
-// functions via UtilsString that are uncovered (lines 49-66)
 // ------------------------------------------------------------------
 
 TEST_F(SystemServicesTest, Utils_String_Contains_CaseInsensitive)
@@ -9645,8 +9956,6 @@ TEST_F(SystemServicesTest, Utils_String_ToUpper_Covered)
 
 // ------------------------------------------------------------------
 // UtilsProcess::getChildProcessIDs — mock openproc/readproc to return
-// a child process entry matching the test process PID
-// (UtilsProcess.h lines 70-90: getChildProcessIDs full function body)
 // ------------------------------------------------------------------
 
 TEST_F(SystemServicesTest, Utils_GetChildProcessIDs_WithMatchingProcess)
@@ -9706,13 +10015,10 @@ TEST_F(SystemServicesTest, Utils_GetChildProcessIDs_NoChildren)
 }
 
 // =============================================================================
-// PLUGIN COVERAGE BOOST — SystemServicesImplementation.cpp uncovered paths
+// PLUGIN COVERAGE — SystemServicesImplementation uncovered paths
 // =============================================================================
-
 // ------------------------------------------------------------------
 // powerModeEnumToString — hit STANDBY, LIGHT_SLEEP, DEEP_SLEEP cases
-// (lines 489-492 in powerModeEnumToString switch)
-// Triggered via GetPowerStateBeforeReboot mock returning these states.
 // ------------------------------------------------------------------
 
 TEST_F(SystemServicesTest, GetPowerStateBeforeReboot_ReturnsSTANDBY_CoversPowerModeEnum)
@@ -9728,8 +10034,12 @@ TEST_F(SystemServicesTest, GetPowerStateBeforeReboot_ReturnsSTANDBY_CoversPowerM
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
-    EXPECT_EQ("LIGHT_SLEEP", jsonResponse["state"].String());
-    TEST_LOG("GetPowerStateBeforeReboot_STANDBY - Response: %s", response.c_str());
+    ASSERT_TRUE(jsonResponse.HasLabel("state")) << "Missing state: " << response;
+    ASSERT_TRUE(jsonResponse["state"].IsSet()) << "state is not set: " << response;
+    string state = jsonResponse["state"].String();
+    EXPECT_EQ("LIGHT_SLEEP", state);
+
+    TEST_LOG("GetPowerStateBeforeReboot_STANDBY - Response: %s, state: %s", response.c_str(), state.c_str());
 }
 
 TEST_F(SystemServicesTest, GetPowerStateBeforeReboot_ReturnsLIGHTSLEEP_CoversPowerModeEnum)
@@ -9774,15 +10084,16 @@ TEST_F(SystemServicesTest, GetPowerStateBeforeReboot_ReturnsOFF_CoversPowerModeE
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
-    EXPECT_EQ("OFF", jsonResponse["state"].String());
-    TEST_LOG("GetPowerStateBeforeReboot_OFF - Response: %s", response.c_str());
+    ASSERT_TRUE(jsonResponse.HasLabel("state")) << "Missing state: " << response;
+    ASSERT_TRUE(jsonResponse["state"].IsSet()) << "state is not set: " << response;
+    string state = jsonResponse["state"].String();
+    EXPECT_EQ("OFF", state);
+
+    TEST_LOG("GetPowerStateBeforeReboot_OFF - Response: %s, state: %s", response.c_str(), state.c_str());
 }
 
 // ------------------------------------------------------------------
-// SetWakeupSrcConfiguration — enable individual source flags to
-// cover the if(src.voice), if(src.wifi), if(src.ir) etc. branches
-// (SystemServicesImplementation.cpp lines 2750-2789)
-// Uses correct WakeupSources struct field names: voice, wifi, ir...
+// SetWakeupSrcConfiguration — enable individual source flags 
 // ------------------------------------------------------------------
 
 TEST_F(SystemServicesTest, SetWakeupSrc_VoiceAndWifi_CoversSourceBranches)
@@ -9857,9 +10168,6 @@ TEST_F(SystemServicesTest, SetWakeupSrc_PowerManagerFails_ReturnsError)
 
 // ------------------------------------------------------------------
 // SetTerritory with lowercase region — covers isStrAlphaUpper
-// returning false for non-uppercase chars (line 2148: LOGERR path)
-// Region "ab-XY" → isRegionValid("ab-XY") → strRegion="ab" (len=2)
-// → isStrAlphaUpper("ab") → 'a' not upper → LOGERR → false (line 2148)
 // ------------------------------------------------------------------
 
 TEST_F(SystemServicesTest, SetTerritory_LowercaseRegion_TriggersIsStrAlphaUpperFail)
@@ -9889,8 +10197,6 @@ TEST_F(SystemServicesTest, SetTerritory_ValidUppercaseRegion_PassesIsStrAlphaUpp
 
 // ------------------------------------------------------------------
 // GetLastFirmwareFailureReason — file with known FailureReason text
-// Covers line 1632: fwFailReason = it->second (FwFailReasonFromText match)
-// "Versions Match" is in FwFailReasonFromText → maps to FwFailReasonNone
 // ------------------------------------------------------------------
 
 TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_VersionsMatch_CoversKnownReasonPath)
@@ -9931,9 +10237,6 @@ TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_NetworkFailure_CoversKno
 
 // ------------------------------------------------------------------
 // GetDownloadedFirmwareInfo — fwdnldstatus with "Reboot|yes"
-// Covers lines 1900-1903: isRebootDeferred = true
-// After delimiter stripping, line="yes" (length=3 > 1) and
-// strncasecmp("yes","yes",3)==0 → !(...) is true → isRebootDeferred=true
 // ------------------------------------------------------------------
 
 TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_RebootDeferred_CoversIsRebootDeferredTrue)
@@ -9976,7 +10279,6 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_RebootDeferredTrue_Value)
 
 // ------------------------------------------------------------------
 // GetMfgSerialNumber — second call uses cached value (m_MfgSerialNumberValid)
-// Covers lines 1053-1057: cached path in GetMfgSerialNumber
 // ------------------------------------------------------------------
 
 TEST_F(SystemServicesTest, GetMfgSerialNumber_SecondCallUsesCachedValue)
@@ -10002,7 +10304,6 @@ TEST_F(SystemServicesTest, GetMfgSerialNumber_SecondCallUsesCachedValue)
 
 // ------------------------------------------------------------------
 // GetPowerState — cover STANDBY_LIGHT enum case in powerModeEnumToString
-// (covers remaining enum values from the switch statement)
 // ------------------------------------------------------------------
 
 TEST_F(SystemServicesTest, GetPowerState_ReturnsSTANDBY_LIGHT_CoversPowerModeEnum)
@@ -10022,8 +10323,7 @@ TEST_F(SystemServicesTest, GetPowerState_ReturnsSTANDBY_LIGHT_CoversPowerModeEnu
 }
 
 // ------------------------------------------------------------------
-// reportFirmwareUpdateInfoReceived — HTTP 404 branch (lines 1670-1710)
-// Already partially covered; test the 404 "NOAVAIL" branch in detail
+// reportFirmwareUpdateInfoReceived — HTTP 404 branch 
 // ------------------------------------------------------------------
 
 TEST_F(SystemServicesTest, ReportFirmwareUpdateInfo_Http404_CoversNoAvailBranch)
@@ -10041,7 +10341,6 @@ TEST_F(SystemServicesTest, ReportFirmwareUpdateInfo_Http404_CoversNoAvailBranch)
 
 // ------------------------------------------------------------------
 // GetTimeZones with specific timezone list (non-null, non-empty iterator)
-// Covers lines 3402-3410: specific timezone processing branch
 // ------------------------------------------------------------------
 
 TEST_F(SystemServicesTest, GetTimeZones_WithSpecificTimezone_CoversIteratorPath)
@@ -10062,8 +10361,6 @@ TEST_F(SystemServicesTest, GetTimeZones_WithSpecificTimezone_CoversIteratorPath)
 
 // ------------------------------------------------------------------
 // SetMode — NORMAL mode when already NORMAL (no change path)
-// covers line 2820-2821 (changeMode = false when MODE_NORMAL == m_currentMode)
-// and the "mode not changed" log path lines 2883-2885
 // ------------------------------------------------------------------
 
 TEST_F(SystemServicesTest, SetMode_NormalToNormal_NoChange_CoversNoChangePath)
@@ -10079,7 +10376,6 @@ TEST_F(SystemServicesTest, SetMode_NormalToNormal_NoChange_CoversNoChangePath)
 
 // ------------------------------------------------------------------
 // GetFirmwareDownloadPercent — with DOWNLOAD_PROGRESS_FILE present
-// covers lines 1839-1860 (file exists path, read percent from file)
 // ------------------------------------------------------------------
 
 TEST_F(SystemServicesTest, GetFirmwareDownloadPercent_WithProgressFile_CoversFilePath)
@@ -10103,7 +10399,6 @@ TEST_F(SystemServicesTest, GetFirmwareDownloadPercent_WithProgressFile_CoversFil
 
 // ------------------------------------------------------------------
 // SetMigrationStatus — invalid status string goes to else branch  
-// (line 1357-1362): covers LOGERR when setToStatus not found + plugin null
 // ------------------------------------------------------------------
 
 TEST_F(SystemServicesTest, SetMigrationStatus_InvalidStatus_CoversNotFoundBranch)
@@ -10135,8 +10430,6 @@ TEST_F(SystemServicesTest, SetMigrationStatus_ValidStatus_AllEnumValues)
 
 // ------------------------------------------------------------------
 // GetMigrationStatus / GetBootTypeInfo — plugin null path
-// covers the LOGERR+errorCode branch when plugin unavailable
-// (lines 1369-1401, 1407-1446)
 // ------------------------------------------------------------------
 
 TEST_F(SystemServicesTest, GetMigrationStatus_PluginUnavailable_CoversErrorPath)
@@ -10157,10 +10450,6 @@ TEST_F(SystemServicesTest, GetBootTypeInfo_PluginUnavailable_CoversErrorPath)
 
 // ------------------------------------------------------------------
 // IsOptOutTelemetry / SetOptOutTelemetry with real Telemetry mock
-// (lines 1283, 1309-1312): plugin always null → covers LOGERR path
-// But to cover the plugin!=null path, need TelemetryMock setup
-// These tests cover the "telemetryObject==null" path (already partially covered)
-// and verify the function returns gracefully
 // ------------------------------------------------------------------
 
 TEST_F(SystemServicesTest, IsOptOutTelemetry_ReturnsGracefullyWhenPluginNull)
@@ -10181,8 +10470,6 @@ TEST_F(SystemServicesTest, SetOptOutTelemetry_ReturnsGracefullyWhenPluginNull)
 
 // ------------------------------------------------------------------
 // GetDownloadedFirmwareInfo — DnldVersn and DnldURL branches
-// (lines 1912-1929): file with "DnldVersn|" and "DnldURL|" entries
-// These cover the previously uncovered DnldVersn and DnldURL parsing
 // ------------------------------------------------------------------
 
 TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_WithDnldVersnAndUrl_CoversAllParseBranches)
@@ -10205,7 +10492,6 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_WithDnldVersnAndUrl_CoversA
 
 // ------------------------------------------------------------------
 // GetLastFirmwareFailureReason with ESTB Download Failure reason
-// Covers FwFailReasonFromText second entry → line 1632
 // ------------------------------------------------------------------
 
 TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_ESTBDownload_CoversFromTextMatch)
@@ -10329,9 +10615,7 @@ TEST_F(SystemServicesTest, Dispatch_OnMacAddressesRetrieved_ReachesNotification)
 }
 
 // =============================================================================
-// conv() — all branches (file-scope function in SystemServicesImplementation.cpp)
-// Covered via SetWakeupSrcConfiguration with wakeupSrc field values
-// conv() is called by SetWakeupSrcConfiguration's JSON parsing path
+// conv() — all branches (file-scope function in SystemServicesImplementation)
 // =============================================================================
 
 TEST_F(SystemServicesTest, Conv_AllWakeupSrcStrings_ViaSWConfig)
@@ -10346,12 +10630,17 @@ TEST_F(SystemServicesTest, Conv_AllWakeupSrcStrings_ViaSWConfig)
         _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[{\"voice\":true,\"wifi\":true,\"ir\":true,\"powerKey\":true,\"cec\":true,\"lan\":true,\"timer\":true,\"bluetooth\":true,\"presenceDetection\":true}]}"),
         response));
 
-    TEST_LOG("Conv_AllWakeupSrcStrings - Response: %s", response.c_str());
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response));
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+
+    TEST_LOG("Conv_AllWakeupSrcStrings - Response: %s, success: %d", response.c_str(), success);
 }
 
 // =============================================================================
 // getWakeupSrcString() — all switch branches
-// Covered via GetWakeupSrcConfiguration response which calls getWakeupSrcString()
 // =============================================================================
 
 TEST_F(SystemServicesTest, GetWakeupSrcString_AllSrcValues_ViaGetWakeupSrcConfig)
@@ -10368,16 +10657,17 @@ TEST_F(SystemServicesTest, GetWakeupSrcString_AllSrcValues_ViaGetWakeupSrcConfig
         _T("{\"powerState\":\"DEEP_SLEEP\",\"wakeupSources\":[{\"voice\":true,\"presenceDetection\":true,\"bluetooth\":true}]}"),
         response));
 
-    TEST_LOG("GetWakeupSrcString_AllSrcValues - Response: %s", response.c_str());
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response));
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+
+    TEST_LOG("GetWakeupSrcString_AllSrcValues - Response: %s, success: %d", response.c_str(), success);
 }
 
 // =============================================================================
 // iarmModeToString() — all three branches (WAREHOUSE, EAS, NORMAL)
-// Covered via IARM_BUS_SYSMGR_SYSSTATE_MODECHANGE event handler path
-// The easiest path: call setMode which calls stringToIarmMode, then
-// iarmModeToString is called in onIARMEventModeChanged handler.
-// We can call it indirectly via OnSystemModeChanged which uses mode directly.
-// Cover iarmModeToString through setMode IARM callback:
 // =============================================================================
 
 TEST_F(SystemServicesTest, IarmModeToString_AllBranches_ViaIarmCallback)
@@ -10409,10 +10699,7 @@ TEST_F(SystemServicesTest, IarmModeToString_AllBranches_ViaIarmCallback)
 
 // =============================================================================
 // AbortLogUpload — pid==-1 path (no upload running → LOGERR, success=false)
-// AbortLogUpload — pid!=-1 path WITH getChildProcessIDs (pid set via
-// startUploadLogs which sets m_uploadLogsPid, but logUploadAsync binary absent
-// → returns -1, so we cannot set pid directly).
-// The pid==-1 path is what we CAN test: abortLogUpload when nothing is running.
+// AbortLogUpload — pid!=-1 path WITH getChildProcessIDs 
 // =============================================================================
 
 TEST_F(SystemServicesTest, AbortLogUpload_NoPidRunning_ReturnsErrorNoneSuccessFalse)
@@ -10430,9 +10717,6 @@ TEST_F(SystemServicesTest, AbortLogUpload_NoPidRunning_ReturnsErrorNoneSuccessFa
 // =============================================================================
 // updateDuration() — decrement path (m_remainingDuration > 0 → decrement)
 // and zero path (m_remainingDuration == 0 → stop timer + reset to NORMAL)
-// Triggered indirectly: set mode to EAS with duration, then call updateDuration
-// which is exposed via OnSystemModeChanged path. The safest approach:
-// call setMode(EAS, duration=-1) to stopModeTimer, then set NORMAL to reset.
 // =============================================================================
 
 TEST_F(SystemServicesTest, UpdateDuration_AfterWarehouseMode_TimerStops)
@@ -10449,7 +10733,11 @@ TEST_F(SystemServicesTest, UpdateDuration_AfterWarehouseMode_TimerStops)
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
-    TEST_LOG("UpdateDuration_AfterWarehouseMode - Response: %s", response.c_str());
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+
+    TEST_LOG("UpdateDuration_AfterWarehouseMode - Response: %s, success: %d", response.c_str(), success);
 
     // Restore to NORMAL
     response.clear();
@@ -10472,7 +10760,13 @@ TEST_F(SystemServicesTest, StartModeTimer_EASMode_NoThreadStart)
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setMode"),
         _T("{\"modeInfo\":{\"mode\":\"EAS\",\"duration\":-1}}"), response));
 
-    TEST_LOG("StartModeTimer_EASMode_NoThreadStart - Response: %s", response.c_str());
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response));
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+
+    TEST_LOG("StartModeTimer_EASMode_NoThreadStart - Response: %s, success: %d", response.c_str(), success);
 
     // Restore to NORMAL
     response.clear();
@@ -10495,7 +10789,11 @@ TEST_F(SystemServicesTest, GetWakeupSrcConfiguration_PMSuccess_PopulatesResponse
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
-    TEST_LOG("GetWakeupSrcConfiguration_PMSuccess - Response: %s", response.c_str());
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+
+    TEST_LOG("GetWakeupSrcConfiguration_PMSuccess - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, GetWakeupSrcConfiguration_PMFailure_ReturnsError)
@@ -10510,7 +10808,13 @@ TEST_F(SystemServicesTest, GetWakeupSrcConfiguration_PMFailure_ReturnsError)
         _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[{\"voice\":true}]}"),
         response));
 
-    TEST_LOG("GetWakeupSrcConfiguration_PMFailure - Response: %s", response.c_str());
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response));
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+
+    TEST_LOG("GetWakeupSrcConfiguration_PMFailure - Response: %s, success: %d", response.c_str(), success);
 }
 
 // =============================================================================
@@ -10585,15 +10889,17 @@ TEST_F(SystemServicesTest, SetPowerState_DeepSleep_WithStandbyReason)
 
     JsonObject jr;
     ASSERT_TRUE(jr.FromString(response)) << "Response: " << response;
-    EXPECT_TRUE(jr["success"].Boolean()) << "Response: " << response;
-    TEST_LOG("SetPowerState_DeepSleep_WithStandbyReason - Response: %s", response.c_str());
+    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
+    bool success = jr["success"].Boolean();
+    EXPECT_TRUE(success) << "Response: " << response;
+
+    TEST_LOG("SetPowerState_DeepSleep_WithStandbyReason - Response: %s, success: %d", response.c_str(), success);
 }
 
 
 // =============================================================================
-// UploadLogsAsync — covers uploadlogs.cpp L135-168 (logUploadAsync body)
-// Creates /usr/bin/logupload + config files so getUploadLogParameters succeeds
-// and fork()+execve() path is exercised (execve fails on empty binary)
+// UploadLogsAsync — covers uploadlogs.cpp (logUploadAsync body)
 // =============================================================================
 TEST_F(SystemServicesTest, UploadLogsAsync_LoguploadBinaryExists_CoversAsyncBody)
 {
@@ -10625,10 +10931,6 @@ TEST_F(SystemServicesTest, UploadLogsAsync_LoguploadBinaryExists_CoversAsyncBody
 
 // =============================================================================
 // GetFirmwareDownloadPercent with M/G unit in curl progress file
-// Covers SystemServicesHelper.cpp L324 (removeExtraWhitespaces)
-//         L328 (split), L329 (stringList[2] check), L331 (downloadprogress assign)
-//         L341 (strtol), L342 (LOGINFO FirmwareDownloadPercent)
-// The M or G character in the progress line is required to enter the branch
 // =============================================================================
 TEST_F(SystemServicesTest, GetFirmwareDownloadPercent_WithMegabyteProgress_CoversBranch)
 {
@@ -10644,14 +10946,18 @@ TEST_F(SystemServicesTest, GetFirmwareDownloadPercent_WithMegabyteProgress_Cover
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection,
               _T("getFirmwareDownloadPercent"), _T("{}"), response));
 
-    TEST_LOG("GetFirmwareDownloadPercent_WithMegabyteProgress - Response: %s", response.c_str());
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response));
+    ASSERT_TRUE(jsonResponse.HasLabel("downloadPercent")) << "Missing downloadPercent: " << response;
+    ASSERT_TRUE(jsonResponse["downloadPercent"].IsSet()) << "downloadPercent is not set: " << response;
+    int downloadPercent = static_cast<int>(jsonResponse["downloadPercent"].Number());
+
+    TEST_LOG("GetFirmwareDownloadPercent_WithMegabyteProgress - Response: %s, downloadPercent: %d", response.c_str(), downloadPercent);
     (void)std::remove("/opt/curl_progress");
 }
 
 // =============================================================================
 // GetBlocklistFlag with invalid (non-boolean) value in devicestate.txt
-// Covers SystemServicesImplementation.cpp read_parameters L954 (LOGERR invalid)
-//         L955 (file.close), L956 (return false)
 // =============================================================================
 TEST_F(SystemServicesTest, GetBlocklistFlag_InvalidValueInFile_CoversReadParamsError)
 {
@@ -10665,17 +10971,23 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_InvalidValueInFile_CoversReadParamsE
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection,
               _T("getBlocklistFlag"), _T("{}"), response));
 
-    TEST_LOG("GetBlocklistFlag_InvalidValueInFile - Response: %s", response.c_str());
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response));
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+
+    TEST_LOG("GetBlocklistFlag_InvalidValueInFile - Response: %s, success: %d", response.c_str(), success);
     (void)std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
 }
 
 
-//adding mock
 
 // =============================================================================
 // SECTION: QueryInterfaceByCallsign-based dependency mock helpers
 // =============================================================================
 // MigrationMock: minimal IMigration implementation for coverage tests.
+// adding mock
 // =============================================================================
 class MigrationMock : public WPEFramework::Exchange::IMigration {
 public:
@@ -10695,8 +11007,7 @@ public:
 };
 
 // =============================================================================
-// SetWakeupSrcConfiguration — covers lines 2751-2779 (all boolean field checks)
-// and 2782-2790 (PowerManager SetWakeupSourceConfig call)
+// SetWakeupSrcConfiguration Coverage
 // =============================================================================
 TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_AllSources_True_CoversFieldChecks)
 {
@@ -10720,14 +11031,13 @@ TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_AllSources_True_CoversField
                  "}]}"),
               response));
 
-    TEST_LOG("SetWakeupSrcConfiguration_AllSources - Response: %s", response.c_str());
-
-    // Thunder JSON-RPC deserialization does not populate WakeupSources boolean fields
-    // in the test environment (all boolean fields remain false → configs stays empty →
-    // success is never set to true). Verify only that the call returns ERROR_NONE and
-    // produces valid JSON — the code path (all if(src.X) branches) is still covered.
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response));
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+
+    TEST_LOG("SetWakeupSrcConfiguration_AllSources - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_SingleSource_Voice_CoversVoiceField)
@@ -10744,7 +11054,13 @@ TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_SingleSource_Voice_CoversVo
                  "}]}"),
               response));
 
-    TEST_LOG("SetWakeupSrcConfiguration_Voice - Response: %s", response.c_str());
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response));
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+
+    TEST_LOG("SetWakeupSrcConfiguration_Voice - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_AllFalse_NoConfigSent)
@@ -10762,7 +11078,13 @@ TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_AllFalse_NoConfigSent)
                  "}]}"),
               response));
 
-    TEST_LOG("SetWakeupSrcConfiguration_AllFalse - Response: %s", response.c_str());
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response));
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+
+    TEST_LOG("SetWakeupSrcConfiguration_AllFalse - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_PresenceOnly_CoversPresenceField)
@@ -10779,7 +11101,13 @@ TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_PresenceOnly_CoversPresence
                  "}]}"),
               response));
 
-    TEST_LOG("SetWakeupSrcConfiguration_Presence - Response: %s", response.c_str());
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response));
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+
+    TEST_LOG("SetWakeupSrcConfiguration_Presence - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_PowerManagerFailure_ReturnsError)
@@ -10794,16 +11122,18 @@ TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_PowerManagerFailure_Returns
                  "\"wakeupSources\":[{\"timer\":true}]}"),
               response));
 
-    TEST_LOG("SetWakeupSrcConfiguration_PMFailure - Response: %s", response.c_str());
-
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response));
-    EXPECT_FALSE(jsonResponse["success"].Boolean());
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_FALSE(success);
+
+    TEST_LOG("SetWakeupSrcConfiguration_PMFailure - Response: %s, success: %d", response.c_str(), success);
 }
 
 // =============================================================================
-// IsOptOutTelemetry success path — covers line 1284
-// TelemetryApiImplMock extends ITelemetry → can be returned via QueryInterfaceByCallsign
+// IsOptOutTelemetry success path
 // =============================================================================
 TEST_F(SystemServicesTest, IsOptOutTelemetry_WithTelemetryPlugin_SuccessPath)
 {
@@ -10861,7 +11191,7 @@ TEST_F(SystemServicesTest, SetOptOutTelemetry_WithTelemetryPlugin_SuccessPath)
 }
 
 // =============================================================================
-// GetMigrationStatus success path — covers lines 1380-1399 (statusToString map)
+// GetMigrationStatus success path 
 // =============================================================================
 TEST_F(SystemServicesTest, GetMigrationStatus_WithMigrationPlugin_MigrationCompleted)
 {
@@ -10926,7 +11256,7 @@ TEST_F(SystemServicesTest, GetMigrationStatus_AllStatusValues_CoversAllMapEntrie
 }
 
 // =============================================================================
-// GetBootTypeInfo success path — covers lines 1420-1427 (bootTypeToString map)
+// GetBootTypeInfo success path 
 // =============================================================================
 TEST_F(SystemServicesTest, GetBootTypeInfo_WithMigrationPlugin_BootMigration)
 {
@@ -10987,7 +11317,7 @@ TEST_F(SystemServicesTest, GetBootTypeInfo_AllBootTypes_CoversAllMapEntries)
 }
 
 // =============================================================================
-// getDeviceInfo with DeviceInfoImplementationMock — covers lines 3552-3831
+// getDeviceInfo with DeviceInfoImplementationMock 
 // =============================================================================
 TEST_F(SystemServicesTest, GetDeviceInfo_ModelNumber_WithDeviceInfoPlugin)
 {
@@ -11065,7 +11395,10 @@ TEST_F(SystemServicesTest, GetDeviceInfo_DeviceType_WithDeviceInfoPlugin)
 
     JsonObject jsonResp_devType;
     ASSERT_TRUE(jsonResp_devType.FromString(response));
-    EXPECT_TRUE(jsonResp_devType["success"].Boolean());
+    ASSERT_TRUE(jsonResp_devType.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResp_devType["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResp_devType["success"].Boolean();
+    EXPECT_TRUE(success);
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
         .WillByDefault(::testing::Return(nullptr));
@@ -11101,7 +11434,10 @@ TEST_F(SystemServicesTest, GetDeviceInfo_EstbMac_WithDeviceInfoPlugin)
 
     JsonObject jsonResp_estbMac;
     ASSERT_TRUE(jsonResp_estbMac.FromString(response));
-    EXPECT_TRUE(jsonResp_estbMac["success"].Boolean());
+    ASSERT_TRUE(jsonResp_estbMac.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResp_estbMac["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResp_estbMac["success"].Boolean();
+    EXPECT_TRUE(success);
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
         .WillByDefault(::testing::Return(nullptr));
@@ -11137,7 +11473,10 @@ TEST_F(SystemServicesTest, GetDeviceInfo_EthMac_WithDeviceInfoPlugin)
 
     JsonObject jsonResp_ethMac;
     ASSERT_TRUE(jsonResp_ethMac.FromString(response));
-    EXPECT_TRUE(jsonResp_ethMac["success"].Boolean());
+    ASSERT_TRUE(jsonResp_ethMac.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResp_ethMac["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResp_ethMac["success"].Boolean();
+    EXPECT_TRUE(success);
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
         .WillByDefault(::testing::Return(nullptr));
@@ -11173,7 +11512,10 @@ TEST_F(SystemServicesTest, GetDeviceInfo_WifiMac_WithDeviceInfoPlugin)
 
     JsonObject jsonResp_wifiMac;
     ASSERT_TRUE(jsonResp_wifiMac.FromString(response));
-    EXPECT_TRUE(jsonResp_wifiMac["success"].Boolean());
+    ASSERT_TRUE(jsonResp_wifiMac.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResp_wifiMac["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResp_wifiMac["success"].Boolean();
+    EXPECT_TRUE(success);
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
         .WillByDefault(::testing::Return(nullptr));
@@ -11209,7 +11551,10 @@ TEST_F(SystemServicesTest, GetDeviceInfo_BoxIP_WithDeviceInfoPlugin)
 
     JsonObject jsonResp_boxIP;
     ASSERT_TRUE(jsonResp_boxIP.FromString(response));
-    EXPECT_TRUE(jsonResp_boxIP["success"].Boolean());
+    ASSERT_TRUE(jsonResp_boxIP.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResp_boxIP["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResp_boxIP["success"].Boolean();
+    EXPECT_TRUE(success);
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
         .WillByDefault(::testing::Return(nullptr));
@@ -11245,7 +11590,10 @@ TEST_F(SystemServicesTest, GetDeviceInfo_FirmwareVersion_WithDeviceInfoPlugin)
 
     JsonObject jsonResp_fwVer;
     ASSERT_TRUE(jsonResp_fwVer.FromString(response));
-    EXPECT_TRUE(jsonResp_fwVer["success"].Boolean());
+    ASSERT_TRUE(jsonResp_fwVer.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResp_fwVer["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResp_fwVer["success"].Boolean();
+    EXPECT_TRUE(success);
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
         .WillByDefault(::testing::Return(nullptr));
@@ -11281,7 +11629,10 @@ TEST_F(SystemServicesTest, GetDeviceInfo_FriendlyId_WithDeviceInfoPlugin)
 
     JsonObject jsonResp_friendly;
     ASSERT_TRUE(jsonResp_friendly.FromString(response));
-    EXPECT_TRUE(jsonResp_friendly["success"].Boolean());
+    ASSERT_TRUE(jsonResp_friendly.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_TRUE(jsonResp_friendly["success"].IsSet()) << "success is not set: " << response;
+    bool success = jsonResp_friendly["success"].Boolean();
+    EXPECT_TRUE(success);
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
         .WillByDefault(::testing::Return(nullptr));
@@ -11411,9 +11762,7 @@ TEST_F(SystemServicesTest, SetMigrationStatus_WithMigrationPlugin_MigrationCompl
 }
 
 // =============================================================================
-// GetSerialNumber — DeviceInfo plugin success path (lines 1458-1465)
-// Previously only the null-DeviceInfo path (line 1468) was covered (count=4).
-// This test covers the non-null branch: SerialNumber() called, result populated.
+// GetSerialNumber — DeviceInfo plugin success path 
 // =============================================================================
 TEST_F(SystemServicesTest, GetSerialNumber_WithDeviceInfoPlugin_SuccessPath)
 {
@@ -11447,8 +11796,6 @@ TEST_F(SystemServicesTest, GetSerialNumber_WithDeviceInfoPlugin_SuccessPath)
 
 // =============================================================================
 // getStbVersionString via GetSystemVersions — DeviceInfo plugin success path
-// (lines 3840-3848): FirmwareVersion() called when DeviceInfo is available.
-// Previously only the null-DeviceInfo fallback path was covered.
 // =============================================================================
 TEST_F(SystemServicesTest, GetStbVersionString_ViaGetSystemVersions_WithDeviceInfoPlugin)
 {
@@ -11482,10 +11829,8 @@ TEST_F(SystemServicesTest, GetStbVersionString_ViaGetSystemVersions_WithDeviceIn
 }
 
 
-
-//firmware
 // =============================================================================
-// GetFirmwareUpdateInfo — covers lines 1809-1840 (spawns thread calling firmwareUpdateInfoReceived)
+// GetFirmwareUpdateInfo Coverage
 // =============================================================================
 TEST_F(SystemServicesTest, GetFirmwareUpdateInfo_SpawnsThread_WithXconfFiles)
 {
@@ -11549,9 +11894,7 @@ TEST_F(SystemServicesTest, GetFirmwareUpdateInfo_NoXconfFiles_StillReturnsAsyncT
 }
 
 // =============================================================================
-// GetDownloadedFirmwareInfo — DnldVersn/DnldURL branch (lines 1913-1933)
-// m_FwUpdateState_LatestEvent must be >= 2 for DnldVersn/DnldURL to populate.
-// Trigger state >= 2 via IARM callback, then call getDownloadedFirmwareInfo.
+// GetDownloadedFirmwareInfo — DnldVersn/DnldURL branch 
 // =============================================================================
 TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_DnldVersn_Branch_WhenStateIsDownloading)
 {
@@ -11588,22 +11931,10 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_DnldVersn_Branch_WhenStateI
 }
 
 
+// =============================================================================
+// deviceMgtUpdateReceived — static IARM callback wrapper
+// =============================================================================
 
-// =============================================================================
-// 1. _deviceMgtUpdateReceived — static IARM callback wrapper
-//    Captured via SaveArg on IARM_Bus_RegisterEventHandler during Initialize.
-//    Uses a dedicated fixture (inherits SystemServicesInitializeTest) so we can
-//    intercept the registration before Initialize() is called.
-// =============================================================================
-// Fixture that captures IARM static callback pointers registered during Initialize().
-// Inherits SystemServicesTest (which already sets up mocks and calls Initialize)
-// but overrides IARM_Bus_RegisterEventHandler BEFORE init via constructor order:
-// SystemServicesTest ctor calls Initialize() last, after all ON_CALLs are set up.
-// We need the capture to happen DURING that Initialize call.
-// Solution: use a wrapper around SystemServicesTest that re-sets on IARM mock right after
-// parent construction. But since Initialize already ran, we cannot capture retroactively.
-// Instead, create our own standalone fixture (same pattern as SystemServicesTest) with
-// SaveArg set before Initialize.
 class SystemServicesIarmCbTest : public SystemServicesInitializeTest {
 protected:
     NiceMock<IarmBusImplMock>       iarmMock;
@@ -11716,10 +12047,8 @@ protected:
         // Step 1: drop pluginImpl so ~SystemServicesImplementation runs (stops cTimer).
         pluginImpl = Core::ProxyType<Plugin::SystemServicesImplementation>();
 
-        // Step 2: drain WorkerPool (joins threads, processes pending Jobs).
         workerPool.Release();
 
-        // Step 3: null global AFTER pool is drained.
         Core::IWorkerPool::Assign(nullptr);
 
         dispatcher->Deactivate();
@@ -11738,7 +12067,9 @@ protected:
     }
 };
 
-// 1. _deviceMgtUpdateReceived — call static IARM wrapper directly
+// =============================================================================
+// _deviceMgtUpdateReceived — call static IARM wrapper directly
+// =============================================================================
 TEST_F(SystemServicesIarmCbTest, IarmCb_DeviceMgtUpdateReceived_TriggersOnDeviceMgtUpdate)
 {
     ASSERT_NE(nullptr, m_deviceMgtHandler) << "_deviceMgtUpdateReceived not registered";
@@ -11754,7 +12085,9 @@ TEST_F(SystemServicesIarmCbTest, IarmCb_DeviceMgtUpdateReceived_TriggersOnDevice
     TEST_LOG("IarmCb_DeviceMgtUpdateReceived PASSED");
 }
 
+// =============================================================================
 // Wrong owner must be silently ignored — covers the !strcmp branch (false path)
+// =============================================================================
 TEST_F(SystemServicesIarmCbTest, IarmCb_DeviceMgtUpdateReceived_WrongOwner_Ignored)
 {
     ASSERT_NE(nullptr, m_deviceMgtHandler);
@@ -11768,9 +12101,7 @@ TEST_F(SystemServicesIarmCbTest, IarmCb_DeviceMgtUpdateReceived_WrongOwner_Ignor
 
 
 // =============================================================================
-// 4. SetWakeupSrcConfiguration — direct static call via JSON-RPC
-//    The Thunder JSON-RPC layer cannot deserialize booleans into the struct, but
-//    we can call the implementation directly to hit the branch bodies.
+//  SetWakeupSrcConfiguration — direct static call via JSON-RPC
 // =============================================================================
 TEST_F(SystemServicesIarmCbTest, SetWakeupSrcConfiguration_DirectImpl_VoiceSourceCovered)
 {
@@ -11789,8 +12120,7 @@ TEST_F(SystemServicesIarmCbTest, SetWakeupSrcConfiguration_DirectImpl_VoiceSourc
 }
 
 // =============================================================================
-// 5. AbortLogUpload — no-upload-running path (m_uploadLogsPid == -1)
-//    Covers the LOGERR branch + ERROR_NONE return at the end of AbortLogUpload.
+// AbortLogUpload — no-upload-running path (m_uploadLogsPid == -1)
 // =============================================================================
 TEST_F(SystemServicesIarmCbTest, AbortLogUpload_NoPidRunning_ReturnsErrorNone)
 {
@@ -11802,13 +12132,7 @@ TEST_F(SystemServicesIarmCbTest, AbortLogUpload_NoPidRunning_ReturnsErrorNone)
 }
 
 // =============================================================================
-// 6 & 7. stopModeTimer + setMode EAS path — covered via public setMode API.
-//   duration=-1 is mandatory (same rule as ALL existing timer tests, lines 10462-10473).
-//   startModeTimer(n>0) starts a cTimer thread; stop() only sets clear=true but does
-//   NOT detach. The only detach happens inside updateDuration() after a 1-second tick.
-//   Using duration=1 then calling stopModeTimer() leaves timerThread joinable forever
-//   → static cTimer destroyed at program exit → std::terminate() → Aborted (core dump).
-//   duration=-1 → stopModeTimer() → no thread started → safe.
+//  stopModeTimer + setMode EAS path — covered via public setMode API.
 // =============================================================================
 TEST_F(SystemServicesIarmCbTest, StopModeTimer_ViaSetMode_EASAndNormal)
 {
@@ -11828,12 +12152,7 @@ TEST_F(SystemServicesIarmCbTest, StopModeTimer_ViaSetMode_EASAndNormal)
 }
 
 // =============================================================================
-// 8. _systemStateChanged — call static IARM callback directly.
-//    We capture m_sysStateHandler as the FIRST RegisterEventHandler call for
-//    eventId==IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE(0). In CI builds the second
-//    call for the same eventId carries _timerStatusEventHandler (captured as
-//    m_timerHandler below). Calling m_sysStateHandler with proper
-//    IARM_Bus_SYSMgr_EventData_t covers the body of _systemStateChanged.
+// systemStateChanged — call static IARM callback directly.
 // =============================================================================
 TEST_F(SystemServicesIarmCbTest, IarmCb_SystemStateChanged_FirmwareUpdateState)
 {
@@ -11855,11 +12174,7 @@ TEST_F(SystemServicesIarmCbTest, IarmCb_SystemStateChanged_FirmwareUpdateState)
 }
 
 // =============================================================================
-// 9. _timerStatusEventHandler — call via m_timerHandler (second registered
-//    handler for eventId==0). Only non-null in CI coverage builds where
-//    IARM_BUS_SYSTIME_MGR_NAME==IARM_BUS_SYSMGR_NAME and cTIMER_STATUS_UPDATE==0.
-//    We pass a zeroed 1024-byte buffer so the internal TimerMsg field reads
-//    produce empty strings without any out-of-bounds access.
+//  timerStatusEventHandler — call via m_timerHandler
 // =============================================================================
 TEST_F(SystemServicesIarmCbTest, IarmCb_TimerStatusEventHandler_OnTimeStatusChanged)
 {
@@ -11884,17 +12199,7 @@ TEST_F(SystemServicesIarmCbTest, IarmCb_TimerStatusEventHandler_OnTimeStatusChan
 }
 
 // =============================================================================
-// 10. startModeTimer + updateDuration — covered via setMode with duration=1.
-//
-// Timeline when setMode("WAREHOUSE", 1) is called:
-//   t=0ms: startModeTimer(1) → m_remainingDuration=1, timer thread starts
-//   t=1000ms: updateDuration() — m_remainingDuration > 0 → decrements to 0
-//   t=2000ms: updateDuration() — m_remainingDuration==0 → stop()+detach()+SetMode(NORMAL)
-//   t=2000ms+ε: timer thread exits (clear==true); thread is detached → no std::terminate
-//
-// We sleep 2500ms to guarantee both updateDuration branches are covered before
-// the fixture destructor runs. The mode timer callback calls SetMode(NORMAL,0)
-// from the timer thread; this goes through the IARM mock (WillRepeatedly).
+// startModeTimer + updateDuration — covered via setMode.
 // =============================================================================
 TEST_F(SystemServicesIarmCbTest, StartModeTimer_UpdateDuration_ViaSetMode_PositiveDuration)
 {
