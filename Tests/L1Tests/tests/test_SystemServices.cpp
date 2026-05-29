@@ -3352,7 +3352,10 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_CompleteData)
     fw << "Status|200\n";
     fw << "Reboot|no\n";
     fw.close();
-    
+
+	// Small delay to ensure files are flushed to disk
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	
     // Set firmware update state to Downloading (2) so the implementation returns downloadedFWVersion/Location
     ASSERT_NE(nullptr, Plugin::SystemServicesImplementation::_instance) << "SystemServicesImplementation instance should be initialized";
     Plugin::SystemServicesImplementation::_instance->OnFirmwareUpdateStateChange(2); // FirmwareUpdateStateDownloading
