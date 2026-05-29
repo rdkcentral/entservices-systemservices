@@ -1316,16 +1316,18 @@ namespace WPEFramework {
               }
               v_secure_pclose(pipe);
             }
-			else {
-				LOGERR("v_secure_popen failed");
-			}
-			
-			if (!res.empty()) {
-				LOGINFO("DeviceDetails response received for [%s]", cmd.c_str());
-			}
-			else {
-				LOGERR("No DeviceDetails response for [%s]", cmd.c_str());
-			}
+            else {
+                LOGERR("v_secure_popen failed for getDeviceDetails.sh read [%s]: %s", cmd.c_str(), strerror(errno));
+            }
+
+            if (pipe != nullptr) {
+                if (!res.empty()) {
+                    LOGINFO("DeviceDetails response received for [%s]", cmd.c_str());
+                }
+                else {
+                    LOGERR("No DeviceDetails response for [%s]", cmd.c_str());
+                }
+            }
 			
             if (res.size() > 0) {
                 std::string model_number;
