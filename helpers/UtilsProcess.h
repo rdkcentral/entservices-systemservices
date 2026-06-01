@@ -32,40 +32,72 @@ using namespace std;
 namespace Utils
 {
 /**
-* @brief Kill all the processes whose command contains the given substring
-* @param[in] input_pname - The process name substring to match
-* @return true if any process matching the substring was killed, otherwise false is returned
-*/
+ * @brief Kill all processes whose command name or any command-line argument
+ *        contains the given substring.
+ *
+ * Scans the system process table and sends SIGTERM to every process whose
+ * executable name or command-line matches `input_pname` (substring match).
+ *
+ * @param input_pname Substring to search in process name or cmdline.
+ * @return true if at least one matching process was terminated; false otherwise.
+ */
 bool killProcess(const string& input_pname)
 {
     if (input_pname.empty())
     {
-        LOGERR("Empty process name provided");
+        LOGERR("killProcess: empty process name provided; refusing to match all processes");
         return false;
     }
-    
-    PROCTAB* proc = openproc(PROC_FILLMEM | PROC_FILLSTAT | PROC_FILLSTATUS );
+
+    // Request enough process metadata to inspect command name and command-line args.
+    PROCTAB* proc = openproc(PROC_FILLMEM | PROC_FILLSTAT | PROC_FILLSTATUS | PROC_FILLCOM);
     proc_t proc_info = {0};
     bool ret_value = false;
 
+    LOGINFO("Attempting to kill processes with name or command-line containing [%s]", input_pname.c_str());
     if (proc != NULL)
     {
         memset(&proc_info, 0, sizeof(proc_info));
+
+        // Walk all processes in the process table.
         while (readproc(proc, &proc_info) != NULL)
         {
-            if (proc_info.cmd[0] != '\0' && strstr(proc_info.cmd, input_pname.c_str()) != nullptr)
+            bool match = false;
+
+            // Match substring against the executable/command name.
+            if ((proc_info.cmd[0] != '\0') &&
+                (strstr(proc_info.cmd, input_pname.c_str()) != nullptr))
+            {
+                match = true;
+                LOGINFO("Matched process [%d] command name [%s]", proc_info.tid, proc_info.cmd);
+            }
+
+            // If not matched yet, match substring against each command-line argument.
+            if (!match && (proc_info.cmdline != nullptr)) {
+                for (char** arg = proc_info.cmdline; *arg != nullptr; ++arg) {
+                    if (strstr(*arg, input_pname.c_str()) != nullptr) {
+                        match = true;
+                        LOGINFO("Matched process [%d] command-line argument [%s]", proc_info.tid, *arg);
+                        break;
+                    }
+                }
+            }
+
+            // Gracefully terminate all matched processes.
+            if (match)
             {
                 if (0 == kill(proc_info.tid, SIGTERM))
                 {
                     ret_value = true;
-                    LOGINFO("Killed the process [%d] process name [%s]", proc_info.tid, proc_info.cmd);
+                    LOGINFO("Killed the process [%d] process name [%s]", proc_info.tid, proc_info.cmd[0] != '\0' ? proc_info.cmd : "null");
                 }
                 else
                 {
-                    LOGERR("Failed to kill process [%d] process name [%s]: %s", proc_info.tid, proc_info.cmd, strerror(errno));
+                    LOGERR("Failed to Kill the process [%d] process name [%s]", proc_info.tid, proc_info.cmd[0] != '\0' ? proc_info.cmd : "null");
                 }
             }
         }
+        // Release resources held by libproc.
         closeproc(proc);
     }
     return ret_value;
