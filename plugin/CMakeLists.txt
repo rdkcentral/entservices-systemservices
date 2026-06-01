@@ -138,10 +138,16 @@ endif()
 target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ../helpers)
 target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ./)
 
-if (BUILD_ENABLE_SYSTIMEMGR_SUPPORT)
-    message ("Adding mock include directories for systimerifc headers") 
-    target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE 
-        ${CMAKE_SOURCE_DIR}/../entservices-testframework/Tests/mocks)
+#Add mock headers and SYSTIMEMGR support for L1 and L2 tests only
+if (RDK_SERVICES_L1_TEST OR RDK_SERVICE_L2_TEST)
+    message ("Test build enabled - adding mock include directories and SYSTIMEMGR support")
+    if (EXISTS ${CMAKE_SOURCE_DIR}/../entservices-testframework/Tests/mocks)
+        target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE 
+            ${CMAKE_SOURCE_DIR}/../entservices-testframework/Tests/mocks)
+        message ("Mock path: ${CMAKE_SOURCE_DIR}/../entservices-testframework/Tests/mocks")
+    endif()
+    # Enable SYSTIMEMGR support for tests
+    target_compile_definitions(${PLUGIN_IMPLEMENTATION} PRIVATE ENABLE_SYSTIMEMGR_SUPPORT)
 endif()
 
 install(TARGETS ${PLUGIN_IMPLEMENTATION}
