@@ -138,6 +138,12 @@ endif()
 target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ../helpers)
 target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ./)
 
+if (RDK_SERVICES_L1_TEST)
+    message ("L1 test Enabled - adding mock include directories")
+    target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE 
+        ${CMAKE_SOURCE_DIR}/../entservices-testframework/Tests/mocks)
+endif()
+
 install(TARGETS ${PLUGIN_IMPLEMENTATION}
         DESTINATION lib/${STORAGE_DIRECTORY}/plugins)
 
