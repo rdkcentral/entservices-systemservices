@@ -266,7 +266,6 @@ jobs:
           systemservices/proc/readproc.h
           systemservices/secure_wrapper.h
           systemaudioplatform.h
-          systimerifc/itimermsg.h
           maintenanceMGR.h
           pkg.h
           edid-parser.hpp
