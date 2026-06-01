@@ -114,6 +114,9 @@ set_source_files_properties(
 
 include_directories(${TEST_INC})
 
+# Add SYSTIMEMGR_SUPPORT for L1 tests
+target_compile_definitions(${MODULE_NAME} PRIVATE ENABLE_SYSTIMEMGR_SUPPORT)
+
 target_link_directories(${MODULE_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/lib ${CMAKE_INSTALL_PREFIX}/lib/wpeframework/plugins)
 
 target_link_libraries(${MODULE_NAME} ${TEST_LIB})
