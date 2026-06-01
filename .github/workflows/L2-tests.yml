@@ -221,7 +221,6 @@ jobs:
           headers/rdk/halif/deepsleep-manager
           headers/systemservices
           headers/systemservices/proc
-          headers/systimerifc
           &&
           cd headers
           &&
@@ -785,7 +784,6 @@ jobs:
           -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvTypes.h
           -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/essos-resmgr.h
           -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Telemetry.h
-          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/systimerifc/itimermsg.h‎
           -Wall -Wno-unused-result -Wno-deprecated-declarations -Wno-error=format=
           -Wl,-wrap,popen -Wl,-wrap,syslog -Wl,-wrap,v_secure_system -Wl,-wrap,v_secure_popen -Wl,-wrap,v_secure_pclose -Wl,-wrap,unlink
           -DUSE_IARMBUS
