@@ -35,7 +35,8 @@ set_target_properties(${MODULE_NAME} PROPERTIES
 target_compile_definitions(${MODULE_NAME}
             PRIVATE
             MODULE_NAME=Plugin_${PLUGIN_NAME}
-            THUNDER_PORT="${THUNDER_PORT}")
+            THUNDER_PORT="${THUNDER_PORT}"
+            ENABLE_SYSTIMEMGR_SUPPORT)
 
 target_compile_options(${MODULE_NAME} PRIVATE -Wno-error)
 target_link_directories(${MODULE_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/lib ${CMAKE_INSTALL_PREFIX}/lib/wpeframework/plugins)
