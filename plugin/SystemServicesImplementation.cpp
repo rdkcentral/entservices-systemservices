@@ -515,18 +515,17 @@ namespace WPEFramework
             {
                 case SYSTEMSERVICES_EVT_ONFIRMWAREUPDATEINFORECEIVED:
                 {
-                    FirmwareUpdateInfo firmwareUpdateInfo;
-                    firmwareUpdateInfo.status = static_cast<int>(params["status"].Number());
-                    firmwareUpdateInfo.responseString = params["responseString"].String();
-                    firmwareUpdateInfo.firmwareUpdateVersion = params["firmwareUpdateVersion"].String();
-                    firmwareUpdateInfo.rebootImmediately = params["rebootImmediately"].Boolean();
-                    firmwareUpdateInfo.updateAvailable = params["updateAvailable"].Boolean();
-                    firmwareUpdateInfo.updateAvailableEnum = static_cast<int>(params["updateAvailableEnum"].Number());
-                    firmwareUpdateInfo.success = params["success"].Boolean();
+                    int status = static_cast<int>(params["status"].Number());
+                    string responseString = params["responseString"].String();
+                    string firmwareUpdateVersion = params["firmwareUpdateVersion"].String();
+                    bool rebootImmediately = params["rebootImmediately"].Boolean();
+                    bool updateAvailable = params["updateAvailable"].Boolean();
+                    int updateAvailableEnum = static_cast<int>(params["updateAvailableEnum"].Number());
+                    bool success = params["success"].Boolean();
 
                     while (index != _systemServicesNotification.end()) 
                     {
-                        (*index)->OnFirmwareUpdateInfoReceived(firmwareUpdateInfo);
+                        (*index)->OnFirmwareUpdateInfoReceived(status, responseString, firmwareUpdateVersion, rebootImmediately, updateAvailable, updateAvailableEnum, success);
                         ++index;
                     }
                     break;
@@ -598,15 +597,14 @@ namespace WPEFramework
                 
                 case SYSTEMSERVICES_EVT_ONTERRITORYCHANGED:
                 {
-                    TerritoryChangedInfo territoryChangedInfo;
-                    territoryChangedInfo.oldTerritory = params["oldTerritory"].String();
-                    territoryChangedInfo.newTerritory = params["newTerritory"].String();
-                    territoryChangedInfo.oldRegion = params["oldRegion"].String();
-                    territoryChangedInfo.newRegion = params["newRegion"].String();
+                    string oldTerritory = params["oldTerritory"].String();
+                    string newTerritory = params["newTerritory"].String();
+                    string oldRegion = params["oldRegion"].String();
+                    string newRegion = params["newRegion"].String();
 
                     while (index != _systemServicesNotification.end()) 
                     {
-                        (*index)->OnTerritoryChanged(territoryChangedInfo);
+                        (*index)->OnTerritoryChanged(oldTerritory, newTerritory, oldRegion, newRegion);
                         ++index;
                     }
                     break;
@@ -614,15 +612,14 @@ namespace WPEFramework
                 
                 case SYSTEMSERVICES_EVT_ONTIMEZONEDSTCHANGED:
                 {
-                    TimeZoneDSTChangedInfo timeZoneDSTChangedInfo;
-                    timeZoneDSTChangedInfo.oldTimeZone = params["oldTimeZone"].String();
-                    timeZoneDSTChangedInfo.newTimeZone = params["newTimeZone"].String();
-                    timeZoneDSTChangedInfo.oldAccuracy = params["oldAccuracy"].String();
-                    timeZoneDSTChangedInfo.newAccuracy = params["newAccuracy"].String();
+                    string oldTimeZone = params["oldTimeZone"].String();
+                    string newTimeZone = params["newTimeZone"].String();
+                    string oldAccuracy = params["oldAccuracy"].String();
+                    string newAccuracy = params["newAccuracy"].String();
 
                     while (index != _systemServicesNotification.end()) 
                     {
-                        (*index)->OnTimeZoneDSTChanged(timeZoneDSTChangedInfo);
+                        (*index)->OnTimeZoneDSTChanged(oldTimeZone, newTimeZone, oldAccuracy, newAccuracy);
                         ++index;
                     }
                     break;
@@ -718,20 +715,19 @@ namespace WPEFramework
                 
                 case SYSTEMSERVICES_EVT_ONMACADDRESSRETRIEVED:
                 {
-                    MacAddressesInfo macAddressesInfo;
-                    macAddressesInfo.ecmMac = params["ecm_mac"].String();
-                    macAddressesInfo.estbMac = params["estb_mac"].String();
-                    macAddressesInfo.mocaMac = params["moca_mac"].String();
-                    macAddressesInfo.ethMac = params["eth_mac"].String();
-                    macAddressesInfo.wifiMac = params["wifi_mac"].String();
-                    macAddressesInfo.bluetoothMac = params["bluetooth_mac"].String();
-                    macAddressesInfo.rf4ceMac = params["rf4ce_mac"].String();
-                    macAddressesInfo.info = params["info"].String();
-                    macAddressesInfo.success = params["success"].Boolean();
+                    string ecmMac = params["ecm_mac"].String();
+                    string estbMac = params["estb_mac"].String();
+                    string mocaMac = params["moca_mac"].String();
+                    string ethMac = params["eth_mac"].String();
+                    string wifiMac = params["wifi_mac"].String();
+                    string bluetoothMac = params["bluetooth_mac"].String();
+                    string rf4ceMac = params["rf4ce_mac"].String();
+                    string info = params["info"].String();
+                    bool success = params["success"].Boolean();
 
                     while (index != _systemServicesNotification.end()) 
                     {
-                        (*index)->OnMacAddressesRetreived(macAddressesInfo);
+                        (*index)->OnMacAddressesRetreived(ecmMac, estbMac, mocaMac, ethMac, wifiMac, bluetoothMac, rf4ceMac, info, success);
                         ++index;
                     }
                     break;
