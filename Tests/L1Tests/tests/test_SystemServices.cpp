@@ -4554,16 +4554,23 @@ TEST_F(SystemServicesTest, Notification_OnFriendlyNameChanged_EmptyName)
 {
     ASSERT_NE(nullptr, m_sysServices) << "ISystemServices not available";
 
-    // SetFriendlyName only fires OnFriendlyNameChanged when m_friendlyName changes.
-    // Default m_friendlyName is "", so setting "" is a no-op. Pre-set a non-empty
-    // name first so the subsequent set-to-empty actually triggers the notification.
-    EXPECT_CALL(*p_rfcApiMock, setRFCParameter(::testing::_, ::testing::_, ::testing::_, ::testing::_))
-        .WillRepeatedly(::testing::Return(WDMP_SUCCESS));
-    handler.Invoke(connection, _T("setFriendlyName"), _T("{\"friendlyName\":\"nonEmpty\"}"), response);
-
+    // Default m_friendlyName is "Living Room", so setting "" should trigger notification.
+    // We need to register handler BEFORE making any calls to avoid race conditions
+    // with async event dispatch.
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
+
+    EXPECT_CALL(*p_rfcApiMock, setRFCParameter(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillRepeatedly(::testing::Return(WDMP_SUCCESS));
+    
+    // First set to non-empty and wait for event
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setFriendlyName"), _T("{\"friendlyName\":\"nonEmpty\"}"), response));
+    EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onFriendlyNameChanged));
+    EXPECT_EQ("nonEmpty", notificationHandler->GetFriendlyName());
+    
+    // Reset event flag and set to empty string
+    notificationHandler->ResetEvent(SystemServices_onFriendlyNameChanged);
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setFriendlyName"), _T("{\"friendlyName\":\"\"}"), response));
     
