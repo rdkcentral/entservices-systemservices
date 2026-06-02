@@ -59,6 +59,8 @@ typedef enum : uint32_t {
     SYSTEMSERVICEL2TEST_SYSTEM_MODE_CHANGED = 0x00000100,
     SYSTEMSERVICEL2TEST_NETWORK_STANDBY_CHANGED = 0x00000200,
     SYSTEMSERVICEL2TEST_CLOCK_SET = 0x00000400,
+    SYSTEMSERVICEL2TEST_TIMEZONEDST_CHANGED = 0x00000800,
+    SYSTEMSERVICEL2TEST_MACADDRESSES_RETREIVED = 0x00001000,
     SYSTEMSERVICEL2TEST_STATE_INVALID = 0x00000000
 }SystemServiceL2test_async_events_t;
 
@@ -186,6 +188,7 @@ public:
         m_tzNewTimeZone = newTimeZone;
         m_tzOldAccuracy = oldAccuracy;
         m_tzNewAccuracy = newAccuracy;
+		m_event_signalled |= SYSTEMSERVICEL2TEST_TIMEZONEDST_CHANGED;
         m_condition_variable.notify_one();
     }
 
@@ -203,6 +206,7 @@ public:
         m_macRf4ce = rf4ceMac;
         m_macInfo = info;
         m_macSuccess = success;
+        m_event_signalled |= SYSTEMSERVICEL2TEST_MACADDRESSES_RETREIVED;
         m_condition_variable.notify_one();
     }
     void OnSystemModeChanged(const string& mode) override
@@ -421,6 +425,30 @@ public:
     string GetMacEstb() {
         std::unique_lock<std::mutex> lock(m_mutex);
         return m_macEstb;
+    }
+    string GetMacMoca() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_macMoca;
+    }
+    string GetMacEth() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_macEth;
+    }
+    string GetMacWifi() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_macWifi;
+    }
+    string GetMacBluetooth() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_macBluetooth;
+    }
+    string GetMacRf4ce() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_macRf4ce;
+    }
+    string GetMacInfo() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_macInfo;
     }
     bool GetMacSuccess() {
         std::unique_lock<std::mutex> lock(m_mutex);
