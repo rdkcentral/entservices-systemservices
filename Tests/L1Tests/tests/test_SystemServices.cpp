@@ -104,14 +104,38 @@ private:
 
     // Event-specific data storage
     struct {
-        Exchange::ISystemServices::FirmwareUpdateInfo firmwareUpdateInfo;
+        // FirmwareUpdateInfo fields
+        int firmwareUpdateStatus;
+        string firmwareUpdateResponseString;
+        string firmwareUpdateVersion;
+        bool firmwareUpdateRebootImmediately;
+        bool firmwareUpdateAvailable;
+        int firmwareUpdateAvailableEnum;
+        bool firmwareUpdateSuccess;
         string requestedApp;
         string rebootReason;
         string powerState;
         string currentPowerState;
-        Exchange::ISystemServices::TerritoryChangedInfo territoryChangedInfo;
-        Exchange::ISystemServices::TimeZoneDSTChangedInfo timeZoneDSTChangedInfo;
-        Exchange::ISystemServices::MacAddressesInfo macAddressesInfo;
+        // TerritoryChangedInfo fields
+        string territoryOldTerritory;
+        string territoryNewTerritory;
+        string territoryOldRegion;
+        string territoryNewRegion;
+        // TimeZoneDSTChangedInfo fields
+        string timeZoneOldTimeZone;
+        string timeZoneNewTimeZone;
+        string timeZoneOldAccuracy;
+        string timeZoneNewAccuracy;
+        // MacAddressesInfo fields
+        string macEcmMac;
+        string macEstbMac;
+        string macMocaMac;
+        string macEthMac;
+        string macWifiMac;
+        string macBluetoothMac;
+        string macRf4ceMac;
+        string macInfo;
+        bool macSuccess;
         string systemMode;
         string logUploadStatus;
         int firmwareUpdateStateChange;
@@ -161,10 +185,16 @@ public:
     }
 
     // Notification interface methods
-    void OnFirmwareUpdateInfoReceived(const Exchange::ISystemServices::FirmwareUpdateInfo& firmwareUpdateInfo) override
+    void OnFirmwareUpdateInfoReceived(const int status, const string& responseString, const string& firmwareUpdateVersion, const bool rebootImmediately, const bool updateAvailable, const int updateAvailableEnum, const bool success) override
     {
         std::unique_lock<std::mutex> lock(m_mutex);
-        m_eventData.firmwareUpdateInfo = firmwareUpdateInfo;
+        m_eventData.firmwareUpdateStatus = status;
+        m_eventData.firmwareUpdateResponseString = responseString;
+        m_eventData.firmwareUpdateVersion = firmwareUpdateVersion;
+        m_eventData.firmwareUpdateRebootImmediately = rebootImmediately;
+        m_eventData.firmwareUpdateAvailable = updateAvailable;
+        m_eventData.firmwareUpdateAvailableEnum = updateAvailableEnum;
+        m_eventData.firmwareUpdateSuccess = success;
         m_event_signalled |= SystemServices_onFirmwareUpdateInfoReceived;
         m_condition_variable.notify_one();
     }
@@ -187,26 +217,40 @@ public:
         m_condition_variable.notify_one();
     }
 
-    void OnTerritoryChanged(const Exchange::ISystemServices::TerritoryChangedInfo& territoryChangedInfo) override
+    void OnTerritoryChanged(const string& oldTerritory, const string& newTerritory, const string& oldRegion, const string& newRegion) override
     {
         std::unique_lock<std::mutex> lock(m_mutex);
-        m_eventData.territoryChangedInfo = territoryChangedInfo;
+        m_eventData.territoryOldTerritory = oldTerritory;
+        m_eventData.territoryNewTerritory = newTerritory;
+        m_eventData.territoryOldRegion = oldRegion;
+        m_eventData.territoryNewRegion = newRegion;
         m_event_signalled |= SystemServices_onTerritoryChanged;
         m_condition_variable.notify_one();
     }
 
-    void OnTimeZoneDSTChanged(const Exchange::ISystemServices::TimeZoneDSTChangedInfo& timeZoneDSTChangedInfo) override
+    void OnTimeZoneDSTChanged(const string& oldTimeZone, const string& newTimeZone, const string& oldAccuracy, const string& newAccuracy) override
     {
         std::unique_lock<std::mutex> lock(m_mutex);
-        m_eventData.timeZoneDSTChangedInfo = timeZoneDSTChangedInfo;
+        m_eventData.timeZoneOldTimeZone = oldTimeZone;
+        m_eventData.timeZoneNewTimeZone = newTimeZone;
+        m_eventData.timeZoneOldAccuracy = oldAccuracy;
+        m_eventData.timeZoneNewAccuracy = newAccuracy;
         m_event_signalled |= SystemServices_onTimeZoneDSTChanged;
         m_condition_variable.notify_one();
     }
 
-    void OnMacAddressesRetreived(const Exchange::ISystemServices::MacAddressesInfo& macAddressesInfo) override
+    void OnMacAddressesRetreived(const string& ecmMac, const string& estbMac, const string& mocaMac, const string& ethMac, const string& wifiMac, const string& bluetoothMac, const string& rf4ceMac, const string& info, const bool success) override
     {
         std::unique_lock<std::mutex> lock(m_mutex);
-        m_eventData.macAddressesInfo = macAddressesInfo;
+        m_eventData.macEcmMac = ecmMac;
+        m_eventData.macEstbMac = estbMac;
+        m_eventData.macMocaMac = mocaMac;
+        m_eventData.macEthMac = ethMac;
+        m_eventData.macWifiMac = wifiMac;
+        m_eventData.macBluetoothMac = bluetoothMac;
+        m_eventData.macRf4ceMac = rf4ceMac;
+        m_eventData.macInfo = info;
+        m_eventData.macSuccess = success;
         m_event_signalled |= SystemServices_onMacAddressesRetreived;
         m_condition_variable.notify_one();
     }
@@ -331,14 +375,50 @@ public:
     // Getter methods for event data
     uint32_t GetEventSignalled() const { return m_event_signalled; }
     
-    const Exchange::ISystemServices::FirmwareUpdateInfo& GetFirmwareUpdateInfo() const { return m_eventData.firmwareUpdateInfo; }
+    FirmwareUpdateInfo GetFirmwareUpdateInfo() const { 
+        FirmwareUpdateInfo info;
+        info.status = m_eventData.firmwareUpdateStatus;
+        info.responseString = m_eventData.firmwareUpdateResponseString;
+        info.firmwareUpdateVersion = m_eventData.firmwareUpdateVersion;
+        info.rebootImmediately = m_eventData.firmwareUpdateRebootImmediately;
+        info.updateAvailable = m_eventData.firmwareUpdateAvailable;
+        info.updateAvailableEnum = m_eventData.firmwareUpdateAvailableEnum;
+        info.success = m_eventData.firmwareUpdateSuccess;
+        return info;
+    }
     string GetRequestedApp() const { return m_eventData.requestedApp; }
     string GetRebootReason() const { return m_eventData.rebootReason; }
     string GetPowerState() const { return m_eventData.powerState; }
     string GetCurrentPowerState() const { return m_eventData.currentPowerState; }
-    const Exchange::ISystemServices::TerritoryChangedInfo& GetTerritoryChangedInfo() const { return m_eventData.territoryChangedInfo; }
-    const Exchange::ISystemServices::TimeZoneDSTChangedInfo& GetTimeZoneDSTChangedInfo() const { return m_eventData.timeZoneDSTChangedInfo; }
-    const Exchange::ISystemServices::MacAddressesInfo& GetMacAddressesInfo() const { return m_eventData.macAddressesInfo; }
+    TerritoryChangedInfo GetTerritoryChangedInfo() const { 
+        TerritoryChangedInfo info;
+        info.oldTerritory = m_eventData.territoryOldTerritory;
+        info.newTerritory = m_eventData.territoryNewTerritory;
+        info.oldRegion = m_eventData.territoryOldRegion;
+        info.newRegion = m_eventData.territoryNewRegion;
+        return info;
+    }
+    TimeZoneDSTChangedInfo GetTimeZoneDSTChangedInfo() const { 
+        TimeZoneDSTChangedInfo info;
+        info.oldTimeZone = m_eventData.timeZoneOldTimeZone;
+        info.newTimeZone = m_eventData.timeZoneNewTimeZone;
+        info.oldAccuracy = m_eventData.timeZoneOldAccuracy;
+        info.newAccuracy = m_eventData.timeZoneNewAccuracy;
+        return info;
+    }
+    MacAddressesInfo GetMacAddressesInfo() const { 
+        MacAddressesInfo info;
+        info.ecmMac = m_eventData.macEcmMac;
+        info.estbMac = m_eventData.macEstbMac;
+        info.mocaMac = m_eventData.macMocaMac;
+        info.ethMac = m_eventData.macEthMac;
+        info.wifiMac = m_eventData.macWifiMac;
+        info.bluetoothMac = m_eventData.macBluetoothMac;
+        info.rf4ceMac = m_eventData.macRf4ceMac;
+        info.info = m_eventData.macInfo;
+        info.success = m_eventData.macSuccess;
+        return info;
+    }
     string GetSystemMode() const { return m_eventData.systemMode; }
     string GetLogUploadStatus() const { return m_eventData.logUploadStatus; }
     int GetFirmwareUpdateStateChange() const { return m_eventData.firmwareUpdateStateChange; }
@@ -8807,7 +8887,11 @@ TEST_F(SystemServicesTest, Dispatch_OnTerritoryChanged_ReachesNotification)
 
     bool eventFired = notificationHandler->WaitForRequestStatus(2000, SystemServices_onTerritoryChanged);
     if (eventFired) {
-        EXPECT_EQ("ITA", notificationHandler->GetTerritoryChangedInfo().newTerritory);
+        auto territoryInfo = notificationHandler->GetTerritoryChangedInfo();
+        EXPECT_EQ("", territoryInfo.oldTerritory);
+        EXPECT_EQ("ITA", territoryInfo.newTerritory);
+        EXPECT_EQ("", territoryInfo.oldRegion);
+        EXPECT_EQ("", territoryInfo.newRegion);
     }
     TEST_LOG("Dispatch_OnTerritoryChanged eventFired=%d - Response: %s", (int)eventFired, response.c_str());
 
@@ -8836,7 +8920,11 @@ TEST_F(SystemServicesTest, Dispatch_OnTimeZoneDSTChanged_ReachesNotification)
 
     bool eventFired = notificationHandler->WaitForRequestStatus(2000, SystemServices_onTimeZoneDSTChanged);
     if (eventFired) {
-        EXPECT_EQ("Europe/Paris", notificationHandler->GetTimeZoneDSTChangedInfo().newTimeZone);
+        auto tzInfo = notificationHandler->GetTimeZoneDSTChangedInfo();
+        EXPECT_EQ("", tzInfo.oldTimeZone);
+        EXPECT_EQ("Europe/Paris", tzInfo.newTimeZone);
+        EXPECT_EQ("", tzInfo.oldAccuracy);
+        EXPECT_EQ("", tzInfo.newAccuracy);
     }
     TEST_LOG("Dispatch_OnTimeZoneDSTChanged eventFired=%d - Response: %s", (int)eventFired, response.c_str());
 
@@ -9298,7 +9386,11 @@ TEST_F(SystemServicesTest, Notification_OnTimeZoneDSTChanged_TwoDifferentTimezon
     handler.Invoke(connection, _T("setTimeZoneDST"), _T("{\"timeZone\":\"Europe/London\"}"), response);
     bool event1Fired = notificationHandler->WaitForRequestStatus(2000, SystemServices_onTimeZoneDSTChanged);
     if (event1Fired) {
-        EXPECT_EQ("Europe/London", notificationHandler->GetTimeZoneDSTChangedInfo().newTimeZone);
+        auto tzInfo = notificationHandler->GetTimeZoneDSTChangedInfo();
+        EXPECT_EQ("", tzInfo.oldTimeZone);
+        EXPECT_EQ("Europe/London", tzInfo.newTimeZone);
+        EXPECT_EQ("", tzInfo.oldAccuracy);
+        EXPECT_EQ("", tzInfo.newAccuracy);
     }
 
     // Second call: old="Europe/London", new="America/Los_Angeles" → fires event
@@ -9306,7 +9398,9 @@ TEST_F(SystemServicesTest, Notification_OnTimeZoneDSTChanged_TwoDifferentTimezon
     handler.Invoke(connection, _T("setTimeZoneDST"), _T("{\"timeZone\":\"America/Los_Angeles\"}"), response);
     bool event2Fired = notificationHandler->WaitForRequestStatus(2000, SystemServices_onTimeZoneDSTChanged);
     if (event2Fired) {
-        EXPECT_EQ("America/Los_Angeles", notificationHandler->GetTimeZoneDSTChangedInfo().newTimeZone);
+        auto tzInfo = notificationHandler->GetTimeZoneDSTChangedInfo();
+        EXPECT_EQ("Europe/London", tzInfo.oldTimeZone);
+        EXPECT_EQ("America/Los_Angeles", tzInfo.newTimeZone);
     }
     TEST_LOG("OnTimeZoneDSTChanged event1=%d event2=%d", (int)event1Fired, (int)event2Fired);
 
@@ -9339,7 +9433,11 @@ TEST_F(SystemServicesTest, Notification_OnTerritoryChanged_ViaSetTerritory)
 
     bool eventFired = notificationHandler->WaitForRequestStatus(2000, SystemServices_onTerritoryChanged);
     if (eventFired) {
-        EXPECT_EQ("DEU", notificationHandler->GetTerritoryChangedInfo().newTerritory);
+        auto territoryInfo = notificationHandler->GetTerritoryChangedInfo();
+        EXPECT_EQ("", territoryInfo.oldTerritory);
+        EXPECT_EQ("DEU", territoryInfo.newTerritory);
+        EXPECT_EQ("", territoryInfo.oldRegion);
+        EXPECT_EQ("", territoryInfo.newRegion);
     }
     TEST_LOG("OnTerritoryChanged eventFired=%d - Response: %s", (int)eventFired, response.c_str());
 
@@ -9457,11 +9555,16 @@ TEST_F(SystemServicesTest, Dispatch_TerritoryChanged_WithRegion)
 
     bool eventFired = notificationHandler->WaitForRequestStatus(2000, SystemServices_onTerritoryChanged);
     if (eventFired) {
-        EXPECT_EQ("USA", notificationHandler->GetTerritoryChangedInfo().newTerritory);
-        EXPECT_EQ("US-NY", notificationHandler->GetTerritoryChangedInfo().newRegion);
-        TEST_LOG("Dispatch_TerritoryChanged_WithRegion fired: new=%s region=%s",
-                 notificationHandler->GetTerritoryChangedInfo().newTerritory.c_str(),
-                 notificationHandler->GetTerritoryChangedInfo().newRegion.c_str());
+        auto territoryInfo = notificationHandler->GetTerritoryChangedInfo();
+        EXPECT_EQ("", territoryInfo.oldTerritory);
+        EXPECT_EQ("USA", territoryInfo.newTerritory);
+        EXPECT_EQ("", territoryInfo.oldRegion);
+        EXPECT_EQ("US-NY", territoryInfo.newRegion);
+        TEST_LOG("Dispatch_TerritoryChanged_WithRegion fired: old=%s new=%s oldRegion=%s newRegion=%s",
+                 territoryInfo.oldTerritory.c_str(),
+                 territoryInfo.newTerritory.c_str(),
+                 territoryInfo.oldRegion.c_str(),
+                 territoryInfo.newRegion.c_str());
     }
 
     m_sysServices->Unregister(notificationHandler);
@@ -9569,9 +9672,13 @@ TEST_F(SystemServicesTest, ReportFirmwareUpdateInfo_HttpStatus460_EmptySwUpdateC
         "", 460, true, "", "");
 
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onFirmwareUpdateInfoReceived));
-    EXPECT_FALSE(notificationHandler->GetFirmwareUpdateInfo().updateAvailable);
-    EXPECT_EQ(3, notificationHandler->GetFirmwareUpdateInfo().updateAvailableEnum); // EMPTY_SW_UPDATE_CONF = 3
-    EXPECT_TRUE(notificationHandler->GetFirmwareUpdateInfo().success);
+    auto fwInfo = notificationHandler->GetFirmwareUpdateInfo();
+    EXPECT_EQ(460, fwInfo.status);
+    EXPECT_EQ("", fwInfo.responseString);
+    EXPECT_EQ("", fwInfo.firmwareUpdateVersion);
+    EXPECT_FALSE(fwInfo.updateAvailable);
+    EXPECT_EQ(3, fwInfo.updateAvailableEnum); // EMPTY_SW_UPDATE_CONF = 3
+    EXPECT_TRUE(fwInfo.success);
 
     m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
@@ -9591,9 +9698,13 @@ TEST_F(SystemServicesTest, ReportFirmwareUpdateInfo_HttpStatus404_NoFwAvailable)
         "", 404, true, "", "");
 
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onFirmwareUpdateInfoReceived));
-    EXPECT_FALSE(notificationHandler->GetFirmwareUpdateInfo().updateAvailable);
-    EXPECT_EQ(1, notificationHandler->GetFirmwareUpdateInfo().updateAvailableEnum); // FW_MATCH_CURRENT_VER = 1
-    EXPECT_TRUE(notificationHandler->GetFirmwareUpdateInfo().success);
+    auto fwInfo = notificationHandler->GetFirmwareUpdateInfo();
+    EXPECT_EQ(404, fwInfo.status);
+    EXPECT_EQ("", fwInfo.responseString);
+    EXPECT_EQ("", fwInfo.firmwareUpdateVersion);
+    EXPECT_FALSE(fwInfo.updateAvailable);
+    EXPECT_EQ(1, fwInfo.updateAvailableEnum); // FW_MATCH_CURRENT_VER = 1
+    EXPECT_TRUE(fwInfo.success);
 
     m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
@@ -9613,9 +9724,13 @@ TEST_F(SystemServicesTest, ReportFirmwareUpdateInfo_NewVersionAvailable)
         "NEW_FW_2.0", 200, true, "CURRENT_FW_1.0", "");
 
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onFirmwareUpdateInfoReceived));
-    EXPECT_TRUE(notificationHandler->GetFirmwareUpdateInfo().updateAvailable);
-    EXPECT_EQ(0, notificationHandler->GetFirmwareUpdateInfo().updateAvailableEnum); // FW_UPDATE_AVAILABLE = 0
-    EXPECT_EQ("NEW_FW_2.0", notificationHandler->GetFirmwareUpdateInfo().firmwareUpdateVersion);
+    auto fwInfo = notificationHandler->GetFirmwareUpdateInfo();
+    EXPECT_EQ(200, fwInfo.status);
+    EXPECT_EQ("", fwInfo.responseString);
+    EXPECT_EQ("NEW_FW_2.0", fwInfo.firmwareUpdateVersion);
+    EXPECT_TRUE(fwInfo.updateAvailable);
+    EXPECT_EQ(0, fwInfo.updateAvailableEnum); // FW_UPDATE_AVAILABLE = 0
+    EXPECT_TRUE(fwInfo.success);
 
     m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
@@ -9635,9 +9750,13 @@ TEST_F(SystemServicesTest, ReportFirmwareUpdateInfo_SameVersionNoUpdate)
         "SAME_FW_1.0", 200, true, "SAME_FW_1.0", "");
 
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onFirmwareUpdateInfoReceived));
-    EXPECT_FALSE(notificationHandler->GetFirmwareUpdateInfo().updateAvailable);
-    EXPECT_EQ(1, notificationHandler->GetFirmwareUpdateInfo().updateAvailableEnum); // FW_MATCH_CURRENT_VER = 1
-
+    auto fwInfo = notificationHandler->GetFirmwareUpdateInfo();
+    EXPECT_EQ(200, fwInfo.status);
+    EXPECT_EQ("", fwInfo.responseString);
+    EXPECT_EQ("SAME_FW_1.0", fwInfo.firmwareUpdateVersion);
+    EXPECT_FALSE(fwInfo.updateAvailable);
+    EXPECT_EQ(1, fwInfo.updateAvailableEnum); // FW_MATCH_CURRENT_VER = 1
+    EXPECT_TRUE(fwInfo.success);
     m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
 }
@@ -9656,8 +9775,13 @@ TEST_F(SystemServicesTest, ReportFirmwareUpdateInfo_EmptyFirmwareVersion_NoFwVer
         "", 200, false, "CURRENT_FW_1.0", "");
 
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onFirmwareUpdateInfoReceived));
-    EXPECT_FALSE(notificationHandler->GetFirmwareUpdateInfo().updateAvailable);
-    EXPECT_EQ(2, notificationHandler->GetFirmwareUpdateInfo().updateAvailableEnum); // NO_FW_VERSION = 2
+    auto fwInfo = notificationHandler->GetFirmwareUpdateInfo();
+    EXPECT_EQ(200, fwInfo.status);
+    EXPECT_EQ("", fwInfo.responseString);
+    EXPECT_EQ("", fwInfo.firmwareUpdateVersion);
+    EXPECT_FALSE(fwInfo.updateAvailable);
+    EXPECT_EQ(2, fwInfo.updateAvailableEnum); // NO_FW_VERSION = 2
+    EXPECT_FALSE(fwInfo.success);
 
     m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
@@ -9678,8 +9802,14 @@ TEST_F(SystemServicesTest, ReportFirmwareUpdateInfo_WithRebootImmediatelyRespons
         "{\"firmwareVersion\":\"NEW_FW_3.0\",\"rebootImmediately\":true}");
 
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onFirmwareUpdateInfoReceived));
-    EXPECT_TRUE(notificationHandler->GetFirmwareUpdateInfo().rebootImmediately);
-    EXPECT_TRUE(notificationHandler->GetFirmwareUpdateInfo().updateAvailable);
+    auto fwInfo = notificationHandler->GetFirmwareUpdateInfo();
+    EXPECT_EQ(200, fwInfo.status);
+    EXPECT_EQ("{\"firmwareVersion\":\"NEW_FW_3.0\",\"rebootImmediately\":true}", fwInfo.responseString);
+    EXPECT_EQ("NEW_FW_3.0", fwInfo.firmwareUpdateVersion);
+    EXPECT_TRUE(fwInfo.rebootImmediately);
+    EXPECT_TRUE(fwInfo.updateAvailable);
+    EXPECT_EQ(0, fwInfo.updateAvailableEnum); // FW_UPDATE_AVAILABLE = 0
+    EXPECT_TRUE(fwInfo.success);
 
     m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
@@ -10815,6 +10945,13 @@ TEST_F(SystemServicesTest, Dispatch_OnMacAddressesRetrieved_ReachesNotification)
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(3000, SystemServices_onMacAddressesRetreived))
         << "OnMacAddressesRetreived event not received within timeout";
 
+    // Validate MAC address parameters were received
+    auto macInfo = notificationHandler->GetMacAddressesInfo();
+    // Note: Actual MAC values depend on the system, so we just verify the event was triggered
+    // and the info structure is accessible
+    TEST_LOG("Dispatch_OnMacAddressesRetrieved - ecmMac: %s, estbMac: %s, success: %d", 
+             macInfo.ecmMac.c_str(), macInfo.estbMac.c_str(), macInfo.success);
+	
     (void)std::remove("/lib/rdk/getDeviceDetails.sh");
     m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
