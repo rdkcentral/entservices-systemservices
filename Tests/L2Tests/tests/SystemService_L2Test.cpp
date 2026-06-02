@@ -77,11 +77,45 @@ private:
     string m_lastOldBlocklist;
     string m_lastNewBlocklist;
     bool m_lastNwStandby;
+     // FirmwareUpdateInfo parameters
+    int m_fwStatus;
+    string m_fwResponseString;
+    string m_fwUpdateVersion;
+    bool m_fwRebootImmediately;
+    bool m_fwUpdateAvailable;
+    int m_fwUpdateAvailableEnum;
+    bool m_fwSuccess;
+    // TerritoryChanged parameters
+    string m_territoryOld;
+    string m_territoryNew;
+    string m_territoryOldRegion;
+    string m_territoryNewRegion;
+    // TimeZoneDSTChanged parameters
+    string m_tzOldTimeZone;
+    string m_tzNewTimeZone;
+    string m_tzOldAccuracy;
+    string m_tzNewAccuracy;
+    // MacAddresses parameters
+    string m_macEcm;
+    string m_macEstb;
+    string m_macMoca;
+    string m_macEth;
+    string m_macWifi;
+    string m_macBluetooth;
+    string m_macRf4ce;
+    string m_macInfo;
+    bool m_macSuccess;
 
 public:
     SystemServicesNotificationHandler()
         : m_event_signalled(SYSTEMSERVICEL2TEST_STATE_INVALID)
         , m_lastNwStandby(false)
+        , m_fwStatus(0)
+        , m_fwRebootImmediately(false)
+        , m_fwUpdateAvailable(false)
+        , m_fwUpdateAvailableEnum(0)
+        , m_fwSuccess(false)
+        , m_macSuccess(false)
     {
     }
 
@@ -91,10 +125,17 @@ public:
     INTERFACE_ENTRY(Exchange::ISystemServices::INotification)
     END_INTERFACE_MAP
 
-    void OnFirmwareUpdateInfoReceived(const Exchange::ISystemServices::FirmwareUpdateInfo& firmwareUpdateInfo) override
+    void OnFirmwareUpdateInfoReceived(const int status, const string& responseString, const string& firmwareUpdateVersion, const bool rebootImmediately, const bool updateAvailable, const int updateAvailableEnum, const bool success) override
     {
         TEST_LOG("OnFirmwareUpdateInfoReceived notification received");
         std::unique_lock<std::mutex> lock(m_mutex);
+        m_fwStatus = status;
+        m_fwResponseString = responseString;
+        m_fwUpdateVersion = firmwareUpdateVersion;
+        m_fwRebootImmediately = rebootImmediately;
+        m_fwUpdateAvailable = updateAvailable;
+        m_fwUpdateAvailableEnum = updateAvailableEnum;
+        m_fwSuccess = success;
         m_event_signalled |= SYSTEMSERVICEL2TEST_FIRMWARE_UPDATE_INFO;
         m_condition_variable.notify_one();
     }
@@ -121,28 +162,49 @@ public:
         m_condition_variable.notify_one();
     }
 
-    void OnTerritoryChanged(const Exchange::ISystemServices::TerritoryChangedInfo& territoryChangedInfo) override
+    void OnTerritoryChanged(const string& oldTerritory, const string& newTerritory, const string& oldRegion, const string& newRegion) override
     {
         TEST_LOG("OnTerritoryChanged notification received");
+        TEST_LOG("  oldTerritory: %s, newTerritory: %s, oldRegion: %s, newRegion: %s",
+                 oldTerritory.c_str(), newTerritory.c_str(), oldRegion.c_str(), newRegion.c_str());
         std::unique_lock<std::mutex> lock(m_mutex);
+        m_territoryOld = oldTerritory;
+        m_territoryNew = newTerritory;
+        m_territoryOldRegion = oldRegion;
+        m_territoryNewRegion = newRegion;
         m_event_signalled |= SYSTEMSERVICEL2TEST_TERRITORY_CHANGED;
         m_condition_variable.notify_one();
     }
 
-    void OnTimeZoneDSTChanged(const Exchange::ISystemServices::TimeZoneDSTChangedInfo& timeZoneDSTChangedInfo) override
+    void OnTimeZoneDSTChanged(const string& oldTimeZone, const string& newTimeZone, const string& oldAccuracy, const string& newAccuracy) override
     {
         TEST_LOG("OnTimeZoneDSTChanged notification received");
+        TEST_LOG("  oldTimeZone: %s, newTimeZone: %s, oldAccuracy: %s, newAccuracy: %s",
+                 oldTimeZone.c_str(), newTimeZone.c_str(), oldAccuracy.c_str(), newAccuracy.c_str());
         std::unique_lock<std::mutex> lock(m_mutex);
+        m_tzOldTimeZone = oldTimeZone;
+        m_tzNewTimeZone = newTimeZone;
+        m_tzOldAccuracy = oldAccuracy;
+        m_tzNewAccuracy = newAccuracy;
         m_condition_variable.notify_one();
     }
 
-    void OnMacAddressesRetreived(const Exchange::ISystemServices::MacAddressesInfo& macAddressesInfo) override
+    void OnMacAddressesRetreived(const string& ecmMac, const string& estbMac, const string& mocaMac, const string& ethMac, const string& wifiMac, const string& bluetoothMac, const string& rf4ceMac, const string& info, const bool success) override
     {
         TEST_LOG("OnMacAddressesRetreived notification received");
+        TEST_LOG("  ecmMac: %s, estbMac: %s, success: %d", ecmMac.c_str(), estbMac.c_str(), success);
         std::unique_lock<std::mutex> lock(m_mutex);
+        m_macEcm = ecmMac;
+        m_macEstb = estbMac;
+        m_macMoca = mocaMac;
+        m_macEth = ethMac;
+        m_macWifi = wifiMac;
+        m_macBluetooth = bluetoothMac;
+        m_macRf4ce = rf4ceMac;
+        m_macInfo = info;
+        m_macSuccess = success;
         m_condition_variable.notify_one();
     }
-
     void OnSystemModeChanged(const string& mode) override
     {
         TEST_LOG("OnSystemModeChanged notification received");
@@ -283,6 +345,86 @@ public:
     bool GetLastNwStandby() {
         std::unique_lock<std::mutex> lock(m_mutex);
         return m_lastNwStandby;
+    }
+
+    // FirmwareUpdateInfo getters
+    int GetFwStatus() { 
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_fwStatus;
+    }
+    string GetFwResponseString() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_fwResponseString;
+    }
+    string GetFwUpdateVersion() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_fwUpdateVersion;
+    }
+    bool GetFwRebootImmediately() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_fwRebootImmediately;
+    }
+    bool GetFwUpdateAvailable() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_fwUpdateAvailable;
+    }
+    int GetFwUpdateAvailableEnum() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_fwUpdateAvailableEnum;
+    }
+    bool GetFwSuccess() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_fwSuccess;
+    }
+
+    // TerritoryChanged getters
+    string GetTerritoryOld() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_territoryOld;
+    }
+    string GetTerritoryNew() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_territoryNew;
+    }
+    string GetTerritoryOldRegion() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_territoryOldRegion;
+    }
+    string GetTerritoryNewRegion() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_territoryNewRegion;
+    }
+
+    // TimeZoneDST getters
+    string GetTzOldTimeZone() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_tzOldTimeZone;
+    }
+    string GetTzNewTimeZone() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_tzNewTimeZone;
+    }
+    string GetTzOldAccuracy() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_tzOldAccuracy;
+    }
+    string GetTzNewAccuracy() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_tzNewAccuracy;
+    }
+
+    // MacAddresses getters
+    string GetMacEcm() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_macEcm;
+    }
+    string GetMacEstb() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_macEstb;
+    }
+    bool GetMacSuccess() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_macSuccess;
     }
 };
 /**
@@ -5593,16 +5735,32 @@ TEST_F(SystemService_L2Test, SysImpl_SetTimeZoneDST_Universal_COMRPC)
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
     TEST_LOG("SetTimeZoneDST: 'Universal' → isUniversal=true branch, zoneinfo check fails safely");
+	
+	m_SystemServicesPlugin->Register(&m_notificationHandler);
 
     uint32_t sysSrvStatus = 0;
     string errorMessage;
     bool success = false;
 
+	m_notificationHandler.ResetEvent();
     uint32_t result = m_SystemServicesPlugin->SetTimeZoneDST("Universal", "FINAL",
                                                               sysSrvStatus, errorMessage, success);
     EXPECT_EQ(result, Core::ERROR_NONE);
     TEST_LOG("  SetTimeZoneDST('Universal'): result=%u, success=%d", result, success);
 
+	 /* Wait for event and validate all TimeZoneDST parameters */
+    m_notificationHandler.WaitForEvent(200, SYSTEMSERVICEL2TEST_TIMEZONEDST_CHANGED);
+    EXPECT_EQ("", m_notificationHandler.GetTzOldTimeZone());
+    EXPECT_EQ("Universal", m_notificationHandler.GetTzNewTimeZone());
+    EXPECT_EQ("", m_notificationHandler.GetTzOldAccuracy());
+    EXPECT_EQ("FINAL", m_notificationHandler.GetTzNewAccuracy());
+    TEST_LOG("  TimeZoneDST event validated: oldTZ='%s' newTZ='%s' oldAccuracy='%s' newAccuracy='%s'",
+             m_notificationHandler.GetTzOldTimeZone().c_str(),
+             m_notificationHandler.GetTzNewTimeZone().c_str(),
+             m_notificationHandler.GetTzOldAccuracy().c_str(),
+             m_notificationHandler.GetTzNewAccuracy().c_str());
+
+    m_SystemServicesPlugin->Unregister(&m_notificationHandler);
     m_SystemServicesPlugin->Release();
     m_controller_SystemServices->Release();
 }
@@ -5633,6 +5791,68 @@ TEST_F(SystemService_L2Test, SysImpl_GetRFCConfig_NullList_COMRPC)
     TEST_LOG("  GetRFCConfig(null): result=%u, sysSrvStatus=%u, error='%s'",
              result, sysSrvStatus, errorMessage.c_str());
 
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
+/* ------------------------------------------------------------------- *
+ * GetMacAddresses — validate OnMacAddressesRetreived event parameters *
+ * Covers all 9 parameters: ecm, estb, moca, eth, wifi, bluetooth,     *
+ * rf4ce, info, success                                                  *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetMacAddresses_ValidateEvent_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    TEST_LOG("GetMacAddresses: validate OnMacAddressesRetreived event parameters");
+
+    m_SystemServicesPlugin->Register(&m_notificationHandler);
+
+    bool asyncResponse = false;
+    uint32_t sysSrvStatus = 0;
+    string errorMessage;
+    bool success = false;
+
+    m_notificationHandler.ResetEvent();
+    uint32_t result = m_SystemServicesPlugin->GetMacAddresses("test-guid-mac-validation",
+                                                               asyncResponse, sysSrvStatus,
+                                                               errorMessage, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+    TEST_LOG("  GetMacAddresses: result=%u, asyncResponse=%d, success=%d",
+             result, asyncResponse, success);
+
+    /* Wait for async event and validate all MacAddresses parameters */
+    m_notificationHandler.WaitForEvent(3000, SYSTEMSERVICEL2TEST_MACADDRESSES_RETREIVED);
+    string ecmMac = m_notificationHandler.GetMacEcm();
+    string estbMac = m_notificationHandler.GetMacEstb();
+    string mocaMac = m_notificationHandler.GetMacMoca();
+    string ethMac = m_notificationHandler.GetMacEth();
+    string wifiMac = m_notificationHandler.GetMacWifi();
+    string bluetoothMac = m_notificationHandler.GetMacBluetooth();
+    string rf4ceMac = m_notificationHandler.GetMacRf4ce();
+    string info = m_notificationHandler.GetMacInfo();
+    bool macSuccess = m_notificationHandler.GetMacSuccess();
+
+    EXPECT_FALSE(ecmMac.empty());
+    EXPECT_FALSE(estbMac.empty());
+    EXPECT_TRUE(macSuccess);
+
+    TEST_LOG("  MacAddresses event validated:");
+    TEST_LOG("    ecm_mac='%s'", ecmMac.c_str());
+    TEST_LOG("    estb_mac='%s'", estbMac.c_str());
+    TEST_LOG("    moca_mac='%s'", mocaMac.c_str());
+    TEST_LOG("    eth_mac='%s'", ethMac.c_str());
+    TEST_LOG("    wifi_mac='%s'", wifiMac.c_str());
+    TEST_LOG("    bluetooth_mac='%s'", bluetoothMac.c_str());
+    TEST_LOG("    rf4ce_mac='%s'", rf4ceMac.c_str());
+    TEST_LOG("    info='%s'", info.c_str());
+    TEST_LOG("    success=%d", macSuccess);
+
+    m_SystemServicesPlugin->Unregister(&m_notificationHandler);
     m_SystemServicesPlugin->Release();
     m_controller_SystemServices->Release();
 }
@@ -7512,6 +7732,13 @@ TEST_F(SystemService_L2Test, SysImpl_ReportFirmwareInfo_WithResponseString_COMRP
         m_notificationHandler.ResetEvent();
         inst->reportFirmwareUpdateInfoReceived("FW_2.0", 200, true, "FW_1.0", responseJson);
         m_notificationHandler.WaitForEvent(200, SYSTEMSERVICEL2TEST_FIRMWARE_UPDATE_INFO);
+		EXPECT_EQ(200, m_notificationHandler.GetFwStatus());
+        EXPECT_EQ(responseJson, m_notificationHandler.GetFwResponseString());
+        EXPECT_EQ("FW_2.0", m_notificationHandler.GetFwUpdateVersion());
+        EXPECT_TRUE(m_notificationHandler.GetFwRebootImmediately());
+        EXPECT_TRUE(m_notificationHandler.GetFwUpdateAvailable());
+        EXPECT_EQ(0, m_notificationHandler.GetFwUpdateAvailableEnum()); // FW_UPDATE_AVAILABLE = 0
+        EXPECT_TRUE(m_notificationHandler.GetFwSuccess());
         TEST_LOG("  fired with JSON responseString: xconfResponse.FromString() executed");
     }
 
@@ -7534,6 +7761,8 @@ TEST_F(SystemService_L2Test, SysImpl_SetTerritory_ValidTerritoryAndRegion_COMRPC
 
     TEST_LOG("SetTerritory: valid territory GBR + valid region GB-ENG → success path");
 
+	m_SystemServicesPlugin->Register(&m_notificationHandler);
+
     mkdir("/opt/secure", 0755);
     mkdir("/opt/secure/persistent", 0755);
     mkdir("/opt/secure/persistent/System", 0700);
@@ -7541,9 +7770,22 @@ TEST_F(SystemService_L2Test, SysImpl_SetTerritory_ValidTerritoryAndRegion_COMRPC
     Exchange::ISystemServices::SystemError sysError{};
     bool success = false;
     /* "GBR" is in standard list; "GB-ENG" passes isRegionValid (2-char prefix + 3-char suffix) */
+	m_notificationHandler.ResetEvent();
     uint32_t result = m_SystemServicesPlugin->SetTerritory("GBR", "GB-ENG", sysError, success);
     EXPECT_EQ(result, Core::ERROR_NONE);
     TEST_LOG("  SetTerritory('GBR','GB-ENG'): result=%u success=%d", result, success);
+
+	/* Wait for event and validate all Territory parameters */
+    m_notificationHandler.WaitForEvent(200, SYSTEMSERVICEL2TEST_TERRITORY_CHANGED);
+    EXPECT_EQ("", m_notificationHandler.GetTerritoryOld());
+    EXPECT_EQ("GBR", m_notificationHandler.GetTerritoryNew());
+    EXPECT_EQ("", m_notificationHandler.GetTerritoryOldRegion());
+    EXPECT_EQ("GB-ENG", m_notificationHandler.GetTerritoryNewRegion());
+    TEST_LOG("  Territory event validated: old='%s' new='%s' oldRegion='%s' newRegion='%s'",
+             m_notificationHandler.GetTerritoryOld().c_str(),
+             m_notificationHandler.GetTerritoryNew().c_str(),
+             m_notificationHandler.GetTerritoryOldRegion().c_str(),
+             m_notificationHandler.GetTerritoryNewRegion().c_str());
 
     /* Now read back with GetTerritory → covers readTerritoryFromFile success path with region */
     string territory, region;
