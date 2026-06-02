@@ -8962,9 +8962,9 @@ TEST_F(SystemServicesTest, Dispatch_OnTimeZoneDSTChanged_ReachesNotification)
         auto tzInfo = notificationHandler->GetTimeZoneDSTChangedInfo();
         EXPECT_EQ("", tzInfo.oldTimeZone);
         EXPECT_EQ("Europe/Paris", tzInfo.newTimeZone);
-        // When no accuracy file exists, default is "INITIAL"
-        EXPECT_EQ("INITIAL", tzInfo.oldAccuracy);
-        EXPECT_EQ("INITIAL", tzInfo.newAccuracy);
+        // When setTimeZoneDST is called without accuracy parameter, accuracy is empty string
+        EXPECT_EQ("", tzInfo.oldAccuracy);
+        EXPECT_EQ("", tzInfo.newAccuracy);
     }
     TEST_LOG("Dispatch_OnTimeZoneDSTChanged eventFired=%d - Response: %s", (int)eventFired, response.c_str());
 
@@ -9429,9 +9429,9 @@ TEST_F(SystemServicesTest, Notification_OnTimeZoneDSTChanged_TwoDifferentTimezon
         auto tzInfo = notificationHandler->GetTimeZoneDSTChangedInfo();
         EXPECT_EQ("", tzInfo.oldTimeZone);
         EXPECT_EQ("Europe/London", tzInfo.newTimeZone);
-        // When no accuracy file exists, default is "INITIAL"
-        EXPECT_EQ("INITIAL", tzInfo.oldAccuracy);
-        EXPECT_EQ("INITIAL", tzInfo.newAccuracy);
+        // When setTimeZoneDST is called without accuracy parameter, accuracy is empty string
+        EXPECT_EQ("", tzInfo.oldAccuracy);
+        EXPECT_EQ("", tzInfo.newAccuracy);
     }
 
     // Sleep briefly to ensure file is written before second call
@@ -9603,8 +9603,8 @@ TEST_F(SystemServicesTest, Dispatch_TerritoryChanged_WithRegion)
         auto territoryInfo = notificationHandler->GetTerritoryChangedInfo();
         EXPECT_EQ("", territoryInfo.oldTerritory);
         EXPECT_EQ("USA", territoryInfo.newTerritory);
-        // When region is not previously set, oldRegion is "null"
-        EXPECT_EQ("null", territoryInfo.oldRegion);
+        // When setTerritory is called WITH region parameter, oldRegion is empty string
+        EXPECT_EQ("", territoryInfo.oldRegion);
         EXPECT_EQ("US-NY", territoryInfo.newRegion);
         TEST_LOG("Dispatch_TerritoryChanged_WithRegion fired: old=%s new=%s oldRegion=%s newRegion=%s",
                  territoryInfo.oldTerritory.c_str(),
