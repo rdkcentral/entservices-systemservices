@@ -92,6 +92,44 @@ typedef enum : uint32_t {
     SystemServices_onNetworkStandbyModeChanged       = 0x00010000
 } SystemServicesEventType_t;
 
+// Local struct definitions for test convenience
+// (These match the old interface but are only used in tests)
+struct FirmwareUpdateInfo {
+    int status;
+    string responseString;
+    string firmwareUpdateVersion;
+    bool rebootImmediately;
+    bool updateAvailable;
+    int updateAvailableEnum;
+    bool success;
+};
+
+struct TerritoryChangedInfo {
+    string oldTerritory;
+    string newTerritory;
+    string oldRegion;
+    string newRegion;
+};
+
+struct TimeZoneDSTChangedInfo {
+    string oldTimeZone;
+    string newTimeZone;
+    string oldAccuracy;
+    string newAccuracy;
+};
+
+struct MacAddressesInfo {
+    string ecmMac;
+    string estbMac;
+    string mocaMac;
+    string ethMac;
+    string wifiMac;
+    string bluetoothMac;
+    string rf4ceMac;
+    string info;
+    bool success;
+};
+
 // ======================================
 // SystemServices Notification Handler
 // ======================================
