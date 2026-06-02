@@ -1,21 +1,21 @@
-/**
-* If not stated otherwise in this file or this component's LICENSE
-* file the following copyright and licenses apply:
-*
-* Copyright 2025 RDK Management
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-* http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-**/
+/*
+ * If not stated otherwise in this file or this component's LICENSE file the
+ * following copyright and licenses apply:
+ *
+ * Copyright 2022 RDK Management
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
@@ -8962,8 +8962,9 @@ TEST_F(SystemServicesTest, Dispatch_OnTimeZoneDSTChanged_ReachesNotification)
         auto tzInfo = notificationHandler->GetTimeZoneDSTChangedInfo();
         EXPECT_EQ("", tzInfo.oldTimeZone);
         EXPECT_EQ("Europe/Paris", tzInfo.newTimeZone);
-        // When setTimeZoneDST is called without accuracy parameter, accuracy is empty string
-        EXPECT_EQ("", tzInfo.oldAccuracy);
+        // When starting from clean state, oldAccuracy defaults to "INITIAL"
+        // When setTimeZoneDST is called without accuracy parameter, newAccuracy is empty string
+        EXPECT_EQ("INITIAL", tzInfo.oldAccuracy);
         EXPECT_EQ("", tzInfo.newAccuracy);
     }
     TEST_LOG("Dispatch_OnTimeZoneDSTChanged eventFired=%d - Response: %s", (int)eventFired, response.c_str());
