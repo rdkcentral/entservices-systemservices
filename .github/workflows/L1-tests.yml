@@ -334,7 +334,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-helpers
           path: entservices-helpers
-          ref: feature/RDKEMW-16743
+          ref: develop
 
       - name: Build entservices-helpers
         run: >
