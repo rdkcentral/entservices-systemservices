@@ -883,6 +883,7 @@ jobs:
           -DPLUGIN_POWERMANAGER=ON
           -DUSE_THUNDER_R4=ON
           -DPLUGIN_L2Tests=ON
+          -DL2_TEST_OOP_RPC=ON
           -DRDK_SERVICE_L2_TEST=ON
           -DDS_FOUND=ON
           -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
