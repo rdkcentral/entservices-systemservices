@@ -93,7 +93,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-powermanager
           path: entservices-powermanager
-          ref: feature/RDKEMW-18279
+          ref: develop
 
       - name: Checkout entservices-migration
         uses: actions/checkout@v3
@@ -336,7 +336,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-helpers
           path: entservices-helpers
-          ref: feature/RDKEMW-16743
+          ref: develop
 
       - name: Build entservices-helpers
         run: >
