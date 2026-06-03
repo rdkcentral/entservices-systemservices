@@ -121,7 +121,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-testframework
           path: entservices-testframework
-          ref: 1.0.11
+          ref: feature/RDKEMW-16053-june4 
 
       - name: Checkout googletest
         if: steps.cache.outputs.cache-hit != 'true'
@@ -322,7 +322,7 @@ jobs:
           -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/install/usr"
           -DCMAKE_MODULE_PATH="$GITHUB_WORKSPACE/install/tools/cmake"
           -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
-          -DRDK_SERVICES_L1_TEST=ON
+          -DRDK_SERVICE_L2_TEST=ON
           -DCMAKE_CXX_FLAGS="
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers
           -I $GITHUB_WORKSPACE/install/usr/include"
