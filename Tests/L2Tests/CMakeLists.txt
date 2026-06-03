@@ -71,6 +71,16 @@ else (MOCKACCESSOR_LIBRARIES)
      message ("Require ${MOCKACCESSOR_LIBRARIES} library")
 endif (MOCKACCESSOR_LIBRARIES)
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/")
+find_package(DS)
+if (DS_FOUND)
+    message ("Found DS library - ${DS_LIBRARIES}")
+    target_include_directories(${MODULE_NAME} PRIVATE ${DS_INCLUDE_DIRS})
+    target_link_libraries(${MODULE_NAME} PRIVATE ${DS_LIBRARIES})
+else (DS_FOUND)
+    message (WARNING "DS library not found - device settings symbols may be unresolved")
+endif (DS_FOUND)
+
 target_include_directories(
     ${MODULE_NAME} PRIVATE ./
     ../../helpers
