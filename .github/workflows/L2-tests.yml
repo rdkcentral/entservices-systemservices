@@ -121,7 +121,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-testframework
           path: entservices-testframework
-          ref: feature/RDKEMW-16053-l1l2
+          ref: 1.0.11
 
       - name: Checkout googletest
         if: steps.cache.outputs.cache-hit != 'true'
