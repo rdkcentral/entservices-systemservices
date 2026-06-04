@@ -35,10 +35,23 @@ set_target_properties(${MODULE_NAME} PROPERTIES
 target_compile_definitions(${MODULE_NAME}
             PRIVATE
             MODULE_NAME=Plugin_${PLUGIN_NAME}
-            THUNDER_PORT="${THUNDER_PORT}")
+            THUNDER_PORT="${THUNDER_PORT}"
+            ENABLE_SYSTIMEMGR_SUPPORT)
 
 target_compile_options(${MODULE_NAME} PRIVATE -Wno-error)
+target_link_directories(${MODULE_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/lib ${CMAKE_INSTALL_PREFIX}/lib/wpeframework/plugins)
 target_link_libraries(${MODULE_NAME} PRIVATE ${NAMESPACE}Plugins::${NAMESPACE}Plugins)
+
+if(PLUGIN_SYSTEMSERVICES)
+    find_library(SYSTEMSERVICES_IMPL_LIBRARIES NAMES ${NAMESPACE}SystemServicesImplementation)
+    if(SYSTEMSERVICES_IMPL_LIBRARIES)
+        message("Found SystemServicesImplementation - ${SYSTEMSERVICES_IMPL_LIBRARIES}")
+        target_link_libraries(${MODULE_NAME} PRIVATE ${SYSTEMSERVICES_IMPL_LIBRARIES})
+    else()
+        message("SystemServicesImplementation library not found, linking by name")
+        target_link_libraries(${MODULE_NAME} PRIVATE ${NAMESPACE}SystemServicesImplementation)
+    endif()
+endif()
 
 if (NOT L2_TEST_OOP_RPC)
     find_library(TESTMOCKLIB_LIBRARIES NAMES TestMocklib)
@@ -61,6 +74,7 @@ endif (MOCKACCESSOR_LIBRARIES)
 target_include_directories(
     ${MODULE_NAME} PRIVATE ./
     ../../helpers
+    ../../plugin
     ../../../entservices-testframework/Tests/mocks
     ../../../entservices-testframework/Tests/mocks/thunder
     ../../../entservices-testframework/Tests/mocks/devicesettings
