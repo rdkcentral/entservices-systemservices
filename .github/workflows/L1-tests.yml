@@ -18,7 +18,7 @@ env:
   INTERFACES_REF: "develop"
   AUTOMATICS_UNAME: ${{ secrets.AUTOMATICS_UNAME}}
   AUTOMATICS_PASSCODE: ${{ secrets. AUTOMATICS_PASSCODE}}
-  RDK_SERVICES_L1_TEST: "OFF"
+  RDK_SERVICES_L1_TEST: "ON"
   ENABLE_CACHE: "false"
 
 jobs:
@@ -125,7 +125,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-testframework
           path: entservices-testframework
-          ref: 1.0.4
+          ref: 1.0.14
 
       - name: Checkout entservices-systemservices
         if: ${{ inputs.caller_source == 'local' }}
@@ -243,6 +243,7 @@ jobs:
           headers/rdk/halif/deepsleep-manager
           headers/ccec/drivers
           headers/network
+          headers/systimerifc
           headers/proc
           &&
           cd headers
@@ -385,7 +386,12 @@ jobs:
           -DHAS_API_POWERSTATE
           -DHAS_RBUS
           -D_DRM_MODE_H
-          -DENABLE_DEVICE_MANUFACTURER_INFO"
+          -DENABLE_DEVICE_MANUFACTURER_INFO
+          -DENABLE_SYSTIMEMGR_SUPPORT
+          -DIARM_BUS_SYSTIME_MGR_NAME=\"SYSMgr\"
+          -DTIMER_STATUS_MSG=\"GetTimeStatus\"
+          -DcTIMER_STATUS_UPDATE=0
+          -DcTIMER_STATUS_MESSAGE_LENGTH=256"
           -D_DRM_MODE_H=ON
           &&
           cmake --build build/mocks -j8
@@ -449,7 +455,12 @@ jobs:
           -DHAS_API_POWERSTATE
           -D_DRM_MODE_H=ON
           -DHAS_RBUS
-          -DENABLE_DEVICE_MANUFACTURER_INFO"
+          -DENABLE_DEVICE_MANUFACTURER_INFO
+          -DENABLE_SYSTIMEMGR_SUPPORT
+          -DIARM_BUS_SYSTIME_MGR_NAME=\\\"SYSMgr\\\"
+          -DTIMER_STATUS_MSG=\\\"GetTimeStatus\\\"
+          -DcTIMER_STATUS_UPDATE=0
+          -DcTIMER_STATUS_MESSAGE_LENGTH=256"
           -DCOMCAST_CONFIG=OFF
           -DCMAKE_DISABLE_FIND_PACKAGE_DS=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_IARMBus=ON
@@ -527,7 +538,8 @@ jobs:
           -DHAS_API_POWERSTATE
           -D_DRM_MODE_H=ON
           -DHAS_RBUS
-          -DENABLE_DEVICE_MANUFACTURER_INFO"
+          -DENABLE_DEVICE_MANUFACTURER_INFO
+          -DENABLE_SYSTIMEMGR_SUPPORT"
           -DCOMCAST_CONFIG=OFF
           -DCMAKE_DISABLE_FIND_PACKAGE_DS=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_IARMBus=ON
@@ -668,6 +680,7 @@ jobs:
           lcov -c
           -o coverage.info
           -d build/entservices-systemservices
+          -d $GITHUB_WORKSPACE/entservices-systemservices/plugin
           &&
           lcov
           -r coverage.info
