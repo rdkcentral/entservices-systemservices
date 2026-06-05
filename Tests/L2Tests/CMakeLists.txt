@@ -73,8 +73,8 @@ endif (MOCKACCESSOR_LIBRARIES)
 
 target_include_directories(
     ${MODULE_NAME} PRIVATE ./
-    ../../helpers
     ../../plugin
+    ${CMAKE_SOURCE_DIR}/../entservices-helpers/helpers
     ../../../entservices-testframework/Tests/mocks
     ../../../entservices-testframework/Tests/mocks/thunder
     ../../../entservices-testframework/Tests/mocks/devicesettings
