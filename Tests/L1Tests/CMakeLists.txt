@@ -32,7 +32,7 @@ set (TEST_LIB
     ${NAMESPACE}Plugins::${NAMESPACE}Plugins
 )
 
-set (TEST_INC ../../helpers)
+set (TEST_INC)
 
 #########################################################################################
 # add_plugin_test_ex: Macro to add plugin tests, it will append to TEST_SRC, TEST_INC,
@@ -102,8 +102,9 @@ macro(add_plugin_test plugin_name test_files)
 endmacro()
 
 # PLUGIN_SYSTEMSERVICES
-set (SYSTEMSERVICES_INC ../../plugin ../../helpers)
-add_plugin_test_ex(PLUGIN_SYSTEMSERVICES tests/test_SystemServices.cpp "${SYSTEMSERVICES_INC}" "${NAMESPACE}SystemServices")
+set (SYSTEMSERVICES_INC ../../plugin ${CMAKE_SOURCE_DIR}/../entservices-helpers/helpers)
+set (SYSTEMSERVICES_LIBS ${NAMESPACE}SystemServices ${NAMESPACE}SystemServicesImplementation)
+add_plugin_test_ex(PLUGIN_SYSTEMSERVICES tests/test_SystemServices.cpp "${SYSTEMSERVICES_INC}" "${SYSTEMSERVICES_LIBS}")
 
 add_library(${MODULE_NAME} SHARED ${TEST_SRC})
 
@@ -112,6 +113,9 @@ set_source_files_properties(
         PROPERTIES COMPILE_FLAGS "-fexceptions")
 
 include_directories(${TEST_INC})
+
+# Add SYSTIMEMGR_SUPPORT for L1 tests
+target_compile_definitions(${MODULE_NAME} PRIVATE ENABLE_SYSTIMEMGR_SUPPORT)
 
 target_link_directories(${MODULE_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/lib ${CMAKE_INSTALL_PREFIX}/lib/wpeframework/plugins)
 

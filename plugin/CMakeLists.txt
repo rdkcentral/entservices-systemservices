@@ -25,6 +25,7 @@ set(PLUGIN_SYSTEMSERVICE_STARTUPORDER "" CACHE STRING "To configure startup orde
 find_package(${NAMESPACE}Plugins REQUIRED)
 find_package(${NAMESPACE}Definitions REQUIRED)
 find_package(CompileSettingsDebug CONFIG REQUIRED)
+find_package(${NAMESPACE}Helpers REQUIRED)
 find_library(PROCPS_LIBRARIES NAMES procps)
 
 find_package(Telemetry)
@@ -40,9 +41,6 @@ add_library(${MODULE_NAME} SHARED
 set_target_properties(${MODULE_NAME} PROPERTIES
         CXX_STANDARD 11
         CXX_STANDARD_REQUIRED YES)
-
-include_directories(
-        ../helpers)
 
 target_link_libraries(${MODULE_NAME}
     PRIVATE
@@ -135,8 +133,21 @@ if(TELEMETRY_FOUND)
     target_include_directories(${MODULE_NAME} PRIVATE ${TELEMETRY_INCLUDE_DIRS})
 endif()
 
-target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ../helpers)
 target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ./)
+target_link_libraries(${MODULE_NAME} PRIVATE ${NAMESPACE}::${NAMESPACE}Helpers)
+target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${NAMESPACE}::${NAMESPACE}Helpers)
+
+#Add mock headers and SYSTIMEMGR support for L1 and L2 tests only
+if (RDK_SERVICES_L1_TEST OR RDK_SERVICE_L2_TEST)
+    message ("Test build enabled - adding mock include directories and SYSTIMEMGR support")
+    if (EXISTS ${CMAKE_SOURCE_DIR}/../entservices-testframework/Tests/mocks)
+        target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE 
+            ${CMAKE_SOURCE_DIR}/../entservices-testframework/Tests/mocks)
+        message ("Mock path: ${CMAKE_SOURCE_DIR}/../entservices-testframework/Tests/mocks")
+    endif()
+    # Enable SYSTIMEMGR support for tests
+    target_compile_definitions(${PLUGIN_IMPLEMENTATION} PRIVATE ENABLE_SYSTIMEMGR_SUPPORT)
+endif()
 
 install(TARGETS ${PLUGIN_IMPLEMENTATION}
         DESTINATION lib/${STORAGE_DIRECTORY}/plugins)

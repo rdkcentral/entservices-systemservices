@@ -15,7 +15,7 @@ env:
   INTERFACES_REF: "develop"
   AUTOMATICS_UNAME: ${{ secrets.AUTOMATICS_UNAME}}
   AUTOMATICS_PASSCODE: ${{ secrets. AUTOMATICS_PASSCODE}}
-  RDK_SERVICES_L1_TEST: "OFF"
+  RDK_SERVICES_L1_TEST: "ON"
   ENABLE_CACHE: "false"
 
 jobs:
@@ -122,7 +122,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-testframework
           path: entservices-testframework
-          ref: 1.0.4
+          ref: 1.0.14
 
       - name: Checkout entservices-systemservices
         if: ${{ inputs.caller_source == 'local' }}
@@ -239,6 +239,7 @@ jobs:
           headers/rdk/halif/deepsleep-manager
           headers/ccec/drivers
           headers/network
+          headers/systimerifc
           headers/proc
           &&
           cd headers
@@ -324,6 +325,34 @@ jobs:
           &&
           cmake --install build/googletest
 
+      - name: Checkout entservices-helpers
+        uses: actions/checkout@v3
+        with:
+          repository: rdkcentral/entservices-helpers
+          path: entservices-helpers
+          ref: develop
+
+      - name: Build entservices-helpers
+        run: >
+          cmake -G Ninja
+          -S "$GITHUB_WORKSPACE/entservices-helpers"
+          -B build/entservices-helpers
+          -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/install/usr"
+          -DCMAKE_MODULE_PATH="$GITHUB_WORKSPACE/install/tools/cmake"
+          -DUSE_THUNDER_R4=ON
+          -DHIDE_NON_EXTERNAL_SYMBOLS=OFF
+          -DPLUGIN_HELPERS=ON
+          "-DCMAKE_CXX_FLAGS=
+          -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers
+          -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmbus
+          -I$GITHUB_WORKSPACE/entservices-testframework/Tests/mocks
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tr181api.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Iarm.h"
+          &&
+          cmake --build build/entservices-helpers
+          &&
+          cmake --install build/entservices-helpers
+
       - name: Build mocks
         run: >
           cmake
@@ -353,7 +382,7 @@ jobs:
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/ccec/drivers
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/network
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests
-          -I$GITHUB_WORKSPACE/entservices-systemservices/helpers
+          -I$GITHUB_WORKSPACE/entservices-helpers/helpers
           -I$GITHUB_WORKSPACE/install/usr/include
           -I ./usr/include/libdrm
           -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/devicesettings.h
@@ -381,7 +410,12 @@ jobs:
           -DHAS_API_POWERSTATE
           -DHAS_RBUS
           -D_DRM_MODE_H
-          -DENABLE_DEVICE_MANUFACTURER_INFO"
+          -DENABLE_DEVICE_MANUFACTURER_INFO
+          -DENABLE_SYSTIMEMGR_SUPPORT
+          -DIARM_BUS_SYSTIME_MGR_NAME=\"SYSMgr\"
+          -DTIMER_STATUS_MSG=\"GetTimeStatus\"
+          -DcTIMER_STATUS_UPDATE=0
+          -DcTIMER_STATUS_MESSAGE_LENGTH=256"
           -D_DRM_MODE_H=ON
           &&
           cmake --build build/mocks -j8
@@ -412,7 +446,7 @@ jobs:
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/ccec/drivers
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/network
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests
-          -I$GITHUB_WORKSPACE/entservices-systemservices/helpers
+          -I$GITHUB_WORKSPACE/entservices-helpers/helpers
           -I$GITHUB_WORKSPACE/install/usr/include
           -I ./usr/include/libdrm
           -I$GITHUB_WORKSPACE/install/usr/include/WPEFramework
@@ -445,7 +479,12 @@ jobs:
           -DHAS_API_POWERSTATE
           -D_DRM_MODE_H=ON
           -DHAS_RBUS
-          -DENABLE_DEVICE_MANUFACTURER_INFO"
+          -DENABLE_DEVICE_MANUFACTURER_INFO
+          -DENABLE_SYSTIMEMGR_SUPPORT
+          -DIARM_BUS_SYSTIME_MGR_NAME=\\\"SYSMgr\\\"
+          -DTIMER_STATUS_MSG=\\\"GetTimeStatus\\\"
+          -DcTIMER_STATUS_UPDATE=0
+          -DcTIMER_STATUS_MESSAGE_LENGTH=256"
           -DCOMCAST_CONFIG=OFF
           -DCMAKE_DISABLE_FIND_PACKAGE_DS=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_IARMBus=ON
@@ -489,7 +528,7 @@ jobs:
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmmgrs-hal
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/ccec/drivers
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests/headers/network
-          -I$GITHUB_WORKSPACE/entservices-systemservices/helpers
+          -I$GITHUB_WORKSPACE/entservices-helpers/helpers
           -I$GITHUB_WORKSPACE/entservices-testframework/Tests
           -I$GITHUB_WORKSPACE/Thunder/Source
           -I$GITHUB_WORKSPACE/Thunder/Source/core
@@ -523,7 +562,8 @@ jobs:
           -DHAS_API_POWERSTATE
           -D_DRM_MODE_H=ON
           -DHAS_RBUS
-          -DENABLE_DEVICE_MANUFACTURER_INFO"
+          -DENABLE_DEVICE_MANUFACTURER_INFO
+          -DENABLE_SYSTIMEMGR_SUPPORT"
           -DCOMCAST_CONFIG=OFF
           -DCMAKE_DISABLE_FIND_PACKAGE_DS=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_IARMBus=ON
@@ -664,6 +704,7 @@ jobs:
           lcov -c
           -o coverage.info
           -d build/entservices-systemservices
+          -d $GITHUB_WORKSPACE/entservices-systemservices/plugin
           &&
           lcov
           -r coverage.info

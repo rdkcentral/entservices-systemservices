@@ -67,10 +67,10 @@ namespace WPEFramework
                             _parent.Deactivated(connection);
                         }
 
-                        void OnFirmwareUpdateInfoReceived(const Exchange::ISystemServices::FirmwareUpdateInfo &firmwareUpdateInfo) override
+                        void OnFirmwareUpdateInfoReceived(const int status, const string& responseString, const string& firmwareUpdateVersion, const bool rebootImmediately, const bool updateAvailable, const int updateAvailableEnum, const bool success) override
                         {
                             LOGINFO("FirmwareUpdateInfo");
-                            Exchange::JSystemServices::Event::OnFirmwareUpdateInfoReceived(_parent, firmwareUpdateInfo);
+                            Exchange::JSystemServices::Event::OnFirmwareUpdateInfoReceived(_parent, status, responseString, firmwareUpdateVersion, rebootImmediately, updateAvailable, updateAvailableEnum, success);
                         }
 
                         void OnRebootRequest(const string& requestedApp, const string& rebootReason) override
@@ -85,22 +85,22 @@ namespace WPEFramework
                             Exchange::JSystemServices::Event::OnSystemPowerStateChanged(_parent, powerState, currentPowerState);
                         }
 
-                        void OnTerritoryChanged(const Exchange::ISystemServices::TerritoryChangedInfo &territoryChangedInfo) override
+                        void OnTerritoryChanged(const string& oldTerritory, const string& newTerritory, const string& oldRegion, const string& newRegion) override
                         {
                             LOGINFO("territoryChangedInfo");
-                            Exchange::JSystemServices::Event::OnTerritoryChanged(_parent, territoryChangedInfo);
+                            Exchange::JSystemServices::Event::OnTerritoryChanged(_parent, oldTerritory, newTerritory, oldRegion, newRegion);
                         }
 
-                        void OnTimeZoneDSTChanged(const Exchange::ISystemServices::TimeZoneDSTChangedInfo& timeZoneDSTChangedInfo) override
+                        void OnTimeZoneDSTChanged(const string& oldTimeZone, const string& newTimeZone, const string& oldAccuracy, const string& newAccuracy) override
                         {
                             LOGINFO("timeZoneDSTChangedInfo");
-                            Exchange::JSystemServices::Event::OnTimeZoneDSTChanged(_parent, timeZoneDSTChangedInfo);
+                            Exchange::JSystemServices::Event::OnTimeZoneDSTChanged(_parent, oldTimeZone, newTimeZone, oldAccuracy, newAccuracy);
                         }
 
-                        void OnMacAddressesRetreived(const Exchange::ISystemServices::MacAddressesInfo& macAddressesInfo) override
+                        void OnMacAddressesRetreived(const string& ecmMac, const string& estbMac, const string& mocaMac, const string& ethMac, const string& wifiMac, const string& bluetoothMac, const string& rf4ceMac, const string& info, const bool success) override
                         {
                             LOGINFO("macAddressesInfo");
-                            Exchange::JSystemServices::Event::OnMacAddressesRetreived(_parent, macAddressesInfo);
+                            Exchange::JSystemServices::Event::OnMacAddressesRetreived(_parent, ecmMac, estbMac, mocaMac, ethMac, wifiMac, bluetoothMac, rf4ceMac, info, success);
                         }
 
                         void OnSystemModeChanged(const string& mode) override
