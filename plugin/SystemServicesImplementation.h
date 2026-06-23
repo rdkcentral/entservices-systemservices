@@ -330,6 +330,8 @@ namespace WPEFramework
             std::string m_strTerritory;
             std::string m_strRegion;
             std::string  m_strStandardTerritoryList;
+            DeviceInfo m_deviceInfo{};
+            bool m_deviceInfoValid{false};
 
             void dispatchEvent(Event, const JsonObject &params);
             void Dispatch(Event event, const JsonObject &params);

@@ -403,6 +403,22 @@ namespace WPEFramework
                 m_friendlyName = param.value;
                 LOGINFO("Success Getting the friendly name value :%s \n",m_friendlyName.c_str());
             }
+
+            // caching the DeviceInfo details during bootup
+            Exchange::ISystemServices::DeviceInfo deviceInfo{};
+            Exchange::ISystemServices::IStringIterator* params = nullptr;
+            auto result = GetDeviceInfo(params, deviceInfo);
+            if (Core::ERROR_NONE == result)
+            {
+                m_deviceInfo = deviceInfo;
+                m_deviceInfoValid = true;
+                LOGINFO("DeviceInfo cached successfully during bootup\n");
+            }
+            else
+            {
+                LOGERR("Failed to cache DeviceInfo during bootup\n");
+            }
+
             return Core::ERROR_NONE;
         }
         
@@ -3513,10 +3529,11 @@ namespace WPEFramework
 
             if (params != nullptr)
             {
-                if (!params->IsValid())
+                queryParam = "";
+                if (!params->Next(queryParam))
+                {
                     queryParam = "";
-                else
-                    params->Next(queryParam);
+                }
             }
 
             removeCharsFromString(queryParam,"[\" ]");
@@ -3530,6 +3547,93 @@ namespace WPEFramework
             }
 
             LOGWARN("SystemService getDeviceInfo query %s", queryParam.c_str());
+
+            if (m_deviceInfoValid && queryParam == "make")
+            {
+                deviceInfo.make = m_deviceInfo.make;
+                deviceinfo.success = true;
+                LOGINFO("Cached Device Make: %s", deviceInfo.make.c_str());
+                return Core::ERROR_NONE;
+            }
+            else if (m_deviceInfoValid && queryParam == "model_number")
+            {
+                deviceInfo.modelNumber = m_deviceInfo.modelNumber;
+                deviceinfo.success = true;
+                LOGINFO("Cached Device Model Number: %s", deviceInfo.modelNumber.c_str());
+                return Core::ERROR_NONE;
+            }
+            else if (m_deviceInfoValid && queryParam == "imageVersion")
+            {
+                deviceInfo.imageVersion = m_deviceInfo.imageVersion;
+                deviceInfo.version = m_deviceInfo.version;
+                deviceInfo.softwareVersion = m_deviceInfo.softwareVersion;
+                deviceinfo.success = true;
+                LOGINFO("Cached Device Image Version: %s", deviceInfo.imageVersion.c_str());
+                return Core::ERROR_NONE;
+            }
+            else if (m_deviceInfoValid && queryParam == "build_type")
+            {
+                deviceInfo.buildType = m_deviceInfo.buildType;
+                deviceinfo.success = true;
+                LOGINFO("Cached Device Build Type: %s", deviceInfo.buildType.c_str());
+                return Core::ERROR_NONE;
+            }
+            else if (m_deviceInfoValid && queryParam == "device_type")
+            {
+                deviceInfo.deviceType = m_deviceInfo.deviceType;
+                deviceinfo.success = true;
+                LOGINFO("Cached Device Type: %s", deviceInfo.deviceType.c_str());
+                return Core::ERROR_NONE;
+            }
+            else if (m_deviceInfoValid && queryParam == MODEL_NAME)
+            {
+                deviceInfo.modelName = m_deviceInfo.modelName;
+                deviceinfo.success = true;
+                LOGINFO("Cached Device Model Name: %s", deviceInfo.modelName.c_str());
+                return Core::ERROR_NONE;
+            }
+            else if (m_deviceInfoValid && queryParam == HARDWARE_ID)
+            {
+                deviceInfo.hardwareID = m_deviceInfo.hardwareID;
+                deviceinfo.success = true;
+                LOGINFO("Cached Device Hardware ID: %s", deviceInfo.hardwareID.c_str());
+                return Core::ERROR_NONE;
+            }
+            else if (m_deviceInfoValid && queryParam == "bluetooth_mac")
+            {
+                deviceInfo.bluetoothMac = m_deviceInfo.bluetoothMac;
+                deviceinfo.success = true;
+                LOGINFO("Cached Device Bluetooth MAC: %s", deviceInfo.bluetoothMac.c_str());
+                return Core::ERROR_NONE;
+            }
+            else if (m_deviceInfoValid && queryParam == "wifi_mac")
+            {
+                deviceInfo.wifiMac = m_deviceInfo.wifiMac;
+                deviceinfo.success = true;
+                LOGINFO("Cached Device WiFi MAC: %s", deviceInfo.wifiMac.c_str());
+                return Core::ERROR_NONE;
+            }
+            else if (m_deviceInfoValid && queryParam == "eth_mac")
+            {
+                deviceInfo.ethMac = m_deviceInfo.ethMac;
+                deviceinfo.success = true;
+                LOGINFO("Cached Device Ethernet MAC: %s", deviceInfo.ethMac.c_str());
+                return Core::ERROR_NONE;
+            }
+            else if (m_deviceInfoValid && queryParam == "estb_mac")
+            {
+                deviceInfo.estbMac = m_deviceInfo.estbMac;
+                deviceinfo.success = true;
+                LOGINFO("Cached Device ESTB MAC: %s", deviceInfo.estbMac.c_str());
+                return Core::ERROR_NONE;
+            }
+            else if (m_deviceInfoValid && queryParam == "friendly_id")
+            {
+                deviceInfo.friendlyID = m_deviceInfo.friendlyID;
+                deviceinfo.success = true;
+                LOGINFO("Cached Device Friendly ID: %s", deviceInfo.friendlyID.c_str());
+                return Core::ERROR_NONE;
+            }
 
             auto deviceInfoObject = m_shellService->QueryInterfaceByCallsign<Exchange::IDeviceInfo>("DeviceInfo");
 
