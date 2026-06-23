@@ -3529,9 +3529,10 @@ namespace WPEFramework
 
             if (params != nullptr)
             {
-                queryParam = "";
+                params->Reset(0);
                 if (!params->Next(queryParam))
                 {
+                    LOGWARN(" Test getDeviceInfo query %s", queryParam.c_str());
                     queryParam = "";
                 }
             }
