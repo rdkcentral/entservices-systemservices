@@ -3532,7 +3532,6 @@ namespace WPEFramework
                 params->Reset(0);
                 if (!params->Next(queryParam))
                 {
-                    LOGWARN(" Test getDeviceInfo query %s", queryParam.c_str());
                     queryParam = "";
                 }
             }
@@ -3633,6 +3632,16 @@ namespace WPEFramework
                 deviceInfo.friendlyId = m_deviceInfo.friendlyId;
                 deviceInfo.success = true;
                 LOGINFO("Cached Device Friendly ID: %s", deviceInfo.friendlyId.c_str());
+                return Core::ERROR_NONE;
+            }
+            else if (m_deviceInfoValid && queryParam.empty())
+            {
+                deviceInfo = m_deviceInfo;
+                deviceInfo.success = true;
+                LOGINFO("Cached Device Info: make=%s, model_number=%s, imageVersion=%s, build_type=%s, device_type=%s, model_name=%s, hardware_id=%s, bluetooth_mac=%s, wifi_mac=%s, eth_mac=%s, estb_mac=%s, friendly_id=%s",
+                    deviceInfo.make.c_str(), deviceInfo.modelNumber.c_str(), deviceInfo.imageVersion.c_str(), deviceInfo.buildType.c_str(), deviceInfo.deviceType.c_str(),
+                    deviceInfo.modelName.c_str(), deviceInfo.hardwareID.c_str(), deviceInfo.bluetoothMac.c_str(), deviceInfo.wifiMac.c_str(), deviceInfo.ethMac.c_str(),
+                    deviceInfo.estbMac.c_str(), deviceInfo.friendlyId.c_str());
                 return Core::ERROR_NONE;
             }
 
