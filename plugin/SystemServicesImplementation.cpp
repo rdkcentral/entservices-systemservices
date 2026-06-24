@@ -3815,6 +3815,7 @@ namespace WPEFramework
             {
                 FILE* fp = v_secure_popen("r", "/lib/rdk/getDeviceDetails.sh read bluetooth_mac");
                 if (!fp) {
+                    deviceInfoObject->Release();
                     return Core::ERROR_GENERAL;
                 }
 
