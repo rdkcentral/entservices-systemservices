@@ -403,6 +403,46 @@ namespace WPEFramework
                 m_friendlyName = param.value;
                 LOGINFO("Success Getting the friendly name value :%s \n",m_friendlyName.c_str());
             }
+
+            using StringIteratorImpl = WPEFramework::Core::Service<
+                WPEFramework::RPC::IteratorType<Exchange::ISystemServices::IStringIterator>>;
+
+            {
+                std::vector<string> queryList = { "estb_mac" };
+                Exchange::ISystemServices::IStringIterator* params =
+                    StringIteratorImpl::Create<Exchange::ISystemServices::IStringIterator>(queryList);
+                if (params != nullptr) {
+                    Exchange::ISystemServices::DeviceInfo deviceInfo{};
+                    if (Core::ERROR_NONE == GetDeviceInfo(params, deviceInfo) && !deviceInfo.estbMac.empty()) {
+                        m_deviceInfo.estbMac = deviceInfo.estbMac;
+                        LOGINFO("estb_mac cached during bootup: %s\n", m_deviceInfo.estbMac.c_str());
+                    } else {
+                        LOGERR("Failed to cache estb_mac during bootup\n");
+                    }
+                    params->Release();
+                } else {
+                    LOGERR("Failed to create iterator for estb_mac\n");
+                }
+            }
+
+            {
+                std::vector<string> queryList = { "wifi_mac" };
+                Exchange::ISystemServices::IStringIterator* params =
+                    StringIteratorImpl::Create<Exchange::ISystemServices::IStringIterator>(queryList);
+                if (params != nullptr) {
+                    Exchange::ISystemServices::DeviceInfo deviceInfo{};
+                    if (Core::ERROR_NONE == GetDeviceInfo(params, deviceInfo) && !deviceInfo.wifiMac.empty()) {
+                        m_deviceInfo.wifiMac = deviceInfo.wifiMac;
+                        LOGINFO("wifi_mac cached during bootup: %s\n", m_deviceInfo.wifiMac.c_str());
+                    } else {
+                        LOGERR("Failed to cache wifi_mac during bootup\n");
+                    }
+                    params->Release();
+                } else {
+                    LOGERR("Failed to create iterator for wifi_mac\n");
+                }
+            }
+
             return Core::ERROR_NONE;
         }
         
@@ -3513,10 +3553,11 @@ namespace WPEFramework
 
             if (params != nullptr)
             {
-                if (!params->IsValid())
+                params->Reset(0);
+                if (!params->Next(queryParam))
+                {
                     queryParam = "";
-                else
-                    params->Next(queryParam);
+                }
             }
 
             removeCharsFromString(queryParam,"[\" ]");
@@ -3556,7 +3597,6 @@ namespace WPEFramework
                         {
                             deviceInfo.make = deviceMake.make;
                             deviceInfo.success = true;
-                            LOGINFO("Device Make: %s", deviceInfo.make.c_str());
                         }
                     }
                 }
@@ -3579,6 +3619,7 @@ namespace WPEFramework
                 if (!queryParam.empty())
                 {
                     deviceInfoObject->Release();
+                    LOGINFO("Device Make: %s", deviceInfo.make.c_str());
                     return Core::ERROR_NONE;
                 }
             }
@@ -3597,6 +3638,12 @@ namespace WPEFramework
                         deviceInfo.success = true;
                     }
 	            }
+                if (!queryParam.empty())
+                {
+                    deviceInfoObject->Release();
+                    LOGINFO("Device Model Number: %s", deviceInfo.modelNumber.c_str());
+                    return Core::ERROR_NONE;
+                }
             }
 
             if (queryParam.empty() || queryParam == "imageVersion")
@@ -3615,6 +3662,12 @@ namespace WPEFramework
                         deviceInfo.success = true;
                     }
 	            }
+                if (!queryParam.empty())
+                {
+                    deviceInfoObject->Release();
+                    LOGINFO("Device Image Version: %s", deviceInfo.imageVersion.c_str());
+                    return Core::ERROR_NONE;
+                }
             }
 
             if (queryParam.empty() || queryParam == "build_type")
@@ -3630,7 +3683,13 @@ namespace WPEFramework
                     Utils::String::toUpper(buildType);
                     deviceInfo.buildType = std::move(buildType);
                 }
-                    deviceInfo.success = success;
+                deviceInfo.success = success;
+                if (!queryParam.empty())
+                {
+                    deviceInfoObject->Release();
+                    LOGINFO("Device Build Type: %s", deviceInfo.buildType.c_str());
+                    return Core::ERROR_NONE;
+                }
             }
 
             if (queryParam.empty() || queryParam == "device_type")
@@ -3657,6 +3716,13 @@ namespace WPEFramework
                         deviceInfo.success = true;
                     }
 	            }
+
+                if (!queryParam.empty())
+                {
+                    deviceInfoObject->Release();
+                    LOGINFO("Device Type: %s", deviceInfo.deviceType.c_str());
+                    return Core::ERROR_NONE;
+                }
             }
 
 #ifdef ENABLE_DEVICE_MANUFACTURER_INFO
@@ -3683,6 +3749,13 @@ namespace WPEFramework
                         deviceInfo.success = true;
                     }
                 }
+
+                if (!queryParam.empty())
+                {
+                    deviceInfoObject->Release();
+                    LOGINFO("Device Model Name: %s", deviceInfo.modelName.c_str());
+                    return Core::ERROR_NONE;
+                }
             }
 
             if (queryParam.empty() || queryParam == HARDWARE_ID)
@@ -3708,6 +3781,12 @@ namespace WPEFramework
 			            deviceInfo.success = true;
                     }
                 }
+                if (!queryParam.empty())
+                {
+                    deviceInfoObject->Release();
+                    LOGINFO("Device Hardware ID: %s", deviceInfo.hardwareID.c_str());
+                    return Core::ERROR_NONE;
+                }
             }
 
             if (queryParam.empty() || queryParam == FRIENDLY_ID)
@@ -3724,6 +3803,12 @@ namespace WPEFramework
                         deviceInfo.success = true;
                     }
 	            }
+                if (!queryParam.empty())
+                {
+                    deviceInfoObject->Release();
+                    LOGINFO("Device Friendly ID: %s", deviceInfo.friendlyId.c_str());
+                    return Core::ERROR_NONE;
+                }
             }
 #endif
             if (queryParam.empty() || queryParam == "bluetooth_mac")
@@ -3747,6 +3832,13 @@ namespace WPEFramework
                     deviceInfo.bluetoothMac.pop_back();
                 }
 
+                if (!queryParam.empty())
+                {
+                    deviceInfoObject->Release();
+                    LOGINFO("Device Bluetooth MAC: %s", deviceInfo.bluetoothMac.c_str());
+                    return Core::ERROR_NONE;
+                }
+
             }
             
             if (queryParam.empty() || queryParam == "boxIP")
@@ -3763,6 +3855,13 @@ namespace WPEFramework
                         deviceInfo.success = true;
                     }
 	            }
+
+                if (!queryParam.empty())
+                {
+                    deviceInfoObject->Release();
+                    LOGINFO("Device Box IP: %s", deviceInfo.boxIP.c_str());
+                    return Core::ERROR_NONE;
+                }
             }
             
             if (queryParam.empty() || queryParam == "estb_mac")
@@ -3770,15 +3869,32 @@ namespace WPEFramework
                 uint32_t result = Core::ERROR_GENERAL;
                 Exchange::IDeviceInfo::StbMac stbMac;
 
-                if (deviceInfoObject)
+                if (!m_deviceInfo.estbMac.empty())
                 {
-                    result = deviceInfoObject->EstbMac(stbMac);
-                    if (Core::ERROR_NONE == result)
+                    deviceInfo.estbMac = m_deviceInfo.estbMac;
+                    deviceInfo.success = true;
+
+                }
+                else
+                {
+                    if (deviceInfoObject)
                     {
-                        deviceInfo.estbMac = stbMac.estbMac;
-                        deviceInfo.success = true;
+                        result = deviceInfoObject->EstbMac(stbMac);
+                        if (Core::ERROR_NONE == result)
+                        {
+                            deviceInfo.estbMac = stbMac.estbMac;
+                            m_deviceInfo.estbMac = stbMac.estbMac;
+                            deviceInfo.success = true;
+                        }
                     }
 	            }
+
+                if (!queryParam.empty())
+                {
+                    deviceInfoObject->Release();
+                    LOGINFO("Device ESTB MAC: %s", deviceInfo.estbMac.c_str());
+                    return Core::ERROR_NONE;
+                }
             }
             
             if (queryParam.empty() || queryParam == "eth_mac")
@@ -3795,21 +3911,44 @@ namespace WPEFramework
                         deviceInfo.success = true;
                     }
 	            }
+
+                if (!queryParam.empty())
+                {
+                    deviceInfoObject->Release();
+                    LOGINFO("Device Ethernet MAC: %s", deviceInfo.ethMac.c_str());
+                    return Core::ERROR_NONE;
+                }
             }
             
             if (queryParam.empty() || queryParam == "wifi_mac")
             {
                 uint32_t result = Core::ERROR_GENERAL;
                 Exchange::IDeviceInfo::WiFiMac wiFiMac;
-
-                if (deviceInfoObject)
+                if (!m_deviceInfo.wifiMac.empty())
                 {
-                    result = deviceInfoObject->WifiMac(wiFiMac);
-                    if (Core::ERROR_NONE == result)
+                    deviceInfo.wifiMac = m_deviceInfo.wifiMac;
+                    deviceInfo.success = true;
+
+                }
+                else
+                {
+                    if (deviceInfoObject)
                     {
-                        deviceInfo.wifiMac = wiFiMac.wifiMac;
-                        deviceInfo.success = true;
+                        result = deviceInfoObject->WifiMac(wiFiMac);
+                        if (Core::ERROR_NONE == result)
+                        {
+                            deviceInfo.wifiMac = wiFiMac.wifiMac;
+                            m_deviceInfo.wifiMac = wiFiMac.wifiMac;
+                            deviceInfo.success = true;
+                        }
                     }
+                }
+
+                if (!queryParam.empty())
+                {
+                    deviceInfoObject->Release();
+                    LOGINFO("Device WiFi MAC: %s", deviceInfo.wifiMac.c_str());
+                    return Core::ERROR_NONE;
                 }
             }
             deviceInfoObject->Release();
