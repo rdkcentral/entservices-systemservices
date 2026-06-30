@@ -291,6 +291,9 @@ namespace WPEFramework
 #if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
             DeinitializeIARM();
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
+#ifdef USE_DEVICESETTING_PLUGIN
+            DeviceSettingsClientHelper::Close();
+#endif /* USE_DEVICESETTING_PLUGIN */
 
             SystemServicesImplementation::_instance = nullptr;
             if (m_shellService) {
@@ -443,6 +446,14 @@ namespace WPEFramework
                 }
             }
 
+#ifdef USE_DEVICESETTING_PLUGIN
+            {
+                const uint32_t dsResult = DeviceSettingsClientHelper::Open(service);
+                if (dsResult != Core::ERROR_NONE) {
+                    LOGERR("Configure: Failed to open DeviceSettings link (result=%u)", dsResult);
+                }
+            }
+#endif /* USE_DEVICESETTING_PLUGIN */
             return Core::ERROR_NONE;
         }
         
@@ -1552,9 +1563,28 @@ namespace WPEFramework
                 LOGINFO("SystemServicesImplementation::SetPowerState powerState: %s, standbyReason: %s\n", powerState.c_str(), reason.c_str());
 
                 if (powerState == "LIGHT_SLEEP" || powerState == "DEEP_SLEEP") {
+#ifdef USE_DEVICESETTING_PLUGIN
+                    auto* host = AcquireSubInterface<Exchange::IDeviceSettingsHost>();
+                    if (host != nullptr) {
+                        Exchange::IDeviceSettingsHost::SleepMode sleepModeEnum;
+                        if (host->GetPreferredSleepMode(sleepModeEnum) == Core::ERROR_NONE) {
+                            sleepMode = (sleepModeEnum == Exchange::IDeviceSettingsHost::DS_HOST_SLEEPMODE_DEEP)
+                                            ? "DEEP_SLEEP" : "LIGHT_SLEEP";
+                        } else {
+                            LOGWARN("SetPowerState: GetPreferredSleepMode failed, defaulting to requested state");
+                            sleepMode = powerState;
+                        }
+                        host->Release();
+                    } else {
+                        LOGWARN("SetPowerState: IDeviceSettingsHost unavailable, defaulting to requested state");
+                        sleepMode = powerState;
+                    }
+                    LOGWARN("Output of getPreferredSleepMode: '%s'", sleepMode.c_str());
+#else /* USE_DEVICESETTING_PLUGIN */
                     const device::SleepMode &mode = device::Host::getInstance().getPreferredSleepMode();
                     sleepMode = mode.toString();
                     LOGWARN("Output of getPreferredSleepMode: '%s'", sleepMode.c_str());
+#endif /* USE_DEVICESETTING_PLUGIN */
 
                     if (convert("DEEP_SLEEP", sleepMode)) {
                         retVal = setPowerStateConversion(std::move(sleepMode));
@@ -4138,6 +4168,27 @@ namespace WPEFramework
                 return false;
             }
         }
+
+#ifdef USE_DEVICESETTING_PLUGIN
+        /**
+         * Called when the DeviceSettings plugin (re-)activates.
+         * The IDeviceSettingsHost sub-interface is now queryable via
+         * AcquireSubInterface<Exchange::IDeviceSettingsHost>().
+         */
+        void SystemServicesImplementation::OnDeviceSettingsActivated()
+        {
+            LOGINFO("SystemServices: DeviceSettings plugin activated — DS host interface available");
+        }
+
+        /**
+         * Called when the DeviceSettings plugin deactivates.
+         * Do NOT call AcquireSubInterface<>() here — the link is already down.
+         */
+        void SystemServicesImplementation::OnDeviceSettingsDeactivated()
+        {
+            LOGINFO("SystemServices: DeviceSettings plugin deactivated");
+        }
+#endif /* USE_DEVICESETTING_PLUGIN */
 
     } // namespace Plugin
 } // namespace WPEFramework

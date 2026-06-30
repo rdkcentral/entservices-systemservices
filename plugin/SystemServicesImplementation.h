@@ -48,9 +48,16 @@ using std::ofstream;
 #include "platformcaps/platformcaps.h"
 #if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
 #include "libIARM.h"
+#ifndef USE_DEVICESETTING_PLUGIN
 #include "host.hpp"
 #include "sleepMode.hpp"
+#endif /* USE_DEVICESETTING_PLUGIN */
 #endif /* USE_IARMBUS || USE_IARM_BUS */
+
+#ifdef USE_DEVICESETTING_PLUGIN
+#include "DeviceSettingsClientHelper.h"
+#include <interfaces/IDeviceSettingsHost.h>
+#endif /* USE_DEVICESETTING_PLUGIN */
 
 #include "sysMgr.h"
 #include "cSettings.h"
@@ -81,6 +88,9 @@ namespace WPEFramework
     namespace Plugin
     {
         class SystemServicesImplementation : public Exchange::ISystemServices, public Exchange::IConfiguration
+#ifdef USE_DEVICESETTING_PLUGIN
+            , public DeviceSettingsClientHelper
+#endif /* USE_DEVICESETTING_PLUGIN */
         {
             private:
                 class PowerManagerNotification : public Exchange::IPowerManager::INetworkStandbyModeChangedNotification,
@@ -271,6 +281,12 @@ namespace WPEFramework
 
             // IConfiguration interface
             uint32_t Configure(PluginHost::IShell* service) override;
+
+#ifdef USE_DEVICESETTING_PLUGIN
+            // DeviceSettingsClientHelper overrides — DS plugin lifecycle
+            void OnDeviceSettingsActivated() override;
+            void OnDeviceSettingsDeactivated() override;
+#endif /* USE_DEVICESETTING_PLUGIN */
 
 #ifdef ENABLE_SYSTIMEMGR_SUPPORT
             void OnTimeStatusChanged(string timequality,string timesource, string utctime);

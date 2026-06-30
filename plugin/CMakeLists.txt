@@ -90,16 +90,32 @@ if(PROCPS_LIBRARIES)
     target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${PROCPS_LIBRARIES})
 endif(PROCPS_LIBRARIES)
 
-find_package(DS)
-if (DS_FOUND)
-	find_package(IARMBus)
-    add_definitions(-DDS_FOUND)
-    target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ${IARMBUS_INCLUDE_DIRS})
-    target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ${DS_INCLUDE_DIRS})
-    target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${NAMESPACE}Plugins::${NAMESPACE}Plugins ${IARMBUS_LIBRARIES} ${DS_LIBRARIES})
-else (DS_FOUND)
-    target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${NAMESPACE}Plugins::${NAMESPACE}Plugins)
-endif(DS_FOUND)
+option(USE_DEVICESETTING_PLUGIN
+    "Enable COM-RPC integration with entservices-devicesettings for SystemServices (replaces libds/IARM device:: calls)"
+    OFF)
+
+if (USE_DEVICESETTING_PLUGIN)
+    # ── DS COM-RPC path ──────────────────────────────────────────────────────
+    # Uses entservices-devicesettings COM-RPC interfaces (IDeviceSettingsHost).
+    # Does NOT link libds.so or libdshalcli.so.
+    find_package(${NAMESPACE}Definitions REQUIRED)
+    target_compile_definitions(${PLUGIN_IMPLEMENTATION} PRIVATE USE_DEVICESETTING_PLUGIN)
+    target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE
+        ${NAMESPACE}Definitions::${NAMESPACE}Definitions)
+    message(STATUS "SystemServices: USE_DEVICESETTING_PLUGIN=ON — using DeviceSettings COM-RPC (no libds)")
+else()
+    # ── Legacy libds path ────────────────────────────────────────────────────
+    find_package(DS)
+    if (DS_FOUND)
+            find_package(IARMBus)
+        add_definitions(-DDS_FOUND)
+        target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ${IARMBUS_INCLUDE_DIRS})
+        target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ${DS_INCLUDE_DIRS})
+        target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${NAMESPACE}Plugins::${NAMESPACE}Plugins ${IARMBUS_LIBRARIES} ${DS_LIBRARIES})
+    else (DS_FOUND)
+        target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${NAMESPACE}Plugins::${NAMESPACE}Plugins)
+    endif(DS_FOUND)
+endif() # USE_DEVICESETTING_PLUGIN
 
 find_package(CURL)
 if (CURL_FOUND)
