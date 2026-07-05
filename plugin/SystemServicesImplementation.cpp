@@ -90,6 +90,7 @@ using WakeupSourceConfigIteratorImpl = WPEFramework::Core::Service<WPEFramework:
 
 #define ZONEINFO_DIR "/usr/share/zoneinfo"
 #define LOCALTIME_FILE "/opt/persistent/localtime"
+
 #define DEVICE_PROPERTIES_FILE "/etc/device.properties"
 
 #define STATUS_CODE_NO_SWUPDATE_CONF 460 

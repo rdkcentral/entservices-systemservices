@@ -92,7 +92,7 @@ endif(PROCPS_LIBRARIES)
 
 option(USE_DEVICESETTING_PLUGIN
     "Enable COM-RPC integration with entservices-devicesettings for SystemServices (replaces libds/IARM device:: calls)"
-    ON)
+    OFF)
 
 if (USE_DEVICESETTING_PLUGIN)
     # ── DS COM-RPC path ──────────────────────────────────────────────────────

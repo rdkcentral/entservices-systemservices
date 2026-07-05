@@ -24,11 +24,9 @@
 #include <fstream>
 #include <algorithm>
 
-#ifndef USE_DEVICESETTING_PLUGIN
 #include "host.hpp"
 #include "videoOutputPort.hpp"
 #include "audioOutputPort.hpp"
-#endif /* USE_DEVICESETTING_PLUGIN */
 
 #include "rfcapi.h"
 
@@ -307,7 +305,6 @@ bool PlatformCapsData::SupportsTrueSD() const {
 bool PlatformCapsData::CanMixPCMWithSurround() {
   bool result = false;
 
-#ifndef USE_DEVICESETTING_PLUGIN
   try {
     device::List<device::VideoOutputPort> vPorts =
         device::Host::getInstance().getVideoOutputPorts();
@@ -319,9 +316,8 @@ bool PlatformCapsData::CanMixPCMWithSurround() {
   } catch (...) {
     result = false;
     TRACE(Trace::Error, 
-        (_T("Exception Caught with device settings calls to get the MS11 Decode status.")));
+        (_T("Exception Caught with device settings calls to get the MS11 Decode status..")));
   }
-#endif /* USE_DEVICESETTING_PLUGIN */
 
   TRACE(Trace::Information, (_T("canMixPCMWithSurround: %s"), result ? "YES" : "NO"));
 
