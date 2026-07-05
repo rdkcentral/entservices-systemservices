@@ -27,6 +27,7 @@ find_package(${NAMESPACE}Definitions REQUIRED)
 find_package(CompileSettingsDebug CONFIG REQUIRED)
 find_package(${NAMESPACE}Helpers REQUIRED)
 find_library(PROCPS_LIBRARIES NAMES procps)
+find_library(SECURE_WRAPPER_LIBRARIES NAMES secure_wrapper)
 
 find_package(Telemetry)
 
@@ -121,6 +122,10 @@ endif(IARMBus_FOUND)
 if(PROCPS_LIBRARIES)
     target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${PROCPS_LIBRARIES})
 endif(PROCPS_LIBRARIES)
+
+if(SECURE_WRAPPER_LIBRARIES)
+    target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${SECURE_WRAPPER_LIBRARIES})
+endif(SECURE_WRAPPER_LIBRARIES)
 
 find_package(DS)
 if (DS_FOUND)
