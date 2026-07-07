@@ -12024,7 +12024,7 @@ TEST_F(SystemServicesTest, GetDeviceInfo_FriendlyId_WithDeviceInfoPlugin)
             ::testing::Return(Core::ERROR_NONE)));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDeviceInfo"),
-              _T("{\"params\":[\"friendlyId\"]}"), response));
+              _T("{\"params\":[\"friendly_id\"]}"), response));
 
     TEST_LOG("GetDeviceInfo_FriendlyId - Response: %s", response.c_str());
 
