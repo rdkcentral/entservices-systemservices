@@ -37,7 +37,8 @@
 #include <core/core.h>
 #include <core/JSON.h>
 #include<interfaces/entservices_errorcodes.h>
-
+#include <future>
+#include <chrono>
 #include "SystemServicesImplementation.h"
 #include <telemetry_busmessage_sender.h>
 
@@ -413,11 +414,15 @@ namespace WPEFramework
                     StringIteratorImpl::Create<Exchange::ISystemServices::IStringIterator>(queryList);
                 if (params != nullptr) {
                     Exchange::ISystemServices::DeviceInfo deviceInfo{};
-                    if (Core::ERROR_NONE == GetDeviceInfo(params, deviceInfo) && !deviceInfo.estbMac.empty()) {
+					auto fut = std::async(std::launch::async, [this, params, &deviceInfo]() {
+                         return (Core::ERROR_NONE == GetDeviceInfo(params, deviceInfo));
+                     });
+                     bool ok = (fut.wait_for(std::chrono::milliseconds(500)) == std::future_status::ready) && fut.get();
+                     if (ok && !deviceInfo.estbMac.empty()) {
                         m_deviceInfo.estbMac = deviceInfo.estbMac;
                         LOGINFO("estb_mac cached during bootup: %s\n", m_deviceInfo.estbMac.c_str());
                     } else {
-                        LOGERR("Failed to cache estb_mac during bootup\n");
+						LOGERR("Failed/timeout caching estb_mac during bootup\n");
                     }
                     params->Release();
                 } else {
@@ -431,11 +436,15 @@ namespace WPEFramework
                     StringIteratorImpl::Create<Exchange::ISystemServices::IStringIterator>(queryList);
                 if (params != nullptr) {
                     Exchange::ISystemServices::DeviceInfo deviceInfo{};
-                    if (Core::ERROR_NONE == GetDeviceInfo(params, deviceInfo) && !deviceInfo.wifiMac.empty()) {
+					auto fut = std::async(std::launch::async, [this, params, &deviceInfo]() {
+                         return (Core::ERROR_NONE == GetDeviceInfo(params, deviceInfo));
+                     });
+                     bool ok = (fut.wait_for(std::chrono::milliseconds(500)) == std::future_status::ready) && fut.get();
+                     if (ok && !deviceInfo.wifiMac.empty()) {
                         m_deviceInfo.wifiMac = deviceInfo.wifiMac;
                         LOGINFO("wifi_mac cached during bootup: %s\n", m_deviceInfo.wifiMac.c_str());
                     } else {
-                        LOGERR("Failed to cache wifi_mac during bootup\n");
+						LOGERR("Failed/timeout caching wifi_mac during bootup\n");
                     }
                     params->Release();
                 } else {
