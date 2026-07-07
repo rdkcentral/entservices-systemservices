@@ -404,45 +404,6 @@ namespace WPEFramework
                 LOGINFO("Success Getting the friendly name value :%s \n",m_friendlyName.c_str());
             }
 
-            using StringIteratorImpl = WPEFramework::Core::Service<
-                WPEFramework::RPC::IteratorType<Exchange::ISystemServices::IStringIterator>>;
-
-            {
-                std::vector<string> queryList = { "estb_mac" };
-                Exchange::ISystemServices::IStringIterator* params =
-                    StringIteratorImpl::Create<Exchange::ISystemServices::IStringIterator>(queryList);
-                if (params != nullptr) {
-                    Exchange::ISystemServices::DeviceInfo deviceInfo{};
-                    if (Core::ERROR_NONE == GetDeviceInfo(params, deviceInfo) && !deviceInfo.estbMac.empty()) {
-                        m_deviceInfo.estbMac = deviceInfo.estbMac;
-                        LOGINFO("estb_mac cached during bootup: %s\n", m_deviceInfo.estbMac.c_str());
-                    } else {
-                        LOGERR("Failed to cache estb_mac during bootup\n");
-                    }
-                    params->Release();
-                } else {
-                    LOGERR("Failed to create iterator for estb_mac\n");
-                }
-            }
-
-            {
-                std::vector<string> queryList = { "wifi_mac" };
-                Exchange::ISystemServices::IStringIterator* params =
-                    StringIteratorImpl::Create<Exchange::ISystemServices::IStringIterator>(queryList);
-                if (params != nullptr) {
-                    Exchange::ISystemServices::DeviceInfo deviceInfo{};
-                    if (Core::ERROR_NONE == GetDeviceInfo(params, deviceInfo) && !deviceInfo.wifiMac.empty()) {
-                        m_deviceInfo.wifiMac = deviceInfo.wifiMac;
-                        LOGINFO("wifi_mac cached during bootup: %s\n", m_deviceInfo.wifiMac.c_str());
-                    } else {
-                        LOGERR("Failed to cache wifi_mac during bootup\n");
-                    }
-                    params->Release();
-                } else {
-                    LOGERR("Failed to create iterator for wifi_mac\n");
-                }
-            }
-
             return Core::ERROR_NONE;
         }
         
