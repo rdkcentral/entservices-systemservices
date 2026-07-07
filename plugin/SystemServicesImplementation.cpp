@@ -413,6 +413,7 @@ namespace WPEFramework
                     StringIteratorImpl::Create<Exchange::ISystemServices::IStringIterator>(queryList);
                 if (params != nullptr) {
                     Exchange::ISystemServices::DeviceInfo deviceInfo{};
+					LOGINFO("DeviceInfo:: calling estb_mac during bootup: \n");
                     if (Core::ERROR_NONE == GetDeviceInfo(params, deviceInfo) && !deviceInfo.estbMac.empty()) {
                         m_deviceInfo.estbMac = deviceInfo.estbMac;
                         LOGINFO("estb_mac cached during bootup: %s\n", m_deviceInfo.estbMac.c_str());
@@ -431,6 +432,7 @@ namespace WPEFramework
                     StringIteratorImpl::Create<Exchange::ISystemServices::IStringIterator>(queryList);
                 if (params != nullptr) {
                     Exchange::ISystemServices::DeviceInfo deviceInfo{};
+					LOGINFO("DeviceInfo:: calling wifi_mac during bootup: \n");
                     if (Core::ERROR_NONE == GetDeviceInfo(params, deviceInfo) && !deviceInfo.wifiMac.empty()) {
                         m_deviceInfo.wifiMac = deviceInfo.wifiMac;
                         LOGINFO("wifi_mac cached during bootup: %s\n", m_deviceInfo.wifiMac.c_str());
