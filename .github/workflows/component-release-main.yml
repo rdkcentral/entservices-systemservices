@@ -15,6 +15,6 @@ jobs:
   release:
     uses: rdkcentral/build_tools_workflows/.github/workflows/component-release-main.yml@develop
     with:
-      tag: ${{ inputs.tag }}q
+      tag: ${{ inputs.tag }}
     secrets:
       RDKCM_DEPLOY_KEY: ${{ secrets.RDKCM_DEPLOY_KEY }}
