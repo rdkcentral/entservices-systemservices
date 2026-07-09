@@ -270,6 +270,7 @@ namespace WPEFramework
             m_MfgSerialNumberValid = false;
 #endif
             m_uploadLogsPid = -1;
+            m_isoCodesLoaded = false;
 
             regcomp (&m_regexUnallowedChars, REGEX_UNALLOWABLE_INPUT, REG_EXTENDED);
         }
@@ -403,7 +404,7 @@ namespace WPEFramework
                 m_friendlyName = param.value;
                 LOGINFO("Success Getting the friendly name value :%s \n",m_friendlyName.c_str());
             }
-
+            loadIsoCodesData();
             return Core::ERROR_NONE;
         }
         
@@ -2160,19 +2161,137 @@ namespace WPEFramework
 	    {
 		    bool retVal = false;
 		    if(regionStr.length() < 7){
-			    string strRegion = regionStr.substr(0,regionStr.find("-"));
-			    if( strRegion.length() == 2){
+			    size_t dashPos = regionStr.find("-");
+			    if(dashPos == std::string::npos){
+				    return false;
+			    }
+			    string strPrefix = regionStr.substr(0, dashPos);
+			    if( strPrefix.length() == 2){
 				    // Coverity Fix: ID 16, 31 - COPY_INSTEAD_OF_MOVE
-				    if (isStrAlphaUpper(strRegion)){
-					    strRegion = regionStr.substr(regionStr.find("-")+1,regionStr.length());
-					    if(strRegion.length() >= 2){
-						    retVal = isStrAlphaUpper(std::move(strRegion));
+				    if (isStrAlphaUpper(std::move(strPrefix))){
+					    string strSuffix = regionStr.substr(dashPos + 1);
+					    if(strSuffix.length() >= 1){
+						    // ISO 3166-2 subdivision codes: only ASCII uppercase letters and digits [A-Z0-9]
+						    bool allValid = true;
+						    for (const unsigned char c : strSuffix) {
+							    const bool isDigit = (c >= '0' && c <= '9');
+							    const bool isUpper = (c >= 'A' && c <= 'Z');
+							    if (!isDigit && !isUpper) {
+								    allValid = false;
+								    LOGERR("Invalid region suffix: %s", strSuffix.c_str());
+								    break;
+							    }
+						    }
+						    retVal = allValid;
 					    }
 				    }
 			    }
 		    }
 		    return retVal;
 	    }
+
+        void SystemServicesImplementation::loadIsoCodesData()
+        {
+            if (m_isoCodesLoaded) {
+                return;
+            }
+
+            const char* iso3166_1_file = "/usr/share/iso-codes/json/iso_3166-1.json";
+            const char* iso3166_2_file = "/usr/share/iso-codes/json/iso_3166-2.json";
+
+            // Load alpha-3 to alpha-2 mapping from iso_3166-1.json
+            if (Utils::fileExists(iso3166_1_file)) {
+                std::string content;
+                if (Utils::readFileContent(iso3166_1_file, content)) {
+                    JsonObject root;
+                    if (root.FromString(content)) {
+                        JsonArray entries = root["3166-1"].Array();
+                        auto it = entries.Elements();
+                        while (it.Next()) {
+                            JsonObject entry = it.Current().Object();
+                            if (entry.HasLabel("alpha_2") && entry.HasLabel("alpha_3")) {
+                                m_alpha3ToAlpha2[entry["alpha_3"].String()] = entry["alpha_2"].String();
+                            }
+                        }
+                        LOGINFO("Loaded %zu territory alpha3-to-alpha2 mappings from iso-codes", m_alpha3ToAlpha2.size());
+                    } else {
+                        LOGERR("Failed to parse %s", iso3166_1_file);
+                    }
+                }
+            } else {
+                LOGWARN("iso_3166-1.json not found at %s, territory-region cross-validation disabled", iso3166_1_file);
+            }
+
+            // Load valid subdivision codes from iso_3166-2.json
+            if (Utils::fileExists(iso3166_2_file)) {
+                std::string content;
+                if (Utils::readFileContent(iso3166_2_file, content)) {
+                    JsonObject root;
+                    if (root.FromString(content)) {
+                        JsonArray entries = root["3166-2"].Array();
+                        auto it = entries.Elements();
+                        while (it.Next()) {
+                            JsonObject entry = it.Current().Object();
+                            if (entry.HasLabel("code")) {
+                                m_validSubdivisions.insert(entry["code"].String());
+                            }
+                        }
+                        LOGINFO("Loaded %zu valid subdivision codes from iso-codes", m_validSubdivisions.size());
+                    } else {
+                        LOGERR("Failed to parse %s", iso3166_2_file);
+                    }
+                }
+            } else {
+                LOGWARN("iso_3166-2.json not found at %s, subdivision validation disabled", iso3166_2_file);
+            }
+
+            m_isoCodesLoaded = true;
+        }
+
+        bool SystemServicesImplementation::isRegionValidForTerritory(const string& regionStr, const string& territoryAlpha3)
+        {
+            // Load iso-codes data if not already loaded
+            if (!m_isoCodesLoaded) {
+                loadIsoCodesData();
+            }
+
+            // If iso-codes data is not available, fall back to format-only validation
+            if (m_alpha3ToAlpha2.empty() || m_validSubdivisions.empty()) {
+                LOGWARN("iso-codes data not available, using format-only validation for region");
+                return isRegionValid(regionStr);
+            }
+
+            // Look up the alpha-2 code for the given territory
+            auto it = m_alpha3ToAlpha2.find(territoryAlpha3);
+            if (it == m_alpha3ToAlpha2.end()) {
+                LOGWARN("Territory '%s' not found in iso-codes alpha3-to-alpha2 map, using format-only validation for region", territoryAlpha3.c_str());
+                return isRegionValid(regionStr);
+            }
+
+            const std::string& alpha2 = it->second;
+
+            // Check that the region prefix matches the territory's alpha-2 code
+            size_t dashPos = regionStr.find('-');
+            if (dashPos == std::string::npos || dashPos != 2) {
+                LOGERR("Invalid region format: %s", regionStr.c_str());
+                return false;
+            }
+            std::string regionPrefix = regionStr.substr(0, dashPos);
+            if (regionPrefix != alpha2) {
+                LOGERR("Region '%s' does not belong to territory '%s' (expected prefix '%s')",
+                       regionStr.c_str(), territoryAlpha3.c_str(), alpha2.c_str());
+                return false;
+            }
+
+            // Check that the full subdivision code exists in the valid set
+            if (m_validSubdivisions.find(regionStr) == m_validSubdivisions.end()) {
+                LOGERR("Region '%s' is not a valid ISO 3166-2 subdivision for territory '%s'",
+                       regionStr.c_str(), territoryAlpha3.c_str());
+                return false;
+            }
+
+            return true;
+        }
 
         Core::hresult SystemServicesImplementation::GetTerritory(string& territory , string& region, bool& success)
 	    {
@@ -2470,24 +2589,22 @@ namespace WPEFramework
                         if(!region.empty()){
                             regionStr = region;
                             if(regionStr != ""){
-                                if(isRegionValid(regionStr)){
+                                if(isRegionValidForTerritory(regionStr, territoryStr)){
                                     resp = writeTerritory(territoryStr,regionStr);
                                     LOGWARN(" territory name %s ", territoryStr.c_str());
                                     LOGWARN(" region name %s", regionStr.c_str());
                                 }else{
                                     error.message = "Invalid region";
-                                    LOGWARN("Please enter valid region");
-                                    return Core::ERROR_GENERAL;
+                                    LOGWARN("Region '%s' is not valid for territory '%s'", regionStr.c_str(), territoryStr.c_str());
                                 }
                             }
                         }else{
-                            resp = writeTerritory(territoryStr,regionStr);
+                            resp = writeTerritory(territoryStr, regionStr);
                             LOGWARN(" Region is empty, only territory is updated. territory name %s ", territoryStr.c_str());
                         }
                     }else{
                         error.message =  "Invalid territory";
                         LOGWARN("Please enter valid territory Parameter value.");
-                        return Core::ERROR_GENERAL;;
                     }
                     if(resp == true){
                         //call event on Territory changed
@@ -2499,7 +2616,7 @@ namespace WPEFramework
                     LOGWARN(" caught exception...");
                 }
             }else{
-                error.message =  "Invalid territory name";
+                error.message =  "Invalid territory";
                 LOGWARN("Please enter valid territory Parameter name.");
                 resp = false;
             }
