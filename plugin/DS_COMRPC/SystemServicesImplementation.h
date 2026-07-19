@@ -50,8 +50,8 @@ using std::ofstream;
 #include "libIARM.h"
 #endif /* USE_IARMBUS || USE_IARM_BUS */
 
-/* DS COM-RPC client helper — provides AcquireSubInterface<T>() and lifecycle callbacks */
-#include "DeviceSettingsClientHelper.h"
+/* DS COM-RPC client helper — provides DSHelper::AcquireSubInterface<T>() and lifecycle callbacks */
+#include "DeviceSettingsInterface.h"
 #include <interfaces/IDeviceSettingsHost.h>
 #include <interfaces/IDeviceSettingsAudio.h>
 
@@ -86,7 +86,7 @@ namespace WPEFramework
         class SystemServicesImplementation
             : public Exchange::ISystemServices
             , public Exchange::IConfiguration
-            , public DeviceSettingsClientHelper   // COM-RPC link to entservices-devicesettings
+            , public DSHelper   // COM-RPC link to entservices-devicesettings
         {
             private:
                 class PowerManagerNotification : public Exchange::IPowerManager::INetworkStandbyModeChangedNotification,
@@ -279,7 +279,7 @@ namespace WPEFramework
             uint32_t Configure(PluginHost::IShell* service) override;
 
         protected:
-            // DeviceSettingsClientHelper lifecycle callbacks
+            // DSHelper lifecycle callbacks
             void OnDeviceSettingsActivated() override;
             void OnDeviceSettingsDeactivated() override;
 

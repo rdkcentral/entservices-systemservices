@@ -292,7 +292,7 @@ namespace WPEFramework
             DeinitializeIARM();
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
             // Close COM-RPC link
-            DeviceSettingsClientHelper::Close();
+            DSHelper::Close();
 
             SystemServicesImplementation::_instance = nullptr;
             if (m_shellService) {
@@ -356,7 +356,7 @@ namespace WPEFramework
             InitializeIARM();
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
             // Open COM-RPC link to entservices-devicesettings
-            const uint32_t dsResult = DeviceSettingsClientHelper::Open(service);
+            const uint32_t dsResult = DSHelper::Open(service);
             if (dsResult != Core::ERROR_NONE) {
                 LOGERR("Configure: Failed to open DeviceSettings link (result=%u)", dsResult);
             }
@@ -1560,7 +1560,7 @@ namespace WPEFramework
 
                 if (powerState == "LIGHT_SLEEP" || powerState == "DEEP_SLEEP") {
                     /* Query preferred sleep mode via COM-RPC IDeviceSettingsHost. */
-                    auto* host = AcquireSubInterface<Exchange::IDeviceSettingsHost>();
+                    auto* host = DSHelper::AcquireSubInterface<Exchange::IDeviceSettingsHost>();
                     if (host != nullptr) {
                         Exchange::IDeviceSettingsHost::SleepMode sleepModeEnum;
                         if (host->GetPreferredSleepMode(sleepModeEnum) == Core::ERROR_NONE) {
@@ -4163,7 +4163,7 @@ namespace WPEFramework
     } // namespace Plugin
 } // namespace WPEFramework
 
-// ── DeviceSettingsClientHelper lifecycle callbacks ────────────────────────────
+// ── DSHelper lifecycle callbacks ────────────────────────────
 
 namespace WPEFramework { namespace Plugin {
 
