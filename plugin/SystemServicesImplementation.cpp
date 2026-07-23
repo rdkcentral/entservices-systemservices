@@ -471,6 +471,12 @@ namespace WPEFramework
             curPowerState = powerModeEnumToString(currentState);
             newPowerState = powerModeEnumToString(newState);
 
+            LOGINFO("OnPowerModeChanged raw enums: currentState=%d newState=%d mappedCurrent=%s mappedNew=%s",
+                static_cast<int>(currentState),
+                static_cast<int>(newState),
+                curPowerState.c_str(),
+                newPowerState.c_str());
+
             LOGWARN("IARM Event triggered for PowerStateChange.\
                     Old State %s, New State: %s\n",
                     curPowerState.c_str() , newPowerState.c_str());
@@ -983,13 +989,19 @@ namespace WPEFramework
                 uploadLogsPid = m_uploadLogsPid;
             }
 
+            LOGINFO("UploadLogsAsync invoked: existingUploadPid=%d", uploadLogsPid);
+
             if (-1 != uploadLogsPid) {
-                LOGWARN("Another instance of log upload script is running");
+                LOGWARN("Another instance of log upload script is running (pid=%d). Aborting old instance before relaunch", uploadLogsPid);
                 AbortLogUpload(result);
             }
 
             std::lock_guard<std::mutex> lck(m_uploadLogsMutex);
             m_uploadLogsPid = UploadLogs::logUploadAsync();
+            LOGINFO("UploadLogsAsync launch result: newUploadPid=%d", m_uploadLogsPid);
+            if (-1 == m_uploadLogsPid) {
+                LOGERR("UploadLogsAsync failed to launch log upload script");
+            }
             result.success = true;
 
 
@@ -1000,11 +1012,14 @@ namespace WPEFramework
         {
             std::lock_guard<std::mutex> lck(m_uploadLogsMutex);
 
+            LOGINFO("AbortLogUpload invoked: trackedUploadPid=%d", m_uploadLogsPid);
+
             if (-1 != m_uploadLogsPid) {
                 std::vector<int> processIds;
                 bool res = Utils::getChildProcessIDs(m_uploadLogsPid, processIds);
 
                 if (true == res) {
+                    LOGINFO("AbortLogUpload: parentPid=%d childCount=%d", m_uploadLogsPid, static_cast<int>(processIds.size()));
                     std::vector<int>::iterator pid_iterator = processIds.begin();
                     while (pid_iterator != processIds.end()) {
                         std::string line = std::to_string(*pid_iterator);
@@ -1012,6 +1027,7 @@ namespace WPEFramework
                         char *end;
                         int pid = strtol(line.c_str(), &end, 10);
                         if (line.c_str() != end && 0 != pid && 1 != pid) {
+                            LOGINFO("AbortLogUpload: killing child pid=%d", pid);
                             kill(pid, SIGKILL);
                         } else {
                             LOGERR("Bad pid: %d", pid);
@@ -1020,15 +1036,18 @@ namespace WPEFramework
                     }
 
                 } else {
-                    LOGERR("Cannot get the child process Ids\n");
+                    LOGERR("AbortLogUpload: Cannot get child process Ids for parentPid=%d", m_uploadLogsPid);
                 }
 
+                LOGINFO("AbortLogUpload: killing parent pid=%d", m_uploadLogsPid);
                 kill(m_uploadLogsPid, SIGKILL);
 
                 int status;
                 waitpid(m_uploadLogsPid, &status, 0);
+                LOGINFO("AbortLogUpload: parent pid=%d reaped waitStatus=%d", m_uploadLogsPid, status);
 
                 m_uploadLogsPid = -1;
+                LOGINFO("AbortLogUpload completed: trackedUploadPid reset to -1");
 
                 JsonObject params;
                 params["logUploadStatus"] = LOG_UPLOAD_STATUS_ABORTED;
@@ -1507,9 +1526,15 @@ namespace WPEFramework
             string sleepMode;
             ofstream outfile;
 
+            LOGINFO("SetPowerState request received: requestedPowerState=%s requestedStandbyReason=%s previousCachedState=%s",
+                    powerState.c_str(), standbyReason.c_str(), m_current_state.c_str());
+
             if (!powerState.empty()) {
                 /* Power state defaults standbyReason is "application". */
                 const std::string reason = standbyReason.empty() ? "application" : standbyReason;
+                if (standbyReason.empty()) {
+                    LOGWARN("SetPowerState standbyReason missing, defaulting to '%s'", reason.c_str());
+                }
                 LOGINFO("SystemServicesImplementation::SetPowerState powerState: %s, standbyReason: %s\n", powerState.c_str(), reason.c_str());
 
                 if (powerState == "LIGHT_SLEEP" || powerState == "DEEP_SLEEP") {
@@ -1518,8 +1543,10 @@ namespace WPEFramework
                     LOGWARN("Output of getPreferredSleepMode: '%s'", sleepMode.c_str());
 
                     if (convert("DEEP_SLEEP", sleepMode)) {
+                        LOGINFO("SetPowerState conversion path: preferredSleepMode=%s overrides requestedPowerState=%s", sleepMode.c_str(), powerState.c_str());
                         retVal = setPowerStateConversion(std::move(sleepMode));
                     } else {
+                        LOGINFO("SetPowerState conversion path: using requestedPowerState=%s", powerState.c_str());
                         retVal = setPowerStateConversion(powerState);
                     }
 
@@ -1533,11 +1560,15 @@ namespace WPEFramework
                     }
 
                 } else {
+                    LOGINFO("SetPowerState conversion path: direct conversion for powerState=%s", powerState.c_str());
                     retVal = setPowerStateConversion(powerState);
                 }
                 m_current_state = powerState;
+                LOGINFO("SetPowerState completed: requestedPowerState=%s success=%s updatedCachedState=%s",
+                        powerState.c_str(), retVal ? "true" : "false", m_current_state.c_str());
             } else {
                 populateResponseWithError(SysSrv_MissingKeyValues, SysSrv_Status, errorMessage);
+                LOGERR("SetPowerState failed: missing powerState parameter");
             }
             success = retVal;
 
@@ -1550,6 +1581,8 @@ namespace WPEFramework
             WPEFramework::Exchange::IPowerManager::PowerState pwrMgrState;
             int keyCode = 0;
 
+            LOGINFO("setPowerStateConversion invoked with powerState=%s", powerState.c_str());
+
             if (powerState == "STANDBY") {
                 pwrMgrState = WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY;
             } else if (powerState == "ON") {
@@ -1559,13 +1592,20 @@ namespace WPEFramework
             } else if (powerState == "LIGHT_SLEEP") {
                 pwrMgrState = WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY;
             } else {
+                LOGERR("setPowerStateConversion unsupported input powerState=%s", powerState.c_str());
                 return false;
             }
+
+            LOGINFO("setPowerStateConversion mapped '%s' to enum=%d",
+                    powerState.c_str(), static_cast<int>(pwrMgrState));
 
             ASSERT (_powerManagerPlugin);
 
             if (_powerManagerPlugin) {
                 status = _powerManagerPlugin->SetPowerState(keyCode, pwrMgrState, "random");
+                LOGINFO("setPowerStateConversion SetPowerState returned status=%d", status);
+            } else {
+                LOGERR("setPowerStateConversion: _powerManagerPlugin is null");
             }
 
             if (status == Core::ERROR_GENERAL)
@@ -2888,14 +2928,29 @@ namespace WPEFramework
 
         void SystemServicesImplementation::OnSystemPowerStateChanged(string currentPowerState, string powerState)
         {
+            pid_t trackedUploadPid = -1;
+            {
+                lock_guard<mutex> lck(m_uploadLogsMutex);
+                trackedUploadPid = m_uploadLogsPid;
+            }
+
+            LOGINFO("OnSystemPowerStateChanged entry: currentPowerState=%s newPowerState=%s trackedUploadPid=%d",
+                    currentPowerState.c_str(), powerState.c_str(), trackedUploadPid);
+
             if ("LIGHT_SLEEP" == powerState || "STANDBY" == powerState) {
                 if ("ON" == currentPowerState) {
                     RFC_ParamData_t param = {0};
                     WDMP_STATUS status = getRFCParameter(NULL, RFC_LOG_UPLOAD, &param);
+                    LOGINFO("OnSystemPowerStateChanged RFC check: status=%d type=%d value='%s'",
+                            status, param.type, param.value);
                     if(WDMP_SUCCESS == status && param.type == WDMP_BOOLEAN && (strncasecmp(param.value,"true",4) == 0))
                     {
+                        LOGINFO("OnSystemPowerStateChanged triggering UploadLogsAsync due to ON->%s transition", powerState.c_str());
                         SystemResult result;
                         UploadLogsAsync(result);
+                        LOGINFO("OnSystemPowerStateChanged UploadLogsAsync returned success=%s", result.success ? "true" : "false");
+                    } else {
+                        LOGWARN("OnSystemPowerStateChanged skipping UploadLogsAsync: RFC disabled or read failed");
                     }
                 }
             } else if ("DEEP_SLEEP" == powerState) {
@@ -2908,8 +2963,12 @@ namespace WPEFramework
 
                 if (-1 != uploadLogsPid)
                 {
+                    LOGINFO("OnSystemPowerStateChanged DEEP_SLEEP: aborting in-flight upload pid=%d", uploadLogsPid);
                     SystemResult result;
                     AbortLogUpload(result);
+                    LOGINFO("OnSystemPowerStateChanged AbortLogUpload returned success=%s", result.success ? "true" : "false");
+                } else {
+                    LOGINFO("OnSystemPowerStateChanged DEEP_SLEEP: no in-flight upload to abort");
                 }
             }
 
