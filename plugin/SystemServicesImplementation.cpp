@@ -91,6 +91,9 @@ using WakeupSourceConfigIteratorImpl = WPEFramework::Core::Service<WPEFramework:
 #define ZONEINFO_DIR "/usr/share/zoneinfo"
 #define LOCALTIME_FILE "/opt/persistent/localtime"
 
+#define ISO3166_1_FILE "/usr/share/iso-codes/json/iso_3166-1.json"
+#define ISO3166_2_FILE "/usr/share/iso-codes/json/iso_3166-2.json"
+
 #define DEVICE_PROPERTIES_FILE "/etc/device.properties"
 
 #define STATUS_CODE_NO_SWUPDATE_CONF 460 
@@ -2100,20 +2103,13 @@ namespace WPEFramework
 			    		    getline (inFile, str);
 			    		    if(str.length() > 0){
 			    		        m_strRegion = safeExtractAfterColon(str);
-			    		        if(!isRegionValid(m_strRegion))
-			    		        {
-			    			        m_strTerritory = "";
-			    			        m_strRegion = "";
-			    			        LOGERR("Territory file corrupted  - region : %s",m_strRegion.c_str());
-			    			        LOGERR("Returning empty values");
-			    		        }
 			    		    }
 			    	    }
 			    	    else{
-			    		    m_strTerritory = "";
-			    		    m_strRegion = "";
 			    		    LOGERR("Territory file corrupted - territory : %s",m_strTerritory.c_str());
 			    		    LOGERR("Returning empty values");
+			    		    m_strTerritory = "";
+			    		    m_strRegion = "";
 			    	    }
 			        }
 			        else{
@@ -2135,44 +2131,104 @@ namespace WPEFramework
 		    return retValue;
 	    }
 
-	    bool SystemServicesImplementation::isStrAlphaUpper(string strVal)
-	    {
-		    try{
-			    long unsigned int i=0;
-			    for(i=0; i<= strVal.length()-1; i++)
-			    {
-				    if((isalpha(strVal[i])== 0) || (isupper(strVal[i])==0))
-				    {
-					    LOGERR(" -- Invalid Territory ");
-					    return false;
-					    break;
-				    }
-			    }
-		    }
-		    catch(...){
-			    LOGERR(" Exception caught");
-			    return false;
-		    }
-		    return true;
-	    }
+        bool SystemServicesImplementation::getAlpha2ForTerritory(const string& territoryAlpha3, string& alpha2)
+        {
+            const char* iso3166_1_file = ISO3166_1_FILE;
 
-	    bool SystemServicesImplementation::isRegionValid(string regionStr)
-	    {
-		    bool retVal = false;
-		    if(regionStr.length() < 7){
-			    string strRegion = regionStr.substr(0,regionStr.find("-"));
-			    if( strRegion.length() == 2){
-				    // Coverity Fix: ID 16, 31 - COPY_INSTEAD_OF_MOVE
-				    if (isStrAlphaUpper(strRegion)){
-					    strRegion = regionStr.substr(regionStr.find("-")+1,regionStr.length());
-					    if(strRegion.length() >= 2){
-						    retVal = isStrAlphaUpper(std::move(strRegion));
-					    }
-				    }
-			    }
-		    }
-		    return retVal;
-	    }
+            if (!Utils::fileExists(iso3166_1_file)) {
+                LOGERR("%s not found", iso3166_1_file);
+                return false;
+            }
+
+            std::string content;
+            if (!Utils::readFileContent(iso3166_1_file, content)) {
+                LOGERR("Failed to read %s", iso3166_1_file);
+                return false;
+            }
+
+            JsonObject root;
+            if (!root.FromString(content)) {
+                LOGERR("Failed to parse %s", iso3166_1_file);
+                return false;
+            }
+
+            JsonArray entries = root["3166-1"].Array();
+            auto it = entries.Elements();
+            while (it.Next()) {
+                JsonObject entry = it.Current().Object();
+                if (entry.HasLabel("alpha_3") && entry.HasLabel("alpha_2")) {
+                    if (entry["alpha_3"].String() == territoryAlpha3) {
+                        alpha2 = entry["alpha_2"].String();
+                        LOGINFO("Territory '%s' -> alpha2 '%s'", territoryAlpha3.c_str(), alpha2.c_str());
+                        return true;
+                    }
+                }
+            }
+
+            LOGERR("Territory '%s' not found in iso_3166-1.json", territoryAlpha3.c_str());
+            return false;
+        }
+
+        bool SystemServicesImplementation::isSubdivisionExists(const string& regionCode)
+        {
+            const char* iso3166_2_file = ISO3166_2_FILE;
+
+            if (!Utils::fileExists(iso3166_2_file)) {
+                LOGERR("%s not found", iso3166_2_file);
+                return false;
+            }
+
+            std::string content;
+            if (!Utils::readFileContent(iso3166_2_file, content)) {
+                LOGERR("Failed to read %s", iso3166_2_file);
+                return false;
+            }
+
+            JsonObject root;
+            if (!root.FromString(content)) {
+                LOGERR("Failed to parse %s", iso3166_2_file);
+                return false;
+            }
+
+            JsonArray entries = root["3166-2"].Array();
+            auto it = entries.Elements();
+            while (it.Next()) {
+                JsonObject entry = it.Current().Object();
+                if (entry.HasLabel("code") && entry["code"].String() == regionCode) {
+                    LOGINFO("Subdivision '%s' found", regionCode.c_str());
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        bool SystemServicesImplementation::isRegionValidForTerritory(const string& regionStr, const string& territoryAlpha3)
+        {
+            // Validate territory and get alpha-2 code
+            std::string alpha2;
+            if (!getAlpha2ForTerritory(territoryAlpha3, alpha2)) {
+                LOGERR("Territory '%s' is not a valid ISO 3166-1 alpha-3 code", territoryAlpha3.c_str());
+                return false;
+            }
+
+            // Check region prefix matches territory's alpha-2 code
+            std::string expectedPrefix = alpha2 + "-";
+            if (regionStr.rfind(expectedPrefix, 0) != 0) {
+                LOGERR("Region '%s' does not belong to territory '%s' (expected prefix '%s')",
+                       regionStr.c_str(), territoryAlpha3.c_str(), expectedPrefix.c_str());
+                return false;
+            }
+
+            // Verify region exists in ISO 3166-2 database
+            if (!isSubdivisionExists(regionStr)) {
+                LOGERR("Region '%s' is not a valid ISO 3166-2 subdivision for territory '%s'",
+                       regionStr.c_str(), territoryAlpha3.c_str());
+                return false;
+            }
+
+            return true;
+        }
 
         Core::hresult SystemServicesImplementation::GetTerritory(string& territory , string& region, bool& success)
 	    {
@@ -2470,13 +2526,13 @@ namespace WPEFramework
                         if(!region.empty()){
                             regionStr = region;
                             if(regionStr != ""){
-                                if(isRegionValid(regionStr)){
+                                if(isRegionValidForTerritory(regionStr, territoryStr)){
                                     resp = writeTerritory(territoryStr,regionStr);
                                     LOGWARN(" territory name %s ", territoryStr.c_str());
                                     LOGWARN(" region name %s", regionStr.c_str());
                                 }else{
                                     error.message = "Invalid region";
-                                    LOGWARN("Please enter valid region");
+                                    LOGWARN("Region '%s' is not valid for territory '%s'", regionStr.c_str(), territoryStr.c_str());
                                     return Core::ERROR_GENERAL;
                                 }
                             }
