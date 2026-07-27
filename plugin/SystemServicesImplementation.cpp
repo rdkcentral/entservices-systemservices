@@ -274,7 +274,11 @@ namespace WPEFramework
 #endif
             m_uploadLogsPid = -1;
 
-            regcomp (&m_regexUnallowedChars, REGEX_UNALLOWABLE_INPUT, REG_EXTENDED);
+            //coverity fix: CHECKED_RETURN - check regcomp return value
+            int regcomp_ret = regcomp (&m_regexUnallowedChars, REGEX_UNALLOWABLE_INPUT, REG_EXTENDED);
+            if (regcomp_ret != 0) {
+                LOGERR("Failed to compile regex pattern");
+            }
         }
 
         SystemServicesImplementation::~SystemServicesImplementation()
@@ -2637,7 +2641,11 @@ namespace WPEFramework
                                     }
 
                                     fflush(f);
-                                    fsync(fileno(f));
+                                    //coverity fix: CHECKED_RETURN - check fsync return value
+                                    if (fsync(fileno(f)) != 0) {
+                                        LOGERR("Failed to sync %s", TZ_FILE);
+                                        resp = false;
+                                    }
                                     fclose(f);
 #ifdef ENABLE_LINK_LOCALTIME
                                     // Now create the linux link back to the zone info file to our writeable localtime
