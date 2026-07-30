@@ -593,7 +593,9 @@ namespace WPEFramework
 
                     while (index != _systemServicesNotification.end()) 
                     {
+						LOGWARN("predebug send event to clients");
                         (*index)->OnSystemPowerStateChanged(powerState, currentPowerState);
+						LOGWARN("predebug send event to clients out");
                         ++index;
                     }
                     break;
@@ -2988,7 +2990,9 @@ namespace WPEFramework
 
             if (currentPowerState == "ON" && powerState == "LIGHT_SLEEP")
             {
+				LOGWARN("predebug markers in");
                 t2_event_d((char*)"SYST_INFO_ThunderSleep1", 1);
+				LOGWARN("predebug markers out");
             }
             else if (currentPowerState == "LIGHT_SLEEP" && powerState == "DEEP_SLEEP")
             {
@@ -3002,7 +3006,9 @@ namespace WPEFramework
             {
                 t2_event_d((char*)"SYST_INFO_ThunderWake2", 1);
             }
+			LOGWARN("predebug dispatch event");
             dispatchEvent(SYSTEMSERVICES_EVT_ONSYSTEMPOWERSTATECHANGED, params);
+			LOGWARN("predebug dipatch event out");
         }
         
         void SystemServicesImplementation::OnSystemModeChanged(string mode)
