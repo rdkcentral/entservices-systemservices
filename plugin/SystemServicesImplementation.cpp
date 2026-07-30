@@ -2944,14 +2944,20 @@ namespace WPEFramework
 
         void SystemServicesImplementation::OnSystemPowerStateChanged(string currentPowerState, string powerState)
         {
+			LOGWARN("predebug currentpowerstate %s powerstate %s", currentPowerState.c_str(), powerState.c_str());
             if ("LIGHT_SLEEP" == powerState || "STANDBY" == powerState) {
+				LOGWARN("predebug inside condition");
                 if ("ON" == currentPowerState) {
                     RFC_ParamData_t param = {0};
+					LOGWARN("predebug call getRFCParameter IN");
                     WDMP_STATUS status = getRFCParameter(NULL, RFC_LOG_UPLOAD, &param);
+					LOGWARN("predebug call getRFCParameter OUT");
                     if(WDMP_SUCCESS == status && param.type == WDMP_BOOLEAN && (strncasecmp(param.value,"true",4) == 0))
                     {
                         SystemResult result;
+						LOGWARN("predebug upload log aync in");
                         UploadLogsAsync(result);
+						LOGWARN("predebug upload log aync out");
                     }
                 }
             } else if ("DEEP_SLEEP" == powerState) {
@@ -2965,7 +2971,9 @@ namespace WPEFramework
                 if (-1 != uploadLogsPid)
                 {
                     SystemResult result;
+					LOGWARN("predebug call AbortLogUpload IN");
                     AbortLogUpload(result);
+					LOGWARN("predebug call AbortLogUpload OUT");
                 }
             }
 
