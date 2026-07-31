@@ -1576,7 +1576,7 @@ namespace WPEFramework
             ASSERT (_powerManagerPlugin);
 
             if (_powerManagerPlugin) {
-				LOGINFO("predebug powermanager setPowerState in %s", pwrMgrState.c_str());
+				LOGINFO("predebug powermanager setPowerState in %d", pwrMgrState);
                 status = _powerManagerPlugin->SetPowerState(keyCode, pwrMgrState, "random");
 				LOGINFO("predebug powermanager  setPowerState out");
             }
@@ -2956,7 +2956,7 @@ namespace WPEFramework
         {
 			LOGWARN("predebug currentpowerstate %s powerstate %s", currentPowerState.c_str(), powerState.c_str());
             if ("LIGHT_SLEEP" == powerState || "STANDBY" == powerState) {
-				LOGWARN("predebug inside condition "LIGHT_SLEEP" == powerState || "STANDBY" == powerState");
+				LOGWARN("predebug inside condition");
                 if ("ON" == currentPowerState) {
                     RFC_ParamData_t param = {0};
 					LOGWARN("predebug call getRFCParameter IN param.value %d param.type %d", param.value,param.type);
