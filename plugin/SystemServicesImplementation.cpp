@@ -474,7 +474,7 @@ namespace WPEFramework
             curPowerState = powerModeEnumToString(currentState);
             newPowerState = powerModeEnumToString(newState);
 
-            LOGWARN("IARM Event triggered for PowerStateChange.\
+            LOGWARN("predebug IARM Event triggered for PowerStateChange.\
                     Old State %s, New State: %s\n",
                     curPowerState.c_str() , newPowerState.c_str());
             if (SystemServicesImplementation::_instance) {
@@ -594,9 +594,9 @@ namespace WPEFramework
 
                     while (index != _systemServicesNotification.end()) 
                     {
-						LOGWARN("predebug send event to clients");
+						LOGWARN("predebug SYSTEMSERVICES_EVT_ONSYSTEMPOWERSTATECHANGED send event to clients");
                         (*index)->OnSystemPowerStateChanged(powerState, currentPowerState);
-						LOGWARN("predebug send event to clients out");
+						LOGWARN("predebug SYSTEMSERVICES_EVT_ONSYSTEMPOWERSTATECHANGED send event to clients out");
                         ++index;
                     }
                     break;
@@ -1009,7 +1009,7 @@ namespace WPEFramework
         {
 			 
             std::lock_guard<std::mutex> lck(m_uploadLogsMutex);
-            LOGWARN("AbortLogUpload lock received m_uploadLogsPid%d", m_uploadLogsPid);
+            LOGWARN("predebug AbortLogUpload lock received m_uploadLogsPid%d", m_uploadLogsPid);
             if (-1 != m_uploadLogsPid) {
                 std::vector<int> processIds;
                 bool res = Utils::getChildProcessIDs(m_uploadLogsPid, processIds);
@@ -1030,7 +1030,7 @@ namespace WPEFramework
                     }
 
                 } else {
-                    LOGERR("Cannot get the child process Ids\n");
+                    LOGERR("predebug Cannot get the child process Ids\n");
                 }
                 LOGWARN("predebug AbortLogUpload kill");
                 kill(m_uploadLogsPid, SIGKILL);
@@ -1521,12 +1521,12 @@ namespace WPEFramework
             if (!powerState.empty()) {
                 /* Power state defaults standbyReason is "application". */
                 const std::string reason = standbyReason.empty() ? "application" : standbyReason;
-                LOGINFO("SystemServicesImplementation::SetPowerState powerState: %s, standbyReason: %s\n", powerState.c_str(), reason.c_str());
+                LOGINFO("predebug SystemServicesImplementation::SetPowerState powerState: %s, standbyReason: %s\n", powerState.c_str(), reason.c_str());
 
                 if (powerState == "LIGHT_SLEEP" || powerState == "DEEP_SLEEP") {
                     const device::SleepMode &mode = device::Host::getInstance().getPreferredSleepMode();
                     sleepMode = mode.toString();
-                    LOGWARN("Output of getPreferredSleepMode: '%s'", sleepMode.c_str());
+                    LOGWARN("predebug Output of getPreferredSleepMode: '%s'", sleepMode.c_str());
 
                     if (convert("DEEP_SLEEP", sleepMode)) {
                         retVal = setPowerStateConversion(std::move(sleepMode));
@@ -1576,7 +1576,7 @@ namespace WPEFramework
             ASSERT (_powerManagerPlugin);
 
             if (_powerManagerPlugin) {
-				LOGINFO("predebug powermanager setPowerState in");
+				LOGINFO("predebug powermanager setPowerState in %s", pwrMgrState.c_str());
                 status = _powerManagerPlugin->SetPowerState(keyCode, pwrMgrState, "random");
 				LOGINFO("predebug powermanager  setPowerState out");
             }
@@ -2956,7 +2956,7 @@ namespace WPEFramework
         {
 			LOGWARN("predebug currentpowerstate %s powerstate %s", currentPowerState.c_str(), powerState.c_str());
             if ("LIGHT_SLEEP" == powerState || "STANDBY" == powerState) {
-				LOGWARN("predebug inside condition");
+				LOGWARN("predebug inside condition "LIGHT_SLEEP" == powerState || "STANDBY" == powerState");
                 if ("ON" == currentPowerState) {
                     RFC_ParamData_t param = {0};
 					LOGWARN("predebug call getRFCParameter IN param.value %d param.type %d", param.value,param.type);
@@ -2974,7 +2974,9 @@ namespace WPEFramework
 
                 pid_t uploadLogsPid = -1;
                 {
+					LOGWARN("predebug lck(m_uploadLogsMutex) IN");
                     lock_guard<mutex> lck(m_uploadLogsMutex);
+					LOGWARN("predebug lck(m_uploadLogsMutex) OUT");
                     uploadLogsPid = m_uploadLogsPid;
                 }
 
