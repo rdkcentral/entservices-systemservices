@@ -482,6 +482,7 @@ namespace WPEFramework
             } else {
                 LOGERR("SystemServicesImplementation::_instance is NULL.\n");
             }
+			 LOGWARN("predebug OnPowerModeChanged out");
         }
 
         std::string SystemServicesImplementation::powerModeEnumToString(PowerState state)
@@ -1545,7 +1546,7 @@ namespace WPEFramework
                 populateResponseWithError(SysSrv_MissingKeyValues, SysSrv_Status, errorMessage);
             }
             success = retVal;
-
+            LOGINFO("predebug SystemServicesImplementation::SetPowerState OUT");
             return Core::ERROR_NONE;
         }
 
@@ -1554,7 +1555,7 @@ namespace WPEFramework
             Core::hresult status = Core::ERROR_GENERAL;
             WPEFramework::Exchange::IPowerManager::PowerState pwrMgrState;
             int keyCode = 0;
-
+            LOGINFO("predebug setPowerStateConversion in");
             if (powerState == "STANDBY") {
                 pwrMgrState = WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY;
             } else if (powerState == "ON") {
@@ -1570,9 +1571,11 @@ namespace WPEFramework
             ASSERT (_powerManagerPlugin);
 
             if (_powerManagerPlugin) {
+				LOGINFO("predebug powermanager setPowerState in");
                 status = _powerManagerPlugin->SetPowerState(keyCode, pwrMgrState, "random");
+				LOGINFO("predebug powermanager  setPowerState out");
             }
-
+            LOGINFO("predebug setPowerStateConversion out"); 
             if (status == Core::ERROR_GENERAL)
                 return false;
             else
