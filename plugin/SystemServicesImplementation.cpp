@@ -2608,6 +2608,8 @@ namespace WPEFramework
                         if( (pos == string::npos) ||  ( (pos != string::npos) &&  (pos+1 == timeZone.length())  )   )
                         {
                             LOGERR("Invalid timezone format received : %s . Timezone should be in either Universal or  Olson format  Ex : America/New_York . \n", timeZone.c_str());
+                            isOlson = false;
+                            resp = false;
                         }
                     }
                     
