@@ -983,9 +983,12 @@ namespace WPEFramework
 
         Core::hresult SystemServicesImplementation::UploadLogsAsync(SystemResult& result)
         {
+			 LOGWARN("UploadLogsAsync IN");
             pid_t uploadLogsPid = -1;
             {
+				LOGWARN("UploadLogsAsync m_uploadLogsMutex locked in");
                 std::lock_guard<std::mutex> lck(m_uploadLogsMutex);
+				LOGWARN("UploadLogsAsync m_uploadLogsMutex unlocked");
                 uploadLogsPid = m_uploadLogsPid;
             }
 
@@ -997,15 +1000,16 @@ namespace WPEFramework
             std::lock_guard<std::mutex> lck(m_uploadLogsMutex);
             m_uploadLogsPid = UploadLogs::logUploadAsync();
             result.success = true;
-
+            LOGWARN("UploadLogsAsync OUT");
 
             return Core::ERROR_NONE;
         }
 
         Core::hresult SystemServicesImplementation::AbortLogUpload(SystemResult& result)
         {
+			 
             std::lock_guard<std::mutex> lck(m_uploadLogsMutex);
-
+            LOGWARN("AbortLogUpload lock received m_uploadLogsPid%d", m_uploadLogsPid);
             if (-1 != m_uploadLogsPid) {
                 std::vector<int> processIds;
                 bool res = Utils::getChildProcessIDs(m_uploadLogsPid, processIds);
@@ -1028,12 +1032,12 @@ namespace WPEFramework
                 } else {
                     LOGERR("Cannot get the child process Ids\n");
                 }
-
+                LOGWARN("predebug AbortLogUpload kill");
                 kill(m_uploadLogsPid, SIGKILL);
-
+                LOGWARN("predebug AbortLogUpload kill and wait for pid IN");
                 int status;
                 waitpid(m_uploadLogsPid, &status, 0);
-
+                LOGWARN("predebug AbortLogUpload waitpid out");
                 m_uploadLogsPid = -1;
 
                 JsonObject params;
@@ -1041,10 +1045,11 @@ namespace WPEFramework
                 dispatchEvent(SYSTEMSERVICES_EVT_ONLOGUPLOAD, params);
                 
                 result.success = true;
+				LOGWARN("predebug AbortLogUpload OUT");
                 return Core::ERROR_NONE;
             }
 
-            LOGERR("Upload logs script is not running");
+            LOGERR("predebug Upload logs script is not running");
             return Core::ERROR_NONE;
         }
 
@@ -2954,7 +2959,7 @@ namespace WPEFramework
 				LOGWARN("predebug inside condition");
                 if ("ON" == currentPowerState) {
                     RFC_ParamData_t param = {0};
-					LOGWARN("predebug call getRFCParameter IN");
+					LOGWARN("predebug call getRFCParameter IN param.value %d param.type %d", param.value,param.type);
                     WDMP_STATUS status = getRFCParameter(NULL, RFC_LOG_UPLOAD, &param);
 					LOGWARN("predebug call getRFCParameter OUT");
                     if(WDMP_SUCCESS == status && param.type == WDMP_BOOLEAN && (strncasecmp(param.value,"true",4) == 0))
