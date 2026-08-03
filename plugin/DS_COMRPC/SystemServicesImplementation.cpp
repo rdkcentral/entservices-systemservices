@@ -1559,29 +1559,8 @@ namespace WPEFramework
                 LOGINFO("SystemServicesImplementation::SetPowerState powerState: %s, standbyReason: %s\n", powerState.c_str(), reason.c_str());
 
                 if (powerState == "LIGHT_SLEEP" || powerState == "DEEP_SLEEP") {
-                    /* Query preferred sleep mode via COM-RPC IDeviceSettingsHost. */
-                    auto* host = DSHelper::AcquireSubInterface<Exchange::IDeviceSettingsHost>();
-                    if (host != nullptr) {
-                        Exchange::IDeviceSettingsHost::SleepMode sleepModeEnum;
-                        if (host->GetPreferredSleepMode(sleepModeEnum) == Core::ERROR_NONE) {
-                            sleepMode = (sleepModeEnum == Exchange::IDeviceSettingsHost::DS_HOST_SLEEPMODE_DEEP)
-                                            ? "DEEP_SLEEP" : "LIGHT_SLEEP";
-                        } else {
-                            LOGWARN("SetPowerState: GetPreferredSleepMode failed, defaulting to requested state");
-                            sleepMode = powerState;
-                        }
-                        host->Release();
-                    } else {
-                        LOGWARN("SetPowerState: IDeviceSettingsHost unavailable, defaulting to requested state");
-                        sleepMode = powerState;
-                    }
-                    LOGWARN("Output of getPreferredSleepMode: '%s'", sleepMode.c_str());
 
-                    if (convert("DEEP_SLEEP", sleepMode)) {
-                        retVal = setPowerStateConversion(std::move(sleepMode));
-                    } else {
-                        retVal = setPowerStateConversion(powerState);
-                    }
+                    retVal = setPowerStateConversion(powerState);
 
                     outfile.open(STANDBY_REASON_FILE, ios::out);
                     if (outfile.is_open()) {
