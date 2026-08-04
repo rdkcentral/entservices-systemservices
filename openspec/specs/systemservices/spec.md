@@ -2,7 +2,7 @@
 
 ## Overview
 
-The SystemServices plugin is a WPEFramework (Thunder) plugin that provides comprehensive system management capabilities for RDK devices including power management, firmware updates, system configuration, device diagnostics, and log management through a standardized JSON-RPC API (callsign: `org.rdk.SystemServices`, version: 3.4.1).
+The SystemServices plugin is a WPEFramework (Thunder) plugin that provides comprehensive system management capabilities for RDK devices including power management, firmware updates, system configuration, device diagnostics, and log management through a standardized JSON-RPC API (callsign: `org.rdk.System`, version: 3.4.1).
 
 ## Description
 
