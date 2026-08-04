@@ -471,7 +471,7 @@ namespace WPEFramework
             curPowerState = powerModeEnumToString(currentState);
             newPowerState = powerModeEnumToString(newState);
 
-            LOGWARN("IARM Event triggered for PowerStateChange.\
+            LOGWARN("predebug IARM Event triggered for PowerStateChange.\
                     Old State %s, New State: %s\n",
                     curPowerState.c_str() , newPowerState.c_str());
             if (SystemServicesImplementation::_instance) {
@@ -479,6 +479,7 @@ namespace WPEFramework
             } else {
                 LOGERR("SystemServicesImplementation::_instance is NULL.\n");
             }
+			 LOGWARN("predebug OnPowerModeChanged out");
         }
 
         std::string SystemServicesImplementation::powerModeEnumToString(PowerState state)
@@ -590,7 +591,9 @@ namespace WPEFramework
 
                     while (index != _systemServicesNotification.end()) 
                     {
+						LOGWARN("predebug SYSTEMSERVICES_EVT_ONSYSTEMPOWERSTATECHANGED send event to clients");
                         (*index)->OnSystemPowerStateChanged(powerState, currentPowerState);
+						LOGWARN("predebug SYSTEMSERVICES_EVT_ONSYSTEMPOWERSTATECHANGED send event to clients out");
                         ++index;
                     }
                     break;
@@ -977,9 +980,12 @@ namespace WPEFramework
 
         Core::hresult SystemServicesImplementation::UploadLogsAsync(SystemResult& result)
         {
+			 LOGWARN("UploadLogsAsync IN");
             pid_t uploadLogsPid = -1;
             {
+				LOGWARN("UploadLogsAsync m_uploadLogsMutex locked in");
                 std::lock_guard<std::mutex> lck(m_uploadLogsMutex);
+				LOGWARN("UploadLogsAsync m_uploadLogsMutex unlocked");
                 uploadLogsPid = m_uploadLogsPid;
             }
 
@@ -991,15 +997,16 @@ namespace WPEFramework
             std::lock_guard<std::mutex> lck(m_uploadLogsMutex);
             m_uploadLogsPid = UploadLogs::logUploadAsync();
             result.success = true;
-
+            LOGWARN("UploadLogsAsync OUT");
 
             return Core::ERROR_NONE;
         }
 
         Core::hresult SystemServicesImplementation::AbortLogUpload(SystemResult& result)
         {
+			 
             std::lock_guard<std::mutex> lck(m_uploadLogsMutex);
-
+            LOGWARN("predebug AbortLogUpload lock received m_uploadLogsPid%d", m_uploadLogsPid);
             if (-1 != m_uploadLogsPid) {
                 std::vector<int> processIds;
                 bool res = Utils::getChildProcessIDs(m_uploadLogsPid, processIds);
@@ -1020,14 +1027,14 @@ namespace WPEFramework
                     }
 
                 } else {
-                    LOGERR("Cannot get the child process Ids\n");
+                    LOGERR("predebug Cannot get the child process Ids\n");
                 }
-
+                LOGWARN("predebug AbortLogUpload kill");
                 kill(m_uploadLogsPid, SIGKILL);
-
+                LOGWARN("predebug AbortLogUpload kill and wait for pid IN");
                 int status;
                 waitpid(m_uploadLogsPid, &status, 0);
-
+                LOGWARN("predebug AbortLogUpload waitpid out");
                 m_uploadLogsPid = -1;
 
                 JsonObject params;
@@ -1035,10 +1042,11 @@ namespace WPEFramework
                 dispatchEvent(SYSTEMSERVICES_EVT_ONLOGUPLOAD, params);
                 
                 result.success = true;
+				LOGWARN("predebug AbortLogUpload OUT");
                 return Core::ERROR_NONE;
             }
 
-            LOGERR("Upload logs script is not running");
+            LOGERR("predebug Upload logs script is not running");
             return Core::ERROR_NONE;
         }
 
@@ -1510,12 +1518,12 @@ namespace WPEFramework
             if (!powerState.empty()) {
                 /* Power state defaults standbyReason is "application". */
                 const std::string reason = standbyReason.empty() ? "application" : standbyReason;
-                LOGINFO("SystemServicesImplementation::SetPowerState powerState: %s, standbyReason: %s\n", powerState.c_str(), reason.c_str());
+                LOGINFO("predebug SystemServicesImplementation::SetPowerState powerState: %s, standbyReason: %s\n", powerState.c_str(), reason.c_str());
 
                 if (powerState == "LIGHT_SLEEP" || powerState == "DEEP_SLEEP") {
                     const device::SleepMode &mode = device::Host::getInstance().getPreferredSleepMode();
                     sleepMode = mode.toString();
-                    LOGWARN("Output of getPreferredSleepMode: '%s'", sleepMode.c_str());
+                    LOGWARN("predebug Output of getPreferredSleepMode: '%s'", sleepMode.c_str());
 
                     if (convert("DEEP_SLEEP", sleepMode)) {
                         retVal = setPowerStateConversion(std::move(sleepMode));
@@ -1540,7 +1548,7 @@ namespace WPEFramework
                 populateResponseWithError(SysSrv_MissingKeyValues, SysSrv_Status, errorMessage);
             }
             success = retVal;
-
+            LOGINFO("predebug SystemServicesImplementation::SetPowerState OUT");
             return Core::ERROR_NONE;
         }
 
@@ -1549,7 +1557,7 @@ namespace WPEFramework
             Core::hresult status = Core::ERROR_GENERAL;
             WPEFramework::Exchange::IPowerManager::PowerState pwrMgrState;
             int keyCode = 0;
-
+            LOGINFO("predebug setPowerStateConversion in");
             if (powerState == "STANDBY") {
                 pwrMgrState = WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY;
             } else if (powerState == "ON") {
@@ -1565,9 +1573,11 @@ namespace WPEFramework
             ASSERT (_powerManagerPlugin);
 
             if (_powerManagerPlugin) {
+				LOGINFO("predebug powermanager setPowerState in %d", pwrMgrState);
                 status = _powerManagerPlugin->SetPowerState(keyCode, pwrMgrState, "random");
+				LOGINFO("predebug powermanager  setPowerState out");
             }
-
+            LOGINFO("predebug setPowerStateConversion out"); 
             if (status == Core::ERROR_GENERAL)
                 return false;
             else
@@ -2888,28 +2898,38 @@ namespace WPEFramework
 
         void SystemServicesImplementation::OnSystemPowerStateChanged(string currentPowerState, string powerState)
         {
+			LOGWARN("predebug currentpowerstate %s powerstate %s", currentPowerState.c_str(), powerState.c_str());
             if ("LIGHT_SLEEP" == powerState || "STANDBY" == powerState) {
+				LOGWARN("predebug inside condition");
                 if ("ON" == currentPowerState) {
                     RFC_ParamData_t param = {0};
+					LOGWARN("predebug call getRFCParameter IN param.value %d param.type %d", param.value,param.type);
                     WDMP_STATUS status = getRFCParameter(NULL, RFC_LOG_UPLOAD, &param);
+					LOGWARN("predebug call getRFCParameter OUT");
                     if(WDMP_SUCCESS == status && param.type == WDMP_BOOLEAN && (strncasecmp(param.value,"true",4) == 0))
                     {
                         SystemResult result;
+						LOGWARN("predebug upload log aync in");
                         UploadLogsAsync(result);
+						LOGWARN("predebug upload log aync out");
                     }
                 }
             } else if ("DEEP_SLEEP" == powerState) {
 
                 pid_t uploadLogsPid = -1;
                 {
+					LOGWARN("predebug lck(m_uploadLogsMutex) IN");
                     lock_guard<mutex> lck(m_uploadLogsMutex);
+					LOGWARN("predebug lck(m_uploadLogsMutex) OUT");
                     uploadLogsPid = m_uploadLogsPid;
                 }
 
                 if (-1 != uploadLogsPid)
                 {
                     SystemResult result;
+					LOGWARN("predebug call AbortLogUpload IN");
                     AbortLogUpload(result);
+					LOGWARN("predebug call AbortLogUpload OUT");
                 }
             }
 
@@ -2924,7 +2944,9 @@ namespace WPEFramework
 
             if (currentPowerState == "ON" && powerState == "LIGHT_SLEEP")
             {
+				LOGWARN("predebug markers in");
                 t2_event_d((char*)"SYST_INFO_ThunderSleep1", 1);
+				LOGWARN("predebug markers out");
             }
             else if (currentPowerState == "LIGHT_SLEEP" && powerState == "DEEP_SLEEP")
             {
@@ -2938,7 +2960,9 @@ namespace WPEFramework
             {
                 t2_event_d((char*)"SYST_INFO_ThunderWake2", 1);
             }
+			LOGWARN("predebug dispatch event");
             dispatchEvent(SYSTEMSERVICES_EVT_ONSYSTEMPOWERSTATECHANGED, params);
+			LOGWARN("predebug dipatch event out");
         }
         
         void SystemServicesImplementation::OnSystemModeChanged(string mode)
