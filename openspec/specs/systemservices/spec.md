@@ -2,17 +2,19 @@
 
 ## Overview
 
-The SystemServices plugin is a WPEFramework (Thunder) plugin that provides comprehensive system management capabilities for RDK devices including power management, firmware updates, system configuration, device diagnostics, and log management through a standardized JSON-RPC API (callsign: `org.rdk.System`, version: 3.4.1).
+The SystemServices plugin is a WPEFramework (Thunder) plugin that provides comprehensive system management capabilities for RDK devices including power management, firmware updates, system configuration, device diagnostics, and log management through dual protocol interfaces: JSON-RPC for external clients and COM-RPC for plugin interoperability (callsign: `org.rdk.System`, version: 3.4.1).
 
 ## Description
 
-The SystemServices plugin serves as the central control point for system-level operations on RDK (Reference Design Kit) devices. It abstracts hardware-specific functionality through HAL (Hardware Abstraction Layer) interfaces and exposes a rich set of JSON-RPC APIs for managing device lifecycle, power states, firmware updates, system configuration, and diagnostic operations.
+The SystemServices plugin serves as the central control point for system-level operations on RDK (Reference Design Kit) devices. It abstracts hardware-specific functionality through HAL (Hardware Abstraction Layer) interfaces and exposes a rich set of APIs through dual protocol support for managing device lifecycle, power states, firmware updates, system configuration, and diagnostic operations.
 
 **Key Characteristics:**
 - **Plugin Type**: WPEFramework R4.4+ plugin
 - **Callsign**: `org.rdk.System`
 - **Version**: 3.4.1 (Major: 3, Minor: 4, Patch: 1)
-- **API Protocol**: JSON-RPC over WPEFramework
+- **API Protocols**: 
+  - **JSON-RPC**: Over WebSocket for external clients (Web UIs, scripts, REST APIs)
+  - **COM-RPC**: Via `Exchange::ISystemServices` for C++ plugin interoperability
 - **Platform**: Linux-based RDK platforms
 - **License**: Apache 2.0
 
@@ -32,6 +34,8 @@ The plugin integrates with multiple RDK subsystems:
 **Key Terminology:**
 - **IARM Bus**: Inter Application Resource Manager for RDK components
 - **HAL**: Hardware Abstraction Layer
+- **JSON-RPC**: Remote procedure call protocol using JSON over WebSocket
+- **COM-RPC**: Component Object Model RPC for typed C++ interfaces
 - **RFC**: Remote Feature Control - dynamic feature flag system
 - **DST**: Daylight Saving Time
 - **STB**: Set-Top Box
@@ -133,7 +137,8 @@ The plugin integrates with multiple RDK subsystems:
 ```
 SystemServices Plugin
 ├── Core Plugin (SystemServices.cpp/h)
-│   ├── JSON-RPC Interface Layer
+│   ├── JSON-RPC Interface Layer (auto-generated)
+│   ├── COM-RPC Interface Layer (Exchange::ISystemServices)
 │   ├── Event Notification System
 │   └── IPlugin Implementation
 │
@@ -161,7 +166,7 @@ SystemServices Plugin
 
 ### High-Level System Architecture
 
-The SystemServices plugin follows a layered architecture pattern, sitting between the WPEFramework core and the hardware abstraction layer:
+The SystemServices plugin follows a layered architecture pattern, sitting between the WPEFramework core and the hardware abstraction layer, with **dual protocol support** for maximum flexibility:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -176,8 +181,19 @@ The SystemServices plugin follows a layered architecture pattern, sitting betwee
        ┌───────────────┴───────────────┐
        │   SystemServices Plugin       │
        │  (Callsign: org.rdk.System)   │
-       │   • JSON-RPC Interface        │
-       │   • Event Notification        │
+       │                               │
+       │  ┌─────────────────────────┐  │
+       │  │  JSON-RPC Interface     │  │ ◄── Web UIs, Scripts
+       │  │  (Auto-generated)       │  │     External Clients
+       │  └─────────────────────────┘  │
+       │                               │
+       │  ┌─────────────────────────┐  │
+       │  │  COM-RPC Interface      │  │ ◄── C++ Plugins
+       │  │  (ISystemServices)      │  │     Type-safe IPC
+       │  └─────────────────────────┘  │
+       │                               │
+       │  • Same 66+ APIs             │
+       │  • Event Notification        │
        └───────────┬───────────────────┘
                    │
     ┌──────────────┼──────────────┬────────────────┐
@@ -207,7 +223,7 @@ The SystemServices plugin follows a layered architecture pattern, sitting betwee
 
 **Power State Transition Flow:**
 ```
-Client Request (JSON-RPC)
+Client Request (JSON-RPC or COM-RPC)
     ↓
 SystemServices: validatePowerState()
     ↓
@@ -223,7 +239,7 @@ Event Propagation (IARM Bus)
     ↓
 PowerManager → SystemServices (Notification)
     ↓
-SystemServices → Clients (JSON-RPC Event)
+SystemServices → Clients (JSON-RPC/COM-RPC Event)
 ```
 
 **Firmware Update Flow:**
@@ -298,7 +314,22 @@ Event Callback Registration
 
 ### COM-RPC Communication
 
-SystemServices uses WPEFramework's **COM-RPC** (Component Object Model - Remote Procedure Call) mechanism to communicate with the PowerManager plugin. COM-RPC provides inter-plugin communication through socket-based interfaces.
+#### Incoming: Exposing COM-RPC Interface
+
+SystemServices exposes its public API via the **`Exchange::ISystemServices`** COM-RPC interface, allowing other C++ plugins to call SystemServices methods using typed C++ interfaces instead of JSON-RPC string-based calls.
+
+**Interface Exposure:**
+- **Interface**: `Exchange::ISystemServices`
+- **Registration**: Via `INTERFACE_AGGREGATE` in plugin initialization
+- **Access Pattern**: Other plugins use `QueryInterfaceByCallsign<Exchange::ISystemServices>("org.rdk.System")`
+- **Benefits**: Compile-time type safety, better performance, C++ native error handling
+
+**Automatic JSON-RPC Binding:**
+The JSON-RPC interface is automatically generated from the COM-RPC interface using `Exchange::JSystemServices::Register()`. This ensures that both protocols expose identical functionality with maintained consistency.
+
+#### Outgoing: PowerManager Integration
+
+SystemServices also uses WPEFramework's **COM-RPC** mechanism to communicate with the PowerManager plugin as a client. COM-RPC provides inter-plugin communication through socket-based interfaces.
 
 **PowerManager Integration:**
 - **Connection Method**: COM-RPC socket connection via `PowerManagerInterfaceBuilder`
@@ -341,7 +372,30 @@ SystemServices                    PowerManager
 
 ## External Interfaces
 
-The SystemServices plugin exposes its functionality through JSON-RPC APIs organized into seven major capability groups. All APIs follow the WPEFramework JSON-RPC protocol and are accessible via the plugin callsign `org.rdk.System`.
+The SystemServices plugin exposes its functionality through **dual protocol interfaces**, providing the same 66+ APIs via both JSON-RPC and COM-RPC protocols.
+
+### Protocol Support
+
+**JSON-RPC Interface:**
+- **Purpose**: External client access (Web UIs, scripts, REST APIs)
+- **Transport**: WebSocket over WPEFramework
+- **Access**: Via callsign `org.rdk.System` and method names (e.g., `org.rdk.System.1.getPowerState`)
+- **Data Format**: JSON request/response with string-based parameters
+- **Use Case**: Language-agnostic clients, remote access, web applications
+
+**COM-RPC Interface:**
+- **Purpose**: C++ plugin interoperability
+- **Transport**: Direct C++ interface via `Exchange::ISystemServices`
+- **Access**: Via WPEFramework QueryInterface mechanism
+- **Data Format**: Typed C++ parameters and return values
+- **Use Case**: Other Thunder plugins calling SystemServices, high-performance local IPC
+
+**Interface Parity:**
+Both protocols expose the same API methods with identical functionality. The JSON-RPC binding is auto-generated from the COM-RPC interface definition, ensuring consistency. Clients can choose the protocol that best fits their implementation language and performance requirements.
+
+### API Organization
+
+The 66+ API methods are organized into seven major capability groups:
 
 ### 1. Power Management APIs
 
@@ -759,6 +813,21 @@ Critical states are persisted to survive reboots:
 - `m_territoryMutex`: Protect territory configuration
 - `_adminLock`: Critical section for plugin operations
 
+## Performance
+
+### Resource Efficiency
+
+- **Memory Footprint**: Minimal runtime overhead
+- **CPU Usage**: Asynchronous operations prevent blocking
+- **Network**: Efficient curl-based transfers
+- **Storage**: Minimal persistent state
+
+### Scalability
+
+- **Multi-Instance**: Can coexist with other plugins
+- **Event Broadcasting**: Efficient subscriber notification
+- **Modular Design**: Easy feature addition
+
 ## Security
 
 ### Input Sanitization
@@ -836,6 +905,26 @@ Conditional compilation flags control optional features:
 - `/usr/share/zoneinfo/*`: Timezone database
 - `/usr/share/iso-codes/json/`: ISO territory codes
 
+## Versioning & Compatibility
+
+### Versioning Scheme
+- **Plugin Version**: 3.4.1 follows semantic versioning (MAJOR.MINOR.PATCH)
+- **Major Version**: Breaking API changes
+- **Minor Version**: New features, backward compatible
+- **Patch Version**: Bug fixes, backward compatible
+
+### Compatibility Guarantees
+- **Backward Compatibility**: APIs maintain compatibility within major version
+- **Platform Compatibility**: Requires WPEFramework R4.4+
+- **HAL Compatibility**: Platform-specific HAL versions may vary
+- **Conditional Features**: Build flags enable/disable features without breaking other platforms
+
+### Migration Path
+- Deprecated APIs marked in documentation with replacement recommendations
+- Minimum one minor version cycle before API removal
+- `setGzEnabled()`/`isGzEnabled()` deprecated - alternative compression methods recommended
+- `uploadLogs()` deprecated in favor of `uploadLogsAsync()`
+
 ## Conformance Testing & Validation
 
 ### Test Strategy
@@ -858,41 +947,6 @@ The SystemServices plugin employs a multi-layered testing approach to ensure con
 - Location: `plugin/TestClient/systemServiceTestClient.cpp`
 - Interactive JSON-RPC testing
 - Manual API validation
-
-## Performance
-
-### Resource Efficiency
-
-- **Memory Footprint**: Minimal runtime overhead
-- **CPU Usage**: Asynchronous operations prevent blocking
-- **Network**: Efficient curl-based transfers
-- **Storage**: Minimal persistent state
-
-### Scalability
-
-- **Multi-Instance**: Can coexist with other plugins
-- **Event Broadcasting**: Efficient subscriber notification
-- **Modular Design**: Easy feature addition
-
-## Versioning & Compatibility
-
-### Versioning Scheme
-- **Plugin Version**: 3.4.1 follows semantic versioning (MAJOR.MINOR.PATCH)
-- **Major Version**: Breaking API changes
-- **Minor Version**: New features, backward compatible
-- **Patch Version**: Bug fixes, backward compatible
-
-### Compatibility Guarantees
-- **Backward Compatibility**: APIs maintain compatibility within major version
-- **Platform Compatibility**: Requires WPEFramework R4.4+
-- **HAL Compatibility**: Platform-specific HAL versions may vary
-- **Conditional Features**: Build flags enable/disable features without breaking other platforms
-
-### Migration Path
-- Deprecated APIs marked in documentation with replacement recommendations
-- Minimum one minor version cycle before API removal
-- `setGzEnabled()`/`isGzEnabled()` deprecated - alternative compression methods recommended
-- `uploadLogs()` deprecated in favor of `uploadLogsAsync()`
 
 ## Compliance & Standards
 
@@ -925,16 +979,52 @@ The SystemServices plugin employs a multi-layered testing approach to ensure con
 
 ### Plugin Integration
 
-**Consuming SystemServices:**
+**Consuming SystemServices via COM-RPC (C++ Plugins):**
 ```cpp
+// Query the COM-RPC interface
 auto systemServices = service->QueryInterfaceByCallsign<Exchange::ISystemServices>(
     "org.rdk.System"
 );
+
+if (systemServices != nullptr) {
+    // Call methods with typed parameters
+    string powerState;
+    uint32_t result = systemServices->GetPowerState(powerState);
+    
+    // Register for events
+    systemServices->Register(notificationHandler);
+}
+```
+
+**Consuming SystemServices via JSON-RPC (External Clients):**
+```javascript
+// WebSocket connection to Thunder
+const ws = new WebSocket('ws://127.0.0.1:9998/jsonrpc');
+
+// Call method via JSON-RPC
+ws.send(JSON.stringify({
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'org.rdk.System.1.getPowerState',
+    params: {}
+}));
 ```
 
 **Event Subscription:**
 ```cpp
+// COM-RPC event subscription
 systemServices->Register(notificationHandler);
+
+// JSON-RPC event subscription
+ws.send(JSON.stringify({
+    jsonrpc: '2.0',
+    id: 2,
+    method: 'org.rdk.System.1.register',
+    params: {
+        event: 'onSystemPowerStateChanged',
+        id: 'client.events.1'
+    }
+}));
 ```
 
 ## Known Constraints
@@ -1177,5 +1267,4 @@ _No open queries at this time._
 - Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0
 
 ## Change History
-
 - [2026-08-04] - openspec-templater - Restructured to match OpenSpec spec template format. Added Requirements section with functional and non-functional requirements. Added Covered Code section with complete file and method mappings. Reorganized content into standard template sections (Overview, Description, Requirements, Architecture/Design, External Interfaces, Performance, Security, Versioning & Compatibility, Conformance Testing & Validation).
