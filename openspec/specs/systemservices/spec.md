@@ -10,7 +10,7 @@ The SystemServices plugin serves as the central control point for system-level o
 
 **Key Characteristics:**
 - **Plugin Type**: WPEFramework R4.4+ plugin
-- **Callsign**: `org.rdk.SystemServices`
+- **Callsign**: `org.rdk.System`
 - **Version**: 3.4.1 (Major: 3, Minor: 4, Patch: 1)
 - **API Protocol**: JSON-RPC over WPEFramework
 - **Platform**: Linux-based RDK platforms
@@ -30,7 +30,7 @@ The plugin integrates with multiple RDK subsystems:
 - **SysMgr**: System manager for device state
 
 **Key Terminology:**
-- **IARM Bus**: Inter-Application Communication Bus for RDK components
+- **IARM Bus**: Inter Application Resource Manager for RDK components
 - **HAL**: Hardware Abstraction Layer
 - **RFC**: Remote Feature Control - dynamic feature flag system
 - **DST**: Daylight Saving Time
@@ -159,6 +159,129 @@ SystemServices Plugin
     └── Deep Sleep Manager (optional)
 ```
 
+### High-Level System Architecture
+
+The SystemServices plugin follows a layered architecture pattern, sitting between the WPEFramework core and the hardware abstraction layer:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   WPEFramework Core                         │
+│              (Thunder Plugin Framework)                      │
+│         • JSON-RPC Protocol Handler                          │
+│         • Service Discovery & Registration                   │
+│         • Plugin Lifecycle Management                        │
+│         • COM-RPC Inter-plugin Communication                 │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+       ┌───────────────┴───────────────┐
+       │   SystemServices Plugin       │
+       │  (Callsign: org.rdk.System)   │
+       │   • JSON-RPC Interface        │
+       │   • Event Notification        │
+       └───────────┬───────────────────┘
+                   │
+    ┌──────────────┼──────────────┬────────────────┐
+    │              │              │                │
+┌───▼────┐  ┌─────▼──────┐  ┌───▼──────┐  ┌─────▼─────┐
+│ Power  │  │  Firmware  │  │  System  │  │ Platform  │
+│ Mgmt   │  │   Update   │  │  Config  │  │   Caps    │
+└───┬────┘  └─────┬──────┘  └───┬──────┘  └─────┬─────┘
+    │             │              │               │
+┌───┴─────────────┴──────────────┴───────────────┴─────┐
+│         Hardware Abstraction Layer (HAL)              │
+│  • IARM Bus (Inter Application Resource Manager)      │
+│  • Device Settings (Display/Audio/Video Control)      │
+│  • RFC Service (Remote Feature Control)               │
+│  • MFR Manager (Manufacturing Data)                   │
+│  • Deep Sleep Manager (Power Control)                 │
+│  • Thermal Monitor (Temperature Management)           │
+└───────────────────────────┬───────────────────────────┘
+                            │
+                ┌───────────┴──────────┐
+                │   Hardware Platform   │
+                │  (RDK Device/STB)     │
+                └───────────────────────┘
+```
+
+### Data Flow Architecture
+
+**Power State Transition Flow:**
+```
+Client Request (JSON-RPC)
+    ↓
+SystemServices: validatePowerState()
+    ↓
+COM-RPC → PowerManager Plugin
+    ↓
+IARM Bus → System Manager
+    ↓
+Device Settings HAL → Hardware
+    ↓
+Hardware State Change
+    ↓
+Event Propagation (IARM Bus)
+    ↓
+PowerManager → SystemServices (Notification)
+    ↓
+SystemServices → Clients (JSON-RPC Event)
+```
+
+**Firmware Update Flow:**
+```
+updateFirmware() API Call
+    ↓
+Input Validation & URL Processing
+    ↓
+Asynchronous Download Manager
+    ├─ Progress Monitoring (Threaded)
+    ├─ State Tracking (Downloading/Downloaded/Failed)
+    └─ Event Notifications (Periodic Updates)
+    ↓
+Installation Trigger
+    ↓
+Reboot Scheduler (with configurable delay)
+    ↓
+System Reboot → Firmware Application
+```
+
+**Configuration Persistence Flow:**
+```
+Configuration API (setTimeZone, setFriendlyName, etc.)
+    ↓
+Input Validation (Regex/Bounds Checking)
+    ↓
+cSettings Framework (Key-Value Storage)
+    ↓
+Persistent Storage Write
+    ├─ /opt/persistent/System/
+    └─ /opt/secure/persistent/
+    ↓
+IARM Bus Event Broadcast
+    ↓
+System-wide Notification
+    └─ All IARM-connected services notified
+```
+
+**Inter-Plugin Communication (COM-RPC):**
+```
+SystemServices Initialization
+    ↓
+InitializePowerManager()
+    ├─ PowerManagerInterfaceBuilder("org.rdk.PowerManager")
+    ├─ Retry Logic (25 attempts × 200ms)
+    └─ Socket Connection Established
+    ↓
+COM-RPC Bidirectional Channel
+    ├─ SystemServices → PowerManager (Queries)
+    └─ PowerManager → SystemServices (Notifications)
+    ↓
+Event Callback Registration
+    ├─ INetworkStandbyModeChangedNotification
+    ├─ IThermalModeChangedNotification
+    ├─ IRebootNotification
+    └─ IModeChangedNotification
+```
+
 ### Integration Points
 
 **Required Services:**
@@ -173,9 +296,52 @@ SystemServices Plugin
 - **Deep Sleep Manager HAL**: Deep sleep hardware control
 - **Thermal Monitor**: Temperature threshold monitoring
 
+### COM-RPC Communication
+
+SystemServices uses WPEFramework's **COM-RPC** (Component Object Model - Remote Procedure Call) mechanism to communicate with the PowerManager plugin. COM-RPC provides inter-plugin communication through socket-based interfaces.
+
+**PowerManager Integration:**
+- **Connection Method**: COM-RPC socket connection via `PowerManagerInterfaceBuilder`
+- **Target Plugin**: `org.rdk.PowerManager`
+- **Retry Strategy**: 25 attempts with 200ms intervals for robustness
+- **Interface**: `Exchange::IPowerManager` for bidirectional communication
+- **Notifications**: Receives power state changes, thermal events, and reboot notifications
+- **Thread Safety**: Mutex-protected access to shared PowerManager instance
+
+**Bidirectional Communication Flow:**
+```
+SystemServices                    PowerManager
+      │                                 │
+      ├─ Connect COM-RPC Socket ────────>
+      │  (PowerManagerInterfaceBuilder)  │
+      │                                 │
+      ├─ Register Notifications ────────>
+      │  (INetworkStandbyModeChanged)   │
+      │  (IThermalModeChanged)          │
+      │  (IRebootNotification)          │
+      │  (IModeChangedNotification)     │
+      │                                 │
+      │<──── Power State Events ────────┤
+      │<──── Thermal Events ────────────┤
+      │<──── Reboot Events ─────────────┤
+      │                                 │
+      ├─ Query Power State ─────────────>
+      │<──── Power State Response ──────┤
+      │                                 │
+      ├─ Set Power State ───────────────>
+      │<──── Acknowledgment ────────────┤
+```
+
+**Implementation Details:**
+- Connection established during plugin initialization (`InitializePowerManager()`)
+- Implements notification interfaces for event callbacks from PowerManager
+- Provides getter method `getPwrMgrPluginInstance()` for internal access
+- Graceful handling of connection failures with retry mechanism
+- Coordinates system-wide power management through IARM Bus and COM-RPC
+
 ## External Interfaces
 
-The SystemServices plugin exposes its functionality through JSON-RPC APIs organized into seven major capability groups. All APIs follow the WPEFramework JSON-RPC protocol and are accessible via the plugin callsign `org.rdk.SystemServices`.
+The SystemServices plugin exposes its functionality through JSON-RPC APIs organized into seven major capability groups. All APIs follow the WPEFramework JSON-RPC protocol and are accessible via the plugin callsign `org.rdk.System`.
 
 ### 1. Power Management APIs
 
@@ -762,7 +928,7 @@ The SystemServices plugin employs a multi-layered testing approach to ensure con
 **Consuming SystemServices:**
 ```cpp
 auto systemServices = service->QueryInterfaceByCallsign<Exchange::ISystemServices>(
-    "org.rdk.SystemServices"
+    "org.rdk.System"
 );
 ```
 
@@ -1013,4 +1179,3 @@ _No open queries at this time._
 ## Change History
 
 - [2026-08-04] - openspec-templater - Restructured to match OpenSpec spec template format. Added Requirements section with functional and non-functional requirements. Added Covered Code section with complete file and method mappings. Reorganized content into standard template sections (Overview, Description, Requirements, Architecture/Design, External Interfaces, Performance, Security, Versioning & Compatibility, Conformance Testing & Validation).
-
