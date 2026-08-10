@@ -167,6 +167,7 @@ touch rfcapi.h
 touch telemetry_busmessage_sender.h
 touch secure_wrapper.h
 touch proc/readproc.h
+touch uploadstblogs.h
 echo "files created successfully"
 echo "======================================================================================"
 
