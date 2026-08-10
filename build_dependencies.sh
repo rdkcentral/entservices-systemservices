@@ -46,29 +46,29 @@ cd "$GITHUB_WORKSPACE"
 
 git clone --branch 1.0.14 https://github.com/rdkcentral/entservices-testframework.git
 
-cd ${GITHUB_WORKSPACE}
-rm -rf iarmmgrs
-git clone https://github.com/rdkcentral/iarmmgrs.git
-cp iarmmgrs/sysmgr/include/sysMgr.h /usr/local/include
-cp iarmmgrs/maintenance/include/maintenanceMGR.h /usr/local/include
+#cd ${GITHUB_WORKSPACE}
+#rm -rf iarmmgrs
+#git clone https://github.com/rdkcentral/iarmmgrs.git
+#cp iarmmgrs/sysmgr/include/sysMgr.h /usr/local/include
+#cp iarmmgrs/maintenance/include/maintenanceMGR.h /usr/local/include
 
-cd ${GITHUB_WORKSPACE}
-rm -rf telemetry
-git clone https://github.com/rdkcentral/telemetry.git
-cd telemetry
-cp include/*.h /usr/local/include
-sh  build_inside_container.sh
+#cd ${GITHUB_WORKSPACE}
+#rm -rf telemetry
+#git clone https://github.com/rdkcentral/telemetry.git
+#cd telemetry
+#cp include/*.h /usr/local/include
+#sh  build_inside_container.sh
 
-cd ${GITHUB_WORKSPACE}
-cd dcm-agent
-git checkout feature/RDKEMW-22385
-autoreconf -i
-./configure
-cp uploadstblogs/include/*.h /usr/local/include
-cd uploadstblogs/src
-make
-make install
-cd ${GITHUB_WORKSPACE}
+#cd ${GITHUB_WORKSPACE}
+#cd dcm-agent
+#git checkout feature/RDKEMW-22385
+#autoreconf -i
+#./configure
+#cp uploadstblogs/include/*.h /usr/local/include
+#cd uploadstblogs/src
+#make
+#make install
+#cd ${GITHUB_WORKSPACE}
 
 ############################
 # Build Thunder-Tools
@@ -197,4 +197,5 @@ echo "==========================================================================
 cd ../../
 
 ls -la ${GITHUB_WORKSPACE}
+
 
