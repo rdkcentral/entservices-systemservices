@@ -46,6 +46,12 @@ cd "$GITHUB_WORKSPACE"
 
 git clone --branch 1.0.14 https://github.com/rdkcentral/entservices-testframework.git
 
+rm -rf rbus 
+
+git clone https://github.com/rdkcentral/rbus
+cmake -Hrbus -Bbuild/rbus -DBUILD_FOR_DESKTOP=ON -DCMAKE_BUILD_TYPE=Debug
+make -C build/rbus && make -C build/rbus install
+
 rm -rf rdk_logger
 
 git clone https://github.com/rdkcentral/rdk_logger.git
