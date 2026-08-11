@@ -72,6 +72,14 @@ git clone https://github.com/rdkcentral/rdk_logger.git
 cd rdk_logger && autoreconf --install && ./configure && make && make install
 
 cd ${GITHUB_WORKSPACE}
+rm -rf common_utilities
+git clone https://github.com/rdkcentral/common_utilities.git
+cd common_utilities && export INSTALL_DIR='/usr/local' && \
+export CFLAGS="-Wno-error=format -Wno-unused-result -Wno-format-truncation -Wno-error=format-security -DRDK_LOGGER" && \
+autoreconf --install && \
+./configure --prefix=/usr/local && make && make install
+
+cd ${GITHUB_WORKSPACE}
 rm -rf iarmmgrs
 git clone https://github.com/rdkcentral/iarmmgrs.git
 cp iarmmgrs/sysmgr/include/sysMgr.h /usr/local/include
