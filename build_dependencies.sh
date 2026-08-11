@@ -46,6 +46,11 @@ cd "$GITHUB_WORKSPACE"
 
 git clone --branch 1.0.14 https://github.com/rdkcentral/entservices-testframework.git
 
+rm -rf rdk-cert-config
+git clone -b 1.0.6 https://github.com/rdkcentral/rdk-cert-config.git && \
+    cd rdk-cert-config && autoreconf --install && ./configure --prefix=/usr/local --enable-testrdkcerts && \
+    make && make install
+
 rm -rf rbus 
 
 git clone https://github.com/rdkcentral/rbus
@@ -216,6 +221,7 @@ echo "==========================================================================
 cd ../../
 
 ls -la ${GITHUB_WORKSPACE}
+
 
 
 
