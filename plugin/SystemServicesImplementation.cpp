@@ -1152,42 +1152,35 @@ namespace WPEFramework
         Core::hresult SystemServicesImplementation::SetBlocklistFlag(const bool blocklist, SetBlocklistResult& result)
         {
             LOGINFO("blocklist=%d", blocklist);
-            bool status = false, update = false, ret;
-            bool blocklistFlag, oldBlocklistFlag;
 
-            /*check /opt/secure/persistent/opflashstore/ dir*/
-            ret = checkOpFlashStoreDir();
-            if(ret == true){
-                LOGINFO("checked opflashstore directory and it is exists. ret = %d",ret);
-            }
-            else {
-                LOGWARN("failed to create opflashstore directory ret =%d", ret);
-                LOGERR("Blocklist flag update failed. status %d ", status);
+            // Get current value first for change detection before updating
+            IARM_Bus_MFRLib_Platformblockdata_Param_t getParam = {0};
+            IARM_Result_t getRes = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME,
+                                       IARM_BUS_MFRLIB_API_GetConfigData,
+                                       (void *)&getParam, sizeof(getParam));
+            bool oldBlocklistFlag = (getRes == IARM_RESULT_SUCCESS) ? (getParam.blocklist != 0) : false;
+
+            IARM_Bus_MFRLib_Platformblockdata_Param_t setParam = {0};
+            setParam.blocklist = blocklist ? 1 : 0;
+            IARM_Result_t setRes = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME,
+                                       IARM_BUS_MFRLIB_API_SetConfigData,
+                                       (void *)&setParam, sizeof(setParam));
+
+            if (IARM_RESULT_SUCCESS != setRes) {
+                LOGERR("Blocklist flag update failed. IARM result %d", setRes);
                 result.error.message = "Blocklist flag update failed";
                 result.error.code = "-32604";
                 result.success = false;
                 return Core::ERROR_GENERAL;
             }
 
-            blocklistFlag = blocklist;
-            status = write_parameters(DEVICESTATE_FILE, BLOCKLIST, blocklistFlag, update, oldBlocklistFlag);
-            if ((status != true)) {
-                LOGERR("Blocklist flag update failed. status %d ", status);
-                result.error.message = "Blocklist flag update failed";
-                result.error.code = "-32604";
-                result.success = false;
-                return Core::ERROR_GENERAL;
-            }
-            else {
-                LOGINFO("Blocklist flag stored successfully in persistent memory");
-                result.success = true;
-            }
+            LOGINFO("Blocklist flag stored successfully via IARM");
+            result.success = true;
 
-            LOGINFO("Update= %s", (update ? "true":"false"));
-            if(update == true) {
+            if (getRes == IARM_RESULT_SUCCESS && (oldBlocklistFlag != blocklist)) {
                 /*Send ONBLOCKLISTCHANGED event notify*/
                 if (SystemServicesImplementation::_instance) {
-                    SystemServicesImplementation::_instance->OnBlocklistChanged(blocklistFlag, oldBlocklistFlag);
+                    SystemServicesImplementation::_instance->OnBlocklistChanged(blocklist, oldBlocklistFlag);
                 } else {
                     LOGERR("SystemServicesImplementation::_instance is NULL.\n");
                 }
@@ -1236,37 +1229,22 @@ namespace WPEFramework
         Core::hresult SystemServicesImplementation::GetBlocklistFlag(BlocklistResult& result)
         {
             LOGINFO();
-            bool status = false, ret = false;
-            bool blocklistFlag = false;
-
             result.success = false;
             result.error.message = "";
             result.error.code = "";
 
-            /*check /opt/secure/persistent/opflashstore/ dir*/
-            ret = checkOpFlashStoreDir();
-            if(ret == true){
-                LOGINFO("checked opflashstore directory and it is exists. ret = %d",ret);
-            }
-            else {
-                LOGWARN("Blocklist flag retrieved failed from persistent memory.");
-                result.error.message = "Blocklist flag retrieved failed from persistent memory.";
-                result.error.code = "-32099";
-                result.success = false;
-                LOGINFO("response: success=%d, error.code=%s", result.success, result.error.code.c_str());
-                return Core::ERROR_GENERAL;
-            }
+            IARM_Bus_MFRLib_Platformblockdata_Param_t param = {0};
+            IARM_Result_t res = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME,
+                                   IARM_BUS_MFRLIB_API_GetConfigData,
+                                   (void *)&param, sizeof(param));
 
-            status = read_parameters(DEVICESTATE_FILE, BLOCKLIST, blocklistFlag);
-            if (status == true) {
-                LOGWARN("blocklistFlag=%d", blocklistFlag);
-                result.blocklist = blocklistFlag;
+            if (IARM_RESULT_SUCCESS == res) {
+                result.blocklist = (param.blocklist != 0);
                 result.success = true;
-                LOGINFO("Blocklist flag retrieved successfully from persistent memory.");
-            }
-            else{
-                LOGWARN("Blocklist flag retrieved failed from persistent memory.");
-                result.error.message = "Blocklist flag retrieved failed from persistent memory.";
+                LOGINFO("Blocklist flag retrieved successfully via IARM. blocklist=%u", param.blocklist);
+            } else {
+                LOGWARN("Blocklist flag retrieved failed via IARM. result=%d", res);
+                result.error.message = "Blocklist flag retrieved failed";
                 result.error.code = "-32099";
                 result.success = false;
             }

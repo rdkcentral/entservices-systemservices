@@ -892,9 +892,28 @@ TEST_F(SystemServicesTest, RequestSystemUptime_Success)
 
 TEST_F(SystemServicesTest, SetBlocklistFlag_Success)
 {
-    // Create the opflashstore directory for blocklist tests
-    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
-    createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "BLOCKLIST=false");
+    // Validate both IARM calls and payload values: GetConfigData then SetConfigData(true).
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke([](const char* ownerName, const char* methodName, void* arg, size_t argLen) -> IARM_Result_t {
+            EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
+            EXPECT_STREQ(IARM_BUS_MFRLIB_API_GetConfigData, methodName);
+            EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
+            ASSERT_NE(nullptr, arg);
+
+            auto* param = static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
+            param->blocklist = 0; // old value is false
+            return IARM_RESULT_SUCCESS;
+        }))
+        .WillOnce(::testing::Invoke([](const char* ownerName, const char* methodName, void* arg, size_t argLen) -> IARM_Result_t {
+            EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
+            EXPECT_STREQ(IARM_BUS_MFRLIB_API_SetConfigData, methodName);
+            EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
+            ASSERT_NE(nullptr, arg);
+
+            const auto* param = static_cast<const IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
+            EXPECT_EQ(1u, param->blocklist);
+            return IARM_RESULT_SUCCESS;
+        }));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"), _T("{\"blocklist\":true}"), response));
     
@@ -904,9 +923,6 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_Success)
     EXPECT_TRUE(jsonResponse["success"].Boolean()) << "SetBlocklistFlag failed: " << response;
     
     TEST_LOG("SetBlocklistFlag test PASSED - Response: %s", response.c_str());
-    
-    // Cleanup
-    removeFile("/opt/secure/persistent/opflashstore/devicestate.txt");
 }
 
 TEST_F(SystemServicesTest, GetBootTypeInfo_Success)
@@ -1731,14 +1747,28 @@ TEST_F(SystemServicesTest, UploadLogsAsync_EmptyUrl)
 
 TEST_F(SystemServicesTest, SetBlocklistFlag_InvalidFileWrite)
 {
-    // Test setBlocklistFlag when the devicestate file does not exist and the directory is absent.
-    // Without the directory, checkOpFlashStoreDir() will attempt mkdir which may or may not succeed
-    // depending on CI environment. Simply verify the API responds without crashing.
-    //
-    // Note: chmod-based write-failure tests are not reliable when CI runs as root
-    // (root bypasses file permission checks). This test validates basic invocation only.
-    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
-    createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "BLOCKLIST=false");
+    // Even though this test name is legacy, validate current IARM read+write payload flow.
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke([](const char* ownerName, const char* methodName, void* arg, size_t argLen) -> IARM_Result_t {
+            EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
+            EXPECT_STREQ(IARM_BUS_MFRLIB_API_GetConfigData, methodName);
+            EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
+            ASSERT_NE(nullptr, arg);
+
+            auto* param = static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
+            param->blocklist = 0;
+            return IARM_RESULT_SUCCESS;
+        }))
+        .WillOnce(::testing::Invoke([](const char* ownerName, const char* methodName, void* arg, size_t argLen) -> IARM_Result_t {
+            EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
+            EXPECT_STREQ(IARM_BUS_MFRLIB_API_SetConfigData, methodName);
+            EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
+            ASSERT_NE(nullptr, arg);
+
+            const auto* param = static_cast<const IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
+            EXPECT_EQ(1u, param->blocklist);
+            return IARM_RESULT_SUCCESS;
+        }));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"), _T("{\"blocklist\":true}"), response));
 
@@ -1747,9 +1777,7 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_InvalidFileWrite)
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
     EXPECT_TRUE(jsonResponse["success"].Boolean()) << "SetBlocklistFlag should succeed: " << response;
 
-    TEST_LOG("SetBlocklistFlag file write test - Response: %s", response.c_str());
-
-    removeFile("/opt/secure/persistent/opflashstore/devicestate.txt");
+    TEST_LOG("SetBlocklistFlag IARM invocation test - Response: %s", response.c_str());
 }
 
 TEST_F(SystemServicesTest, UpdateFirmware_InvalidParameters)
@@ -2814,26 +2842,31 @@ TEST_F(SystemServicesTest, SetMigrationStatus_Failed)
     TEST_LOG("SetMigrationStatus failed test - Response: %s", response.c_str());
 }
 
-TEST_F(SystemServicesTest, GetBlocklistFlag_FileExists)
+TEST_F(SystemServicesTest, GetBlocklistFlag_IarmSuccess)
 {
-    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
-    // Use uppercase key: read_parameters is case-sensitive so "BLOCKLIST" != "blocklist".
-    // This ensures the success=false serialization path, which does NOT crash Thunder's
-    // BlocklistResult serializer (only success=true with error.code="" crashes it).
-    // pluginImpl is null in the test fixture, so handler.Invoke must be used.
-    createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "BLOCKLIST=false");
+    // Populate output argument to verify parser path, not only return code path.
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke([](const char* ownerName, const char* methodName, void* arg, size_t argLen) -> IARM_Result_t {
+            EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
+            EXPECT_STREQ(IARM_BUS_MFRLIB_API_GetConfigData, methodName);
+            EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
+            ASSERT_NE(nullptr, arg);
+
+            auto* param = static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
+            param->blocklist = 1;
+            return IARM_RESULT_SUCCESS;
+        }));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBlocklistFlag"), _T("{}"), response));
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
-    // success=false because lowercase 'blocklist' key not found in file with 'BLOCKLIST' (uppercase)
-    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "Expected success=false: " << response;
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "Expected success=true: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("blocklist")) << "Missing blocklist field: " << response;
+    EXPECT_TRUE(jsonResponse["blocklist"].Boolean()) << "Expected blocklist=true from mocked IARM output: " << response;
 
-    TEST_LOG("GetBlocklistFlag file exists test - Response: %s", response.c_str());
-
-    removeFile("/opt/secure/persistent/opflashstore/devicestate.txt");
+    TEST_LOG("GetBlocklistFlag IARM success test - Response: %s", response.c_str());
 }
 
 TEST_F(SystemServicesTest, GetMigrationStatus_NotAvailable)
@@ -3291,29 +3324,54 @@ TEST_F(SystemServicesTest, GetDeviceInfo_ImageVersion)
     EXPECT_TRUE(jsonResponse.HasLabel("success"));
 }
 
-TEST_F(SystemServicesTest, GetBlocklistFlag_DirectoryMissing)
+TEST_F(SystemServicesTest, GetBlocklistFlag_IarmFailure)
 {
-    // Remove directory so checkOpFlashStoreDir() attempts mkdir.
-    // In CI (runs as root), mkdir succeeds -> file missing -> success=false, ERROR_NONE.
-    // success=false path is safe for Thunder BlocklistResult serializer.
-    (void)system("rm -rf /opt/secure/persistent/opflashstore");
+    // Simulate IARM_BUS_MFRLIB_API_GetConfigData returning a failure code.
+    // The implementation should return Core::ERROR_NONE with success=false.
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(
+        ::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke([](const char* ownerName, const char* methodName, void* arg, size_t argLen) -> IARM_Result_t {
+            EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
+            EXPECT_STREQ(IARM_BUS_MFRLIB_API_GetConfigData, methodName);
+            EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
+            ASSERT_NE(nullptr, arg);
+            return IARM_RESULT_INVALID_PARAM;
+        }));
 
-    uint32_t result = handler.Invoke(connection, _T("getBlocklistFlag"), _T("{}"), response);
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBlocklistFlag"), _T("{}"), response));
 
-    // Returns ERROR_NONE (mkdir creates dir, file absent -> success=false)
-    // or ERROR_GENERAL (mkdir fails). Both are acceptable — just must not crash.
-    if (result == Core::ERROR_NONE) {
-        JsonObject jsonResponse;
-        ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
-        EXPECT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
-        EXPECT_FALSE(jsonResponse["success"].Boolean()) << "Expected success=false: " << response;
-    }
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    EXPECT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
+    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "Expected success=false on IARM error: " << response;
 
-    TEST_LOG("GetBlocklistFlag directory missing test - Result: %u, Response: %s", result, response.c_str());
+    TEST_LOG("GetBlocklistFlag IARM failure test - Response: %s", response.c_str());
 }
 
 TEST_F(SystemServicesTest, SetBlocklistFlag_EnableTrue)
 {
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke([](const char* ownerName, const char* methodName, void* arg, size_t argLen) -> IARM_Result_t {
+            EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
+            EXPECT_STREQ(IARM_BUS_MFRLIB_API_GetConfigData, methodName);
+            EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
+            ASSERT_NE(nullptr, arg);
+
+            auto* param = static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
+            param->blocklist = 0;
+            return IARM_RESULT_SUCCESS;
+        }))
+        .WillOnce(::testing::Invoke([](const char* ownerName, const char* methodName, void* arg, size_t argLen) -> IARM_Result_t {
+            EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
+            EXPECT_STREQ(IARM_BUS_MFRLIB_API_SetConfigData, methodName);
+            EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
+            ASSERT_NE(nullptr, arg);
+
+            const auto* param = static_cast<const IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
+            EXPECT_EQ(1u, param->blocklist);
+            return IARM_RESULT_SUCCESS;
+        }));
+
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"), _T("{\"blocklist\":true}"), response));
     
     JsonObject jsonResponse;
@@ -3323,6 +3381,28 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_EnableTrue)
 
 TEST_F(SystemServicesTest, SetBlocklistFlag_EnableFalse)
 {
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke([](const char* ownerName, const char* methodName, void* arg, size_t argLen) -> IARM_Result_t {
+            EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
+            EXPECT_STREQ(IARM_BUS_MFRLIB_API_GetConfigData, methodName);
+            EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
+            ASSERT_NE(nullptr, arg);
+
+            auto* param = static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
+            param->blocklist = 1;
+            return IARM_RESULT_SUCCESS;
+        }))
+        .WillOnce(::testing::Invoke([](const char* ownerName, const char* methodName, void* arg, size_t argLen) -> IARM_Result_t {
+            EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
+            EXPECT_STREQ(IARM_BUS_MFRLIB_API_SetConfigData, methodName);
+            EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
+            ASSERT_NE(nullptr, arg);
+
+            const auto* param = static_cast<const IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
+            EXPECT_EQ(0u, param->blocklist);
+            return IARM_RESULT_SUCCESS;
+        }));
+
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"), _T("{\"blocklist\":false}"), response));
     
     JsonObject jsonResponse;
@@ -4467,12 +4547,29 @@ TEST_F(SystemServicesTest, Notification_OnNetworkStandbyModeChanged_Disable)
 
 TEST_F(SystemServicesTest, Notification_OnBlocklistChanged_ViaSetBlocklistFlag)
 {
-    // Create required file for blocklistFlag write to succeed.
-    // IMPORTANT: key must be lowercase 'blocklist' to match #define BLOCKLIST "blocklist".
-    // If the file uses uppercase 'BLOCKLIST', write_parameters won't find the key,
-    // update stays false, and OnBlocklistChanged is never fired.
-    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
-    createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "blocklist=false");
+    // Validate both IARM calls and set payload while triggering the notification path.
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(
+        ::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke([](const char* ownerName, const char* methodName, void* arg, size_t argLen) -> IARM_Result_t {
+            EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
+            EXPECT_STREQ(IARM_BUS_MFRLIB_API_GetConfigData, methodName);
+            EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
+            ASSERT_NE(nullptr, arg);
+
+            auto* param = static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
+            param->blocklist = 0;
+            return IARM_RESULT_SUCCESS;
+        }))
+        .WillOnce(::testing::Invoke([](const char* ownerName, const char* methodName, void* arg, size_t argLen) -> IARM_Result_t {
+            EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
+            EXPECT_STREQ(IARM_BUS_MFRLIB_API_SetConfigData, methodName);
+            EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
+            ASSERT_NE(nullptr, arg);
+
+            const auto* param = static_cast<const IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
+            EXPECT_EQ(1u, param->blocklist);
+            return IARM_RESULT_SUCCESS;
+        }));
 
     ASSERT_NE(nullptr, m_sysServices) << "ISystemServices not available";
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
@@ -4480,7 +4577,6 @@ TEST_F(SystemServicesTest, Notification_OnBlocklistChanged_ViaSetBlocklistFlag)
     m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
 
-    // Use correct param name 'blocklist' (bool) instead of wrong 'blocklistFlag' (string)
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"), _T("{\"blocklist\":true}"), response));
 
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onBlocklistChanged));
@@ -4488,8 +4584,6 @@ TEST_F(SystemServicesTest, Notification_OnBlocklistChanged_ViaSetBlocklistFlag)
 
     m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
-
-    removeFile("/opt/secure/persistent/opflashstore/devicestate.txt");
 }
 
 TEST_F(SystemServicesTest, Notification_MultipleHandlers_IndependentNotifications)
@@ -4653,18 +4747,59 @@ TEST_F(SystemServicesTest, Notification_SequentialEvents_BothReceived)
 
 TEST_F(SystemServicesTest, Notification_OnBlocklistChanged_MultipleChanges)
 {
-    // Create required directory and file for blocklist write to succeed.
-    // Key must be lowercase 'blocklist' to match #define BLOCKLIST "blocklist".
-    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
-    createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "blocklist=false");
+    // First setBlocklistFlag(true): GetConfigData returns blocklist=0 (false) by default →
+    //   change false→true → fires event.
+    // Second setBlocklistFlag(false): GetConfigData must return blocklist=1 (true) to simulate
+    //   the stored state after the first set → change true→false → fires event.
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(
+        ::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke([](const char* ownerName, const char* methodName, void* arg, size_t argLen) -> IARM_Result_t {
+            EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
+            EXPECT_STREQ(IARM_BUS_MFRLIB_API_GetConfigData, methodName);
+            EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
+            ASSERT_NE(nullptr, arg);
 
-	ASSERT_NE(nullptr, m_sysServices) << "ISystemServices not available";
+            auto* param = static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
+            param->blocklist = 0;
+            return IARM_RESULT_SUCCESS;
+        }))
+        .WillOnce(::testing::Invoke([](const char* ownerName, const char* methodName, void* arg, size_t argLen) -> IARM_Result_t {
+            EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
+            EXPECT_STREQ(IARM_BUS_MFRLIB_API_SetConfigData, methodName);
+            EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
+            ASSERT_NE(nullptr, arg);
+
+            const auto* param = static_cast<const IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
+            EXPECT_EQ(1u, param->blocklist);
+            return IARM_RESULT_SUCCESS;
+        }))
+        .WillOnce(::testing::Invoke([](const char* ownerName, const char* methodName, void* arg, size_t argLen) -> IARM_Result_t {
+            EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
+            EXPECT_STREQ(IARM_BUS_MFRLIB_API_GetConfigData, methodName);
+            EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
+            ASSERT_NE(nullptr, arg);
+
+            auto* param = static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
+            param->blocklist = 1;
+            return IARM_RESULT_SUCCESS;
+        }))
+        .WillOnce(::testing::Invoke([](const char* ownerName, const char* methodName, void* arg, size_t argLen) -> IARM_Result_t {
+            EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
+            EXPECT_STREQ(IARM_BUS_MFRLIB_API_SetConfigData, methodName);
+            EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
+            ASSERT_NE(nullptr, arg);
+
+            const auto* param = static_cast<const IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
+            EXPECT_EQ(0u, param->blocklist);
+            return IARM_RESULT_SUCCESS;
+        }));
+
+    ASSERT_NE(nullptr, m_sysServices) << "ISystemServices not available";
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
 
     m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
 
-    // Use correct param key "blocklist" (bool) — not "blocklistFlag" (string)
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"), _T("{\"blocklist\":true}"), response));
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onBlocklistChanged));
 
@@ -4676,8 +4811,6 @@ TEST_F(SystemServicesTest, Notification_OnBlocklistChanged_MultipleChanges)
 
     m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
-
-    removeFile("/opt/secure/persistent/opflashstore/devicestate.txt");
 }
 
 TEST_F(SystemServicesTest, Notification_GetEventSignalled_ReturnsCorrectFlags)
@@ -5200,8 +5333,17 @@ TEST_F(SystemServicesTest, SetTerritory_ValidRegion_US_CA)
 
 TEST_F(SystemServicesTest, GetBlocklistFlag_LowercaseKey_SuccessTrue)
 {
-    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
-    createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "blocklist=false");
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke([](const char* ownerName, const char* methodName, void* arg, size_t argLen) -> IARM_Result_t {
+            EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
+            EXPECT_STREQ(IARM_BUS_MFRLIB_API_GetConfigData, methodName);
+            EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
+            ASSERT_NE(nullptr, arg);
+
+            auto* param = static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
+            param->blocklist = 1;
+            return IARM_RESULT_SUCCESS;
+        }));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBlocklistFlag"), _T("{}"), response));
 
@@ -5210,8 +5352,8 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_LowercaseKey_SuccessTrue)
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
     ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
     bool success = jsonResponse["success"].Boolean();
-    EXPECT_TRUE(success) << "Lowercase key should succeed: " << response;
-    
+    EXPECT_TRUE(success) << "IARM success should yield success=true: " << response;
+
     if (jsonResponse.HasLabel("blocklist")) {
         ASSERT_TRUE(jsonResponse["blocklist"].IsSet()) << "blocklist is not set: " << response;
         bool blocklist = jsonResponse["blocklist"].Boolean();
@@ -5219,8 +5361,6 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_LowercaseKey_SuccessTrue)
     } else {
         TEST_LOG("GetBlocklistFlag_LowercaseKey_SuccessTrue - Response: %s, success: %d", response.c_str(), success);
     }
-
-    removeFile("/opt/secure/persistent/opflashstore/devicestate.txt");
 }
 
 // ======================================
@@ -5229,8 +5369,30 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_LowercaseKey_SuccessTrue)
 
 TEST_F(SystemServicesTest, SetBlocklistFlag_SameValue_NoEvent)
 {
-    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
-    createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "blocklist=true");
+    // Simulate stored blocklist=true: GetConfigData returns blocklist=1.
+    // Setting the same value (true) → no change → no OnBlocklistChanged event.
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(
+        ::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke([](const char* ownerName, const char* methodName, void* arg, size_t argLen) -> IARM_Result_t {
+            EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
+            EXPECT_STREQ(IARM_BUS_MFRLIB_API_GetConfigData, methodName);
+            EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
+            ASSERT_NE(nullptr, arg);
+
+            auto* param = static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
+            param->blocklist = 1;
+            return IARM_RESULT_SUCCESS;
+        }))
+        .WillOnce(::testing::Invoke([](const char* ownerName, const char* methodName, void* arg, size_t argLen) -> IARM_Result_t {
+            EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
+            EXPECT_STREQ(IARM_BUS_MFRLIB_API_SetConfigData, methodName);
+            EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
+            ASSERT_NE(nullptr, arg);
+
+            const auto* param = static_cast<const IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
+            EXPECT_EQ(1u, param->blocklist);
+            return IARM_RESULT_SUCCESS;
+        }));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"),
               _T("{\"blocklist\":true}"), response));
@@ -5242,15 +5404,33 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_SameValue_NoEvent)
     bool success = jsonResponse["success"].Boolean();
     EXPECT_TRUE(success) << "Same-value set should succeed: " << response;
 
-    removeFile("/opt/secure/persistent/opflashstore/devicestate.txt");
-
     TEST_LOG("SetBlocklistFlag_SameValue_NoEvent - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetBlocklistFlag_DifferentValue_FiresEvent)
 {
-    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
-    createFile("/opt/secure/persistent/opflashstore/devicestate.txt", "blocklist=false");
+    // Validate data for both IARM calls while covering value-change path.
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke([](const char* ownerName, const char* methodName, void* arg, size_t argLen) -> IARM_Result_t {
+            EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
+            EXPECT_STREQ(IARM_BUS_MFRLIB_API_GetConfigData, methodName);
+            EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
+            ASSERT_NE(nullptr, arg);
+
+            auto* param = static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
+            param->blocklist = 0;
+            return IARM_RESULT_SUCCESS;
+        }))
+        .WillOnce(::testing::Invoke([](const char* ownerName, const char* methodName, void* arg, size_t argLen) -> IARM_Result_t {
+            EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
+            EXPECT_STREQ(IARM_BUS_MFRLIB_API_SetConfigData, methodName);
+            EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
+            ASSERT_NE(nullptr, arg);
+
+            const auto* param = static_cast<const IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
+            EXPECT_EQ(1u, param->blocklist);
+            return IARM_RESULT_SUCCESS;
+        }));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"),
               _T("{\"blocklist\":true}"), response));
@@ -5261,8 +5441,6 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_DifferentValue_FiresEvent)
     ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
     bool success = jsonResponse["success"].Boolean();
     EXPECT_TRUE(success) << "Different-value set should succeed: " << response;
-
-    removeFile("/opt/secure/persistent/opflashstore/devicestate.txt");
 
     TEST_LOG("SetBlocklistFlag_DifferentValue_FiresEvent - Response: %s, success: %d", response.c_str(), success);
 }
