@@ -112,6 +112,7 @@ git clone https://github.com/rdkcentral/tr69hostif.git
 cd tr69hostif
 cp src/hostif/include/*.h /usr/local/include
 cp src/hostif/handlers/include/*.h /usr/local/include
+cp src/hostif/profiles/DeviceInfo/*.h /usr/local/include
 cd ./src/unittest/stubs
 touch webpa_parameter.h
 g++ -fPIC -shared -o libIARMBus.so iarm_stubs.cpp  -I/usr/tr69hostif/src/hostif/parodusClient/pal -I/usr/tr69hostif/src/unittest/stubs -I/usr/tr69hostif/src/hostif/parodusClient/waldb -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include -I/usr/tr69hostif/src/hostif/include -I/usr/tr69hostif/src/hostif/profiles/DeviceInfo -I/usr/tr69hostif/src/hostif/parodusClient/pal -fpermissive
