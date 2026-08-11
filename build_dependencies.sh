@@ -85,6 +85,7 @@ cp include/*.h /usr/local/include
 sh  build_inside_container.sh
 
 cd ${GITHUB_WORKSPACE}
+gi clone https://github.com/rdkcentral/dcm-agent.git
 cd dcm-agent
 git checkout feature/RDKEMW-22385
 autoreconf -i
