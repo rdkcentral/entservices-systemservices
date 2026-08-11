@@ -92,8 +92,8 @@ rm -rf iarmmgrs
 rm -rf iarmbus
 git clone https://github.com/rdkcentral/iarmbus.git
 # Install header files alone from iarmbus repositories
-cp /usr/iarmbus/core/include/*.h /usr/local/include
-cp /usr/iarmbus/core/*.h /usr/local/include
+cp iarmbus/core/include/*.h /usr/local/include
+cp iarmbus/core/*.h /usr/local/include
 
 git clone https://github.com/rdkcentral/iarmmgrs.git
 cp iarmmgrs/sysmgr/include/sysMgr.h /usr/local/include
