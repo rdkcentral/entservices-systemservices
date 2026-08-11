@@ -46,18 +46,21 @@ cd "$GITHUB_WORKSPACE"
 
 git clone --branch 1.0.14 https://github.com/rdkcentral/entservices-testframework.git
 
+cd $WORKDIR
 rm -rf rdk-cert-config
 git clone -b 1.0.6 https://github.com/rdkcentral/rdk-cert-config.git && \
     cd rdk-cert-config && autoreconf --install && ./configure --prefix=/usr/local --enable-testrdkcerts && \
     make && make install
 cp RdkConfigApi/src/librdkconfig.a /usr/local/lib/librdkconfig.a
 
+cd $WORKDIR
 rm -rf rbus 
-
 git clone https://github.com/rdkcentral/rbus
 cmake -Hrbus -Bbuild/rbus -DBUILD_FOR_DESKTOP=ON -DCMAKE_BUILD_TYPE=Debug
 make -C build/rbus && make -C build/rbus install
 
+
+cd $WORKDIR
 rm -rf WebconfigFramework
 git clone https://github.com/rdkcentral/WebconfigFramework.git
 cd WebconfigFramework && export INSTALL_DIR='/usr/local'&& \
@@ -66,6 +69,16 @@ export LDFLAGS="-L${INSTALL_DIR}/lib" && \
 autoreconf --install && \
 ./configure --prefix=/usr/local && make && make install && cp -r include/* /usr/local/include/
 
+cd $WORKDIR
+rm -rf WebconfigFramework
+git clone https://github.com/rdkcentral/WebconfigFramework.git
+cd WebconfigFramework && export INSTALL_DIR='/usr/local'&& \
+export CFLAGS="-I${INSTALL_DIR}/include/rtmessage -I${INSTALL_DIR}/include/msgpack -I${INSTALL_DIR}/include/rbus -I${INSTALL_DIR}/include" && \
+export LDFLAGS="-L${INSTALL_DIR}/lib" && \
+autoreconf --install && \
+./configure --prefix=/usr/local && make && make install && cp -r include/* /usr/local/include/
+
+cd $WORKDIR
 rm -rf rdk_logger
 
 git clone https://github.com/rdkcentral/rdk_logger.git
