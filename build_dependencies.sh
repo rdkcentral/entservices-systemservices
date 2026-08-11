@@ -50,6 +50,7 @@ rm -rf rdk-cert-config
 git clone -b 1.0.6 https://github.com/rdkcentral/rdk-cert-config.git && \
     cd rdk-cert-config && autoreconf --install && ./configure --prefix=/usr/local --enable-testrdkcerts && \
     make && make install
+cp RdkConfigApi/src/librdkconfig.a /usr/local/lib/librdkconfig.a
 
 rm -rf rbus 
 
