@@ -89,6 +89,13 @@ autoreconf --install && \
 
 cd ${GITHUB_WORKSPACE}
 rm -rf iarmmgrs
+rm -rf iarmbus
+git clone https://github.com/rdkcentral/iarmbus.git
+# Install header files alone from iarmbus repositories
+cp /usr/iarmbus/core/include/libIBusDaemon.h /usr/local/include
+cp /usr/iarmbus/core/include/libIBus.h /usr/local/include
+cp /usr/iarmbus/core/libIARMCore.h /usr/local/include
+
 git clone https://github.com/rdkcentral/iarmmgrs.git
 cp iarmmgrs/sysmgr/include/sysMgr.h /usr/local/include
 cp iarmmgrs/maintenance/include/maintenanceMGR.h /usr/local/include
