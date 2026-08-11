@@ -72,6 +72,14 @@ git clone https://github.com/rdkcentral/rdk_logger.git
 cd rdk_logger && autoreconf --install && ./configure && make && make install
 
 cd ${GITHUB_WORKSPACE}
+rm -rf libSyscallWrapper
+git clone https://github.com/rdkcentral/libSyscallWrapper.git
+cd libSyscallWrapper && export INSTALL_DIR='/usr/local' && \
+autoreconf --install && \
+./configure --prefix=/usr/local && make && make install
+
+
+cd ${GITHUB_WORKSPACE}
 rm -rf common_utilities
 git clone https://github.com/rdkcentral/common_utilities.git
 cd common_utilities && export INSTALL_DIR='/usr/local' && \
