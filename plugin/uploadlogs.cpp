@@ -155,6 +155,7 @@ pid_t logUploadAsync(void)
         params.rrd_flag = false;
         params.rrd_file = NULL;
         params.uploadlogsnow_mode = false;
+        
 
         int result = uploadstblogs_run(&params);
         _Exit(result);
