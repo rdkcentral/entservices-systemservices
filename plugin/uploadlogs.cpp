@@ -37,6 +37,7 @@
 extern "C" {
 #include "uploadstblogs.h"
 }
+
 namespace WPEFramework
 {
 namespace Plugin
