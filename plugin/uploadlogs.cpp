@@ -138,7 +138,6 @@ pid_t logUploadAsync(void)
 
     if (E_NOK == getUploadLogParameters(tftp_server, upload_protocol, upload_httplink))
         return -1;
-
     pid_t pid = fork();
 
     if (-1 == pid)
