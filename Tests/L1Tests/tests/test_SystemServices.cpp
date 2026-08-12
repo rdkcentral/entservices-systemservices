@@ -211,6 +211,7 @@ public:
     uint32_t AddRef() const override
     {
         Core::InterlockedIncrement(m_refCount);
+        return ERROR_NONE;
     }
 
     uint32_t Release() const override
