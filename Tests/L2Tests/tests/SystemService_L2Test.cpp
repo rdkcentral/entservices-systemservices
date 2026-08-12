@@ -20,7 +20,6 @@
 #include "SystemServicesTestFixture.h"
 
 #define JSON_TIMEOUT   (1000)
-#define TEST_LOG(x, ...) fprintf(stderr, "\033[1;32m[%s:%d](%s)<PID:%d><TID:%d>" x "\n\033[0m", __FILE__, __LINE__, __FUNCTION__, getpid(), gettid(), ##__VA_ARGS__); fflush(stderr);
 #define SYSTEM_CALLSIGN  _T("org.rdk.System.1")
 #define L2TEST_CALLSIGN _T("L2tests.1")
 
@@ -8207,88 +8206,6 @@ TEST_F(SystemService_L2Test, SysImpl_GetLastFirmwareFailureReason_KnownReason_JS
 }
 
 // ==================================================================================
-// Test fixture for Migration plugin integration tests
-// ==================================================================================
-/**
- * @brief Fixture that activates org.rdk.Migration before running migration tests.
- *
- * Inherits from SystemService_L2Test (which already activates org.rdk.System and
- * org.rdk.PowerManager). The Migration plugin is activated in the constructor and
- * deactivated in the destructor so each test gets a clean plugin lifecycle.
- *
- * Coverage goal: exercise the `if (migrationObject)` TRUE branches inside
- *   - SystemServicesImplementation::GetBootTypeInfo
- *   - SystemServicesImplementation::GetMigrationStatus
- *   - SystemServicesImplementation::SetMigrationStatus
- * and all internal enum/string conversion tables that are unreachable without the
- * Migration plugin being present.
- */
-class SystemService_L2Test_WithMigration : public SystemService_L2Test {
-protected:
-    bool m_migrationActivated = false;
-
-    SystemService_L2Test_WithMigration() : SystemService_L2Test()
-    {
-        /* The MigrationStatus file lives under /opt/secure/persistent/ */
-        (void)system("mkdir -p /opt/secure/persistent");
-
-        uint32_t status = ActivateService("org.rdk.Migration");
-        if (status == Core::ERROR_NONE) {
-            m_migrationActivated = true;
-            TEST_LOG("org.rdk.Migration activated for migration coverage tests");
-        } else {
-            TEST_LOG("org.rdk.Migration activation returned %u - migration tests will be gracefully skipped", status);
-        }
-    }
-
-    ~SystemService_L2Test_WithMigration() override
-    {
-        /* Clean up test files written by the Migration plugin */
-        (void)system("rm -f /tmp/bootType");
-        (void)system("rm -f /opt/secure/persistent/MigrationStatus");
-
-        if (m_migrationActivated) {
-            uint32_t s = DeactivateService("org.rdk.Migration");
-            if (s != Core::ERROR_NONE) {
-                TEST_LOG("org.rdk.Migration deactivation returned %u (non-fatal)", s);
-            }
-        }
-    }
-
-    /**
-     * @brief Write a BOOT_TYPE entry to /tmp/bootType so that
-     *        MigrationImplementation::GetBootTypeInfo can find it.
-     */
-    void WriteBootTypeFile(const char* bootTypeValue)
-    {
-        std::ofstream f("/tmp/bootType");
-        if (f.is_open()) {
-            f << "BOOT_TYPE=" << bootTypeValue << "\n";
-        }
-    }
-
-    /**
-     * @brief Configure p_rfcApiImplMock to return @p statusValue for the
-     *        TR181 Migration-status parameter so that
-     *        MigrationImplementation::GetMigrationStatus returns that status.
-     */
-    void SetRFCMigrationStatus(const char* statusValue)
-    {
-        std::string sv(statusValue);
-        ON_CALL(*p_rfcApiImplMock, getRFCParameter(
-            ::testing::_,
-            ::testing::StrEq("Device.DeviceInfo.Migration.MigrationStatus"),
-            ::testing::_))
-        .WillByDefault(::testing::Invoke(
-            [sv](char*, const char*, RFC_ParamData_t* d) {
-                strncpy(d->value, sv.c_str(), sizeof(d->value) - 1);
-                d->value[sizeof(d->value) - 1] = '\0';
-                return WDMP_SUCCESS;
-            }));
-    }
-};
-
-// ==================================================================================
 // GetBootTypeInfo tests – covers the migrationObject-non-null success / failure paths
 // and all four BootType enum values in the bootTypeToString map
 // ==================================================================================
@@ -8787,56 +8704,6 @@ TEST_F(SystemService_L2Test_WithMigration, Migration_SetMigrationStatus_COMRPC)
 }
 
 // ==================================================================================
-// Test fixture for DeviceInfo plugin integration tests
-// ==================================================================================
-/**
- * @brief Fixture that activates DeviceInfo before running DeviceInfo-dependent tests.
- *
- * Coverage goal: exercise the `if (deviceInfoObject)` TRUE branches inside
- *   - SystemServicesImplementation::GetSerialNumber
- *   - SystemServicesImplementation::GetDeviceInfo
- */
-class SystemService_L2Test_WithDeviceInfo : public SystemService_L2Test {
-protected:
-    bool m_deviceInfoActivated = false;
-
-    SystemService_L2Test_WithDeviceInfo() : SystemService_L2Test()
-    {
-        /* GetDeviceInfo with empty queryParam hits the bluetooth_mac branch which calls
-         * v_secure_popen.  NiceMock returns nullptr by default → Core::ERROR_GENERAL.
-         * Set up a mock that returns a valid (empty) FILE* so the call succeeds. */
-        ON_CALL(*p_wrapsImplMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_))
-            .WillByDefault(::testing::Invoke(
-                [](const char*, const char*, va_list) -> FILE* {
-                    return fopen("/dev/null", "r");
-                }));
-        ON_CALL(*p_wrapsImplMock, v_secure_pclose(::testing::_))
-            .WillByDefault(::testing::Invoke(
-                [](FILE* f) -> int {
-                    return f ? fclose(f) : 0;
-                }));
-
-        uint32_t status = ActivateService("DeviceInfo");
-        if (status == Core::ERROR_NONE) {
-            m_deviceInfoActivated = true;
-            TEST_LOG("DeviceInfo activated for coverage tests");
-        } else {
-            TEST_LOG("DeviceInfo activation returned %u - tests will be gracefully skipped", status);
-        }
-    }
-
-    ~SystemService_L2Test_WithDeviceInfo() override
-    {
-        if (m_deviceInfoActivated) {
-            uint32_t s = DeactivateService("DeviceInfo");
-            if (s != Core::ERROR_NONE) {
-                TEST_LOG("DeviceInfo deactivation returned %u (non-fatal)", s);
-            }
-        }
-    }
-};
-
-// ==================================================================================
 // GetSerialNumber tests — exercises the `if (deviceInfoObject)` TRUE branch
 // ==================================================================================
 
@@ -8969,48 +8836,6 @@ TEST_F(SystemService_L2Test_WithDeviceInfo, DeviceInfo_GetDeviceInfo_PlatcoPath_
 }
 
 // ==================================================================================
-// Test fixture for Telemetry plugin integration tests
-// ==================================================================================
-/**
- * @brief Fixture that activates org.rdk.Telemetry before running telemetry tests.
- *
- * Coverage goal: exercise the `if (telemetryObject)` TRUE branches inside
- *   - SystemServicesImplementation::IsOptOutTelemetry
- *   - SystemServicesImplementation::SetOptOutTelemetry
- */
-class SystemService_L2Test_WithTelemetry : public SystemService_L2Test {
-protected:
-    bool m_telemetryActivated = false;
-
-    SystemService_L2Test_WithTelemetry() : SystemService_L2Test()
-    {
-        /* Ensure opt-out file directory exists */
-        (void)system("mkdir -p /opt");
-
-        uint32_t status = ActivateService("org.rdk.Telemetry");
-        if (status == Core::ERROR_NONE) {
-            m_telemetryActivated = true;
-            TEST_LOG("org.rdk.Telemetry activated for coverage tests");
-        } else {
-            TEST_LOG("org.rdk.Telemetry activation returned %u - tests will be gracefully skipped", status);
-        }
-    }
-
-    ~SystemService_L2Test_WithTelemetry() override
-    {
-        /* Remove opt-out file created by tests */
-        (void)system("rm -f /opt/tmtryoptout");
-
-        if (m_telemetryActivated) {
-            uint32_t s = DeactivateService("org.rdk.Telemetry");
-            if (s != Core::ERROR_NONE) {
-                TEST_LOG("org.rdk.Telemetry deactivation returned %u (non-fatal)", s);
-            }
-        }
-    }
-};
-
-// ==================================================================================
 // IsOptOutTelemetry tests — exercises the `if (telemetryObject)` TRUE branch
 // ==================================================================================
 
@@ -9113,41 +8938,6 @@ TEST_F(SystemService_L2Test_WithTelemetry, Telemetry_SetOptOutTelemetry_COMRPC)
     m_SystemServicesPlugin->Release();
     m_controller_SystemServices->Release();
 }
-
-// ==================================================================================
-// Test fixture for FirmwareUpdate plugin integration tests
-// ==================================================================================
-/**
- * @brief Fixture that activates org.rdk.FirmwareUpdate before running firmware tests.
- *
- * Coverage goal: exercise the `if (firmwareupdateObject)` TRUE branch inside
- *   - SystemServicesImplementation::SetFirmwareAutoReboot
- */
-class SystemService_L2Test_WithFirmwareUpdate : public SystemService_L2Test {
-protected:
-    bool m_firmwareUpdateActivated = false;
-
-    SystemService_L2Test_WithFirmwareUpdate() : SystemService_L2Test()
-    {
-        uint32_t status = ActivateService("org.rdk.FirmwareUpdate");
-        if (status == Core::ERROR_NONE) {
-            m_firmwareUpdateActivated = true;
-            TEST_LOG("org.rdk.FirmwareUpdate activated for coverage tests");
-        } else {
-            TEST_LOG("org.rdk.FirmwareUpdate activation returned %u - tests will be gracefully skipped", status);
-        }
-    }
-
-    ~SystemService_L2Test_WithFirmwareUpdate() override
-    {
-        if (m_firmwareUpdateActivated) {
-            uint32_t s = DeactivateService("org.rdk.FirmwareUpdate");
-            if (s != Core::ERROR_NONE) {
-                TEST_LOG("org.rdk.FirmwareUpdate deactivation returned %u (non-fatal)", s);
-            }
-        }
-    }
-};
 
 // ==================================================================================
 // SetFirmwareAutoReboot tests — exercises the `if (firmwareupdateObject)` TRUE branch
