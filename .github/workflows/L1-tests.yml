@@ -115,7 +115,7 @@ jobs:
         with:
           repository: rdkcentral/ThunderTools
           path: ThunderTools
-          ref: R4.4.3
+          ref: R4_4-RDK
 
       - name: Checkout entservices-testframework
         uses: actions/checkout@v3
