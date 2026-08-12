@@ -208,7 +208,7 @@ public:
     virtual ~SystemServicesNotificationHandler() = default;
 
     // Reference counting implementation
-    void AddRef() const override
+    uint32_t AddRef() const override
     {
         Core::InterlockedIncrement(m_refCount);
     }
