@@ -11,8 +11,8 @@ on:
 env:
   BUILD_TYPE: Debug 
   REPO_NAME: "systemservices"
-  THUNDER_REF: "R4.4.1"
-  INTERFACES_REF: "4.0.8"
+  THUNDER_REF: "R4_4-RDK"
+  INTERFACES_REF: "develop"
   AUTOMATICS_UNAME: ${{ secrets.AUTOMATICS_UNAME}}
   AUTOMATICS_PASSCODE: ${{ secrets. AUTOMATICS_PASSCODE}}
   RDK_SERVICES_L1_TEST: "ON"
@@ -122,7 +122,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-testframework
           path: entservices-testframework
-          ref: 1.0.14
+          ref: feature/RDKEMW-23342
 
       - name: Checkout entservices-systemservices
         if: ${{ inputs.caller_source == 'local' }}
