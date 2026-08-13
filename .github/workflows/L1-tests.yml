@@ -122,7 +122,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-testframework
           path: entservices-testframework
-          ref: feature/logupload_1.0.14
+          ref: feature/logupload1.0.14
 
       - name: Checkout entservices-systemservices
         if: ${{ inputs.caller_source == 'local' }}
