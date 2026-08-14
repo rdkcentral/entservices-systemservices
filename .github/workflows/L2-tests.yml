@@ -118,7 +118,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-testframework
           path: entservices-testframework
-          ref: feature/logupload_1.0.17
+          ref: 1.0.17
 
       - name: Checkout googletest
         if: steps.cache.outputs.cache-hit != 'true'
