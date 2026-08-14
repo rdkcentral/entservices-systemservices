@@ -1037,9 +1037,10 @@ TEST_F(SystemService_L2Test,SystemServiceGetSetBlocklistFlag)
     uint32_t signalled = SYSTEMSERVICEL2TEST_STATE_INVALID;
 
     // Blocklist is stored by the MFR library over IARM; emulate that storage so
-    // a get after a set observes the written value.
+    // a get after a set observes the written value. Seeded to 1 so the initial
+    // setBlocklistFlag(true) is a no-change and does not emit onBlocklistChanged.
     static uint8_t s_blocklist;
-    s_blocklist = 0;
+    s_blocklist = 1;
     ON_CALL(*p_iarmBusImplMock, IARM_Bus_Call(
         ::testing::StrEq(IARM_BUS_MFRLIB_NAME),
         ::testing::StrEq(IARM_BUS_MFRLIB_API_GetConfigData),
