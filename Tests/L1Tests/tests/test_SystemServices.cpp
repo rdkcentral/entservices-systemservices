@@ -208,9 +208,9 @@ public:
     virtual ~SystemServicesNotificationHandler() = default;
 
     // Reference counting implementation
-    void AddRef() const override
+    uint32_t AddRef() const override
     {
-        Core::InterlockedIncrement(m_refCount);
+        return Core::InterlockedIncrement(m_refCount);
     }
 
     uint32_t Release() const override
@@ -11447,7 +11447,7 @@ public:
                  WPEFramework::Exchange::IMigration::MigrationResult& migrationResult), (override));
     MOCK_METHOD(WPEFramework::Core::hresult, GetMigrationStatus,
                 (WPEFramework::Exchange::IMigration::MigrationStatusInfo& migrationStatusInfo), (override));
-    MOCK_METHOD(void, AddRef, (), (const, override));
+    MOCK_METHOD(uint32_t, AddRef, (), (const, override));
     MOCK_METHOD(uint32_t, Release, (), (const, override));
     MOCK_METHOD(void*, QueryInterface, (const uint32_t interfacenumber), (override));
 };
@@ -11585,7 +11585,7 @@ TEST_F(SystemServicesTest, IsOptOutTelemetry_WithTelemetryPlugin_SuccessPath)
 {
     EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("org.rdk.Telemetry"))))
         .WillOnce(::testing::Return(static_cast<Exchange::ITelemetry*>(p_telemetryApiImplMock)));
-    ON_CALL(*p_telemetryApiImplMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(*p_telemetryApiImplMock, AddRef()).WillByDefault(::testing::Return(0u));
     ON_CALL(*p_telemetryApiImplMock, Release()).WillByDefault(::testing::Return(1));
     ON_CALL(*p_telemetryApiImplMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
     ON_CALL(*p_telemetryApiImplMock, IsOptOutTelemetry(::testing::_, ::testing::_))
@@ -11612,7 +11612,7 @@ TEST_F(SystemServicesTest, SetOptOutTelemetry_WithTelemetryPlugin_SuccessPath)
     // Covers line 1303 (telemetryObject->SetOptOutTelemetry)
     EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("org.rdk.Telemetry"))))
         .WillOnce(::testing::Return(static_cast<Exchange::ITelemetry*>(p_telemetryApiImplMock)));
-    ON_CALL(*p_telemetryApiImplMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(*p_telemetryApiImplMock, AddRef()).WillByDefault(::testing::Return(0u));
     ON_CALL(*p_telemetryApiImplMock, Release()).WillByDefault(::testing::Return(1));
     ON_CALL(*p_telemetryApiImplMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
@@ -11645,7 +11645,7 @@ TEST_F(SystemServicesTest, GetMigrationStatus_WithMigrationPlugin_MigrationCompl
 
     EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("org.rdk.Migration"))))
         .WillOnce(::testing::Return(static_cast<Exchange::IMigration*>(&migrationMock)));
-    ON_CALL(migrationMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(migrationMock, AddRef()).WillByDefault(::testing::Return(0u));
     ON_CALL(migrationMock, Release()).WillByDefault(::testing::Return(1));
     ON_CALL(migrationMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
@@ -11682,7 +11682,7 @@ TEST_F(SystemServicesTest, GetMigrationStatus_AllStatusValues_CoversAllMapEntrie
 
         EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("org.rdk.Migration"))))
             .WillOnce(::testing::Return(static_cast<Exchange::IMigration*>(&migrationMock)));
-        ON_CALL(migrationMock, AddRef()).WillByDefault(::testing::Return());
+        ON_CALL(migrationMock, AddRef()).WillByDefault(::testing::Return(0u));
         ON_CALL(migrationMock, Release()).WillByDefault(::testing::Return(1));
         ON_CALL(migrationMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
@@ -11710,7 +11710,7 @@ TEST_F(SystemServicesTest, GetBootTypeInfo_WithMigrationPlugin_BootMigration)
 
     EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("org.rdk.Migration"))))
         .WillOnce(::testing::Return(static_cast<Exchange::IMigration*>(&migrationMock)));
-    ON_CALL(migrationMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(migrationMock, AddRef()).WillByDefault(::testing::Return(0u));
     ON_CALL(migrationMock, Release()).WillByDefault(::testing::Return(1));
     ON_CALL(migrationMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
@@ -11743,7 +11743,7 @@ TEST_F(SystemServicesTest, GetBootTypeInfo_AllBootTypes_CoversAllMapEntries)
 
         EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("org.rdk.Migration"))))
             .WillOnce(::testing::Return(static_cast<Exchange::IMigration*>(&migrationMock)));
-        ON_CALL(migrationMock, AddRef()).WillByDefault(::testing::Return());
+        ON_CALL(migrationMock, AddRef()).WillByDefault(::testing::Return(0u));
         ON_CALL(migrationMock, Release()).WillByDefault(::testing::Return(1));
         ON_CALL(migrationMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
@@ -11787,7 +11787,7 @@ TEST_F(SystemServicesTest, GetDeviceInfo_ModelNumber_WithDeviceInfoPlugin)
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
         .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
-    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return(0u));
     ON_CALL(*deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
     ON_CALL(*deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
@@ -11823,7 +11823,7 @@ TEST_F(SystemServicesTest, GetDeviceInfo_DeviceType_WithDeviceInfoPlugin)
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
         .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
-    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return(0u));
     ON_CALL(*deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
     ON_CALL(*deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
@@ -11862,7 +11862,7 @@ TEST_F(SystemServicesTest, GetDeviceInfo_EstbMac_WithDeviceInfoPlugin)
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
         .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
-    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return(0u));
     ON_CALL(*deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
     ON_CALL(*deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
@@ -11901,7 +11901,7 @@ TEST_F(SystemServicesTest, GetDeviceInfo_EthMac_WithDeviceInfoPlugin)
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
         .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
-    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return(0u));
     ON_CALL(*deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
     ON_CALL(*deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
@@ -11940,7 +11940,7 @@ TEST_F(SystemServicesTest, GetDeviceInfo_WifiMac_WithDeviceInfoPlugin)
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
         .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
-    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return(0u));
     ON_CALL(*deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
     ON_CALL(*deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
@@ -11979,7 +11979,7 @@ TEST_F(SystemServicesTest, GetDeviceInfo_BoxIP_WithDeviceInfoPlugin)
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
         .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
-    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return(0u));
     ON_CALL(*deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
     ON_CALL(*deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
@@ -12018,7 +12018,7 @@ TEST_F(SystemServicesTest, GetDeviceInfo_FirmwareVersion_WithDeviceInfoPlugin)
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
         .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
-    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return(0u));
     ON_CALL(*deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
     ON_CALL(*deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
@@ -12057,7 +12057,7 @@ TEST_F(SystemServicesTest, GetDeviceInfo_FriendlyId_WithDeviceInfoPlugin)
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
         .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
-    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return(0u));
     ON_CALL(*deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
     ON_CALL(*deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
@@ -12097,7 +12097,7 @@ TEST_F(SystemServicesTest, GetDeviceInfo_AllFields_WithDeviceInfoPlugin_CoversAl
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
         .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
-    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return(0u));
     ON_CALL(*deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
     ON_CALL(*deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
@@ -12183,7 +12183,7 @@ TEST_F(SystemServicesTest, SetMigrationStatus_WithMigrationPlugin_MigrationCompl
 
     EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("org.rdk.Migration"))))
         .WillOnce(::testing::Return(static_cast<Exchange::IMigration*>(&migrationMock)));
-    ON_CALL(migrationMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(migrationMock, AddRef()).WillByDefault(::testing::Return(0u));
     ON_CALL(migrationMock, Release()).WillByDefault(::testing::Return(1));
     ON_CALL(migrationMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
@@ -12216,7 +12216,7 @@ TEST_F(SystemServicesTest, GetSerialNumber_WithDeviceInfoPlugin_SuccessPath)
 
     EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
         .WillOnce(::testing::Return(static_cast<Exchange::IDeviceInfo*>(&deviceInfoMock)));
-    ON_CALL(deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(deviceInfoMock, AddRef()).WillByDefault(::testing::Return(0u));
     ON_CALL(deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
     ON_CALL(deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
@@ -12249,7 +12249,7 @@ TEST_F(SystemServicesTest, GetStbVersionString_ViaGetSystemVersions_WithDeviceIn
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
         .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
-    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return());
+    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return(0u));
     ON_CALL(*deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
     ON_CALL(*deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
