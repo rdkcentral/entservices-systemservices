@@ -898,7 +898,7 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_Success)
             EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
             EXPECT_STREQ(IARM_BUS_MFRLIB_API_GetConfigData, methodName);
             EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
-            ASSERT_NE(nullptr, arg);
+            if (nullptr == arg) { ADD_FAILURE() << "arg must not be null"; return IARM_RESULT_INVALID_PARAM; }
 
             auto* param = static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
             param->blocklist = 0; // old value is false
@@ -908,7 +908,7 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_Success)
             EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
             EXPECT_STREQ(IARM_BUS_MFRLIB_API_SetConfigData, methodName);
             EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
-            ASSERT_NE(nullptr, arg);
+            if (nullptr == arg) { ADD_FAILURE() << "arg must not be null"; return IARM_RESULT_INVALID_PARAM; }
 
             const auto* param = static_cast<const IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
             EXPECT_EQ(1u, param->blocklist);
@@ -1753,7 +1753,7 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_InvalidFileWrite)
             EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
             EXPECT_STREQ(IARM_BUS_MFRLIB_API_GetConfigData, methodName);
             EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
-            ASSERT_NE(nullptr, arg);
+            if (nullptr == arg) { ADD_FAILURE() << "arg must not be null"; return IARM_RESULT_INVALID_PARAM; }
 
             auto* param = static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
             param->blocklist = 0;
@@ -1763,7 +1763,7 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_InvalidFileWrite)
             EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
             EXPECT_STREQ(IARM_BUS_MFRLIB_API_SetConfigData, methodName);
             EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
-            ASSERT_NE(nullptr, arg);
+            if (nullptr == arg) { ADD_FAILURE() << "arg must not be null"; return IARM_RESULT_INVALID_PARAM; }
 
             const auto* param = static_cast<const IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
             EXPECT_EQ(1u, param->blocklist);
@@ -2850,7 +2850,7 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_IarmSuccess)
             EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
             EXPECT_STREQ(IARM_BUS_MFRLIB_API_GetConfigData, methodName);
             EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
-            ASSERT_NE(nullptr, arg);
+            if (nullptr == arg) { ADD_FAILURE() << "arg must not be null"; return IARM_RESULT_INVALID_PARAM; }
 
             auto* param = static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
             param->blocklist = 1;
@@ -3334,7 +3334,7 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_IarmFailure)
             EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
             EXPECT_STREQ(IARM_BUS_MFRLIB_API_GetConfigData, methodName);
             EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
-            ASSERT_NE(nullptr, arg);
+            EXPECT_NE(nullptr, arg);
             return IARM_RESULT_INVALID_PARAM;
         }));
 
@@ -3355,7 +3355,7 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_EnableTrue)
             EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
             EXPECT_STREQ(IARM_BUS_MFRLIB_API_GetConfigData, methodName);
             EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
-            ASSERT_NE(nullptr, arg);
+            if (nullptr == arg) { ADD_FAILURE() << "arg must not be null"; return IARM_RESULT_INVALID_PARAM; }
 
             auto* param = static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
             param->blocklist = 0;
@@ -3365,7 +3365,7 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_EnableTrue)
             EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
             EXPECT_STREQ(IARM_BUS_MFRLIB_API_SetConfigData, methodName);
             EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
-            ASSERT_NE(nullptr, arg);
+            if (nullptr == arg) { ADD_FAILURE() << "arg must not be null"; return IARM_RESULT_INVALID_PARAM; }
 
             const auto* param = static_cast<const IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
             EXPECT_EQ(1u, param->blocklist);
@@ -3386,7 +3386,7 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_EnableFalse)
             EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
             EXPECT_STREQ(IARM_BUS_MFRLIB_API_GetConfigData, methodName);
             EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
-            ASSERT_NE(nullptr, arg);
+            if (nullptr == arg) { ADD_FAILURE() << "arg must not be null"; return IARM_RESULT_INVALID_PARAM; }
 
             auto* param = static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
             param->blocklist = 1;
@@ -3396,7 +3396,7 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_EnableFalse)
             EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
             EXPECT_STREQ(IARM_BUS_MFRLIB_API_SetConfigData, methodName);
             EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
-            ASSERT_NE(nullptr, arg);
+            if (nullptr == arg) { ADD_FAILURE() << "arg must not be null"; return IARM_RESULT_INVALID_PARAM; }
 
             const auto* param = static_cast<const IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
             EXPECT_EQ(0u, param->blocklist);
@@ -4554,7 +4554,7 @@ TEST_F(SystemServicesTest, Notification_OnBlocklistChanged_ViaSetBlocklistFlag)
             EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
             EXPECT_STREQ(IARM_BUS_MFRLIB_API_GetConfigData, methodName);
             EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
-            ASSERT_NE(nullptr, arg);
+            if (nullptr == arg) { ADD_FAILURE() << "arg must not be null"; return IARM_RESULT_INVALID_PARAM; }
 
             auto* param = static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
             param->blocklist = 0;
@@ -4564,7 +4564,7 @@ TEST_F(SystemServicesTest, Notification_OnBlocklistChanged_ViaSetBlocklistFlag)
             EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
             EXPECT_STREQ(IARM_BUS_MFRLIB_API_SetConfigData, methodName);
             EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
-            ASSERT_NE(nullptr, arg);
+            if (nullptr == arg) { ADD_FAILURE() << "arg must not be null"; return IARM_RESULT_INVALID_PARAM; }
 
             const auto* param = static_cast<const IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
             EXPECT_EQ(1u, param->blocklist);
@@ -4757,7 +4757,7 @@ TEST_F(SystemServicesTest, Notification_OnBlocklistChanged_MultipleChanges)
             EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
             EXPECT_STREQ(IARM_BUS_MFRLIB_API_GetConfigData, methodName);
             EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
-            ASSERT_NE(nullptr, arg);
+            if (nullptr == arg) { ADD_FAILURE() << "arg must not be null"; return IARM_RESULT_INVALID_PARAM; }
 
             auto* param = static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
             param->blocklist = 0;
@@ -4767,7 +4767,7 @@ TEST_F(SystemServicesTest, Notification_OnBlocklistChanged_MultipleChanges)
             EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
             EXPECT_STREQ(IARM_BUS_MFRLIB_API_SetConfigData, methodName);
             EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
-            ASSERT_NE(nullptr, arg);
+            if (nullptr == arg) { ADD_FAILURE() << "arg must not be null"; return IARM_RESULT_INVALID_PARAM; }
 
             const auto* param = static_cast<const IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
             EXPECT_EQ(1u, param->blocklist);
@@ -4777,7 +4777,7 @@ TEST_F(SystemServicesTest, Notification_OnBlocklistChanged_MultipleChanges)
             EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
             EXPECT_STREQ(IARM_BUS_MFRLIB_API_GetConfigData, methodName);
             EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
-            ASSERT_NE(nullptr, arg);
+            if (nullptr == arg) { ADD_FAILURE() << "arg must not be null"; return IARM_RESULT_INVALID_PARAM; }
 
             auto* param = static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
             param->blocklist = 1;
@@ -4787,7 +4787,7 @@ TEST_F(SystemServicesTest, Notification_OnBlocklistChanged_MultipleChanges)
             EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
             EXPECT_STREQ(IARM_BUS_MFRLIB_API_SetConfigData, methodName);
             EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
-            ASSERT_NE(nullptr, arg);
+            if (nullptr == arg) { ADD_FAILURE() << "arg must not be null"; return IARM_RESULT_INVALID_PARAM; }
 
             const auto* param = static_cast<const IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
             EXPECT_EQ(0u, param->blocklist);
@@ -5338,7 +5338,7 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_LowercaseKey_SuccessTrue)
             EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
             EXPECT_STREQ(IARM_BUS_MFRLIB_API_GetConfigData, methodName);
             EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
-            ASSERT_NE(nullptr, arg);
+            if (nullptr == arg) { ADD_FAILURE() << "arg must not be null"; return IARM_RESULT_INVALID_PARAM; }
 
             auto* param = static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
             param->blocklist = 1;
@@ -5377,7 +5377,7 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_SameValue_NoEvent)
             EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
             EXPECT_STREQ(IARM_BUS_MFRLIB_API_GetConfigData, methodName);
             EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
-            ASSERT_NE(nullptr, arg);
+            if (nullptr == arg) { ADD_FAILURE() << "arg must not be null"; return IARM_RESULT_INVALID_PARAM; }
 
             auto* param = static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
             param->blocklist = 1;
@@ -5387,7 +5387,7 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_SameValue_NoEvent)
             EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
             EXPECT_STREQ(IARM_BUS_MFRLIB_API_SetConfigData, methodName);
             EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
-            ASSERT_NE(nullptr, arg);
+            if (nullptr == arg) { ADD_FAILURE() << "arg must not be null"; return IARM_RESULT_INVALID_PARAM; }
 
             const auto* param = static_cast<const IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
             EXPECT_EQ(1u, param->blocklist);
@@ -5415,7 +5415,7 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_DifferentValue_FiresEvent)
             EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
             EXPECT_STREQ(IARM_BUS_MFRLIB_API_GetConfigData, methodName);
             EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
-            ASSERT_NE(nullptr, arg);
+            if (nullptr == arg) { ADD_FAILURE() << "arg must not be null"; return IARM_RESULT_INVALID_PARAM; }
 
             auto* param = static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
             param->blocklist = 0;
@@ -5425,7 +5425,7 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_DifferentValue_FiresEvent)
             EXPECT_STREQ(IARM_BUS_MFRLIB_NAME, ownerName);
             EXPECT_STREQ(IARM_BUS_MFRLIB_API_SetConfigData, methodName);
             EXPECT_EQ(sizeof(IARM_Bus_MFRLib_Platformblockdata_Param_t), argLen);
-            ASSERT_NE(nullptr, arg);
+            if (nullptr == arg) { ADD_FAILURE() << "arg must not be null"; return IARM_RESULT_INVALID_PARAM; }
 
             const auto* param = static_cast<const IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg);
             EXPECT_EQ(1u, param->blocklist);
