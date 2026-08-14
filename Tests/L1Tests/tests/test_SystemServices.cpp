@@ -6337,41 +6337,35 @@ TEST_F(SystemServicesTest, SetFriendlyName_DifferentName_RfcFailure_StillSuccess
 
 // ------------------------------------------------------------------
 // SetBlocklistFlag branches:
-//   1) Directory creation fails → ERROR_GENERAL / success=false
-//   2) write_parameters fails → ERROR_GENERAL / success=false  (read-only dir)
-//   3) update=false (same value already in file) → success, no event
-//   4) update=true (value changed) → success, event dispatched
+//   1) IARM SetConfigData fails → ERROR_GENERAL / success=false
+//   2) update=false (IARM reports same value) → success, no event
+//   3) update=true (value changed) → success, event dispatched
 // ------------------------------------------------------------------
 
-TEST_F(SystemServicesTest, SetBlocklistFlag_WriteParamFails_DirectoryUnwritable)
+TEST_F(SystemServicesTest, SetBlocklistFlag_IarmSetFails_ReturnsErrorGeneral)
 {
-    // Point the code at a path that cannot be created without root.
-    // checkOpFlashStoreDir() tries mkdir on OPFLASH_STORE; if the parent
-    // dir is absent and not creatable it returns false → ERROR_GENERAL.
-    // Actually it's hard to make the dir un-creatable in CI.
-    // Instead: pre-create a REGULAR FILE at /opt/secure/persistent/opflashstore
-    // so mkdir fails with ENOTDIR → errno != EEXIST → ret=false.
-    (void)system("rm -rf /opt/secure/persistent/opflashstore");
-    (void)system("mkdir -p /opt/secure/persistent && touch /opt/secure/persistent/opflashstore");
+    // Both GetConfigData and SetConfigData fail; the SetConfigData failure is
+    // what drives the ERROR_GENERAL return.
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillRepeatedly(::testing::Return(IARM_RESULT_INVALID_PARAM));
 
     uint32_t result = handler.Invoke(connection, _T("setBlocklistFlag"),
                                      _T("{\"blocklist\":true}"), response);
-    // With the dir unavailable, SetBlocklistFlag returns Core::ERROR_GENERAL
-    EXPECT_EQ(Core::ERROR_GENERAL, result) << "Should fail when opflashstore is a file";
+    EXPECT_EQ(Core::ERROR_GENERAL, result) << "IARM SetConfigData failure should return ERROR_GENERAL";
 
-    // Clean up — restore proper dir for subsequent tests
-    (void)system("rm -f /opt/secure/persistent/opflashstore");
-    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
-
-    TEST_LOG("SetBlocklistFlag_WriteParamFails_DirectoryUnwritable - Result: %u", result);
+    TEST_LOG("SetBlocklistFlag_IarmSetFails_ReturnsErrorGeneral - Result: %u", result);
 }
 
 TEST_F(SystemServicesTest, SetBlocklistFlag_SameValueAsFile_NoEventDispatched)
 {
-    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
-    // Pre-write "blocklist=true" so write_parameters finds the same value → update=false
-    std::ofstream f("/opt/secure/persistent/opflashstore/devicestate.txt");
-    f << "blocklist=true\n"; f.close();
+    // GetConfigData reports blocklist=1; setting true again → no change → no event.
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke([](const char*, const char*, void* arg, size_t) -> IARM_Result_t {
+            if (nullptr == arg) { ADD_FAILURE() << "arg must not be null"; return IARM_RESULT_INVALID_PARAM; }
+            static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg)->blocklist = 1;
+            return IARM_RESULT_SUCCESS;
+        }))
+        .WillOnce(::testing::Return(IARM_RESULT_SUCCESS));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"),
               _T("{\"blocklist\":true}"), response));
@@ -6381,18 +6375,20 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_SameValueAsFile_NoEventDispatched)
     ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
     bool success = jr["success"].Boolean();
     EXPECT_TRUE(success) << response;
-
-    (void)std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
 
     TEST_LOG("SetBlocklistFlag_SameValueAsFile_NoEventDispatched - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetBlocklistFlag_DifferentValueFromFile_EventDispatched)
 {
-    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
-    // Pre-write "blocklist=false", then set to true → update=true → event
-    std::ofstream f("/opt/secure/persistent/opflashstore/devicestate.txt");
-    f << "blocklist=false\n"; f.close();
+    // GetConfigData reports blocklist=0; setting true → change → event dispatched.
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke([](const char*, const char*, void* arg, size_t) -> IARM_Result_t {
+            if (nullptr == arg) { ADD_FAILURE() << "arg must not be null"; return IARM_RESULT_INVALID_PARAM; }
+            static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg)->blocklist = 0;
+            return IARM_RESULT_SUCCESS;
+        }))
+        .WillOnce(::testing::Return(IARM_RESULT_SUCCESS));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBlocklistFlag"),
               _T("{\"blocklist\":true}"), response));
@@ -6403,23 +6399,20 @@ TEST_F(SystemServicesTest, SetBlocklistFlag_DifferentValueFromFile_EventDispatch
     bool success = jr["success"].Boolean();
     EXPECT_TRUE(success) << response;
 
-    (void)std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
-
     TEST_LOG("SetBlocklistFlag_DifferentValueFromFile_EventDispatched - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ------------------------------------------------------------------
 // GetBlocklistFlag branches:
-//   1) Directory not creatable → ERROR_GENERAL, success=false
-//   2) File absent → read_parameters fails → success=false, ERROR_NONE
-//   3) File present with "blocklist=true" → success=true, blocklist=true
-//   4) File present with "blocklist=false" → success=true, blocklist=false
+//   1) IARM GetConfigData fails → success=false, ERROR_NONE
+//   2) IARM reports blocklist=1 → success=true, blocklist=true
+//   3) IARM reports blocklist=0 → success=true, blocklist=false
 // ------------------------------------------------------------------
 
-TEST_F(SystemServicesTest, GetBlocklistFlag_FileAbsent_SuccessFalse)
+TEST_F(SystemServicesTest, GetBlocklistFlag_IarmError_SuccessFalse)
 {
-    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
-    (void)std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(IARM_RESULT_INVALID_PARAM));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBlocklistFlag"), _T("{}"), response));
 
@@ -6427,16 +6420,19 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_FileAbsent_SuccessFalse)
     ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
     ASSERT_TRUE(jr["success"].IsSet()) << "success is not set: " << response;
     bool success = jr["success"].Boolean();
-    EXPECT_FALSE(success) << "No file should yield success=false: " << response;
+    EXPECT_FALSE(success) << "IARM failure should yield success=false: " << response;
 
-    TEST_LOG("GetBlocklistFlag_FileAbsent_SuccessFalse - Response: %s, success: %d", response.c_str(), success);
+    TEST_LOG("GetBlocklistFlag_IarmError_SuccessFalse - Response: %s, success: %d", response.c_str(), success);
 }
 
-TEST_F(SystemServicesTest, GetBlocklistFlag_FilePresent_BlocklistTrue)
+TEST_F(SystemServicesTest, GetBlocklistFlag_IarmReportsSet_BlocklistTrue)
 {
-    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
-    std::ofstream f("/opt/secure/persistent/opflashstore/devicestate.txt");
-    f << "blocklist=true\n"; f.close();
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke([](const char*, const char*, void* arg, size_t) -> IARM_Result_t {
+            if (nullptr == arg) { ADD_FAILURE() << "arg must not be null"; return IARM_RESULT_INVALID_PARAM; }
+            static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg)->blocklist = 1;
+            return IARM_RESULT_SUCCESS;
+        }));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBlocklistFlag"), _T("{}"), response));
 
@@ -6450,16 +6446,17 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_FilePresent_BlocklistTrue)
     bool blocklist = jr["blocklist"].Boolean();
     EXPECT_TRUE(blocklist) << "Expected blocklist=true: " << response;
 
-    (void)std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
-
-    TEST_LOG("GetBlocklistFlag_FilePresent_BlocklistTrue - Response: %s, success: %d, blocklist: %d", response.c_str(), success, blocklist);
+    TEST_LOG("GetBlocklistFlag_IarmReportsSet_BlocklistTrue - Response: %s, success: %d, blocklist: %d", response.c_str(), success, blocklist);
 }
 
 TEST_F(SystemServicesTest, GetBlocklistFlag_FilePresent_BlocklistFalse)
 {
-    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
-    std::ofstream f("/opt/secure/persistent/opflashstore/devicestate.txt");
-    f << "blocklist=false\n"; f.close();
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke([](const char*, const char*, void* arg, size_t) -> IARM_Result_t {
+            if (nullptr == arg) { ADD_FAILURE() << "arg must not be null"; return IARM_RESULT_INVALID_PARAM; }
+            static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg)->blocklist = 0;
+            return IARM_RESULT_SUCCESS;
+        }));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getBlocklistFlag"), _T("{}"), response));
 
@@ -6472,8 +6469,6 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_FilePresent_BlocklistFalse)
     ASSERT_TRUE(jr["blocklist"].IsSet()) << "blocklist is not set: " << response;
     bool blocklist = jr["blocklist"].Boolean();
     EXPECT_FALSE(blocklist) << "Expected blocklist=false: " << response;
-
-    (void)std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
 
     TEST_LOG("GetBlocklistFlag_FilePresent_BlocklistFalse - Response: %s, success: %d, blocklist: %d", response.c_str(), success, blocklist);
 }
@@ -8886,20 +8881,20 @@ TEST_F(SystemServicesTest, SetMode_IarmFailure_Path)
 }
 
 // ------------------------------------------------------------------
-// 4. FILE MISSING — GetBlocklistFlag with no devicestate file
+// 4. IARM READ FAILURE — GetBlocklistFlag when GetConfigData fails
 // ------------------------------------------------------------------
-TEST_F(SystemServicesTest, GetBlocklistFlag_FileMissing)
+TEST_F(SystemServicesTest, GetBlocklistFlag_IarmReadFails_SuccessFalse)
 {
-    (void)system("mkdir -p /opt/secure/persistent/opflashstore");
-    (void)std::remove("/opt/secure/persistent/opflashstore/devicestate.txt");
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(IARM_RESULT_IPCCORE_FAIL));
 
     EXPECT_EQ(Core::ERROR_NONE,
         handler.Invoke(connection, _T("getBlocklistFlag"), _T("{}"), response));
 
     JsonObject res; ASSERT_TRUE(res.FromString(response));
     EXPECT_TRUE(res.HasLabel("success"));
-    EXPECT_FALSE(res["success"].Boolean()) << "Missing file must yield success=false";
-    TEST_LOG("GetBlocklistFlag_FileMissing - Response: %s", response.c_str());
+    EXPECT_FALSE(res["success"].Boolean()) << "IARM read failure must yield success=false";
+    TEST_LOG("GetBlocklistFlag_IarmReadFails_SuccessFalse - Response: %s", response.c_str());
 }
 
 // ------------------------------------------------------------------
