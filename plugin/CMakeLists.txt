@@ -27,6 +27,7 @@ find_package(${NAMESPACE}Definitions REQUIRED)
 find_package(CompileSettingsDebug CONFIG REQUIRED)
 find_package(${NAMESPACE}Helpers REQUIRED)
 find_library(PROCPS_LIBRARIES NAMES procps)
+find_library(SECURE_WRAPPER_LIBRARIES NAMES secure_wrapper)
 
 find_package(Telemetry)
 
@@ -51,21 +52,53 @@ target_link_libraries(${MODULE_NAME}
 install(TARGETS ${MODULE_NAME}
     DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/${STORAGE_DIRECTORY}/plugins)
 
+option(USE_DEVICESETTING_PLUGIN
+    "Enable COM-RPC integration with entservices-devicesettings for SystemServices (replaces libds/IARM device:: calls)"
+    ON)
+
+if (USE_DEVICESETTING_PLUGIN)
+    # ── DS_COMRPC/ path ───────────────────────────────────────────────────────
+    # COM-RPC to entservices-devicesettings (IDeviceSettingsHost / IDeviceSettingsAudio).
+    # Does NOT link libds.so or libdshalcli.so.
+    set(SS_DS_IMPL_SRCS
+        DS_COMRPC/SystemServicesImplementation.cpp
+        DS_COMRPC/platformcapsdata.cpp)
+    set(SS_DS_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/DS_COMRPC)
+    message(STATUS "SystemServices: USE_DEVICESETTING_PLUGIN=ON — DS_COMRPC/ path (no libds)")
+else()
+    # ── DS_IARM/ path ─────────────────────────────────────────────────────────
+    # IARM / libds path using device:: host APIs directly.
+    set(SS_DS_IMPL_SRCS
+        DS_IARM/SystemServicesImplementation.cpp
+        DS_IARM/platformcapsdata.cpp)
+    set(SS_DS_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/DS_IARM)
+    message(STATUS "SystemServices: USE_DEVICESETTING_PLUGIN=OFF — DS_IARM/ path (libds/IARM)")
+endif() # USE_DEVICESETTING_PLUGIN
+
 add_library(${PLUGIN_IMPLEMENTATION} SHARED
-        SystemServicesImplementation.cpp
+        ${SS_DS_IMPL_SRCS}
         Module.cpp
         cTimer.cpp
         thermonitor.cpp
         SystemServicesHelper.cpp
         uploadlogs.cpp
         platformcaps/platformcaps.cpp
-        platformcaps/platformcapsdata.cpp
         platformcaps/platformcapsdatarpc.cpp
         )
-set_source_files_properties(SystemServicesImplementation.cpp thermonitor.cpp platformcaps/platformcapsdata.cpp PROPERTIES COMPILE_FLAGS "-fexceptions")
+set_source_files_properties(${SS_DS_IMPL_SRCS} thermonitor.cpp PROPERTIES COMPILE_FLAGS "-fexceptions")
 set_target_properties(${PLUGIN_IMPLEMENTATION} PROPERTIES
         CXX_STANDARD 11
         CXX_STANDARD_REQUIRED YES)
+
+# DS-path-specific compile definitions and link libraries (target now exists)
+if (USE_DEVICESETTING_PLUGIN)
+    find_package(${NAMESPACE}Definitions REQUIRED)
+    find_package(${NAMESPACE}Helpers REQUIRED)
+    target_compile_definitions(${PLUGIN_IMPLEMENTATION} PRIVATE USE_DEVICESETTING_PLUGIN)
+    target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE
+        ${NAMESPACE}Definitions::${NAMESPACE}Definitions
+        ${NAMESPACE}::${NAMESPACE}Helpers)
+endif()
 
 target_compile_definitions(${PLUGIN_IMPLEMENTATION} PRIVATE MODULE_NAME=Plugin_${PLUGIN_NAME})
 
@@ -89,6 +122,10 @@ endif(IARMBus_FOUND)
 if(PROCPS_LIBRARIES)
     target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${PROCPS_LIBRARIES})
 endif(PROCPS_LIBRARIES)
+
+if(SECURE_WRAPPER_LIBRARIES)
+    target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${SECURE_WRAPPER_LIBRARIES})
+endif(SECURE_WRAPPER_LIBRARIES)
 
 find_package(DS)
 if (DS_FOUND)
@@ -133,7 +170,8 @@ if(TELEMETRY_FOUND)
     target_include_directories(${MODULE_NAME} PRIVATE ${TELEMETRY_INCLUDE_DIRS})
 endif()
 
-target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ./)
+target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ./
+    ${SS_DS_INCLUDE_DIR})
 target_link_libraries(${MODULE_NAME} PRIVATE ${NAMESPACE}::${NAMESPACE}Helpers)
 target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${NAMESPACE}::${NAMESPACE}Helpers)
 
