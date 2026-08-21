@@ -161,8 +161,12 @@ pid_t logUploadAsync(void)
         if (execve(argArray[0], (char **)argArray, environ) == -1)
         {
             LOGERR("Execve failed: %s", strerror(errno));
-            _Exit(127);
+            _Exit(EXIT_FAILURE);
         }
+    }
+    else if (pid > 0)
+    {
+    LOGINFO("Log upload parent process: %d", pid);
     }
 
     LOGINFO("Started %d process with %s", pid, argArray[1]);
