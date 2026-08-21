@@ -1,0 +1,263 @@
+name: PR - Validate Release Version
+
+# yml1: Runs when PR is opened/updated targeting dummy_develop or support/* branches.
+# Checks that the PR description contains a valid 'release_version:' field
+# AND that the target support branch actually exists on the remote.
+#
+# Rules:
+#   release_version: none       → ✅ no backport needed
+#   release_version: 8.3.4      → ✅ valid (maps to support/8.3.4.0)
+#   release_version: 8.3.4.0    → ✅ valid (maps to support/8.3.4.0)
+#   release_version: (missing)  → ❌ field is required
+#   release_version: 8          → ❌ too short (need X.Y.Z or X.Y.Z.W)
+#   release_version: 8.3        → ❌ missing patch number
+#   release_version: support/8.3.4.0 → ❌ don't include "support/" prefix
+#   valid format but branch missing  → ❌ support branch not found on remote
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+    branches:
+      - dummy_develop
+      - 'support/**'
+      - 'release/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate-release-version:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RDKCM_RDKE }}
+
+      - name: Validate release_version
+        env:
+          PR_BODY:   ${{ github.event.pull_request.body }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          
+          echo "PR branch       : $PR_BRANCH"
+          echo "PR number       : #$PR_NUMBER"
+          echo ""
+          echo "╔══════════════════════════════════════════════════════════════════╗"
+          echo "║  RELEASE VERSION VALIDATION                                     ║"
+          echo "╚══════════════════════════════════════════════════════════════════╝"
+          echo ""
+
+          # ────────────────────────────────────────────────────────────────────
+          # Rule 1: Check for multiple occurrences (enforce single source of truth)
+          # ────────────────────────────────────────────────────────────────────
+          echo "▶ Rule 1: Checking for multiple 'release_version' fields..."
+          
+          # Count all lines containing release_version (case-insensitive)
+          OCCURRENCE_COUNT=$(echo "$PR_BODY" | grep -iE '^\s*release[_-]?version\s*:' | wc -l | tr -d ' ')
+          
+          if [ "$OCCURRENCE_COUNT" -eq 0 ]; then
+            echo "  ❌ VALIDATION FAILED: 'release_version:' field is MISSING from PR description."
+            echo ""
+            echo "  ┌─ REQUIRED FORMAT ────────────────────────────────────────────┐"
+            echo "  │  Add EXACTLY ONE of these lines to your PR description:      │"
+            echo "  │                                                               │"
+            echo "  │  release_version: none       → no backport needed            │"
+            echo "  │  release_version: 8.3.4      → backport to support/8.3.4.0  │"
+            echo "  │  release_version: 8.3.4.0    → backport to support/8.3.4.0  │"
+            echo "  │                                                               │"
+            echo "  │  Flexible formats accepted:                                  │"
+            echo "  │  - Case insensitive: RELEASE_VERSION, Release_Version, etc.  │"
+            echo "  │  - With/without space after colon: 'version:' or 'version :'│"
+            echo "  │  - Trailing comments: 'release_version: 8.3.4.0 # comment'   │"
+            echo "  └───────────────────────────────────────────────────────────────┘"
+            echo ""
+            echo "  ▶ Validation logs and helpful checks (automated):"
+            echo ""
+            echo "    • Showing the PR description excerpt for quick inspection:"
+            echo "" 
+            echo "---- BEGIN PR BODY ----"
+            echo "$PR_BODY" | sed -n '1,120p' || true
+            echo "----  END PR BODY  ----"
+            echo ""
+            echo "    • Attempting to list remote 'support/*' branches to help pick a target:" 
+            git fetch origin --quiet || true
+            echo ""
+            echo "    Remote support branches (origin):"
+            git ls-remote --heads origin | grep 'refs/heads/support/' | awk '{print "      - " $2}' | sed 's@refs/heads/@@' || echo "      (none found)"
+            echo ""
+            echo "    • Helpful next steps:" 
+            echo "      - Add one 'release_version:' line to your PR description (see formats above)."
+            echo "      - If you don't need a backport, set: release_version: none"
+            echo "      - If you intend backport to an existing support branch, use the numeric form (X.Y.Z or X.Y.Z.W)."
+            echo "      - After adding the field, push an update to this PR and this check will re-run."
+            echo ""
+            echo "    • Example commands you can run locally to inspect branches:"
+            echo "      git fetch origin --quiet"
+            echo "      git ls-remote --heads origin 'refs/heads/support/*' | sed -e 's@refs/heads/@@'"
+            echo ""
+            exit 1
+          fi
+          
+          if [ "$OCCURRENCE_COUNT" -gt 1 ]; then
+            echo "  ❌ VALIDATION FAILED: Multiple 'release_version' fields found ($OCCURRENCE_COUNT occurrences)."
+            echo ""
+            echo "  Found entries:"
+            echo "$PR_BODY" | grep -inE '^\s*release[_-]?version\s*:' | sed 's/^/    │ Line /'
+            echo ""
+            echo "  ┌─ SINGLE SOURCE OF TRUTH ─────────────────────────────────────┐"
+            echo "  │  Only ONE 'release_version:' field is allowed.               │"
+            echo "  │  Remove duplicate entries from PR description.                │"
+            echo "  │                                                               │"
+            echo "  │  Examples of duplicates (ALL INVALID):                        │"
+            echo "  │  release_version: none                                        │"
+            echo "  │  release_version: 8.3.4.0      ← multiple entries not allowed│"
+            echo "  └───────────────────────────────────────────────────────────────┘"
+            exit 1
+          fi
+          
+          echo "  ✅ Found exactly 1 occurrence (single source of truth)"
+          echo ""
+
+          # ────────────────────────────────────────────────────────────────────
+          # Rule 2: Extract and normalize the value
+          # ────────────────────────────────────────────────────────────────────
+          echo "▶ Rule 2: Extracting and normalizing value..."
+          
+          # Extract the line (case-insensitive, flexible colon spacing)
+          RAW_LINE=$(echo "$PR_BODY" | grep -iE '^\s*release[_-]?version\s*:' | head -1)
+          echo "  Raw line: '$RAW_LINE'"
+          
+          # Extract value after colon (handle multi-line YAML format)
+          # If value is empty after colon, check next non-empty line
+          VALUE_ON_SAME_LINE=$(echo "$RAW_LINE" | sed -E 's/^[^:]*:\s*//' | sed 's/#.*//' | xargs)
+          
+          if [ -z "$VALUE_ON_SAME_LINE" ]; then
+            # Multi-line YAML format: check next non-empty line
+            echo "  ⚠️  Value not on same line, checking next line (multi-line YAML)..."
+            LINE_NUM=$(echo "$PR_BODY" | grep -inE '^\s*release[_-]?version\s*:' | head -1 | cut -d: -f1)
+            VALUE_ON_SAME_LINE=$(echo "$PR_BODY" | tail -n +$((LINE_NUM + 1)) | grep -v '^[[:space:]]*$' | head -1 | sed 's/#.*//' | xargs)
+            echo "  Next line value: '$VALUE_ON_SAME_LINE'"
+          fi
+          
+          # Strip leading/trailing spaces, newlines, carriage returns, and remove trailing comments
+          VERSION=$(echo "$VALUE_ON_SAME_LINE" | sed 's/#.*//' | tr -d '\n\r' | xargs)
+          
+          echo "  Normalized value: '$VERSION'"
+          echo ""
+
+          # ────────────────────────────────────────────────────────────────────
+          # Rule 3: Handle 'none' (no backport needed)
+          # ────────────────────────────────────────────────────────────────────
+          echo "▶ Rule 3: Checking if backport is needed..."
+          
+          if echo "$VERSION" | grep -qiE '^none$'; then
+            echo "  ✅ release_version: none — no backport needed for this PR."
+            echo ""
+            echo "╔══════════════════════════════════════════════════════════════════╗"
+            echo "║  ✅ VALIDATION PASSED: NO BACKPORT                              ║"
+            echo "╚══════════════════════════════════════════════════════════════════╝"
+            exit 0
+          fi
+          
+          echo "  ℹ️  Backport required for version: $VERSION"
+          echo ""
+
+          # ────────────────────────────────────────────────────────────────────
+          # Rule 4: Validate format (must not include prefix)
+          # ────────────────────────────────────────────────────────────────────
+          echo "▶ Rule 4: Checking for invalid prefixes..."
+          
+          if echo "$VERSION" | grep -qiE '^(support/|release/)'; then
+            echo "  ❌ VALIDATION FAILED: Do not include 'support/' or 'release/' prefix."
+            echo ""
+            echo "  Wrong  : release_version: support/8.3.4.0"
+            echo "  Wrong  : release_version: release/8.3.4.0"
+            echo "  Correct: release_version: 8.3.4.0"
+            exit 1
+          fi
+          
+          echo "  ✅ No invalid prefixes"
+          echo ""
+
+          # ────────────────────────────────────────────────────────────────────
+          # Rule 5: Simplified validation and mapping (develop | numeric)
+          # ────────────────────────────────────────────────────────────────────
+          echo "▶ Rule 5: Validating version format (numeric X.Y.Z(.W) or 'develop')..."
+
+          # If explicitly 'develop', accept and map to develop
+          if echo "$VERSION" | grep -qiE '^develop$'; then
+            SUPPORT_BRANCH="develop"
+            echo "  ✅ 'develop' accepted → branch: develop"
+          else
+            # Accept numeric semantic versions: X.Y.Z or X.Y.Z.W
+            if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$'; then
+              echo "  ❌ VALIDATION FAILED: Invalid format '$VERSION'"
+              echo "  Allowed: 'develop' or semantic numeric like 8.3.4 or 8.3.4.0"
+              exit 1
+            fi
+
+            # Simple leading-zero check for parts (e.g., disallow '08')
+            IFS='.' read -ra PARTS <<< "$VERSION"
+            for PART in "${PARTS[@]}"; do
+              if [[ "$PART" =~ ^0[0-9]+ ]]; then
+                echo "  ❌ VALIDATION FAILED: Part has leading zero: '$PART'"
+                exit 1
+              fi
+            done
+
+            # Map 3-part versions to support/X.Y.Z.0 (backwards compatibility)
+            if [ "${#PARTS[@]}" -eq 3 ]; then
+              SUPPORT_BRANCH="support/${VERSION}.0"
+            else
+              SUPPORT_BRANCH="support/${VERSION}"
+            fi
+
+            echo "  ✅ Numeric version accepted → branch: $SUPPORT_BRANCH"
+          fi
+
+          # ────────────────────────────────────────────────────────────────────
+          # Rule 9: Verify support branch exists on remote (early validation)
+          # ────────────────────────────────────────────────────────────────────
+          echo "▶ Rule 9: Verifying support branch exists on remote..."
+          echo "  (This catches configuration errors BEFORE merge)"
+          
+          git fetch origin 2>/dev/null || true
+
+          if git ls-remote --exit-code --heads origin "$SUPPORT_BRANCH" > /dev/null 2>&1; then
+            echo "  ✅ Support branch found: $SUPPORT_BRANCH"
+          else
+            echo "  ❌ VALIDATION FAILED: Support branch '$SUPPORT_BRANCH' does NOT exist on remote."
+            echo ""
+            echo "    Available support branches:"
+            git branch -r | grep 'origin/support/' | sed 's/.*origin\//      /' || echo "      (none found)"
+            echo ""
+            echo "  ┌─ BRANCH NOT FOUND ───────────────────────────────────────────┐"
+            echo "  │  Your release_version: $VERSION"
+            echo "  │  Expected branch     : $SUPPORT_BRANCH  ← NOT FOUND         │"
+            echo "  │                                                               │"
+            echo "  │  Choose a version that matches an existing support branch.   │"
+            echo "  │  This validation prevents merge-time failures.               │"
+            echo "  └───────────────────────────────────────────────────────────────┘"
+            exit 1
+          fi
+          echo ""
+
+          # ────────────────────────────────────────────────────────────────────
+          # SUCCESS
+          # ────────────────────────────────────────────────────────────────────
+          echo "╔══════════════════════════════════════════════════════════════════╗"
+          echo "║  ✅ VALIDATION PASSED                                           ║"
+          echo "╠══════════════════════════════════════════════════════════════════╣"
+          echo "║  Release version : $VERSION"
+          echo "║  Target branch   : $SUPPORT_BRANCH"
+          echo "║  Branch status   : EXISTS on remote"
+          echo "║                                                                  ║"
+          echo "║  When this PR merges → automatic backport will be created       ║"
+          echo "╚══════════════════════════════════════════════════════════════════╝"

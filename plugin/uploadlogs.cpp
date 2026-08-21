@@ -166,6 +166,7 @@ pid_t logUploadAsync(void)
     }
 
     LOGINFO("Started %d process with %s", pid, argArray[1]);
+    LOGINFO("Log upload process initiated");
 
     return pid;
 }
