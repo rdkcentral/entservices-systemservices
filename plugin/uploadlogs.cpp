@@ -136,20 +136,6 @@ pid_t logUploadAsync(void)
     string upload_protocol;
     string upload_httplink;
 
-    if (E_NOK == getUploadLogParameters(tftp_server, upload_protocol, upload_httplink))
-        return -1;
-    const char *argArray[] = {
-        "/usr/bin/logupload",
-        tftp_server.c_str(),
-        "0", //FLAG,
-        "1", //DCM_FLAG,
-        "false", //UploadOnReboot,
-        upload_protocol.c_str(),
-        upload_httplink.c_str(), 
-        "1",
-        "false"
-    };
-
     pid_t pid  = fork();
 
     if (-1 == pid)
@@ -164,13 +150,8 @@ pid_t logUploadAsync(void)
             _Exit(EXIT_FAILURE);
         }
     }
-    else if (pid > 0)
-    {
-    LOGINFO("Log upload parent process: %d", pid);
-    }
-
     LOGINFO("Started %d process with %s", pid, argArray[1]);
-    LOGINFO("Log upload process initiated");
+    LOGINFO("Initiated");
 
     return pid;
 }
