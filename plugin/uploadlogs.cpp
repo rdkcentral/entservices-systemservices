@@ -148,7 +148,6 @@ pid_t logUploadAsync(void)
         upload_httplink.c_str(), 
         "1",
         "false",
-        nullptr
     };
 
     pid_t pid  = fork();
