@@ -1161,10 +1161,13 @@ namespace WPEFramework
             IARM_Result_t getRes = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME,
                                        IARM_BUS_MFRLIB_API_GetConfigData,
                                        (void *)&getParam, sizeof(getParam));
-            bool oldBlocklistFlag = (getRes == IARM_RESULT_SUCCESS) ? (getParam.blocklist != 0) : false;
+            bool oldBlocklistFlag = false;
+            if (getRes == IARM_RESULT_SUCCESS) {
+                oldBlocklistFlag = (getParam.blocklist != 0);
+            }
 
             IARM_Bus_MFRLib_Platformblockdata_Param_t setParam = {0};
-            setParam.blocklist = blocklist ? 1 : 0;
+            setParam.blocklist = blocklist;
             IARM_Result_t setRes = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME,
                                        IARM_BUS_MFRLIB_API_SetConfigData,
                                        (void *)&setParam, sizeof(setParam));
@@ -1180,7 +1183,7 @@ namespace WPEFramework
             LOGINFO("Blocklist flag stored successfully via IARM");
             result.success = true;
 
-            if (getRes == IARM_RESULT_SUCCESS && (oldBlocklistFlag != blocklist)) {
+            if (oldBlocklistFlag != blocklist) {
                 /*Send ONBLOCKLISTCHANGED event notify*/
                 if (SystemServicesImplementation::_instance) {
                     SystemServicesImplementation::_instance->OnBlocklistChanged(blocklist, oldBlocklistFlag);
