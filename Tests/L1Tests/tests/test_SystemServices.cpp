@@ -682,30 +682,6 @@ protected:
         // the test body even starts.
         (void)system("rm -f /opt/secure/persistent/opflashstore/devicestate.txt");
 
-        // Create minimal ISO 3166 fixture files required by isRegionValidForTerritory().
-        // These are normally installed via the iso-codes RDEPENDS package on the target.
-        (void)system("mkdir -p /usr/share/iso-codes/json");
-        createFile("/usr/share/iso-codes/json/iso_3166-1.json",
-            "{\"3166-1\":["
-            "{\"alpha_2\":\"US\",\"alpha_3\":\"USA\",\"name\":\"United States\"},"
-            "{\"alpha_2\":\"AU\",\"alpha_3\":\"AUS\",\"name\":\"Australia\"},"
-            "{\"alpha_2\":\"GB\",\"alpha_3\":\"GBR\",\"name\":\"United Kingdom\"},"
-            "{\"alpha_2\":\"DE\",\"alpha_3\":\"DEU\",\"name\":\"Germany\"},"
-            "{\"alpha_2\":\"CA\",\"alpha_3\":\"CAN\",\"name\":\"Canada\"},"
-            "{\"alpha_2\":\"JP\",\"alpha_3\":\"JPN\",\"name\":\"Japan\"},"
-            "{\"alpha_2\":\"IT\",\"alpha_3\":\"ITA\",\"name\":\"Italy\"}"
-            "]}");
-        createFile("/usr/share/iso-codes/json/iso_3166-2.json",
-            "{\"3166-2\":["
-            "{\"code\":\"US-CA\",\"name\":\"California\"},"
-            "{\"code\":\"US-NY\",\"name\":\"New York\"},"
-            "{\"code\":\"US-TX\",\"name\":\"Texas\"},"
-            "{\"code\":\"AU-NSW\",\"name\":\"New South Wales\"},"
-            "{\"code\":\"GB-LND\",\"name\":\"London\"},"
-            "{\"code\":\"JP-13\",\"name\":\"Tokyo\"},"
-            "{\"code\":\"IT-BG\",\"name\":\"Bergamo\"}"
-            "]}");
-
         plugin->Initialize(&service);
 
         // Obtain the live ISystemServices* via INTERFACE_AGGREGATE (always valid).
@@ -3334,8 +3310,7 @@ TEST_F(SystemServicesTest, GetTerritory_TerritoryFilePresent)
 {
     (void)system("mkdir -p /opt/secure/persistent/System");
     // Territory file requires "territory:" prefix format for safeExtractAfterColon
-    // Region must be valid ISO 3166-2 format (e.g., "US-NY") for isRegionValidForTerritory()
-    createFile(TERRITORYFILE, "territory:USA\nregion:US-NY");
+    createFile(TERRITORYFILE, "territory:USA\nregion:US");
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTerritory"), _T("{}"), response));
     
@@ -3360,7 +3335,7 @@ TEST_F(SystemServicesTest, GetTerritory_TerritoryFilePresent)
     ASSERT_TRUE(jsonResponse["region"].IsSet()) << "region is not set: " << response;
     std::string region = jsonResponse["region"].String();
     EXPECT_FALSE(region.empty()) << "region should not be empty: " << response;
-    EXPECT_EQ(region, "US-NY") << "Expected region 'US-NY': " << response;
+    EXPECT_EQ(region, "US") << "Expected region 'US': " << response;
     
     TEST_LOG("GetTerritory_TerritoryFilePresent - success: %d, territory: %s, region: %s", 
              success, territory.c_str(), region.c_str());
@@ -10540,15 +10515,14 @@ TEST_F(SystemServicesTest, SetWakeupSrc_PowerManagerFails_ReturnsError)
 }
 
 // ------------------------------------------------------------------
-// SetTerritory with lowercase region — covers ISO 3166-2 validation
+// SetTerritory with lowercase region — covers isStrAlphaUpper
 // ------------------------------------------------------------------
 
-TEST_F(SystemServicesTest, SetTerritory_LowercaseRegion_FailsISO3166Validation)
+TEST_F(SystemServicesTest, SetTerritory_LowercaseRegion_TriggersIsStrAlphaUpperFail)
 {
-    // territory="USA" is valid (3 chars, in ISO 3166-1 list)
-    // region="ab-XY" → isRegionValidForTerritory fails (prefix "ab" != alpha-2 "US",
-    // and "ab-XY" not found in iso_3166-2.json)
-    // → implementation returns Core::ERROR_GENERAL
+    // territory="USA" is valid (3 chars, in standard list)
+    // region="ab-XY" (5 chars < 7) → isRegionValid → isStrAlphaUpper("ab") fails
+    // → implementation returns Core::ERROR_GENERAL (same as invalid territory path)
     uint32_t result = handler.Invoke(connection, _T("setTerritory"),
         _T("{\"territory\":\"USA\",\"region\":\"ab-XY\"}"), response);
 
@@ -10557,35 +10531,16 @@ TEST_F(SystemServicesTest, SetTerritory_LowercaseRegion_FailsISO3166Validation)
     TEST_LOG("SetTerritory_LowercaseRegion - Result: %u", result);
 }
 
-TEST_F(SystemServicesTest, SetTerritory_ValidRegion_PassesISO3166Validation)
+TEST_F(SystemServicesTest, SetTerritory_ValidUppercaseRegion_PassesIsStrAlphaUpper)
 {
-    // "US-NY" → prefix "US" matches alpha-2 for "USA" in iso_3166-1.json,
-    // and "US-NY" exists in iso_3166-2.json → isRegionValidForTerritory passes
+    // "US-NY" → strRegion="US" (len=2, both uppercase) → isStrAlphaUpper passes
+    // Covers the TRUE path of isStrAlphaUpper (line 2144-2153 all chars alpha+upper)
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
         _T("{\"territory\":\"USA\",\"region\":\"US-NY\"}"), response));
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
     TEST_LOG("SetTerritory_ValidUppercaseRegion - Response: %s", response.c_str());
-}
-
-// Numeric ISO 3166-2 subdivision code (e.g. JP-13 for Tokyo).
-TEST_F(SystemServicesTest, SetTerritory_NumericSubdivision_Succeeds)
-{
-    (void)system("mkdir -p /opt/secure/persistent/System");
-    (void)std::remove("/opt/secure/persistent/System/Territory.txt");
-
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
-              _T("{\"territory\":\"JPN\",\"region\":\"JP-13\"}"), response));
-
-    JsonObject jr; ASSERT_TRUE(jr.FromString(response));
-    ASSERT_TRUE(jr.HasLabel("success")) << "Missing success: " << response;
-    bool success = jr["success"].Boolean();
-    EXPECT_TRUE(success) << "Numeric subdivision JP-13 should succeed: " << response;
-
-    (void)std::remove("/opt/secure/persistent/System/Territory.txt");
-
-    TEST_LOG("SetTerritory_NumericSubdivision_Succeeds - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ------------------------------------------------------------------
