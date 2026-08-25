@@ -68,7 +68,7 @@ The plugin integrates with multiple RDK subsystems:
 
 #### System Configuration
 - **REQ-CFG-001**: The plugin SHALL support timezone configuration with DST awareness using standard timezone database
-- **REQ-CFG-002**: The plugin SHALL support territory and region configuration with ISO 3166-1 and ISO 3166-2 validation
+- **REQ-CFG-002**: The plugin SHALL support territory and region configuration with format validation (region format: XX-YY where XX and YY are uppercase alphabetic strings)
 - **REQ-CFG-003**: The plugin SHALL allow setting and getting user-friendly device names with RFC persistence
 - **REQ-CFG-004**: The plugin SHALL support operating modes: NORMAL, WAREHOUSE (retail demo), and EAS (Emergency Alert System)
 - **REQ-CFG-005**: The plugin SHALL provide RFC integration for querying dynamic feature flag values
@@ -493,8 +493,8 @@ The 66+ API methods are organized into seven major capability groups:
   - Automatic DST handling
   - Timezone accuracy tracking
 - **Territory Configuration**: Set device regional settings
-  - ISO 3166-1 (country codes) and ISO 3166-2 (subdivision codes) support
-  - Validation against standard territory/region lists
+  - Territory validation against standard country code lists
+  - Region format validation (XX-YY where XX and YY are uppercase alphabetic strings)
   - Region-specific regulatory compliance
 - **Device Identity**: Configure user-facing device names
   - Friendly names for easy identification
@@ -903,7 +903,6 @@ Conditional compilation flags control optional features:
 **System Configuration:**
 - `/etc/device.properties`: Device property definitions
 - `/usr/share/zoneinfo/*`: Timezone database
-- `/usr/share/iso-codes/json/`: ISO territory codes
 
 ## Versioning & Compatibility
 
@@ -1133,9 +1132,8 @@ The following code files and methods/classes are covered by this specification:
     - SystemServicesImplementation::GetTerritory
     - SystemServicesImplementation::writeTerritory
     - SystemServicesImplementation::readTerritoryFromFile
-    - SystemServicesImplementation::getAlpha2ForTerritory
-    - SystemServicesImplementation::isSubdivisionExists
-    - SystemServicesImplementation::isRegionValidForTerritory
+    - SystemServicesImplementation::isStrAlphaUpper
+    - SystemServicesImplementation::isRegionValid
     - SystemServicesImplementation::SetFriendlyName
     - SystemServicesImplementation::GetFriendlyName
     - SystemServicesImplementation::SetMode
