@@ -68,7 +68,7 @@ The plugin integrates with multiple RDK subsystems:
 
 #### System Configuration
 - **REQ-CFG-001**: The plugin SHALL support timezone configuration with DST awareness using standard timezone database
-- **REQ-CFG-002**: The plugin SHALL support territory and region configuration with ISO 3166-1 and ISO 3166-2 validation
+- **REQ-CFG-002**: The plugin SHALL support territory and region configuration with territory validation and region format validation
 - **REQ-CFG-003**: The plugin SHALL allow setting and getting user-friendly device names with RFC persistence
 - **REQ-CFG-004**: The plugin SHALL support operating modes: NORMAL, WAREHOUSE (retail demo), and EAS (Emergency Alert System)
 - **REQ-CFG-005**: The plugin SHALL provide RFC integration for querying dynamic feature flag values
@@ -903,7 +903,7 @@ Conditional compilation flags control optional features:
 **System Configuration:**
 - `/etc/device.properties`: Device property definitions
 - `/usr/share/zoneinfo/*`: Timezone database
-- `/usr/share/iso-codes/json/`: ISO territory codes
+
 
 ## Versioning & Compatibility
 
@@ -1257,8 +1257,6 @@ _No open queries at this time._
 - RFC (Remote Feature Control) Service Specification
 
 ### Standards
-- ISO 3166-1: Country codes (territory configuration)
-- ISO 3166-2: Subdivision codes (region configuration)
 - JSON-RPC 2.0 Specification
 - Semantic Versioning 2.0.0 (semver.org)
 
