@@ -652,33 +652,6 @@ SystemService_L2Test::SystemService_L2Test()
                    return mfrERR_NONE;
         }));
 
-         // Create minimal ISO 3166 fixture files required by isRegionValidForTerritory().
-         // These are normally installed via the iso-codes package on the target.
-         (void)system("mkdir -p /usr/share/iso-codes/json");
-         {
-             std::ofstream f1("/usr/share/iso-codes/json/iso_3166-1.json");
-             f1 << "{\"3166-1\":["
-                << "{\"alpha_2\":\"US\",\"alpha_3\":\"USA\",\"name\":\"United States\"},"
-                << "{\"alpha_2\":\"AU\",\"alpha_3\":\"AUS\",\"name\":\"Australia\"},"
-                << "{\"alpha_2\":\"GB\",\"alpha_3\":\"GBR\",\"name\":\"United Kingdom\"},"
-                << "{\"alpha_2\":\"DE\",\"alpha_3\":\"DEU\",\"name\":\"Germany\"},"
-                << "{\"alpha_2\":\"CA\",\"alpha_3\":\"CAN\",\"name\":\"Canada\"},"
-                << "{\"alpha_2\":\"FR\",\"alpha_3\":\"FRA\",\"name\":\"France\"}"
-                << "]}";
-             f1.close();
-             std::ofstream f2("/usr/share/iso-codes/json/iso_3166-2.json");
-             f2 << "{\"3166-2\":["
-                << "{\"code\":\"US-CA\",\"name\":\"California\"},"
-                << "{\"code\":\"US-NY\",\"name\":\"New York\"},"
-                << "{\"code\":\"US-TX\",\"name\":\"Texas\"},"
-                << "{\"code\":\"AU-NSW\",\"name\":\"New South Wales\"},"
-                << "{\"code\":\"GB-LND\",\"name\":\"London\"},"
-                << "{\"code\":\"GB-ENG\",\"name\":\"England\"},"
-                << "{\"code\":\"DE-BY\",\"name\":\"Bavaria\"}"
-                << "]}";
-             f2.close();
-         }
-
          /* Activate PowerManager plugin */
          status = ActivateService("org.rdk.PowerManager");
          EXPECT_EQ(Core::ERROR_NONE, status);
@@ -2933,7 +2906,7 @@ TEST_F(SystemService_L2Test, SysImpl_Cov_SetTerritory_JSONRPC)
 
     JsonObject params;
     params["territory"] = "USA";
-    params["region"] = "US-CA";
+    params["region"] = "US";
     JsonObject result;
 
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setTerritory", params, result);
@@ -4781,7 +4754,7 @@ TEST_F(SystemService_L2Test, SysImpl_Reboot_COMRPC)
     }
 }
 
-/* SetTerritory with valid USA territory - covers isRegionValidForTerritory (ISO 3166),
+/* SetTerritory with valid USA territory - covers isStrAlphaUpper, isRegionValid,
  * writeTerritory, and OnTerritoryChanged dispatch path */
 TEST_F(SystemService_L2Test, SysImpl_SetTerritory_Valid_COMRPC)
 {
@@ -7047,7 +7020,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetMode_InvalidModeName_COMRPC)
 
 /* ------------------------------------------------------------------- *
  * SetTerritory — invalid region format → L2480-2481                    *
- * isRegionValidForTerritory("bad@region") returns false → ERROR_GENERAL *
+ * isRegionValid("bad@region") returns false → ERROR_GENERAL branch    *
  * ------------------------------------------------------------------- */
 TEST_F(SystemService_L2Test, SysImpl_SetTerritory_InvalidRegionFormat_COMRPC)
 {
@@ -7063,7 +7036,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetTerritory_InvalidRegionFormat_COMRPC)
     bool success = false;
     /* Territory "USA" is valid (3 chars, in list); region has invalid char '@' */
     uint32_t result = m_SystemServicesPlugin->SetTerritory("USA", "bad@region", sysError, success);
-    /* Expected: ERROR_GENERAL because isRegionValidForTerritory fails */
+    /* Expected: ERROR_GENERAL because isRegionValid fails */
     TEST_LOG("  SetTerritory('USA','bad@region'): result=%u success=%d msg='%s'",
              result, success, sysError.message.c_str());
 
@@ -7290,7 +7263,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetTerritory_CorruptedTerritoryFile_COMRPC)
 
 /* ------------------------------------------------------------------- *
  * GetTerritory — file with valid territory but invalid region format    *
- * Covers L2107-2110: region read but isRegionValidForTerritory fails   *
+ * Covers L2107-2110: region read but isRegionValid fails → LOGERR     *
  * ------------------------------------------------------------------- */
 TEST_F(SystemService_L2Test, SysImpl_GetTerritory_CorruptedRegionFile_COMRPC)
 {
@@ -7306,7 +7279,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetTerritory_CorruptedRegionFile_COMRPC)
     mkdir("/opt/secure/persistent", 0755);
     mkdir("/opt/secure/persistent/System", 0700);
 
-    /* "USA" is 3 chars and in the standard list; "bad@region" fails isRegionValidForTerritory */
+    /* "USA" is 3 chars and in the standard list; "bad@region" fails isRegionValid */
     {
         std::ofstream f("/opt/secure/persistent/System/Territory.txt");
         if (f.is_open()) {
@@ -7844,7 +7817,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetTerritory_ValidTerritoryAndRegion_COMRPC
 
     Exchange::ISystemServices::SystemError sysError{};
     bool success = false;
-    /* "GBR" is in standard list; "GB-ENG" passes isRegionValidForTerritory (ISO 3166-2 lookup) */
+    /* "GBR" is in standard list; "GB-ENG" passes isRegionValid (2-char prefix + 3-char suffix) */
 	m_notificationHandler.ResetEvent();
     uint32_t result = m_SystemServicesPlugin->SetTerritory("GBR", "GB-ENG", sysError, success);
     EXPECT_EQ(result, Core::ERROR_NONE);
