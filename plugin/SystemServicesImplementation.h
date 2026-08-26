@@ -322,6 +322,7 @@ namespace WPEFramework
             static cTimer m_operatingModeTimer;
             static int m_remainingDuration;
             Utils::ThreadRAII m_getFirmwareInfoThread;
+            Utils::ThreadRAII m_powerModeChangedThread;
             PluginHost::IShell* m_shellService { nullptr };
             regex_t m_regexUnallowedChars;
             int m_FwUpdateState_LatestEvent;

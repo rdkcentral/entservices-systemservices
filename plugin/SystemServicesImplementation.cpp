@@ -469,19 +469,19 @@ namespace WPEFramework
 
         void SystemServicesImplementation::OnPowerModeChanged(const PowerState currentState, const PowerState newState)
         {
-            std::string curPowerState,newPowerState = "";
+            m_powerModeChangedThread = Utils::ThreadRAII(std::thread([this, currentState, newState]() {
+                std::string curPowerState = powerModeEnumToString(currentState);
+                std::string newPowerState = powerModeEnumToString(newState);
 
-            curPowerState = powerModeEnumToString(currentState);
-            newPowerState = powerModeEnumToString(newState);
-
-            LOGWARN("IARM Event triggered for PowerStateChange.\
-                    Old State %s, New State: %s\n",
-                    curPowerState.c_str() , newPowerState.c_str());
-            if (SystemServicesImplementation::_instance) {
-                SystemServicesImplementation::_instance->OnSystemPowerStateChanged(std::move(curPowerState), std::move(newPowerState));
-            } else {
-                LOGERR("SystemServicesImplementation::_instance is NULL.\n");
-            }
+                LOGWARN("IARM Event triggered for PowerStateChange.\
+                        Old State %s, New State: %s\n",
+                        curPowerState.c_str(), newPowerState.c_str());
+                if (SystemServicesImplementation::_instance) {
+                    SystemServicesImplementation::_instance->OnSystemPowerStateChanged(std::move(curPowerState), std::move(newPowerState));
+                } else {
+                    LOGERR("SystemServicesImplementation::_instance is NULL.\n");
+                }
+            }));
         }
 
         std::string SystemServicesImplementation::powerModeEnumToString(PowerState state)
@@ -776,11 +776,10 @@ namespace WPEFramework
 
         void SystemServicesImplementation::updateDuration()
         {
+            bool stopTimer = false;
             if (m_remainingDuration > 0) {
                 m_remainingDuration--;
             } else {
-                m_operatingModeTimer.stop();
-                m_operatingModeTimer.detach();
                 ModeInfo modeinfo;
                 uint32_t SysSrv_Status;
                 string errorMessage;
@@ -792,10 +791,16 @@ namespace WPEFramework
                 } else {
                     LOGERR("_instance is NULL.\n");
                 }
+                stopTimer = true;
             }
 
             //set values in temp file so they can be restored in receiver restarts / crashes
             m_temp_settings.setValue("mode_duration", m_remainingDuration);
+
+            if (stopTimer) {
+                m_operatingModeTimer.stop();
+                m_operatingModeTimer.detach();
+            }
         }
 
         uint32_t GetValueFromPropertiesFile(const char* filename, const char* key, string& response, const char *delimiter = "=")
