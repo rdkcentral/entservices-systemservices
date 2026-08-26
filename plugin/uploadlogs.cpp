@@ -150,6 +150,7 @@ pid_t logUploadAsync(void)
         "false"
     };
 
+
     pid_t pid  = fork();
 
     if (-1 == pid)
