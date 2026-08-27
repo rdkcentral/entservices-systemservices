@@ -23,6 +23,8 @@
 #include <curl/curl.h>
 #include <sstream>
 #include <map>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "SystemServicesHelper.h"
 
@@ -158,6 +160,13 @@ pid_t logUploadAsync(void)
     }
     else if (0 == pid)
     {
+        int fd = open("/opt/logs/dcmscript.log", O_WRONLY | O_CREAT | O_APPEND, 0644);
+        if (fd != -1)
+        {
+            dup2(fd, STDOUT_FILENO);
+            dup2(fd, STDERR_FILENO);
+            close(fd);
+        }
         if (execve(argArray[0], (char **)argArray, environ) == -1)
         {
             LOGERR("Execve failed: %s", strerror(errno));
