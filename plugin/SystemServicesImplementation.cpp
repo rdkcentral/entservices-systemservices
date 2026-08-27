@@ -2744,34 +2744,16 @@ namespace WPEFramework
                 WakeupSources src{};
                 while(wakeupSources->Next(src))
                 {
-                    // Check each wakeup source field and add to configs if enabled
-                    if(src.voice) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_VOICE, true});
-                    }
-                    if(src.presenceDetection) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_PRESENCEDETECTED, true});
-                    }
-                    if(src.bluetooth) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_BLUETOOTH, true});
-                    }
-                    if(src.wifi) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_WIFI, true});
-                    }
-                    if(src.ir) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_IR, true});
-                    }
-                    if(src.powerKey) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_POWERKEY, true});
-                    }
-                    if(src.cec) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_CEC, true});
-                    }
-                    if(src.lan) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_LAN, true});
-                    }
-                    if(src.timer) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_TIMER, true});
-                    }
+                    // Add each wakeup source with both enable (true) and disable (false) states
+                    configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_VOICE, src.voice});
+                    configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_PRESENCEDETECTED, src.presenceDetection});
+                    configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_BLUETOOTH, src.bluetooth});
+                    configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_WIFI, src.wifi});
+                    configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_IR, src.ir});
+                    configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_POWERKEY, src.powerKey});
+                    configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_CEC, src.cec});
+                    configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_LAN, src.lan});
+                    configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_TIMER, src.timer});
                 }
                 LOGWARN("configs size :%zu", configs.size());
 
