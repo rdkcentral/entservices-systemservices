@@ -1007,8 +1007,35 @@ TEST_F(SystemService_L2Test,SystemServiceGetSetBlocklistFlag)
     JsonObject result;
     std::string message;
     JsonObject expected_status;
-    uint32_t file_status = -1;
-	uint32_t signalled = SYSTEMSERVICEL2TEST_STATE_INVALID;
+    uint32_t signalled = SYSTEMSERVICEL2TEST_STATE_INVALID;
+
+    // Blocklist is stored by the MFR library over IARM; emulate that storage so
+    // a get after a set observes the written value. Seeded to 1 so the initial
+    // setBlocklistFlag(true) is a no-change and does not emit onBlocklistChanged.
+    static uint8_t s_blocklist;
+    s_blocklist = 1;
+    ON_CALL(*p_iarmBusImplMock, IARM_Bus_Call(
+        ::testing::StrEq(IARM_BUS_MFRLIB_NAME),
+        ::testing::StrEq(IARM_BUS_MFRLIB_API_GetConfigData),
+        ::testing::_,
+        ::testing::_))
+        .WillByDefault(::testing::Invoke(
+            [](const char*, const char*, void* arg, size_t) -> IARM_Result_t {
+                if (nullptr == arg) return IARM_RESULT_INVALID_PARAM;
+                static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg)->blocklist = s_blocklist;
+                return IARM_RESULT_SUCCESS;
+            }));
+    ON_CALL(*p_iarmBusImplMock, IARM_Bus_Call(
+        ::testing::StrEq(IARM_BUS_MFRLIB_NAME),
+        ::testing::StrEq(IARM_BUS_MFRLIB_API_SetConfigData),
+        ::testing::_,
+        ::testing::_))
+        .WillByDefault(::testing::Invoke(
+            [](const char*, const char*, void* arg, size_t) -> IARM_Result_t {
+                if (nullptr == arg) return IARM_RESULT_INVALID_PARAM;
+                s_blocklist = static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg)->blocklist;
+                return IARM_RESULT_SUCCESS;
+            }));
 
     /* Register for temperature threshold change event. */
     status = jsonrpc.Subscribe<JsonObject>(JSON_TIMEOUT,
@@ -1054,17 +1081,6 @@ TEST_F(SystemService_L2Test,SystemServiceGetSetBlocklistFlag)
     EXPECT_TRUE(result["success"].Boolean());
     EXPECT_FALSE(result["blocklist"].Boolean());
 
-    file_status = remove("/opt/secure/persistent/opflashstore/devicestate.txt");
-    // Check if the file has been successfully removed
-    if (file_status != 0)
-    {
-        TEST_LOG("Error deleting file[devicestate.txt]");
-    }
-    else
-    {
-        TEST_LOG("File[devicestate.txt] successfully deleted");
-    }
-    TEST_LOG("Removed the devicestate.txt file in preparation for the next round of testing.");
     jsonrpc.Unsubscribe(JSON_TIMEOUT, _T("onBlocklistChanged"));
 }
 
@@ -8286,8 +8302,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetNetworkStandbyMode_CachedAndFresh_COMRPC
 }
 
 /* ------------------------------------------------------------------- *
- * GetBlocklistFlag — BLOCKLIST=true in file → L955 true branch         *
- * Covers L955: file_value == "true" → value = true                    *
+ * GetBlocklistFlag — MFR library reports blocklist set                 *
  * ------------------------------------------------------------------- */
 TEST_F(SystemService_L2Test, SysImpl_GetBlocklistFlag_TrueValue_COMRPC)
 {
@@ -8297,18 +8312,19 @@ TEST_F(SystemService_L2Test, SysImpl_GetBlocklistFlag_TrueValue_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("SysImpl_GetBlocklistFlag_TrueValue: BLOCKLIST=true returns true");
+    TEST_LOG("SysImpl_GetBlocklistFlag_TrueValue: IARM GetConfigData reports blocklist=1");
 
-    mkdir("/opt/secure",                         0755);
-    mkdir("/opt/secure/persistent",              0755);
-    mkdir("/opt/secure/persistent/opflashstore", 0755);
-
-    const char* devFile = "/opt/secure/persistent/opflashstore/devicestate.txt";
-    {
-        std::ofstream f(devFile);
-        if (f.is_open())
-            f << "blocklist=true\n";
-    }
+    ON_CALL(*p_iarmBusImplMock, IARM_Bus_Call(
+        ::testing::StrEq(IARM_BUS_MFRLIB_NAME),
+        ::testing::StrEq(IARM_BUS_MFRLIB_API_GetConfigData),
+        ::testing::_,
+        ::testing::_))
+        .WillByDefault(::testing::Invoke(
+            [](const char*, const char*, void* arg, size_t) -> IARM_Result_t {
+                if (nullptr == arg) return IARM_RESULT_INVALID_PARAM;
+                static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg)->blocklist = 1;
+                return IARM_RESULT_SUCCESS;
+            }));
 
     Exchange::ISystemServices::BlocklistResult blResult{};
     uint32_t result = m_SystemServicesPlugin->GetBlocklistFlag(blResult);
@@ -8317,15 +8333,12 @@ TEST_F(SystemService_L2Test, SysImpl_GetBlocklistFlag_TrueValue_COMRPC)
     TEST_LOG("  GetBlocklistFlag(true): result=%u blocklist=%d success=%d",
              result, blResult.blocklist, blResult.success);
 
-    std::remove(devFile);
-
     m_SystemServicesPlugin->Release();
     m_controller_SystemServices->Release();
 }
 
 /* ------------------------------------------------------------------- *
- * GetBlocklistFlag — BLOCKLIST=false in file → L956 false branch       *
- * Covers L956: file_value == "false" → value = false                  *
+ * GetBlocklistFlag — MFR library reports blocklist cleared             *
  * ------------------------------------------------------------------- */
 TEST_F(SystemService_L2Test, SysImpl_GetBlocklistFlag_FalseValue_COMRPC)
 {
@@ -8335,18 +8348,19 @@ TEST_F(SystemService_L2Test, SysImpl_GetBlocklistFlag_FalseValue_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("SysImpl_GetBlocklistFlag_FalseValue: BLOCKLIST=false returns false");
+    TEST_LOG("SysImpl_GetBlocklistFlag_FalseValue: IARM GetConfigData reports blocklist=0");
 
-    mkdir("/opt/secure",                         0755);
-    mkdir("/opt/secure/persistent",              0755);
-    mkdir("/opt/secure/persistent/opflashstore", 0755);
-
-    const char* devFile = "/opt/secure/persistent/opflashstore/devicestate.txt";
-    {
-        std::ofstream f(devFile);
-        if (f.is_open())
-            f << "blocklist=false\n";
-    }
+    ON_CALL(*p_iarmBusImplMock, IARM_Bus_Call(
+        ::testing::StrEq(IARM_BUS_MFRLIB_NAME),
+        ::testing::StrEq(IARM_BUS_MFRLIB_API_GetConfigData),
+        ::testing::_,
+        ::testing::_))
+        .WillByDefault(::testing::Invoke(
+            [](const char*, const char*, void* arg, size_t) -> IARM_Result_t {
+                if (nullptr == arg) return IARM_RESULT_INVALID_PARAM;
+                static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg)->blocklist = 0;
+                return IARM_RESULT_SUCCESS;
+            }));
 
     Exchange::ISystemServices::BlocklistResult blResult{};
     uint32_t result = m_SystemServicesPlugin->GetBlocklistFlag(blResult);
@@ -8354,8 +8368,6 @@ TEST_F(SystemService_L2Test, SysImpl_GetBlocklistFlag_FalseValue_COMRPC)
     EXPECT_FALSE(blResult.blocklist);
     TEST_LOG("  GetBlocklistFlag(false): result=%u blocklist=%d success=%d",
              result, blResult.blocklist, blResult.success);
-
-    std::remove(devFile);
 
     m_SystemServicesPlugin->Release();
     m_controller_SystemServices->Release();
