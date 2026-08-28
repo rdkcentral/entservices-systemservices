@@ -766,8 +766,8 @@ Critical states are persisted to survive reboots:
 - `/opt/secure/persistent/` - Secure storage for sensitive data
 - `/opt/persistent/localtime` - Timezone symlink
 - `/opt/tmtryoptout` - Telemetry opt-out status
-- `/opt/secure/persistent/opflashstore/devicestate.txt` - Device state
 - `/opt/secure/persistent/MigrationStatus` - Migration status
+- **IARM MFR Library** - Blocklist flag persisted via `IARM_BUS_MFRLIB_API_GetConfigData` and `IARM_BUS_MFRLIB_API_SetConfigData`
 
 **Settings Framework:**
 - Uses `cSettings` helper for key-value persistence
