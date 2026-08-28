@@ -54,6 +54,112 @@ cd "$GITHUB_WORKSPACE"
 
 git clone --branch 2.0.6 https://github.com/rdkcentral/entservices-testframework.git
 
+cd $WORKDIR
+rm -rf rdk-cert-config
+git clone -b 1.0.6 https://github.com/rdkcentral/rdk-cert-config.git && \
+    cd rdk-cert-config && autoreconf --install && ./configure --prefix=/usr/local --enable-testrdkcerts && \
+    make && make install
+cp RdkConfigApi/src/librdkconfig.a /usr/local/lib/librdkconfig.a
+
+cd $WORKDIR
+rm -rf rbus 
+git clone https://github.com/rdkcentral/rbus
+cmake -Hrbus -Bbuild/rbus -DBUILD_FOR_DESKTOP=ON -DCMAKE_BUILD_TYPE=Debug
+make -C build/rbus && make -C build/rbus install
+
+cd $WORKDIR
+git clone https://github.com/xmidt-org/wdmp-c.git
+cd wdmp-c
+sed -i '/WDMP_ERR_SESSION_IN_PROGRESS/a\    WDMP_ERR_INTERNAL_ERROR,\n    WDMP_ERR_DEFAULT_VALUE,' src/wdmp-c.h
+cmake -H. -Bbuild -DBUILD_FOR_DESKTOP=ON -DCMAKE_BUILD_TYPE=Debug
+make -C build && make -C build install
+
+cd $WORKDIR
+rm -rf WebconfigFramework
+git clone https://github.com/rdkcentral/WebconfigFramework.git
+cd WebconfigFramework && export INSTALL_DIR='/usr/local'&& \
+export CFLAGS="-I${INSTALL_DIR}/include/rtmessage -I${INSTALL_DIR}/include/msgpack -I${INSTALL_DIR}/include/rbus -I${INSTALL_DIR}/include" && \
+export LDFLAGS="-L${INSTALL_DIR}/lib" && \
+autoreconf --install && \
+./configure --prefix=/usr/local && make && make install && cp -r include/* /usr/local/include/
+
+cd $WORKDIR
+rm -rf rdk_logger
+
+git clone https://github.com/rdkcentral/rdk_logger.git
+cd rdk_logger && autoreconf --install && ./configure && make && make install
+
+cd ${GITHUB_WORKSPACE}
+rm -rf libSyscallWrapper
+git clone https://github.com/rdkcentral/libSyscallWrapper.git
+cd libSyscallWrapper && export INSTALL_DIR='/usr/local' && \
+autoreconf --install && \
+./configure --prefix=/usr/local && make && make install
+
+
+cd ${GITHUB_WORKSPACE}
+rm -rf common_utilities
+git clone https://github.com/rdkcentral/common_utilities.git
+cd common_utilities && export INSTALL_DIR='/usr/local' && \
+export CFLAGS="-Wno-error=format -Wno-unused-result -Wno-format-truncation -Wno-error=format-security -DRDK_LOGGER" && \
+autoreconf --install && \
+./configure --prefix=/usr/local && make && make install
+
+cd ${GITHUB_WORKSPACE}
+rm -rf rfc
+git clone https://github.com/rdkcentral/rfc.git
+cd rfc
+autoreconf -i
+./configure --enable-rfctool=yes --enable-tr181set=yes
+cd rfcapi
+make librfcapi_la_CPPFLAGS="-I/usr/include/cjson -I/usr/rfc/rfcMgr/gtest/mocks"
+make install
+
+cd ${GITHUB_WORKSPACE}
+git clone https://github.com/rdkcentral/tr69hostif.git
+cd tr69hostif
+cp src/hostif/include/*.h /usr/local/include
+cp src/hostif/handlers/include/*.h /usr/local/include
+cp src/hostif/profiles/DeviceInfo/*.h /usr/local/include
+cp src/unittest/stubs/wdmp-c.h /usr/local/include
+cp src/hostif/parodusClient/pal/*.h /usr/local/include
+cp src/hostif/parodusClient/waldb/*.h /usr/local/include
+cd ./src/unittest/stubs
+
+g++ -fPIC -shared -o libIARMBus.so iarm_stubs.cpp  -I/usr/tr69hostif/src/hostif/parodusClient/pal -I/usr/tr69hostif/src/unittest/stubs -I/usr/tr69hostif/src/hostif/parodusClient/waldb -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include -I/usr/tr69hostif/src/hostif/include -I/usr/tr69hostif/src/hostif/profiles/DeviceInfo -I/usr/tr69hostif/src/hostif/parodusClient/pal -fpermissive
+cp libIARMBus.so /usr/local/lib
+
+cd ${GITHUB_WORKSPACE}
+rm -rf iarmmgrs
+rm -rf iarmbus
+git clone https://github.com/rdkcentral/iarmbus.git
+# Install header files alone from iarmbus repositories
+cp iarmbus/core/include/*.h /usr/local/include
+cp iarmbus/core/*.h /usr/local/include
+
+git clone https://github.com/rdkcentral/iarmmgrs.git
+cp iarmmgrs/sysmgr/include/sysMgr.h /usr/local/include
+cp iarmmgrs/maintenance/include/maintenanceMGR.h /usr/local/include
+
+cd ${GITHUB_WORKSPACE}
+rm -rf telemetry
+git clone https://github.com/rdkcentral/telemetry.git
+cd telemetry
+cp include/*.h /usr/local/include
+sh  build_inside_container.sh
+
+cd ${GITHUB_WORKSPACE}
+git clone https://github.com/rdkcentral/dcm-agent.git
+cd dcm-agent
+git checkout feature/RDKEMW-22385
+autoreconf -i
+./configure
+cp uploadstblogs/include/*.h /usr/local/include
+cd uploadstblogs/src
+make
+make install
+cd ${GITHUB_WORKSPACE}
+
 ############################
 # Build Thunder-Tools
 echo "======================================================================================"
@@ -175,3 +281,7 @@ echo "==========================================================================
 cd ../../
 
 ls -la ${GITHUB_WORKSPACE}
+
+
+
+
