@@ -52,7 +52,7 @@ cd ..
 git clone --branch develop https://github.com/rdkcentral/entservices-helpers.git
 cd "$GITHUB_WORKSPACE"
 
-git clone --branch 2.0.6 https://github.com/rdkcentral/entservices-testframework.git
+git clone --branch 2.0.8 https://github.com/rdkcentral/entservices-testframework.git
 
 cd $WORKDIR
 rm -rf rdk-cert-config
