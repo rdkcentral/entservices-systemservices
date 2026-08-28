@@ -354,9 +354,8 @@ namespace WPEFramework
             bool makePersistentDir();
             std::string safeExtractAfterColon(const std::string& inputLine);
             bool readTerritoryFromFile();
-            bool getAlpha2ForTerritory(const string& territoryAlpha3, string& alpha2);
-            bool isSubdivisionExists(const string& regionCode);
-            bool isRegionValidForTerritory(const string& regionStr, const string& territoryAlpha3);
+            bool isStrAlphaUpper(string strVal);
+            bool isRegionValid(string regionStr);
             uint32_t writeTerritory(string territory, string region);
             bool setPowerStateConversion(std::string powerState);
 
