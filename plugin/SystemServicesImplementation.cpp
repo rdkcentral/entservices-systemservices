@@ -2763,7 +2763,7 @@ namespace WPEFramework
 
                 LOGINFO("wakeupSource=%u enabled=%s", static_cast<uint16_t>(src.wakeupSource), src.enabled ? "true" : "false");
 
-                configs.emplace_back(WakeupSrcConfig{static_cast<WakeupSrcType>(src.wakeupSource),src.enabled});
+                configs.emplace_back(WakeupSrcConfig{static_cast<WPEFramework::Exchange::IPowerManager::WakeupSrcType>(src.wakeupSource),src.enabled});
             }
 
             LOGINFO("configs size=%zu", configs.size());
@@ -2774,7 +2774,7 @@ namespace WPEFramework
             }
 
             ASSERT(_powerManagerPlugin);
-            if (_powerManagerPlugin == nullptr) {
+            if (!_powerManagerPlugin) {
                 LOGERR("PowerManager plugin is not available");
                 return Core::ERROR_GENERAL;
             }
