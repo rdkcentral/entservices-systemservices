@@ -359,7 +359,7 @@ namespace WPEFramework
             InitializeIARM();
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
             // Open COM-RPC link to entservices-devicesettings
-            const uint32_t dsResult = DSHelper::Open(service);
+            const uint32_t dsResult = DSHelper::Open(service, "SystemServices");
             if (dsResult != Core::ERROR_NONE) {
                 LOGERR("Configure: Failed to open DeviceSettings link (result=%u)", dsResult);
             }
