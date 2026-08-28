@@ -119,7 +119,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-testframework
           path: entservices-testframework
-          ref: 2.0.7
+          ref: feature/test
 
       - name: Checkout googletest
         if: steps.cache.outputs.cache-hit != 'true'
