@@ -2756,14 +2756,14 @@ namespace WPEFramework
 
             while (wakeupSources->Next(src)) {
 
-                if (src.wakeupSource == WakeupSrcType::WAKEUP_SRC_UNKNOWN) {
+                if (src.wakeupSource == WAKEUP_SRC_UNKNOWN) {
                     LOGWARN("Ignoring unknown wakeup source");
                     continue;
                 }
 
                 LOGINFO("wakeupSource=%u enabled=%s", static_cast<uint16_t>(src.wakeupSource), src.enabled ? "true" : "false");
 
-                configs.emplace_back( WakeupSrcConfig{src.wakeupSource,src.enabled});
+                configs.emplace_back(WakeupSrcConfig{static_cast<WakeupSrcType>(src.wakeupSource),src.enabled});
             }
 
             LOGINFO("configs size=%zu", configs.size());
