@@ -34,6 +34,10 @@
 #include "UtilsfileExists.h"
 #include "secure_wrapper.h"
 
+extern "C" {
+#include "uploadstblogs.h"
+}
+
 namespace WPEFramework
 {
 namespace Plugin
@@ -128,44 +132,37 @@ std::int32_t getUploadLogParameters(string &tftp_server, string &upload_protocol
 
 pid_t logUploadAsync(void)
 {
-    if ( !Utils::fileExists("/usr/bin/logupload") ){
-        return -1;
-    }
-
     string tftp_server;
     string upload_protocol;
     string upload_httplink;
 
     if (E_NOK == getUploadLogParameters(tftp_server, upload_protocol, upload_httplink))
         return -1;
-    const char *argArray[] = {
-        "/usr/bin/logupload",
-        tftp_server.c_str(),
-        "0", //FLAG,
-        "1", //DCM_FLAG,
-        "false", //UploadOnReboot,
-        upload_protocol.c_str(),
-        upload_httplink.c_str(), 
-        "1",
-        "false"
-    };
-
-    pid_t pid  = fork();
+    pid_t pid = fork();
 
     if (-1 == pid)
     {
-        LOGERR("Fork failed for %s", argArray[2]);
+        LOGERR("Fork failed for logUploadAsync");
     }
     else if (0 == pid)
     {
-        if (execve(argArray[0], (char **)argArray, environ) == -1)
-        {
-            LOGERR("Execve failed: %s", strerror(errno));
-            _Exit(127);
-        }
+        UploadSTBLogsParams params = {0};
+        params.flag = 0;
+        params.dcm_flag = 1;
+        params.upload_on_reboot = false;
+        params.upload_protocol = upload_protocol.c_str();
+        params.upload_http_link = upload_httplink.c_str();
+        params.trigger_type = TRIGGER_MANUAL;
+        params.rrd_flag = false;
+        params.rrd_file = NULL;
+        params.uploadlogsnow_mode = false;
+        
+
+        int result = uploadstblogs_run(&params);
+        _Exit(result);
     }
 
-    LOGINFO("Started %d process with %s", pid, argArray[1]);
+    LOGINFO("Started logUploadAsync pid=%d", pid);
 
     return pid;
 }
