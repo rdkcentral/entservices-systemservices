@@ -2740,8 +2740,8 @@ namespace WPEFramework
             result.success = false;
 
             if (wakeupSources == nullptr) {
-                LOGERR("wakeupSources is null");
-                return Core::ERROR_GENERAL;
+                LOGWARN("wakeupSources is null (no-op)");
+                return Core::ERROR_NONE;
             }
 
             std::list<WakeupSrcConfig> configs;
