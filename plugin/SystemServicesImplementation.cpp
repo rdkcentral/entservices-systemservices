@@ -2723,58 +2723,49 @@ namespace WPEFramework
         Core::hresult SystemServicesImplementation::SetWakeupSrcConfiguration(const string& powerState, ISystemServicesWakeupSourcesIterator* const& wakeupSources, SystemResult& result)
         {
             LOGINFO("powerState=%s", powerState.c_str());
-            Core::hresult retStatus = Core::ERROR_NONE;
+            Core::hresult retStatus = Core::ERROR_GENERAL;
+            result.success = false;
 
-            if(wakeupSources != nullptr)
-            {
-                std::list<WakeupSrcConfig> configs = {};
-                WakeupSources src{};
-                while(wakeupSources->Next(src))
-                {
-                    // Check each wakeup source field and add to configs if enabled
-                    if(src.voice) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_VOICE, true});
-                    }
-                    if(src.presenceDetection) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_PRESENCEDETECTED, true});
-                    }
-                    if(src.bluetooth) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_BLUETOOTH, true});
-                    }
-                    if(src.wifi) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_WIFI, true});
-                    }
-                    if(src.ir) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_IR, true});
-                    }
-                    if(src.powerKey) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_POWERKEY, true});
-                    }
-                    if(src.cec) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_CEC, true});
-                    }
-                    if(src.lan) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_LAN, true});
-                    }
-                    if(src.timer) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_TIMER, true});
-                    }
-                }
-                LOGWARN("configs size :%zu", configs.size());
-
-                if(!configs.empty())
-                {
-                    ASSERT (_powerManagerPlugin);
-                    if(_powerManagerPlugin)
-                    {
-                        auto iter = WakeupSourceConfigIteratorImpl::Create<IWakeupSourceConfigIterator>(configs);
-                        retStatus = _powerManagerPlugin->SetWakeupSourceConfig(iter);
-                        iter->Release();
-                    }
-
-                    result.success = (retStatus == Core::ERROR_NONE);
-                }
+            if (wakeupSources == nullptr) {
+                LOGWARN("wakeupSources is null (no-op)");
+                return Core::ERROR_NONE;
             }
+
+            std::list<WakeupSrcConfig> configs;
+            WakeupSources src{};
+
+            while (wakeupSources->Next(src)) {
+                if (src.wakeupSource == WAKEUP_SRC_UNKNOWN) {
+                    LOGWARN("Ignoring unknown wakeup source");
+                    continue;
+                }
+                LOGINFO("wakeupSource=%u enabled=%s", static_cast<uint16_t>(src.wakeupSource), src.enabled ? "true" : "false");
+                configs.emplace_back(WakeupSrcConfig{static_cast<WPEFramework::Exchange::IPowerManager::WakeupSrcType>(src.wakeupSource),src.enabled});
+            }
+
+            LOGINFO("configs size=%zu", configs.size());
+
+            if (configs.empty()) {
+                LOGWARN("No wakeup source configuration provided");
+                return Core::ERROR_GENERAL;
+            }
+
+            ASSERT(_powerManagerPlugin);
+            if (!_powerManagerPlugin) {
+                LOGERR("PowerManager plugin is not available");
+                return Core::ERROR_GENERAL;
+            }
+
+            auto iter = WakeupSourceConfigIteratorImpl::Create<IWakeupSourceConfigIterator>(configs);
+            if (iter == nullptr) {
+                LOGERR("Failed to create WakeupSourceConfigIterator");
+                return Core::ERROR_GENERAL;
+            }
+
+            retStatus = _powerManagerPlugin->SetWakeupSourceConfig(iter);
+            iter->Release();
+            result.success = (retStatus == Core::ERROR_NONE);
+
             LOGINFO("response: success=%s", result.success ? "true" : "false");
             return retStatus;
         }
