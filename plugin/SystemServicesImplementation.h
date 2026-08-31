@@ -316,6 +316,9 @@ namespace WPEFramework
 #if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
             bool m_iarmEventHandlersRegistered;
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
+#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
+            bool m_iarmEventHandlersRegistered;
+#endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
             Utils::ThreadRAII thread_getMacAddresses;
             static const string MODEL_NAME;
             static const string HARDWARE_ID;
