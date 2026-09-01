@@ -10686,7 +10686,7 @@ TEST_F(SystemServicesTest, SetWakeupSrc_PowerManagerFails_ReturnsError)
         .WillRepeatedly(::testing::Return(Core::ERROR_GENERAL));
 
     // result.success = false when PowerManager returns error
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setWakeupSrcConfiguration"),
+    EXPECT_EQ(Core::ERROR_GENERAL, handler.Invoke(connection, _T("setWakeupSrcConfiguration"),
         _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[{\"wakeupSource\":\"WAKEUPSRC_VOICE\",\"enabled\":true}]}"),
         response));
 
@@ -11376,13 +11376,13 @@ TEST_F(SystemServicesTest, GetWakeupSrcConfiguration_PMSuccess_PopulatesResponse
     // getWakeupSrcConfiguration is not a registered JSON-RPC handler.
     // Cover the SetWakeupSrcConfiguration path with all fields disabled (no PM call).
     // wakeupSources with all false fields → configs is empty → PM not called → success=false
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setWakeupSrcConfiguration"),
+    EXPECT_EQ(Core::ERROR_GENERAL, handler.Invoke(connection, _T("setWakeupSrcConfiguration"),
         _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[]}"),
         response));
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
-    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_FALSE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
     ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
     bool success = jsonResponse["success"].Boolean();
 
@@ -11397,13 +11397,13 @@ TEST_F(SystemServicesTest, GetWakeupSrcConfiguration_PMFailure_ReturnsError)
         .Times(::testing::AnyNumber())
         .WillRepeatedly(::testing::Return(Core::ERROR_GENERAL));
 
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setWakeupSrcConfiguration"),
+    EXPECT_EQ(Core::ERROR_GENERAL, handler.Invoke(connection, _T("setWakeupSrcConfiguration"),
         _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[{\"wakeupSource\":\"WAKEUPSRC_VOICE\",\"enabled\":true}]}"),
         response));
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response));
-    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_FALSE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
     ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
     bool success = jsonResponse["success"].Boolean();
 
@@ -11660,14 +11660,14 @@ TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_AllFalse_NoConfigSent)
     EXPECT_CALL(PowerManagerMock::Mock(), SetWakeupSourceConfig(::testing::_))
         .Times(0);
 
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection,
+    EXPECT_EQ(Core::ERROR_GENERAL, handler.Invoke(connection,
               _T("setWakeupSrcConfiguration"),
               _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[]}"),
               response));
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response));
-    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_FALSE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
     ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
     bool success = jsonResponse["success"].Boolean();
 
@@ -11701,7 +11701,7 @@ TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_PowerManagerFailure_Returns
         .Times(::testing::AnyNumber())
         .WillRepeatedly(::testing::Return(Core::ERROR_GENERAL));
 
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection,
+    EXPECT_EQ(Core::ERROR_GENERAL, handler.Invoke(connection,
               _T("setWakeupSrcConfiguration"),
               _T("{\"powerState\":\"STANDBY\","
                  "\"wakeupSources\":[{\"wakeupSource\":\"WAKEUPSRC_TIMER\",\"enabled\":true}]}"),
@@ -11709,7 +11709,7 @@ TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_PowerManagerFailure_Returns
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response));
-    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    ASSERT_FALSE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
     ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
     bool success = jsonResponse["success"].Boolean();
     EXPECT_FALSE(success);
