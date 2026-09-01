@@ -11382,11 +11382,9 @@ TEST_F(SystemServicesTest, GetWakeupSrcConfiguration_PMSuccess_PopulatesResponse
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
-    ASSERT_FALSE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
-    bool success = jsonResponse["success"].Boolean();
+    ASSERT_FALSE(jsonResponse.HasLabel("success")) << "Unexpected success field in error response: " << response;
 
-    TEST_LOG("GetWakeupSrcConfiguration_PMSuccess - Response: %s, success: %d", response.c_str(), success);
+    TEST_LOG("GetWakeupSrcConfiguration_PMSuccess - Response: %s", response.c_str());
 }
 
 TEST_F(SystemServicesTest, GetWakeupSrcConfiguration_PMFailure_ReturnsError)
@@ -11403,11 +11401,9 @@ TEST_F(SystemServicesTest, GetWakeupSrcConfiguration_PMFailure_ReturnsError)
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response));
-    ASSERT_FALSE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
-    bool success = jsonResponse["success"].Boolean();
+    ASSERT_FALSE(jsonResponse.HasLabel("success")) << "Unexpected success field in error response: " << response;
 
-    TEST_LOG("GetWakeupSrcConfiguration_PMFailure - Response: %s, success: %d", response.c_str(), success);
+    TEST_LOG("GetWakeupSrcConfiguration_PMFailure - Response: %s", response.c_str());
 }
 
 // =============================================================================
@@ -11667,11 +11663,9 @@ TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_AllFalse_NoConfigSent)
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response));
-    ASSERT_FALSE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
-    bool success = jsonResponse["success"].Boolean();
+    ASSERT_FALSE(jsonResponse.HasLabel("success")) << "Unexpected success field in error response: " << response;
 
-    TEST_LOG("SetWakeupSrcConfiguration_AllFalse - Response: %s, success: %d", response.c_str(), success);
+    TEST_LOG("SetWakeupSrcConfiguration_AllFalse - Response: %s", response.c_str());
 }
 
 TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_PresenceOnly_CoversPresenceField)
@@ -11709,12 +11703,9 @@ TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_PowerManagerFailure_Returns
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response));
-    ASSERT_FALSE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
-    bool success = jsonResponse["success"].Boolean();
-    EXPECT_FALSE(success);
+    ASSERT_FALSE(jsonResponse.HasLabel("success")) << "Unexpected success field in error response: " << response;
 
-    TEST_LOG("SetWakeupSrcConfiguration_PMFailure - Response: %s, success: %d", response.c_str(), success);
+    TEST_LOG("SetWakeupSrcConfiguration_PMFailure - Response: %s", response.c_str());
 }
 
 // =============================================================================
