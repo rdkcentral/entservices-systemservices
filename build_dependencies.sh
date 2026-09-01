@@ -46,7 +46,7 @@ cd Thunder
 git checkout $THUNDER_COMMIT_SHA
 cd ..
 
-git clone --branch develop https://github.com/rdkcentral/entservices-apis.git
+git clone --branch topic/RDKEMW-24228 https://github.com/rdkcentral/entservices-apis.git
 
 cd ..
 git clone --branch develop https://github.com/rdkcentral/entservices-helpers.git
