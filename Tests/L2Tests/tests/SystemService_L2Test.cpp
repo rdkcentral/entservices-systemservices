@@ -8618,9 +8618,9 @@ TEST_F(SystemService_L2Test, SysImpl_GetSystemVersions_VersionEqFound_COMRPC)
 
 /* ------------------------------------------------------------------- *
  * setWakeupSrcConfiguration with all wakeup sources enabled            *
- * Covers L2745-2792: wakeupSources->Next loop body + all src.X checks *
+ * Exercises the wakeupSources->Next loop body in SetWakeupSrcConfiguration *
  *   + configs.empty()==false → SetWakeupSourceConfig path             *
- * JSON keys per ISystemServices schema: WAKEUPSRC_VOICE etc.           *
+ * Each entry uses WakeupSources struct: {wakeupSource, enabled}        *
  * ------------------------------------------------------------------- */
 TEST_F(SystemService_L2Test, SysImpl_SetWakeupSrc_AllSources_JSONRPC)
 {
@@ -8629,23 +8629,28 @@ TEST_F(SystemService_L2Test, SysImpl_SetWakeupSrc_AllSources_JSONRPC)
     JsonObject params;
     params["powerState"] = "STANDBY";
     JsonArray sourcesArr;
-    JsonObject src;
-    /* Keys match ISystemServices.json schema WAKEUPSRC_* field names */
-    src["WAKEUPSRC_VOICE"]              = true;
-    src["WAKEUPSRC_PRESENCE_DETECTION"] = true;
-    src["WAKEUPSRC_BLUETOOTH"]          = true;
-    src["WAKEUPSRC_WIFI"]               = true;
-    src["WAKEUPSRC_IR"]                 = true;
-    src["WAKEUPSRC_POWER_KEY"]          = true;
-    src["WAKEUPSRC_CEC"]                = true;
-    src["WAKEUPSRC_LAN"]                = true;
-    src["WAKEUPSRC_TIMER"]              = true;
-    sourcesArr.Add(src);
+
+    /* Each entry uses the WakeupSources struct fields: wakeupSource (enum @text) + enabled (bool) */
+    const char* srcNames[] = {
+        "WAKEUPSRC_VOICE", "WAKEUPSRC_PRESENCE_DETECTION", "WAKEUPSRC_BLUETOOTH",
+        "WAKEUPSRC_WIFI", "WAKEUPSRC_IR", "WAKEUPSRC_POWER_KEY",
+        "WAKEUPSRC_CEC", "WAKEUPSRC_LAN", "WAKEUPSRC_TIMER"
+    };
+    for (const char* name : srcNames) {
+        JsonObject entry;
+        entry["wakeupSource"] = name;
+        entry["enabled"]      = true;
+        sourcesArr.Add(entry);
+    }
+
     params["wakeupSources"] = sourcesArr;
     JsonObject result;
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setWakeupSrcConfiguration",
                                           params, result);
     TEST_LOG("setWakeupSrcConfiguration status=%u", status);
+    if (result.HasLabel("success")) {
+        TEST_LOG("  success=%s", result["success"].Boolean() ? "true" : "false");
+    }
 }
 
 /* ------------------------------------------------------------------- *
