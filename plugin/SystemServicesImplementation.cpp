@@ -458,6 +458,7 @@ namespace WPEFramework
         {
             if (!m_iarmEventHandlersRegistered && Utils::IARM::isConnected())
             {
+				IARM_Result_t res;
                 IARM_CHECK( IARM_Bus_RegisterEventHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, _systemStateChanged));
                 IARM_CHECK( IARM_Bus_RegisterEventHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_DEVICE_UPDATE_RECEIVED, _deviceMgtUpdateReceived));
 #ifdef ENABLE_SYSTIMEMGR_SUPPORT
@@ -471,6 +472,7 @@ namespace WPEFramework
         {
             if (m_iarmEventHandlersRegistered && Utils::IARM::isConnected())
             {
+                IARM_Result_t res;
                 IARM_CHECK( IARM_Bus_RemoveEventHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, _systemStateChanged));
                 IARM_CHECK( IARM_Bus_RemoveEventHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_DEVICE_UPDATE_RECEIVED, _deviceMgtUpdateReceived));
 #ifdef ENABLE_SYSTIMEMGR_SUPPORT
