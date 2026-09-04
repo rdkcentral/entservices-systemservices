@@ -9853,6 +9853,94 @@ TEST_F(SystemService_L2Test, SysImpl_ProcessTimeZones_InvalidPath_COMRPC)
 }
 
 /* ------------------------------------------------------------------- *
+ * Security: processTimeZones — reject shell metacharacters             *
+ * GetTimeZones with malicious timezone inputs containing shell         *
+ * metacharacters (;, |, $, `, ..) must be rejected before reaching     *
+ * popen/v_secure_popen.                                                *
+ * Covers: RDKEMW-24474 / entservices_Critical_003                      *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_ProcessTimeZones_RejectShellMetachars_JSONRPC)
+{
+    TEST_LOG("SysImpl_ProcessTimeZones_RejectShellMetachars: getTimeZones with malicious inputs");
+
+    /* Each of these inputs contains shell metacharacters or path traversal
+     * that could lead to command injection if passed to popen() unsanitized. */
+    const std::vector<std::string> maliciousInputs = {
+        "America/New_York;touch /tmp/pwned",
+        "UTC|cat /etc/passwd",
+        "$(whoami)",
+        "`id`",
+        "../../../etc/passwd",
+        "America/../../../etc/shadow",
+        "US/Eastern\nnewline",
+        "zone name with spaces",
+    };
+
+    for (const auto& input : maliciousInputs)
+    {
+        JsonObject params;
+        JsonArray tzArray;
+        tzArray.Add(input);
+        params["timeZones"] = tzArray;
+
+        JsonObject response;
+        uint32_t result = InvokeServiceMethod("org.rdk.System.1", "getTimeZones", params, response);
+        TEST_LOG("  input='%s' result=%u success=%s",
+                 input.c_str(), result,
+                 response["success"].Boolean() ? "true" : "false");
+        /* Malicious inputs must NOT succeed */
+        EXPECT_FALSE(response["success"].Boolean())
+            << "Shell metacharacter input was not rejected: " << input;
+    }
+}
+
+/* ------------------------------------------------------------------- *
+ * Security: processTimeZones — accept valid timezone names             *
+ * Verify that legitimate timezone strings still work after the         *
+ * input validation fix.                                                *
+ * Covers: RDKEMW-24474 regression check                                *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_ProcessTimeZones_AcceptValidTimezones_JSONRPC)
+{
+    TEST_LOG("SysImpl_ProcessTimeZones_AcceptValidTimezones: getTimeZones with valid inputs");
+
+    if (access("/usr/share/zoneinfo", F_OK) != 0) {
+        TEST_LOG("  /usr/share/zoneinfo not found - skipping");
+        return;
+    }
+
+    const std::vector<std::string> validInputs = {
+        "America/New_York",
+        "US/Eastern",
+        "UTC",
+        "Etc/GMT+5",
+        "Pacific/Port_Moresby",
+    };
+
+    for (const auto& input : validInputs)
+    {
+        std::string fullPath = std::string("/usr/share/zoneinfo/") + input;
+        if (access(fullPath.c_str(), F_OK) != 0) {
+            TEST_LOG("  %s not found on this host - skipping", input.c_str());
+            continue;
+        }
+
+        JsonObject params;
+        JsonArray tzArray;
+        tzArray.Add(input);
+        params["timeZones"] = tzArray;
+
+        JsonObject response;
+        uint32_t result = InvokeServiceMethod("org.rdk.System.1", "getTimeZones", params, response);
+        TEST_LOG("  input='%s' result=%u success=%s",
+                 input.c_str(), result,
+                 response["success"].Boolean() ? "true" : "false");
+        EXPECT_TRUE(response["success"].Boolean())
+            << "Valid timezone was incorrectly rejected: " << input;
+    }
+}
+
+/* ------------------------------------------------------------------- *
  * Function 2: OnLogUpload — m_uploadLogsPid != -1 branch              *
  * Strategy: fork a real 'sleep 60' process via UploadLogsAsync,       *
  * then fire the LOG_UPLOAD IARM event → OnLogUpload sees               *
