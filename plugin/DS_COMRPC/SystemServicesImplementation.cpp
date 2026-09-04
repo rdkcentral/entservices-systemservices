@@ -2734,16 +2734,18 @@ namespace WPEFramework
 
             std::list<WakeupSrcConfig> configs;
             WakeupSources src{};
+
             while (wakeupSources->Next(src)) {
                 if (src.wakeupSource == WAKEUP_SRC_UNKNOWN) {
                     LOGWARN("Ignoring unknown wakeup source");
                     continue;
                 }
                 LOGINFO("wakeupSource=%u enabled=%s", static_cast<uint16_t>(src.wakeupSource), src.enabled ? "true" : "false");
-                configs.emplace_back(WakeupSrcConfig{static_cast<WakeupSrcType>(src.wakeupSource), src.enabled});
+                configs.emplace_back(WakeupSrcConfig{static_cast<WPEFramework::Exchange::IPowerManager::WakeupSrcType>(src.wakeupSource),src.enabled});
             }
 
-            LOGWARN("configs size=%zu", configs.size());
+            LOGINFO("configs size=%zu", configs.size());
+
             if (configs.empty()) {
                 LOGWARN("No wakeup source configuration provided");
                 return Core::ERROR_GENERAL;
@@ -2764,6 +2766,7 @@ namespace WPEFramework
             retStatus = _powerManagerPlugin->SetWakeupSourceConfig(iter);
             iter->Release();
             result.success = (retStatus == Core::ERROR_NONE);
+
             LOGINFO("response: success=%s", result.success ? "true" : "false");
             return retStatus;
         }
