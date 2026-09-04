@@ -294,6 +294,8 @@ namespace WPEFramework
 #if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
             DeinitializeIARM();
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
+            // Close COM-RPC link
+            DSHelper::Close();
 
             SystemServicesImplementation::_instance = nullptr;
             if (m_shellService) {
@@ -356,6 +358,11 @@ namespace WPEFramework
             #if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
             InitializeIARM();
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
+            // Open COM-RPC link to entservices-devicesettings
+            const uint32_t dsResult = DSHelper::Open(service, "SystemServices");
+            if (dsResult != Core::ERROR_NONE) {
+                LOGERR("Configure: Failed to open DeviceSettings link (result=%u)", dsResult);
+            }
             m_shellService = service;
             m_shellService->AddRef();
             InitializePowerManager();
@@ -1152,8 +1159,6 @@ namespace WPEFramework
         Core::hresult SystemServicesImplementation::SetBlocklistFlag(const bool blocklist, SetBlocklistResult& result)
         {
             LOGINFO("blocklist=%d", blocklist);
-
-            // Get current value first for change detection before updating
             IARM_Bus_MFRLib_Platformblockdata_Param_t getParam = {0};
             IARM_Result_t getRes = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME,
                                        IARM_BUS_MFRLIB_API_GetConfigData,
@@ -1497,15 +1502,8 @@ namespace WPEFramework
                 LOGINFO("SystemServicesImplementation::SetPowerState powerState: %s, standbyReason: %s\n", powerState.c_str(), reason.c_str());
 
                 if (powerState == "LIGHT_SLEEP" || powerState == "DEEP_SLEEP") {
-                    const device::SleepMode &mode = device::Host::getInstance().getPreferredSleepMode();
-                    sleepMode = mode.toString();
-                    LOGWARN("Output of getPreferredSleepMode: '%s'", sleepMode.c_str());
 
-                    if (convert("DEEP_SLEEP", sleepMode)) {
-                        retVal = setPowerStateConversion(std::move(sleepMode));
-                    } else {
-                        retVal = setPowerStateConversion(powerState);
-                    }
+                    retVal = setPowerStateConversion(powerState);
 
                     outfile.open(STANDBY_REASON_FILE, ios::out);
                     if (outfile.is_open()) {
@@ -2084,19 +2082,19 @@ namespace WPEFramework
 			    		    getline (inFile, str);
 			    		    if(str.length() > 0){
 			    		        m_strRegion = safeExtractAfterColon(str);
-			    		        if(!isRegionValid(m_strRegion))
-			    		        {
-			    			        m_strTerritory = "";
-			    			        m_strRegion = "";
-			    			        LOGERR("Territory file corrupted  - region : %s",m_strRegion.c_str());
-			    			        LOGERR("Returning empty values");
-			    		        }
+                                if(!isRegionValid(m_strRegion))
+                                {
+                                    m_strTerritory = "";
+                                    m_strRegion = "";
+                                    LOGERR("Territory file corrupted - invalid region");
+                                    LOGERR("Returning empty values");
+                                }
 			    		    }
 			    	    }
 			    	    else{
 			    		    m_strTerritory = "";
 			    		    m_strRegion = "";
-			    		    LOGERR("Territory file corrupted - territory : %s",m_strTerritory.c_str());
+                            LOGERR("Territory file corrupted - territory : %s",m_strTerritory.c_str());
 			    		    LOGERR("Returning empty values");
 			    	    }
 			        }
@@ -2119,7 +2117,7 @@ namespace WPEFramework
 		    return retValue;
 	    }
 
-	    bool SystemServicesImplementation::isStrAlphaUpper(string strVal)
+        bool SystemServicesImplementation::isStrAlphaUpper(string strVal)
 	    {
 		    try{
 			    long unsigned int i=0;
@@ -2608,7 +2606,10 @@ namespace WPEFramework
                                     }
 
                                     fflush(f);
-                                    fsync(fileno(f));
+                                    if (fsync(fileno(f)) != 0) {
+                                        LOGERR("Failed to sync %s", TZ_ACCURACY_FILE);
+                                        resp = false;
+                                    }
                                     fclose(f);
                                 }
                             }
@@ -4080,3 +4081,24 @@ namespace WPEFramework
 
     } // namespace Plugin
 } // namespace WPEFramework
+
+// ── DSHelper lifecycle callbacks ────────────────────────────
+
+namespace WPEFramework { namespace Plugin {
+
+void SystemServicesImplementation::OnDeviceSettingsActivated()
+{
+    LOGINFO("SystemServices (DS_COMRPC): DeviceSettings plugin activated — IDeviceSettingsHost queryable");
+    // No notification subscriptions needed: sleep-mode and audio-format changes
+    // are not handled via subscription in the DS_IARM path either.
+    // SetPowerState queries IDeviceSettingsHost::GetPreferredSleepMode() on demand.
+}
+
+void SystemServicesImplementation::OnDeviceSettingsDeactivated()
+{
+    LOGINFO("SystemServices (DS_COMRPC): DeviceSettings plugin deactivated");
+    // Sub-interfaces are no longer valid; notifications will be re-registered
+    // on the next OnDeviceSettingsActivated() call.
+}
+
+}} // namespace WPEFramework::Plugin

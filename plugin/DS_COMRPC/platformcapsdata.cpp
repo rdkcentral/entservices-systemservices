@@ -17,16 +17,15 @@
 * limitations under the License.
 **/
 
-#include "platformcapsdata.h"
+#include "../platformcaps/platformcapsdata.h"
 
 #include <regex>
 #include <mutex>
 #include <fstream>
 #include <algorithm>
 
-#include "host.hpp"
-#include "videoOutputPort.hpp"
-#include "audioOutputPort.hpp"
+/* COM-RPC path: no libds headers needed */
+#include <interfaces/IDeviceSettingsAudio.h>
 
 #include "rfcapi.h"
 
@@ -303,20 +302,24 @@ bool PlatformCapsData::SupportsTrueSD() const {
  */
 
 bool PlatformCapsData::CanMixPCMWithSurround() {
+  /* COM-RPC path: query IDeviceSettingsAudio::IsAudioMSDecoded via the
+   * DeviceSettings plugin. _service is available after Configure(). */
   bool result = false;
 
-  try {
-    device::List<device::VideoOutputPort> vPorts =
-        device::Host::getInstance().getVideoOutputPorts();
-    // Coverity Fix: ID 589 - Structurally dead code: Remove pointless loop
-    if (vPorts.size() > 0) {
-      device::AudioOutputPort &aPort = vPorts.at(0).getAudioOutputPort();
-      result = aPort.isAudioMSDecode();
+  if (_service != nullptr) {
+    auto* audio = _service->QueryInterfaceByCallsign<Exchange::IDeviceSettingsAudio>("org.rdk.DeviceSettings");
+    if (audio != nullptr) {
+      int32_t handle = -1;
+      if (audio->GetAudioPort(Exchange::IDeviceSettingsAudio::AUDIO_PORT_TYPE_HDMI, 0, handle) == Core::ERROR_NONE) {
+        bool hasMS11 = false;
+        if (audio->IsAudioMSDecoded(handle, hasMS11) == Core::ERROR_NONE) {
+          result = hasMS11;
+        }
+      }
+      audio->Release();
+    } else {
+      TRACE(Trace::Warning, (_T("CanMixPCMWithSurround: IDeviceSettingsAudio not available")));
     }
-  } catch (...) {
-    result = false;
-    TRACE(Trace::Error, 
-        (_T("Exception Caught with device settings calls to get the MS11 Decode status..")));
   }
 
   TRACE(Trace::Information, (_T("canMixPCMWithSurround: %s"), result ? "YES" : "NO"));
