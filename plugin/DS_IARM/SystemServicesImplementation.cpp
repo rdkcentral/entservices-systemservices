@@ -2088,7 +2088,7 @@ namespace WPEFramework
 			    		        {
 			    			        m_strTerritory = "";
 			    			        m_strRegion = "";
-			    			        LOGERR("Territory file corrupted  - region : %s",m_strRegion.c_str());
+                                    LOGERR("Territory file corrupted - invalid region");
 			    			        LOGERR("Returning empty values");
 			    		        }
 			    		    }
@@ -2608,7 +2608,10 @@ namespace WPEFramework
                                     }
 
                                     fflush(f);
-                                    fsync(fileno(f));
+                                    if (fsync(fileno(f)) != 0) {
+                                        LOGERR("Failed to sync %s", TZ_ACCURACY_FILE);
+                                        resp = false;
+                                    }
                                     fclose(f);
                                 }
                             }
@@ -2733,14 +2736,13 @@ namespace WPEFramework
 
             std::list<WakeupSrcConfig> configs;
             WakeupSources src{};
-
             while (wakeupSources->Next(src)) {
                 if (src.wakeupSource == WAKEUP_SRC_UNKNOWN) {
                     LOGWARN("Ignoring unknown wakeup source");
                     continue;
                 }
                 LOGINFO("wakeupSource=%u enabled=%s", static_cast<uint16_t>(src.wakeupSource), src.enabled ? "true" : "false");
-                configs.emplace_back(WakeupSrcConfig{static_cast<WPEFramework::Exchange::IPowerManager::WakeupSrcType>(src.wakeupSource),src.enabled});
+                configs.emplace_back(WakeupSrcConfig{static_cast<WakeupSrcType>(src.wakeupSource), src.enabled});
             }
 
             LOGINFO("configs size=%zu", configs.size());
@@ -2765,7 +2767,6 @@ namespace WPEFramework
             retStatus = _powerManagerPlugin->SetWakeupSourceConfig(iter);
             iter->Release();
             result.success = (retStatus == Core::ERROR_NONE);
-
             LOGINFO("response: success=%s", result.success ? "true" : "false");
             return retStatus;
         }
