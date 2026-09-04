@@ -1828,8 +1828,8 @@ TEST_F(SystemServicesTest, GetTerritory_Success)
 
 TEST_F(SystemServicesTest, SetTerritory_Success)
 {
-    (void)system("mkdir -p /opt/persistent/System");
-    
+    (void)system("mkdir -p /opt/secure/persistent/System");
+
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"), _T("{\"territory\":\"USA\"}"), response));
     
     JsonObject jsonResponse;
@@ -1844,13 +1844,16 @@ TEST_F(SystemServicesTest, SetTerritory_Success)
 
 TEST_F(SystemServicesTest, SetTerritory_InvalidTerritory)
 {
-    uint32_t result = handler.Invoke(connection, _T("setTerritory"), _T("{\"territory\":\"invalid123\"}"), response);
-    
-    // When territory is invalid, implementation returns ERROR_GENERAL and response is empty
-    EXPECT_EQ(Core::ERROR_GENERAL, result) << "Should return ERROR_GENERAL with invalid territory";
-    EXPECT_TRUE(response.empty()) << "Response should be empty on error";
-    
-    TEST_LOG("SetTerritory invalid territory test - Result: %u", result);
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
+              _T("{\"territory\":\"invalid123\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_FALSE(success) << "Invalid territory should fail: " << response;
+
+    TEST_LOG("SetTerritory invalid territory test - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, GetPlatformConfiguration_Success)
@@ -2301,16 +2304,19 @@ TEST_F(SystemServicesTest, GetTerritory_WithRegion)
 TEST_F(SystemServicesTest, SetTerritory_WithRegion)
 {
     (void)system("mkdir -p /opt/secure/persistent/System");
-    
-    // Region validation expects specific format - invalid region returns ERROR_GENERAL
-    uint32_t result = handler.Invoke(connection, _T("setTerritory"), _T("{\"territory\":\"USA\",\"region\":\"California\"}"), response);
-    
-    // Invalid region format returns ERROR_GENERAL with empty response
-    EXPECT_EQ(Core::ERROR_GENERAL, result) << "Invalid region should return ERROR_GENERAL";
-    EXPECT_TRUE(response.empty()) << "Response should be empty for invalid region: " << response;
-    
-    TEST_LOG("SetTerritory with invalid region test - Response: %s", response.c_str());
-    
+
+    // "California" is not valid ISO 3166-2 format (requires XX-YYY)
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
+              _T("{\"territory\":\"USA\",\"region\":\"California\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_FALSE(success) << "Invalid region format should fail: " << response;
+
+    TEST_LOG("SetTerritory with invalid region test - Response: %s, success: %d", response.c_str(), success);
+
     removeFile(TERRITORYFILE);
 }
 
@@ -3266,10 +3272,14 @@ TEST_F(SystemServicesTest, SetTerritory_ValidUSATerritory)
 
 TEST_F(SystemServicesTest, SetTerritory_LowercaseInvalid)
 {
-    uint32_t result = handler.Invoke(connection, _T("setTerritory"), _T("{\"territory\":\"usa\"}"), response);
-    
-    EXPECT_EQ(Core::ERROR_GENERAL, result);
-    EXPECT_TRUE(response.empty());
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
+              _T("{\"territory\":\"usa\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_FALSE(success) << "Lowercase territory should fail: " << response;
 }
 
 TEST_F(SystemServicesTest, GetLastFirmwareFailureReason_ValidFile)
@@ -3396,8 +3406,9 @@ TEST_F(SystemServicesTest, GetTerritory_TerritoryFilePresent)
 {
     (void)system("mkdir -p /opt/secure/persistent/System");
     // Territory file requires "territory:" prefix format for safeExtractAfterColon
-    createFile(TERRITORYFILE, "territory:USA\nregion:US");
-    
+    // Region must be valid ISO 3166-2 format (XX-YYY) to pass isRegionValid() in readTerritoryFromFile
+    createFile(TERRITORYFILE, "territory:USA\nregion:US-CA");
+
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTerritory"), _T("{}"), response));
     
     JsonObject jsonResponse;
@@ -3421,9 +3432,9 @@ TEST_F(SystemServicesTest, GetTerritory_TerritoryFilePresent)
     ASSERT_TRUE(jsonResponse["region"].IsSet()) << "region is not set: " << response;
     std::string region = jsonResponse["region"].String();
     EXPECT_FALSE(region.empty()) << "region should not be empty: " << response;
-    EXPECT_EQ(region, "US") << "Expected region 'US': " << response;
-    
-    TEST_LOG("GetTerritory_TerritoryFilePresent - success: %d, territory: %s, region: %s", 
+    EXPECT_EQ(region, "US-CA") << "Expected region 'US-CA': " << response;
+
+    TEST_LOG("GetTerritory_TerritoryFilePresent - success: %d, territory: %s, region: %s",
              success, territory.c_str(), region.c_str());
     
     removeFile(TERRITORYFILE);
@@ -3449,10 +3460,14 @@ TEST_F(SystemServicesTest, SetTerritory_ValidCAN)
 
 TEST_F(SystemServicesTest, SetTerritory_InvalidFormat)
 {
-    uint32_t result = handler.Invoke(connection, _T("setTerritory"), _T("{\"territory\":\"us\"}"), response);
-    
-    EXPECT_EQ(Core::ERROR_GENERAL, result);
-    EXPECT_TRUE(response.empty());
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
+              _T("{\"territory\":\"us\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_FALSE(success) << "2-char territory should fail: " << response;
 }
 
 TEST_F(SystemServicesTest, SetPowerState_ONState)
@@ -5259,20 +5274,30 @@ TEST_F(SystemServicesTest, SetTerritory_ValidGBR)
 
 TEST_F(SystemServicesTest, SetTerritory_TooShort_Invalid)
 {
-    uint32_t result = handler.Invoke(connection, _T("setTerritory"),
-                                     _T("{\"territory\":\"US\"}"), response);
-    EXPECT_EQ(Core::ERROR_GENERAL, result) << "2-char territory should fail";
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
+              _T("{\"territory\":\"US\"}"), response));
 
-    TEST_LOG("SetTerritory_TooShort_Invalid - Result: %u", result);
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_FALSE(success) << "2-char territory should fail: " << response;
+
+    TEST_LOG("SetTerritory_TooShort_Invalid - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetTerritory_TooLong_Invalid)
 {
-    uint32_t result = handler.Invoke(connection, _T("setTerritory"),
-                                     _T("{\"territory\":\"USAA\"}"), response);
-    EXPECT_EQ(Core::ERROR_GENERAL, result) << "4-char territory should fail";
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
+              _T("{\"territory\":\"USAA\"}"), response));
 
-    TEST_LOG("SetTerritory_TooLong_Invalid - Result: %u", result);
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_FALSE(success) << "4-char territory should fail: " << response;
+
+    TEST_LOG("SetTerritory_TooLong_Invalid - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetTerritory_EmptyTerritory_SuccessFalse)
@@ -6647,20 +6672,30 @@ TEST_F(SystemServicesTest, SetTerritory_EmptyTerritory_SuccessFalse_ErrorNone)
 
 TEST_F(SystemServicesTest, SetTerritory_Length4_ReturnsErrorGeneral)
 {
-    uint32_t result = handler.Invoke(connection, _T("setTerritory"),
-                                     _T("{\"territory\":\"ABCD\"}"), response);
-    EXPECT_EQ(Core::ERROR_GENERAL, result) << "4-char territory should give ERROR_GENERAL";
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
+              _T("{\"territory\":\"ABCD\"}"), response));
 
-    TEST_LOG("SetTerritory_Length4_ReturnsErrorGeneral - Result: %u", result);
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_FALSE(success) << "4-char territory should fail: " << response;
+
+    TEST_LOG("SetTerritory_Length4_ReturnsErrorGeneral - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetTerritory_Length2_ReturnsErrorGeneral)
 {
-    uint32_t result = handler.Invoke(connection, _T("setTerritory"),
-                                     _T("{\"territory\":\"AB\"}"), response);
-    EXPECT_EQ(Core::ERROR_GENERAL, result) << "2-char territory should give ERROR_GENERAL";
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
+              _T("{\"territory\":\"AB\"}"), response));
 
-    TEST_LOG("SetTerritory_Length2_ReturnsErrorGeneral - Result: %u", result);
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_FALSE(success) << "2-char territory should fail: " << response;
+
+    TEST_LOG("SetTerritory_Length2_ReturnsErrorGeneral - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetTerritory_ValidUSA_EmptyRegion_Succeeds)
@@ -6703,11 +6738,16 @@ TEST_F(SystemServicesTest, SetTerritory_ValidUSA_ValidRegion_Succeeds)
 
 TEST_F(SystemServicesTest, SetTerritory_ValidUSA_InvalidRegion_ErrorGeneral)
 {
-    uint32_t result = handler.Invoke(connection, _T("setTerritory"),
-                                     _T("{\"territory\":\"USA\",\"region\":\"invalid-region-too-long\"}"), response);
-    EXPECT_EQ(Core::ERROR_GENERAL, result) << "Invalid region should give ERROR_GENERAL";
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
+              _T("{\"territory\":\"USA\",\"region\":\"invalid-region-too-long\"}"), response));
 
-    TEST_LOG("SetTerritory_ValidUSA_InvalidRegion_ErrorGeneral - Result: %u", result);
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_FALSE(success) << "Invalid region should fail: " << response;
+
+    TEST_LOG("SetTerritory_ValidUSA_InvalidRegion_ErrorGeneral - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ------------------------------------------------------------------
@@ -10701,13 +10741,17 @@ TEST_F(SystemServicesTest, SetTerritory_LowercaseRegion_TriggersIsStrAlphaUpperF
 {
     // territory="USA" is valid (3 chars, in standard list)
     // region="ab-XY" (5 chars < 7) → isRegionValid → isStrAlphaUpper("ab") fails
-    // → implementation returns Core::ERROR_GENERAL (same as invalid territory path)
-    uint32_t result = handler.Invoke(connection, _T("setTerritory"),
-        _T("{\"territory\":\"USA\",\"region\":\"ab-XY\"}"), response);
+    // → implementation returns ERROR_NONE with success=false
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
+        _T("{\"territory\":\"USA\",\"region\":\"ab-XY\"}"), response));
 
-    EXPECT_EQ(Core::ERROR_GENERAL, result) << "Should return ERROR_GENERAL for invalid region";
-    EXPECT_TRUE(response.empty()) << "Response should be empty on error";
-    TEST_LOG("SetTerritory_LowercaseRegion - Result: %u", result);
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_FALSE(success) << "Lowercase region prefix should fail: " << response;
+
+    TEST_LOG("SetTerritory_LowercaseRegion - Response: %s, success: %d", response.c_str(), success);
 }
 
 TEST_F(SystemServicesTest, SetTerritory_ValidUppercaseRegion_PassesIsStrAlphaUpper)
@@ -10720,6 +10764,86 @@ TEST_F(SystemServicesTest, SetTerritory_ValidUppercaseRegion_PassesIsStrAlphaUpp
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
     TEST_LOG("SetTerritory_ValidUppercaseRegion - Response: %s", response.c_str());
+}
+
+// ------------------------------------------------------------------
+// SetTerritory — numeric and mixed ISO 3166-2 subdivision suffix tests
+// Covers the [A-Z0-9] validation loop in isRegionValid()
+// ------------------------------------------------------------------
+
+TEST_F(SystemServicesTest, SetTerritory_NumericRegionSuffix_Valid)
+{
+    // "FR-30" → purely numeric suffix, valid ISO 3166-2 (France, Gard)
+    // Exercises the (c >= '0' && c <= '9') digit branch in isRegionValid
+    (void)system("mkdir -p /opt/secure/persistent/System");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
+              _T("{\"territory\":\"FRA\",\"region\":\"FR-30\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "Numeric region suffix should be valid: " << response;
+
+    removeFile(TERRITORYFILE);
+    TEST_LOG("SetTerritory_NumericRegionSuffix_Valid - Response: %s, success: %d", response.c_str(), success);
+}
+
+TEST_F(SystemServicesTest, SetTerritory_MixedAlphaNumericRegionSuffix_Valid)
+{
+    // "FR-2A" — mixed digit+letter suffix exercises both branches in isRegionValid
+    (void)system("mkdir -p /opt/secure/persistent/System");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
+              _T("{\"territory\":\"FRA\",\"region\":\"FR-2A\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "Mixed alphanumeric region suffix should be valid: " << response;
+
+    removeFile(TERRITORYFILE);
+    TEST_LOG("SetTerritory_MixedAlphaNumericRegionSuffix_Valid - Response: %s, success: %d", response.c_str(), success);
+}
+
+TEST_F(SystemServicesTest, SetTerritory_SingleLetterRegionSuffix_Valid)
+{
+    // "AR-C" → 1-char alpha suffix, valid per ISO 3166-2 (e.g., Argentina - Ciudad de Buenos Aires)
+    // Verifies the strSuffix.length() >= 1 minimum-length boundary
+    (void)system("mkdir -p /opt/secure/persistent/System");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
+              _T("{\"territory\":\"ARG\",\"region\":\"AR-C\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "1-char region suffix should be valid: " << response;
+
+    removeFile(TERRITORYFILE);
+    TEST_LOG("SetTerritory_SingleLetterRegionSuffix_Valid - Response: %s, success: %d", response.c_str(), success);
+}
+
+TEST_F(SystemServicesTest, SetTerritory_ThreeLetterRegionSuffix_Valid)
+{
+    // "GB-ENG" → 3-char alpha suffix, valid per ISO 3166-2 (e.g., United Kingdom - England)
+    // Verifies the loop iterates correctly over a longer suffix (6 chars total, still < 7)
+    (void)system("mkdir -p /opt/secure/persistent/System");
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTerritory"),
+              _T("{\"territory\":\"GBR\",\"region\":\"GB-ENG\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
+    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
+    bool success = jsonResponse["success"].Boolean();
+    EXPECT_TRUE(success) << "3-char region suffix should be valid: " << response;
+
+    removeFile(TERRITORYFILE);
+    TEST_LOG("SetTerritory_ThreeLetterRegionSuffix_Valid - Response: %s, success: %d", response.c_str(), success);
 }
 
 // ------------------------------------------------------------------

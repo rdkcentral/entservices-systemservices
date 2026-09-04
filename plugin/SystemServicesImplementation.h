@@ -33,6 +33,8 @@
 #include <cctype>
 #include <fstream>
 #include <cstring>
+#include <unordered_map>
+#include <unordered_set>
 using std::ofstream;
 #include <cstdlib>
 #include <iostream>
@@ -330,6 +332,9 @@ namespace WPEFramework
             std::string m_strTerritory;
             std::string m_strRegion;
             std::string  m_strStandardTerritoryList;
+            std::unordered_map<std::string, std::string> m_alpha3ToAlpha2;
+            std::unordered_set<std::string> m_validSubdivisions;
+            bool m_isoCodesLoaded;
             DeviceInfo m_deviceInfo{};
 
             void dispatchEvent(Event, const JsonObject &params);
@@ -356,6 +361,8 @@ namespace WPEFramework
             bool readTerritoryFromFile();
             bool isStrAlphaUpper(string strVal);
             bool isRegionValid(string regionStr);
+            bool isRegionValidForTerritory(const string& regionStr, const string& territoryAlpha3);
+            void loadIsoCodesData();
             uint32_t writeTerritory(string territory, string region);
             bool setPowerStateConversion(std::string powerState);
 
