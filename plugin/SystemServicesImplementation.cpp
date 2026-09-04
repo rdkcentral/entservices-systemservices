@@ -3300,7 +3300,7 @@ namespace WPEFramework
 
             if(!p)
             {
-                LOGERR("failed to start %s: %s", cmd.c_str(), strerror(errno));
+                LOGERR("failed to start zdump %s: %s", entry.c_str(), strerror(errno));
                 return false;
             }
 
@@ -3393,6 +3393,7 @@ namespace WPEFramework
 
             if (timeZones && (timeZones->Count() != 0))
             {
+                success = true;
                 string tz;
                 while (timeZones->Next(tz))
                 {
@@ -3408,11 +3409,11 @@ namespace WPEFramework
 
                     std::string path = std::string(ZONEINFO_DIR) + "/" + tz;
                     bool status = processTimeZones(std::move(path), dirObject);
-                    success = status;
 
                     if (!status)
                     {
                         LOGERR("Failed timezone %s", tz.c_str());
+                        success = false;
                     }
                 }
             }
