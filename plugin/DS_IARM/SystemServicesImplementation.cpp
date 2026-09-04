@@ -91,9 +91,6 @@ using WakeupSourceConfigIteratorImpl = WPEFramework::Core::Service<WPEFramework:
 #define ZONEINFO_DIR "/usr/share/zoneinfo"
 #define LOCALTIME_FILE "/opt/persistent/localtime"
 
-#define ISO3166_1_FILE "/usr/share/iso-codes/json/iso_3166-1.json"
-#define ISO3166_2_FILE "/usr/share/iso-codes/json/iso_3166-2.json"
-
 #define DEVICE_PROPERTIES_FILE "/etc/device.properties"
 
 #define STATUS_CODE_NO_SWUPDATE_CONF 460 
@@ -274,7 +271,10 @@ namespace WPEFramework
 #endif
             m_uploadLogsPid = -1;
 
-            regcomp (&m_regexUnallowedChars, REGEX_UNALLOWABLE_INPUT, REG_EXTENDED);
+            int regcomp_ret = regcomp (&m_regexUnallowedChars, REGEX_UNALLOWABLE_INPUT, REG_EXTENDED);
+            if (regcomp_ret != 0) {
+                LOGERR("Failed to compile regex pattern");
+            }
         }
 
         SystemServicesImplementation::~SystemServicesImplementation()
@@ -1152,42 +1152,38 @@ namespace WPEFramework
         Core::hresult SystemServicesImplementation::SetBlocklistFlag(const bool blocklist, SetBlocklistResult& result)
         {
             LOGINFO("blocklist=%d", blocklist);
-            bool status = false, update = false, ret;
-            bool blocklistFlag, oldBlocklistFlag;
 
-            /*check /opt/secure/persistent/opflashstore/ dir*/
-            ret = checkOpFlashStoreDir();
-            if(ret == true){
-                LOGINFO("checked opflashstore directory and it is exists. ret = %d",ret);
+            // Get current value first for change detection before updating
+            IARM_Bus_MFRLib_Platformblockdata_Param_t getParam = {0};
+            IARM_Result_t getRes = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME,
+                                       IARM_BUS_MFRLIB_API_GetConfigData,
+                                       (void *)&getParam, sizeof(getParam));
+            bool oldBlocklistFlag = false;
+            if (getRes == IARM_RESULT_SUCCESS) {
+                oldBlocklistFlag = (getParam.blocklist != 0);
             }
-            else {
-                LOGWARN("failed to create opflashstore directory ret =%d", ret);
-                LOGERR("Blocklist flag update failed. status %d ", status);
+
+            IARM_Bus_MFRLib_Platformblockdata_Param_t setParam = {0};
+            setParam.blocklist = blocklist;
+            IARM_Result_t setRes = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME,
+                                       IARM_BUS_MFRLIB_API_SetConfigData,
+                                       (void *)&setParam, sizeof(setParam));
+
+            if (IARM_RESULT_SUCCESS != setRes) {
+                LOGERR("Blocklist flag update failed. IARM result %d", setRes);
                 result.error.message = "Blocklist flag update failed";
                 result.error.code = "-32604";
                 result.success = false;
                 return Core::ERROR_GENERAL;
             }
 
-            blocklistFlag = blocklist;
-            status = write_parameters(DEVICESTATE_FILE, BLOCKLIST, blocklistFlag, update, oldBlocklistFlag);
-            if ((status != true)) {
-                LOGERR("Blocklist flag update failed. status %d ", status);
-                result.error.message = "Blocklist flag update failed";
-                result.error.code = "-32604";
-                result.success = false;
-                return Core::ERROR_GENERAL;
-            }
-            else {
-                LOGINFO("Blocklist flag stored successfully in persistent memory");
-                result.success = true;
-            }
+            LOGINFO("Blocklist flag stored successfully via IARM");
+            result.success = true;
 
-            LOGINFO("Update= %s", (update ? "true":"false"));
-            if(update == true) {
+            if (oldBlocklistFlag != blocklist) {
                 /*Send ONBLOCKLISTCHANGED event notify*/
                 if (SystemServicesImplementation::_instance) {
-                    SystemServicesImplementation::_instance->OnBlocklistChanged(blocklistFlag, oldBlocklistFlag);
+                    SystemServicesImplementation::_instance->OnBlocklistChanged(blocklist, oldBlocklistFlag);
                 } else {
                     LOGERR("SystemServicesImplementation::_instance is NULL.\n");
                 }
@@ -1236,37 +1232,22 @@ namespace WPEFramework
         Core::hresult SystemServicesImplementation::GetBlocklistFlag(BlocklistResult& result)
         {
             LOGINFO();
-            bool status = false, ret = false;
-            bool blocklistFlag = false;
-
             result.success = false;
             result.error.message = "";
             result.error.code = "";
 
-            /*check /opt/secure/persistent/opflashstore/ dir*/
-            ret = checkOpFlashStoreDir();
-            if(ret == true){
-                LOGINFO("checked opflashstore directory and it is exists. ret = %d",ret);
-            }
-            else {
-                LOGWARN("Blocklist flag retrieved failed from persistent memory.");
-                result.error.message = "Blocklist flag retrieved failed from persistent memory.";
-                result.error.code = "-32099";
-                result.success = false;
-                LOGINFO("response: success=%d, error.code=%s", result.success, result.error.code.c_str());
-                return Core::ERROR_GENERAL;
-            }
+            IARM_Bus_MFRLib_Platformblockdata_Param_t param = {0};
+            IARM_Result_t res = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME,
+                                   IARM_BUS_MFRLIB_API_GetConfigData,
+                                   (void *)&param, sizeof(param));
 
-            status = read_parameters(DEVICESTATE_FILE, BLOCKLIST, blocklistFlag);
-            if (status == true) {
-                LOGWARN("blocklistFlag=%d", blocklistFlag);
-                result.blocklist = blocklistFlag;
+            if (IARM_RESULT_SUCCESS == res) {
+                result.blocklist = (param.blocklist != 0);
                 result.success = true;
-                LOGINFO("Blocklist flag retrieved successfully from persistent memory.");
-            }
-            else{
-                LOGWARN("Blocklist flag retrieved failed from persistent memory.");
-                result.error.message = "Blocklist flag retrieved failed from persistent memory.";
+                LOGINFO("Blocklist flag retrieved successfully via IARM. blocklist=%u", param.blocklist);
+            } else {
+                LOGWARN("Blocklist flag retrieved failed via IARM. result=%d", res);
+                result.error.message = "Blocklist flag retrieved failed";
                 result.error.code = "-32099";
                 result.success = false;
             }
@@ -2103,13 +2084,20 @@ namespace WPEFramework
 			    		    getline (inFile, str);
 			    		    if(str.length() > 0){
 			    		        m_strRegion = safeExtractAfterColon(str);
+			    		        if(!isRegionValid(m_strRegion))
+			    		        {
+			    			        m_strTerritory = "";
+			    			        m_strRegion = "";
+			    			        LOGERR("Territory file corrupted  - region : %s",m_strRegion.c_str());
+			    			        LOGERR("Returning empty values");
+			    		        }
 			    		    }
 			    	    }
 			    	    else{
-			    		    LOGERR("Territory file corrupted - territory : %s",m_strTerritory.c_str());
-			    		    LOGERR("Returning empty values");
 			    		    m_strTerritory = "";
 			    		    m_strRegion = "";
+			    		    LOGERR("Territory file corrupted - territory : %s",m_strTerritory.c_str());
+			    		    LOGERR("Returning empty values");
 			    	    }
 			        }
 			        else{
@@ -2131,104 +2119,44 @@ namespace WPEFramework
 		    return retValue;
 	    }
 
-        bool SystemServicesImplementation::getAlpha2ForTerritory(const string& territoryAlpha3, string& alpha2)
-        {
-            const char* iso3166_1_file = ISO3166_1_FILE;
+	    bool SystemServicesImplementation::isStrAlphaUpper(string strVal)
+	    {
+		    try{
+			    long unsigned int i=0;
+			    for(i=0; i<= strVal.length()-1; i++)
+			    {
+				    if((isalpha(strVal[i])== 0) || (isupper(strVal[i])==0))
+				    {
+					    LOGERR(" -- Invalid Territory ");
+					    return false;
+					    break;
+				    }
+			    }
+		    }
+		    catch(...){
+			    LOGERR(" Exception caught");
+			    return false;
+		    }
+		    return true;
+	    }
 
-            if (!Utils::fileExists(iso3166_1_file)) {
-                LOGERR("%s not found", iso3166_1_file);
-                return false;
-            }
-
-            std::string content;
-            if (!Utils::readFileContent(iso3166_1_file, content)) {
-                LOGERR("Failed to read %s", iso3166_1_file);
-                return false;
-            }
-
-            JsonObject root;
-            if (!root.FromString(content)) {
-                LOGERR("Failed to parse %s", iso3166_1_file);
-                return false;
-            }
-
-            JsonArray entries = root["3166-1"].Array();
-            auto it = entries.Elements();
-            while (it.Next()) {
-                JsonObject entry = it.Current().Object();
-                if (entry.HasLabel("alpha_3") && entry.HasLabel("alpha_2")) {
-                    if (entry["alpha_3"].String() == territoryAlpha3) {
-                        alpha2 = entry["alpha_2"].String();
-                        LOGINFO("Territory '%s' -> alpha2 '%s'", territoryAlpha3.c_str(), alpha2.c_str());
-                        return true;
-                    }
-                }
-            }
-
-            LOGERR("Territory '%s' not found in iso_3166-1.json", territoryAlpha3.c_str());
-            return false;
-        }
-
-        bool SystemServicesImplementation::isSubdivisionExists(const string& regionCode)
-        {
-            const char* iso3166_2_file = ISO3166_2_FILE;
-
-            if (!Utils::fileExists(iso3166_2_file)) {
-                LOGERR("%s not found", iso3166_2_file);
-                return false;
-            }
-
-            std::string content;
-            if (!Utils::readFileContent(iso3166_2_file, content)) {
-                LOGERR("Failed to read %s", iso3166_2_file);
-                return false;
-            }
-
-            JsonObject root;
-            if (!root.FromString(content)) {
-                LOGERR("Failed to parse %s", iso3166_2_file);
-                return false;
-            }
-
-            JsonArray entries = root["3166-2"].Array();
-            auto it = entries.Elements();
-            while (it.Next()) {
-                JsonObject entry = it.Current().Object();
-                if (entry.HasLabel("code") && entry["code"].String() == regionCode) {
-                    LOGINFO("Subdivision '%s' found", regionCode.c_str());
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        bool SystemServicesImplementation::isRegionValidForTerritory(const string& regionStr, const string& territoryAlpha3)
-        {
-            // Validate territory and get alpha-2 code
-            std::string alpha2;
-            if (!getAlpha2ForTerritory(territoryAlpha3, alpha2)) {
-                LOGERR("Territory '%s' is not a valid ISO 3166-1 alpha-3 code", territoryAlpha3.c_str());
-                return false;
-            }
-
-            // Check region prefix matches territory's alpha-2 code
-            std::string expectedPrefix = alpha2 + "-";
-            if (regionStr.rfind(expectedPrefix, 0) != 0) {
-                LOGERR("Region '%s' does not belong to territory '%s' (expected prefix '%s')",
-                       regionStr.c_str(), territoryAlpha3.c_str(), expectedPrefix.c_str());
-                return false;
-            }
-
-            // Verify region exists in ISO 3166-2 database
-            if (!isSubdivisionExists(regionStr)) {
-                LOGERR("Region '%s' is not a valid ISO 3166-2 subdivision for territory '%s'",
-                       regionStr.c_str(), territoryAlpha3.c_str());
-                return false;
-            }
-
-            return true;
-        }
+	    bool SystemServicesImplementation::isRegionValid(string regionStr)
+	    {
+		    bool retVal = false;
+		    if(regionStr.length() < 7){
+			    string strRegion = regionStr.substr(0,regionStr.find("-"));
+			    if( strRegion.length() == 2){
+				    // Coverity Fix: ID 16, 31 - COPY_INSTEAD_OF_MOVE
+				    if (isStrAlphaUpper(strRegion)){
+					    strRegion = regionStr.substr(regionStr.find("-")+1,regionStr.length());
+					    if(strRegion.length() >= 2){
+						    retVal = isStrAlphaUpper(std::move(strRegion));
+					    }
+				    }
+			    }
+		    }
+		    return retVal;
+	    }
 
         Core::hresult SystemServicesImplementation::GetTerritory(string& territory , string& region, bool& success)
 	    {
@@ -2526,13 +2454,13 @@ namespace WPEFramework
                         if(!region.empty()){
                             regionStr = region;
                             if(regionStr != ""){
-                                if(isRegionValidForTerritory(regionStr, territoryStr)){
+                                if(isRegionValid(regionStr)){
                                     resp = writeTerritory(territoryStr,regionStr);
                                     LOGWARN(" territory name %s ", territoryStr.c_str());
                                     LOGWARN(" region name %s", regionStr.c_str());
                                 }else{
                                     error.message = "Invalid region";
-                                    LOGWARN("Region '%s' is not valid for territory '%s'", regionStr.c_str(), territoryStr.c_str());
+                                    LOGWARN("Please enter valid region");
                                     return Core::ERROR_GENERAL;
                                 }
                             }
@@ -2637,7 +2565,10 @@ namespace WPEFramework
                                     }
 
                                     fflush(f);
-                                    fsync(fileno(f));
+                                    if (fsync(fileno(f)) != 0) {
+                                        LOGERR("Failed to sync %s", TZ_FILE);
+                                        resp = false;
+                                    }
                                     fclose(f);
 #ifdef ENABLE_LINK_LOCALTIME
                                     // Now create the linux link back to the zone info file to our writeable localtime
@@ -2792,58 +2723,49 @@ namespace WPEFramework
         Core::hresult SystemServicesImplementation::SetWakeupSrcConfiguration(const string& powerState, ISystemServicesWakeupSourcesIterator* const& wakeupSources, SystemResult& result)
         {
             LOGINFO("powerState=%s", powerState.c_str());
-            Core::hresult retStatus = Core::ERROR_NONE;
+            Core::hresult retStatus = Core::ERROR_GENERAL;
+            result.success = false;
 
-            if(wakeupSources != nullptr)
-            {
-                std::list<WakeupSrcConfig> configs = {};
-                WakeupSources src{};
-                while(wakeupSources->Next(src))
-                {
-                    // Check each wakeup source field and add to configs if enabled
-                    if(src.voice) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_VOICE, true});
-                    }
-                    if(src.presenceDetection) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_PRESENCEDETECTED, true});
-                    }
-                    if(src.bluetooth) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_BLUETOOTH, true});
-                    }
-                    if(src.wifi) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_WIFI, true});
-                    }
-                    if(src.ir) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_IR, true});
-                    }
-                    if(src.powerKey) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_POWERKEY, true});
-                    }
-                    if(src.cec) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_CEC, true});
-                    }
-                    if(src.lan) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_LAN, true});
-                    }
-                    if(src.timer) {
-                        configs.emplace_back(WakeupSrcConfig{WakeupSrcType::WAKEUP_SRC_TIMER, true});
-                    }
-                }
-                LOGWARN("configs size :%zu", configs.size());
-
-                if(!configs.empty())
-                {
-                    ASSERT (_powerManagerPlugin);
-                    if(_powerManagerPlugin)
-                    {
-                        auto iter = WakeupSourceConfigIteratorImpl::Create<IWakeupSourceConfigIterator>(configs);
-                        retStatus = _powerManagerPlugin->SetWakeupSourceConfig(iter);
-                        iter->Release();
-                    }
-
-                    result.success = (retStatus == Core::ERROR_NONE);
-                }
+            if (wakeupSources == nullptr) {
+                LOGWARN("wakeupSources is null (no-op)");
+                return Core::ERROR_NONE;
             }
+
+            std::list<WakeupSrcConfig> configs;
+            WakeupSources src{};
+
+            while (wakeupSources->Next(src)) {
+                if (src.wakeupSource == WAKEUP_SRC_UNKNOWN) {
+                    LOGWARN("Ignoring unknown wakeup source");
+                    continue;
+                }
+                LOGINFO("wakeupSource=%u enabled=%s", static_cast<uint16_t>(src.wakeupSource), src.enabled ? "true" : "false");
+                configs.emplace_back(WakeupSrcConfig{static_cast<WPEFramework::Exchange::IPowerManager::WakeupSrcType>(src.wakeupSource),src.enabled});
+            }
+
+            LOGINFO("configs size=%zu", configs.size());
+
+            if (configs.empty()) {
+                LOGWARN("No wakeup source configuration provided");
+                return Core::ERROR_GENERAL;
+            }
+
+            ASSERT(_powerManagerPlugin);
+            if (!_powerManagerPlugin) {
+                LOGERR("PowerManager plugin is not available");
+                return Core::ERROR_GENERAL;
+            }
+
+            auto iter = WakeupSourceConfigIteratorImpl::Create<IWakeupSourceConfigIterator>(configs);
+            if (iter == nullptr) {
+                LOGERR("Failed to create WakeupSourceConfigIterator");
+                return Core::ERROR_GENERAL;
+            }
+
+            retStatus = _powerManagerPlugin->SetWakeupSourceConfig(iter);
+            iter->Release();
+            result.success = (retStatus == Core::ERROR_NONE);
+
             LOGINFO("response: success=%s", result.success ? "true" : "false");
             return retStatus;
         }

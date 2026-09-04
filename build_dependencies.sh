@@ -20,6 +20,8 @@
 set -x
 set -e
 ##############################
+THUNDER_TOOLS_COMMIT_SHA="d5dd83c7c19c49c7f25c558c126500bd2d64f7a4"
+THUNDER_COMMIT_SHA="2c0fcc5529e7da734be558ca6efa05d934dcce31"
 GITHUB_WORKSPACE="${PWD}"
 ls -la ${GITHUB_WORKSPACE}
 cd ${GITHUB_WORKSPACE}
@@ -34,24 +36,135 @@ pip install jsonref
 # Clone the required repositories
 
 
-git clone --branch  R4.4.3 https://github.com/rdkcentral/ThunderTools.git
+git clone --branch R4_4-RDK https://github.com/rdkcentral/ThunderTools.git
+cd ThunderTools
+git checkout $THUNDER_TOOLS_COMMIT_SHA
+cd ..
 
-git clone --branch R4.4.1 https://github.com/rdkcentral/Thunder.git
+git clone --branch R4_4-RDK https://github.com/rdkcentral/Thunder.git
+cd Thunder
+git checkout $THUNDER_COMMIT_SHA
+cd ..
 
-git clone --branch RDKEMW-19266 https://github.com/rdkcentral/entservices-apis.git
+git clone --branch develop https://github.com/rdkcentral/entservices-apis.git
 
 cd ..
 git clone --branch develop https://github.com/rdkcentral/entservices-helpers.git
 cd "$GITHUB_WORKSPACE"
 
-git clone --branch 1.0.14 https://github.com/rdkcentral/entservices-testframework.git
+git clone --branch 2.0.8 https://github.com/rdkcentral/entservices-testframework.git
+
+cd $WORKDIR
+rm -rf rdk-cert-config
+git clone -b 1.0.6 https://github.com/rdkcentral/rdk-cert-config.git && \
+    cd rdk-cert-config && autoreconf --install && ./configure --prefix=/usr/local --enable-testrdkcerts && \
+    make && make install
+cp RdkConfigApi/src/librdkconfig.a /usr/local/lib/librdkconfig.a
+
+cd $WORKDIR
+rm -rf rbus 
+git clone https://github.com/rdkcentral/rbus
+cmake -Hrbus -Bbuild/rbus -DBUILD_FOR_DESKTOP=ON -DCMAKE_BUILD_TYPE=Debug
+make -C build/rbus && make -C build/rbus install
+
+cd $WORKDIR
+git clone https://github.com/xmidt-org/wdmp-c.git
+cd wdmp-c
+sed -i '/WDMP_ERR_SESSION_IN_PROGRESS/a\    WDMP_ERR_INTERNAL_ERROR,\n    WDMP_ERR_DEFAULT_VALUE,' src/wdmp-c.h
+cmake -H. -Bbuild -DBUILD_FOR_DESKTOP=ON -DCMAKE_BUILD_TYPE=Debug
+make -C build && make -C build install
+
+cd $WORKDIR
+rm -rf WebconfigFramework
+git clone https://github.com/rdkcentral/WebconfigFramework.git
+cd WebconfigFramework && export INSTALL_DIR='/usr/local'&& \
+export CFLAGS="-I${INSTALL_DIR}/include/rtmessage -I${INSTALL_DIR}/include/msgpack -I${INSTALL_DIR}/include/rbus -I${INSTALL_DIR}/include" && \
+export LDFLAGS="-L${INSTALL_DIR}/lib" && \
+autoreconf --install && \
+./configure --prefix=/usr/local && make && make install && cp -r include/* /usr/local/include/
+
+cd $WORKDIR
+rm -rf rdk_logger
+
+git clone https://github.com/rdkcentral/rdk_logger.git
+cd rdk_logger && autoreconf --install && ./configure && make && make install
+
+cd ${GITHUB_WORKSPACE}
+rm -rf libSyscallWrapper
+git clone https://github.com/rdkcentral/libSyscallWrapper.git
+cd libSyscallWrapper && export INSTALL_DIR='/usr/local' && \
+autoreconf --install && \
+./configure --prefix=/usr/local && make && make install
+
+
+cd ${GITHUB_WORKSPACE}
+rm -rf common_utilities
+git clone https://github.com/rdkcentral/common_utilities.git
+cd common_utilities && export INSTALL_DIR='/usr/local' && \
+export CFLAGS="-Wno-error=format -Wno-unused-result -Wno-format-truncation -Wno-error=format-security -DRDK_LOGGER" && \
+autoreconf --install && \
+./configure --prefix=/usr/local && make && make install
+
+cd ${GITHUB_WORKSPACE}
+rm -rf rfc
+git clone https://github.com/rdkcentral/rfc.git
+cd rfc
+autoreconf -i
+./configure --enable-rfctool=yes --enable-tr181set=yes
+cd rfcapi
+make librfcapi_la_CPPFLAGS="-I/usr/include/cjson -I/usr/rfc/rfcMgr/gtest/mocks"
+make install
+
+cd ${GITHUB_WORKSPACE}
+git clone https://github.com/rdkcentral/tr69hostif.git
+cd tr69hostif
+cp src/hostif/include/*.h /usr/local/include
+cp src/hostif/handlers/include/*.h /usr/local/include
+cp src/hostif/profiles/DeviceInfo/*.h /usr/local/include
+cp src/unittest/stubs/wdmp-c.h /usr/local/include
+cp src/hostif/parodusClient/pal/*.h /usr/local/include
+cp src/hostif/parodusClient/waldb/*.h /usr/local/include
+cd ./src/unittest/stubs
+
+g++ -fPIC -shared -o libIARMBus.so iarm_stubs.cpp  -I/usr/tr69hostif/src/hostif/parodusClient/pal -I/usr/tr69hostif/src/unittest/stubs -I/usr/tr69hostif/src/hostif/parodusClient/waldb -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include -I/usr/tr69hostif/src/hostif/include -I/usr/tr69hostif/src/hostif/profiles/DeviceInfo -I/usr/tr69hostif/src/hostif/parodusClient/pal -fpermissive
+cp libIARMBus.so /usr/local/lib
+
+cd ${GITHUB_WORKSPACE}
+rm -rf iarmmgrs
+rm -rf iarmbus
+git clone https://github.com/rdkcentral/iarmbus.git
+# Install header files alone from iarmbus repositories
+cp iarmbus/core/include/*.h /usr/local/include
+cp iarmbus/core/*.h /usr/local/include
+
+git clone https://github.com/rdkcentral/iarmmgrs.git
+cp iarmmgrs/sysmgr/include/sysMgr.h /usr/local/include
+cp iarmmgrs/maintenance/include/maintenanceMGR.h /usr/local/include
+
+cd ${GITHUB_WORKSPACE}
+rm -rf telemetry
+git clone https://github.com/rdkcentral/telemetry.git
+cd telemetry
+cp include/*.h /usr/local/include
+sh  build_inside_container.sh
+
+cd ${GITHUB_WORKSPACE}
+git clone https://github.com/rdkcentral/dcm-agent.git
+cd dcm-agent
+git checkout feature/RDKEMW-22385
+autoreconf -i
+./configure
+cp uploadstblogs/include/*.h /usr/local/include
+cd uploadstblogs/src
+make
+make install
+cd ${GITHUB_WORKSPACE}
 
 ############################
 # Build Thunder-Tools
 echo "======================================================================================"
 echo "buliding thunderTools"
 cd ThunderTools
-patch -p1 < $GITHUB_WORKSPACE/entservices-testframework/patches/00010-R4.4-Add-support-for-project-dir.patch
 cd -
 
 
@@ -70,11 +183,6 @@ echo "==========================================================================
 echo "buliding thunder"
 
 cd Thunder
-patch -p1 < $GITHUB_WORKSPACE/entservices-testframework/patches/Use_Legact_Alt_Based_On_ThunderTools_R4.4.3.patch
-patch -p1 < $GITHUB_WORKSPACE/entservices-testframework/patches/error_code_R4_4.patch
-patch -p1 < $GITHUB_WORKSPACE/entservices-testframework/patches/1004-Add-support-for-project-dir.patch
-patch -p1 < $GITHUB_WORKSPACE/entservices-testframework/patches/RDKEMW-733-Add-ENTOS-IDS.patch
-patch -p1 < $GITHUB_WORKSPACE/entservices-testframework/patches/Jsonrpc_dynamic_error_handling.patch
 cd -
 
 cmake -G Ninja -S Thunder -B build/Thunder \
@@ -173,3 +281,7 @@ echo "==========================================================================
 cd ../../
 
 ls -la ${GITHUB_WORKSPACE}
+
+
+
+

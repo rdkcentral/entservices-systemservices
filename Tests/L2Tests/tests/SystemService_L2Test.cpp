@@ -652,33 +652,6 @@ SystemService_L2Test::SystemService_L2Test()
                    return mfrERR_NONE;
         }));
 
-         // Create minimal ISO 3166 fixture files required by isRegionValidForTerritory().
-         // These are normally installed via the iso-codes package on the target.
-         (void)system("mkdir -p /usr/share/iso-codes/json");
-         {
-             std::ofstream f1("/usr/share/iso-codes/json/iso_3166-1.json");
-             f1 << "{\"3166-1\":["
-                << "{\"alpha_2\":\"US\",\"alpha_3\":\"USA\",\"name\":\"United States\"},"
-                << "{\"alpha_2\":\"AU\",\"alpha_3\":\"AUS\",\"name\":\"Australia\"},"
-                << "{\"alpha_2\":\"GB\",\"alpha_3\":\"GBR\",\"name\":\"United Kingdom\"},"
-                << "{\"alpha_2\":\"DE\",\"alpha_3\":\"DEU\",\"name\":\"Germany\"},"
-                << "{\"alpha_2\":\"CA\",\"alpha_3\":\"CAN\",\"name\":\"Canada\"},"
-                << "{\"alpha_2\":\"FR\",\"alpha_3\":\"FRA\",\"name\":\"France\"}"
-                << "]}";
-             f1.close();
-             std::ofstream f2("/usr/share/iso-codes/json/iso_3166-2.json");
-             f2 << "{\"3166-2\":["
-                << "{\"code\":\"US-CA\",\"name\":\"California\"},"
-                << "{\"code\":\"US-NY\",\"name\":\"New York\"},"
-                << "{\"code\":\"US-TX\",\"name\":\"Texas\"},"
-                << "{\"code\":\"AU-NSW\",\"name\":\"New South Wales\"},"
-                << "{\"code\":\"GB-LND\",\"name\":\"London\"},"
-                << "{\"code\":\"GB-ENG\",\"name\":\"England\"},"
-                << "{\"code\":\"DE-BY\",\"name\":\"Bavaria\"}"
-                << "]}";
-             f2.close();
-         }
-
          /* Activate PowerManager plugin */
          status = ActivateService("org.rdk.PowerManager");
          EXPECT_EQ(Core::ERROR_NONE, status);
@@ -1034,8 +1007,35 @@ TEST_F(SystemService_L2Test,SystemServiceGetSetBlocklistFlag)
     JsonObject result;
     std::string message;
     JsonObject expected_status;
-    uint32_t file_status = -1;
-	uint32_t signalled = SYSTEMSERVICEL2TEST_STATE_INVALID;
+    uint32_t signalled = SYSTEMSERVICEL2TEST_STATE_INVALID;
+
+    // Blocklist is stored by the MFR library over IARM; emulate that storage so
+    // a get after a set observes the written value. Seeded to 1 so the initial
+    // setBlocklistFlag(true) is a no-change and does not emit onBlocklistChanged.
+    static uint8_t s_blocklist;
+    s_blocklist = 1;
+    ON_CALL(*p_iarmBusImplMock, IARM_Bus_Call(
+        ::testing::StrEq(IARM_BUS_MFRLIB_NAME),
+        ::testing::StrEq(IARM_BUS_MFRLIB_API_GetConfigData),
+        ::testing::_,
+        ::testing::_))
+        .WillByDefault(::testing::Invoke(
+            [](const char*, const char*, void* arg, size_t) -> IARM_Result_t {
+                if (nullptr == arg) return IARM_RESULT_INVALID_PARAM;
+                static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg)->blocklist = s_blocklist;
+                return IARM_RESULT_SUCCESS;
+            }));
+    ON_CALL(*p_iarmBusImplMock, IARM_Bus_Call(
+        ::testing::StrEq(IARM_BUS_MFRLIB_NAME),
+        ::testing::StrEq(IARM_BUS_MFRLIB_API_SetConfigData),
+        ::testing::_,
+        ::testing::_))
+        .WillByDefault(::testing::Invoke(
+            [](const char*, const char*, void* arg, size_t) -> IARM_Result_t {
+                if (nullptr == arg) return IARM_RESULT_INVALID_PARAM;
+                s_blocklist = static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg)->blocklist;
+                return IARM_RESULT_SUCCESS;
+            }));
 
     /* Register for temperature threshold change event. */
     status = jsonrpc.Subscribe<JsonObject>(JSON_TIMEOUT,
@@ -1081,17 +1081,6 @@ TEST_F(SystemService_L2Test,SystemServiceGetSetBlocklistFlag)
     EXPECT_TRUE(result["success"].Boolean());
     EXPECT_FALSE(result["blocklist"].Boolean());
 
-    file_status = remove("/opt/secure/persistent/opflashstore/devicestate.txt");
-    // Check if the file has been successfully removed
-    if (file_status != 0)
-    {
-        TEST_LOG("Error deleting file[devicestate.txt]");
-    }
-    else
-    {
-        TEST_LOG("File[devicestate.txt] successfully deleted");
-    }
-    TEST_LOG("Removed the devicestate.txt file in preparation for the next round of testing.");
     jsonrpc.Unsubscribe(JSON_TIMEOUT, _T("onBlocklistChanged"));
 }
 
@@ -2917,7 +2906,7 @@ TEST_F(SystemService_L2Test, SysImpl_Cov_SetTerritory_JSONRPC)
 
     JsonObject params;
     params["territory"] = "USA";
-    params["region"] = "US-CA";
+    params["region"] = "US";
     JsonObject result;
 
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setTerritory", params, result);
@@ -4765,7 +4754,7 @@ TEST_F(SystemService_L2Test, SysImpl_Reboot_COMRPC)
     }
 }
 
-/* SetTerritory with valid USA territory - covers isRegionValidForTerritory (ISO 3166),
+/* SetTerritory with valid USA territory - covers isStrAlphaUpper, isRegionValid,
  * writeTerritory, and OnTerritoryChanged dispatch path */
 TEST_F(SystemService_L2Test, SysImpl_SetTerritory_Valid_COMRPC)
 {
@@ -7031,7 +7020,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetMode_InvalidModeName_COMRPC)
 
 /* ------------------------------------------------------------------- *
  * SetTerritory — invalid region format → L2480-2481                    *
- * isRegionValidForTerritory("bad@region") returns false → ERROR_GENERAL *
+ * isRegionValid("bad@region") returns false → ERROR_GENERAL branch    *
  * ------------------------------------------------------------------- */
 TEST_F(SystemService_L2Test, SysImpl_SetTerritory_InvalidRegionFormat_COMRPC)
 {
@@ -7047,7 +7036,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetTerritory_InvalidRegionFormat_COMRPC)
     bool success = false;
     /* Territory "USA" is valid (3 chars, in list); region has invalid char '@' */
     uint32_t result = m_SystemServicesPlugin->SetTerritory("USA", "bad@region", sysError, success);
-    /* Expected: ERROR_GENERAL because isRegionValidForTerritory fails */
+    /* Expected: ERROR_GENERAL because isRegionValid fails */
     TEST_LOG("  SetTerritory('USA','bad@region'): result=%u success=%d msg='%s'",
              result, success, sysError.message.c_str());
 
@@ -7274,7 +7263,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetTerritory_CorruptedTerritoryFile_COMRPC)
 
 /* ------------------------------------------------------------------- *
  * GetTerritory — file with valid territory but invalid region format    *
- * Covers L2107-2110: region read but isRegionValidForTerritory fails   *
+ * Covers L2107-2110: region read but isRegionValid fails → LOGERR     *
  * ------------------------------------------------------------------- */
 TEST_F(SystemService_L2Test, SysImpl_GetTerritory_CorruptedRegionFile_COMRPC)
 {
@@ -7290,7 +7279,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetTerritory_CorruptedRegionFile_COMRPC)
     mkdir("/opt/secure/persistent", 0755);
     mkdir("/opt/secure/persistent/System", 0700);
 
-    /* "USA" is 3 chars and in the standard list; "bad@region" fails isRegionValidForTerritory */
+    /* "USA" is 3 chars and in the standard list; "bad@region" fails isRegionValid */
     {
         std::ofstream f("/opt/secure/persistent/System/Territory.txt");
         if (f.is_open()) {
@@ -7828,7 +7817,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetTerritory_ValidTerritoryAndRegion_COMRPC
 
     Exchange::ISystemServices::SystemError sysError{};
     bool success = false;
-    /* "GBR" is in standard list; "GB-ENG" passes isRegionValidForTerritory (ISO 3166-2 lookup) */
+    /* "GBR" is in standard list; "GB-ENG" passes isRegionValid (2-char prefix + 3-char suffix) */
 	m_notificationHandler.ResetEvent();
     uint32_t result = m_SystemServicesPlugin->SetTerritory("GBR", "GB-ENG", sysError, success);
     EXPECT_EQ(result, Core::ERROR_NONE);
@@ -8313,8 +8302,7 @@ TEST_F(SystemService_L2Test, SysImpl_GetNetworkStandbyMode_CachedAndFresh_COMRPC
 }
 
 /* ------------------------------------------------------------------- *
- * GetBlocklistFlag — BLOCKLIST=true in file → L955 true branch         *
- * Covers L955: file_value == "true" → value = true                    *
+ * GetBlocklistFlag — MFR library reports blocklist set                 *
  * ------------------------------------------------------------------- */
 TEST_F(SystemService_L2Test, SysImpl_GetBlocklistFlag_TrueValue_COMRPC)
 {
@@ -8324,18 +8312,19 @@ TEST_F(SystemService_L2Test, SysImpl_GetBlocklistFlag_TrueValue_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("SysImpl_GetBlocklistFlag_TrueValue: BLOCKLIST=true returns true");
+    TEST_LOG("SysImpl_GetBlocklistFlag_TrueValue: IARM GetConfigData reports blocklist=1");
 
-    mkdir("/opt/secure",                         0755);
-    mkdir("/opt/secure/persistent",              0755);
-    mkdir("/opt/secure/persistent/opflashstore", 0755);
-
-    const char* devFile = "/opt/secure/persistent/opflashstore/devicestate.txt";
-    {
-        std::ofstream f(devFile);
-        if (f.is_open())
-            f << "blocklist=true\n";
-    }
+    ON_CALL(*p_iarmBusImplMock, IARM_Bus_Call(
+        ::testing::StrEq(IARM_BUS_MFRLIB_NAME),
+        ::testing::StrEq(IARM_BUS_MFRLIB_API_GetConfigData),
+        ::testing::_,
+        ::testing::_))
+        .WillByDefault(::testing::Invoke(
+            [](const char*, const char*, void* arg, size_t) -> IARM_Result_t {
+                if (nullptr == arg) return IARM_RESULT_INVALID_PARAM;
+                static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg)->blocklist = 1;
+                return IARM_RESULT_SUCCESS;
+            }));
 
     Exchange::ISystemServices::BlocklistResult blResult{};
     uint32_t result = m_SystemServicesPlugin->GetBlocklistFlag(blResult);
@@ -8344,15 +8333,12 @@ TEST_F(SystemService_L2Test, SysImpl_GetBlocklistFlag_TrueValue_COMRPC)
     TEST_LOG("  GetBlocklistFlag(true): result=%u blocklist=%d success=%d",
              result, blResult.blocklist, blResult.success);
 
-    std::remove(devFile);
-
     m_SystemServicesPlugin->Release();
     m_controller_SystemServices->Release();
 }
 
 /* ------------------------------------------------------------------- *
- * GetBlocklistFlag — BLOCKLIST=false in file → L956 false branch       *
- * Covers L956: file_value == "false" → value = false                  *
+ * GetBlocklistFlag — MFR library reports blocklist cleared             *
  * ------------------------------------------------------------------- */
 TEST_F(SystemService_L2Test, SysImpl_GetBlocklistFlag_FalseValue_COMRPC)
 {
@@ -8362,18 +8348,19 @@ TEST_F(SystemService_L2Test, SysImpl_GetBlocklistFlag_FalseValue_COMRPC)
     }
     if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
 
-    TEST_LOG("SysImpl_GetBlocklistFlag_FalseValue: BLOCKLIST=false returns false");
+    TEST_LOG("SysImpl_GetBlocklistFlag_FalseValue: IARM GetConfigData reports blocklist=0");
 
-    mkdir("/opt/secure",                         0755);
-    mkdir("/opt/secure/persistent",              0755);
-    mkdir("/opt/secure/persistent/opflashstore", 0755);
-
-    const char* devFile = "/opt/secure/persistent/opflashstore/devicestate.txt";
-    {
-        std::ofstream f(devFile);
-        if (f.is_open())
-            f << "blocklist=false\n";
-    }
+    ON_CALL(*p_iarmBusImplMock, IARM_Bus_Call(
+        ::testing::StrEq(IARM_BUS_MFRLIB_NAME),
+        ::testing::StrEq(IARM_BUS_MFRLIB_API_GetConfigData),
+        ::testing::_,
+        ::testing::_))
+        .WillByDefault(::testing::Invoke(
+            [](const char*, const char*, void* arg, size_t) -> IARM_Result_t {
+                if (nullptr == arg) return IARM_RESULT_INVALID_PARAM;
+                static_cast<IARM_Bus_MFRLib_Platformblockdata_Param_t*>(arg)->blocklist = 0;
+                return IARM_RESULT_SUCCESS;
+            }));
 
     Exchange::ISystemServices::BlocklistResult blResult{};
     uint32_t result = m_SystemServicesPlugin->GetBlocklistFlag(blResult);
@@ -8381,8 +8368,6 @@ TEST_F(SystemService_L2Test, SysImpl_GetBlocklistFlag_FalseValue_COMRPC)
     EXPECT_FALSE(blResult.blocklist);
     TEST_LOG("  GetBlocklistFlag(false): result=%u blocklist=%d success=%d",
              result, blResult.blocklist, blResult.success);
-
-    std::remove(devFile);
 
     m_SystemServicesPlugin->Release();
     m_controller_SystemServices->Release();
@@ -8641,9 +8626,9 @@ TEST_F(SystemService_L2Test, SysImpl_GetSystemVersions_VersionEqFound_COMRPC)
 
 /* ------------------------------------------------------------------- *
  * setWakeupSrcConfiguration with all wakeup sources enabled            *
- * Covers L2745-2792: wakeupSources->Next loop body + all src.X checks *
+ * Exercises the wakeupSources->Next loop body in SetWakeupSrcConfiguration *
  *   + configs.empty()==false → SetWakeupSourceConfig path             *
- * JSON keys per ISystemServices schema: WAKEUPSRC_VOICE etc.           *
+ * Each entry uses WakeupSources struct: {wakeupSource, enabled}        *
  * ------------------------------------------------------------------- */
 TEST_F(SystemService_L2Test, SysImpl_SetWakeupSrc_AllSources_JSONRPC)
 {
@@ -8652,23 +8637,28 @@ TEST_F(SystemService_L2Test, SysImpl_SetWakeupSrc_AllSources_JSONRPC)
     JsonObject params;
     params["powerState"] = "STANDBY";
     JsonArray sourcesArr;
-    JsonObject src;
-    /* Keys match ISystemServices.json schema WAKEUPSRC_* field names */
-    src["WAKEUPSRC_VOICE"]              = true;
-    src["WAKEUPSRC_PRESENCE_DETECTION"] = true;
-    src["WAKEUPSRC_BLUETOOTH"]          = true;
-    src["WAKEUPSRC_WIFI"]               = true;
-    src["WAKEUPSRC_IR"]                 = true;
-    src["WAKEUPSRC_POWER_KEY"]          = true;
-    src["WAKEUPSRC_CEC"]                = true;
-    src["WAKEUPSRC_LAN"]                = true;
-    src["WAKEUPSRC_TIMER"]              = true;
-    sourcesArr.Add(src);
+
+    /* Each entry uses the WakeupSources struct fields: wakeupSource (enum @text) + enabled (bool) */
+    const char* srcNames[] = {
+        "WAKEUPSRC_VOICE", "WAKEUPSRC_PRESENCE_DETECTION", "WAKEUPSRC_BLUETOOTH",
+        "WAKEUPSRC_WIFI", "WAKEUPSRC_IR", "WAKEUPSRC_POWER_KEY",
+        "WAKEUPSRC_CEC", "WAKEUPSRC_LAN", "WAKEUPSRC_TIMER"
+    };
+    for (const char* name : srcNames) {
+        JsonObject entry;
+        entry["wakeupSource"] = name;
+        entry["enabled"]      = true;
+        sourcesArr.Add(entry);
+    }
+
     params["wakeupSources"] = sourcesArr;
     JsonObject result;
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setWakeupSrcConfiguration",
                                           params, result);
     TEST_LOG("setWakeupSrcConfiguration status=%u", status);
+    if (result.HasLabel("success")) {
+        TEST_LOG("  success=%s", result["success"].Boolean() ? "true" : "false");
+    }
 }
 
 /* ------------------------------------------------------------------- *
