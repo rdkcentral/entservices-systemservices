@@ -17,7 +17,7 @@
 * limitations under the License.
 **/
 
-#include "../platformcaps/platformcapsdata.h"
+#include "platformcapsdata.h"
 
 #include <regex>
 #include <mutex>

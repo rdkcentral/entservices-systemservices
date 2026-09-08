@@ -4165,15 +4165,14 @@ namespace WPEFramework { namespace Plugin {
 
 void SystemServicesImplementation::OnDeviceSettingsActivated()
 {
-    LOGINFO("SystemServices (DS_COMRPC): DeviceSettings plugin activated — IDeviceSettingsHost queryable");
-    // No notification subscriptions needed: sleep-mode and audio-format changes
-    // are not handled via subscription in the DS_IARM path either.
-    // SetPowerState queries IDeviceSettingsHost::GetPreferredSleepMode() on demand.
+    LOGINFO("SystemServices: DeviceSettings plugin activated — IDeviceSettingsHost queryable");
+    // No notification subscriptions needed; SetPowerState queries
+    // IDeviceSettingsHost::GetPreferredSleepMode() on demand.
 }
 
 void SystemServicesImplementation::OnDeviceSettingsDeactivated()
 {
-    LOGINFO("SystemServices (DS_COMRPC): DeviceSettings plugin deactivated");
+    LOGINFO("SystemServices: DeviceSettings plugin deactivated");
     // Sub-interfaces are no longer valid; notifications will be re-registered
     // on the next OnDeviceSettingsActivated() call.
 }
