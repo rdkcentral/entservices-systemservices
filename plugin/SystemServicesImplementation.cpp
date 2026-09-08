@@ -294,6 +294,8 @@ namespace WPEFramework
 #if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
             DeinitializeIARM();
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
+            // Close COM-RPC link
+            DSHelper::Close();
 
             SystemServicesImplementation::_instance = nullptr;
             if (m_shellService) {
@@ -356,6 +358,11 @@ namespace WPEFramework
             #if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
             InitializeIARM();
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
+            // Open COM-RPC link to entservices-devicesettings
+            const uint32_t dsResult = DSHelper::Open(service, "SystemServices");
+            if (dsResult != Core::ERROR_NONE) {
+                LOGERR("Configure: Failed to open DeviceSettings link (result=%u)", dsResult);
+            }
             m_shellService = service;
             m_shellService->AddRef();
             InitializePowerManager();
@@ -1497,15 +1504,8 @@ namespace WPEFramework
                 LOGINFO("SystemServicesImplementation::SetPowerState powerState: %s, standbyReason: %s\n", powerState.c_str(), reason.c_str());
 
                 if (powerState == "LIGHT_SLEEP" || powerState == "DEEP_SLEEP") {
-                    const device::SleepMode &mode = device::Host::getInstance().getPreferredSleepMode();
-                    sleepMode = mode.toString();
-                    LOGWARN("Output of getPreferredSleepMode: '%s'", sleepMode.c_str());
 
-                    if (convert("DEEP_SLEEP", sleepMode)) {
-                        retVal = setPowerStateConversion(std::move(sleepMode));
-                    } else {
-                        retVal = setPowerStateConversion(powerState);
-                    }
+                    retVal = setPowerStateConversion(powerState);
 
                     outfile.open(STANDBY_REASON_FILE, ios::out);
                     if (outfile.is_open()) {
@@ -4080,3 +4080,23 @@ namespace WPEFramework
 
     } // namespace Plugin
 } // namespace WPEFramework
+
+// ── DSHelper lifecycle callbacks ────────────────────────────
+
+namespace WPEFramework { namespace Plugin {
+
+void SystemServicesImplementation::OnDeviceSettingsActivated()
+{
+    LOGINFO("SystemServices: DeviceSettings plugin activated — IDeviceSettingsHost queryable");
+    // No notification subscriptions needed; SetPowerState queries
+    // IDeviceSettingsHost::GetPreferredSleepMode() on demand.
+}
+
+void SystemServicesImplementation::OnDeviceSettingsDeactivated()
+{
+    LOGINFO("SystemServices: DeviceSettings plugin deactivated");
+    // Sub-interfaces are no longer valid; notifications will be re-registered
+    // on the next OnDeviceSettingsActivated() call.
+}
+
+}} // namespace WPEFramework::Plugin
