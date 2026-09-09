@@ -34,6 +34,7 @@ if (DISABLE_GEOGRAPHY_TIMEZONE)
     add_definitions (-DDISABLE_GEOGRAPHY_TIMEZONE)
 endif()
 
+option(BUILD_ENABLE_SYSTIMEMGR_SUPPORT "Enable system time manager support" ON)
 if (BUILD_ENABLE_SYSTIMEMGR_SUPPORT)
     message("Building with SYSTIMEMGR_SUPPORT enabled")
    add_definitions (-DENABLE_SYSTIMEMGR_SUPPORT)
