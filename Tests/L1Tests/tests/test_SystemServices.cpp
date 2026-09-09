@@ -827,7 +827,7 @@ TEST_F(SystemServicesTest, RegisteredMethods)
     EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("getPowerState")));
     EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("setPowerState")));
     EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("getPowerStateBeforeReboot")));
-    // EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("setWakeupSrcConfiguration")));
+    EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("setWakeupSrcConfiguration")));
     EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("getDeviceInfo")));
     EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("reboot")));
     EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("setBootLoaderSplashScreen")));
@@ -1519,19 +1519,22 @@ TEST_F(SystemServicesTest, SetBootLoaderSplashScreen_Success)
     
     (void)std::remove("/tmp/test_splash.png");
 }
-// TODO: Implement SetWakeupSrcConfiguration in SystemServicesImplementation before enabling this test
-/*
 TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_Success)
 {
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setWakeupSrcConfiguration"), _T("{\"wakeupSrc\":\"VOICE\",\"enabled\":true}"), response));
-    
+    EXPECT_CALL(PowerManagerMock::Mock(), SetWakeupSourceConfig(::testing::_))
+        .Times(::testing::AnyNumber())
+        .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setWakeupSrcConfiguration"),
+        _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[{\"wakeupSource\":\"WAKEUPSRC_VOICE\",\"enabled\":true}]}"), response));
+
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
     ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success field: " << response;
-    
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << "SetWakeupSrcConfiguration failed: " << response;
+
     TEST_LOG("SetWakeupSrcConfiguration test PASSED - Response: %s", response.c_str());
 }
-*/
 
 TEST_F(SystemServicesTest, UpdateFirmware_Success)
 {
@@ -2766,11 +2769,14 @@ TEST_F(SystemServicesTest, GetBuildType_Sprint)
 
 TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_ValidSource)
 {
-    // SetWakeupSrcConfiguration is not fully implemented, test basic invocation
+    EXPECT_CALL(PowerManagerMock::Mock(), SetWakeupSourceConfig(::testing::_))
+        .Times(::testing::AnyNumber())
+        .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
+
     uint32_t result = handler.Invoke(connection, _T("setWakeupSrcConfiguration"),
-              _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[{\"wakeupSrc\":\"WAKEUPSRC_VOICE\",\"enabled\":true}]}"), response);
-    
-    // May return error if PowerManager doesn't support this
+              _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[{\"wakeupSource\":\"WAKEUPSRC_VOICE\",\"enabled\":true}]}"), response);
+
+    EXPECT_EQ(Core::ERROR_NONE, result) << "setWakeupSrcConfiguration should succeed: " << result;
     TEST_LOG("SetWakeupSrcConfiguration test - Result: %u, Response: %s", result, response.c_str());
 }
 
@@ -9474,7 +9480,7 @@ TEST_F(SystemServicesTest, SetWakeupSrcConfig_AllSources_InvokesConvAndGetWakeup
     };
 
     for (const char* src : sources) {
-        std::string params = std::string("{\"powerState\":\"DEEP_SLEEP\",\"wakeupSources\":[{\"wakeupSrc\":\"")
+        std::string params = std::string("{\"powerState\":\"DEEP_SLEEP\",\"wakeupSources\":[{\"wakeupSource\":\"")
                            + src + "\",\"enabled\":true}]}";
         uint32_t result = handler.Invoke(connection, _T("setWakeupSrcConfiguration"),
                                          Core::ToString(params), response);
@@ -9487,9 +9493,9 @@ TEST_F(SystemServicesTest, SetWakeupSrcConfig_AllSources_InvokesConvAndGetWakeup
 
 TEST_F(SystemServicesTest, SetWakeupSrcConfig_UnknownSource_HandledGracefully)
 {
-    // Unknown source → conv() returns WAKEUP_SRC_UNKNOWN
+    // Unknown/unrecognized wakeupSource string → treated as WAKEUP_SRC_UNKNOWN → ignored → configs empty → ERROR_GENERAL
     uint32_t result = handler.Invoke(connection, _T("setWakeupSrcConfiguration"),
-        _T("{\"powerState\":\"DEEP_SLEEP\",\"wakeupSources\":[{\"wakeupSrc\":\"WAKEUPSRC_UNKNOWN_XYZ\",\"enabled\":true}]}"),
+        _T("{\"powerState\":\"DEEP_SLEEP\",\"wakeupSources\":[{\"wakeupSource\":\"WAKEUPSRC_UNKNOWN_XYZ\",\"enabled\":true}]}"),
         response);
     EXPECT_TRUE(result == Core::ERROR_NONE || result == Core::ERROR_GENERAL);
     TEST_LOG("SetWakeupSrcConfig unknown source - Result: %u, Response: %s", result, response.c_str());
@@ -10623,9 +10629,9 @@ TEST_F(SystemServicesTest, SetWakeupSrc_VoiceAndWifi_CoversSourceBranches)
         .Times(::testing::AnyNumber())
         .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
 
-    // voice=true covers line 2750; wifi=true covers line 2759
+    // voice and wifi sources use new struct-based format
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setWakeupSrcConfiguration"),
-        _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[{\"voice\":true,\"wifi\":true}]}"),
+        _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[{\"wakeupSource\":\"WAKEUPSRC_VOICE\",\"enabled\":true},{\"wakeupSource\":\"WAKEUPSRC_WIFI\",\"enabled\":true}]}"),
         response));
 
     TEST_LOG("SetWakeupSrc_VoiceAndWifi - Response: %s", response.c_str());
@@ -10637,9 +10643,9 @@ TEST_F(SystemServicesTest, SetWakeupSrc_IrPowerKeyCec_CoversMoreBranches)
         .Times(::testing::AnyNumber())
         .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
 
-    // ir=true covers line 2762; powerKey=true covers line 2765; cec=true covers line 2768
+    // ir, powerKey and cec sources use new struct-based format
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setWakeupSrcConfiguration"),
-        _T("{\"powerState\":\"DEEP_SLEEP\",\"wakeupSources\":[{\"ir\":true,\"powerKey\":true,\"cec\":true}]}"),
+        _T("{\"powerState\":\"DEEP_SLEEP\",\"wakeupSources\":[{\"wakeupSource\":\"WAKEUPSRC_IR\",\"enabled\":true},{\"wakeupSource\":\"WAKEUPSRC_POWER_KEY\",\"enabled\":true},{\"wakeupSource\":\"WAKEUPSRC_CEC\",\"enabled\":true}]}"),
         response));
 
     TEST_LOG("SetWakeupSrc_IrPowerKeyCec - Response: %s", response.c_str());
@@ -10651,9 +10657,9 @@ TEST_F(SystemServicesTest, SetWakeupSrc_LanAndTimer_CoversRemainingBranches)
         .Times(::testing::AnyNumber())
         .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
 
-    // lan=true covers line 2771; timer=true covers line 2774
+    // lan and timer sources use new struct-based format
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setWakeupSrcConfiguration"),
-        _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[{\"lan\":true,\"timer\":true}]}"),
+        _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[{\"wakeupSource\":\"WAKEUPSRC_LAN\",\"enabled\":true},{\"wakeupSource\":\"WAKEUPSRC_TIMER\",\"enabled\":true}]}"),
         response));
 
     TEST_LOG("SetWakeupSrc_LanAndTimer - Response: %s", response.c_str());
@@ -10665,9 +10671,9 @@ TEST_F(SystemServicesTest, SetWakeupSrc_PresenceDetectionBluetooth_CoversMoreBra
         .Times(::testing::AnyNumber())
         .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
 
-    // presenceDetection=true covers line 2753; bluetooth=true covers line 2756
+    // presenceDetection and bluetooth sources use new struct-based format
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setWakeupSrcConfiguration"),
-        _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[{\"presenceDetection\":true,\"bluetooth\":true}]}"),
+        _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[{\"wakeupSource\":\"WAKEUPSRC_PRESENCE_DETECTION\",\"enabled\":true},{\"wakeupSource\":\"WAKEUPSRC_BLUETOOTH\",\"enabled\":true}]}"),
         response));
 
     TEST_LOG("SetWakeupSrc_PresenceDetectionBluetooth - Response: %s", response.c_str());
@@ -10680,8 +10686,8 @@ TEST_F(SystemServicesTest, SetWakeupSrc_PowerManagerFails_ReturnsError)
         .WillRepeatedly(::testing::Return(Core::ERROR_GENERAL));
 
     // result.success = false when PowerManager returns error
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setWakeupSrcConfiguration"),
-        _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[{\"voice\":true}]}"),
+    EXPECT_EQ(Core::ERROR_GENERAL, handler.Invoke(connection, _T("setWakeupSrcConfiguration"),
+        _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[{\"wakeupSource\":\"WAKEUPSRC_VOICE\",\"enabled\":true}]}"),
         response));
 
     TEST_LOG("SetWakeupSrc_PowerManagerFails - Response: %s", response.c_str());
@@ -11194,14 +11200,24 @@ TEST_F(SystemServicesTest, Dispatch_OnMacAddressesRetrieved_ReachesNotification)
 
 TEST_F(SystemServicesTest, Conv_AllWakeupSrcStrings_ViaSWConfig)
 {
-    // Exercise all boolean wakeup source fields in one call
-    // Each 'if(src.X)' branch in SetWakeupSrcConfiguration is covered
+    // Exercise all wakeup source types via setWakeupSrcConfiguration using the new
+    // struct-based format: each element has {"wakeupSource":"WAKEUPSRC_*","enabled":true}
     EXPECT_CALL(PowerManagerMock::Mock(), SetWakeupSourceConfig(::testing::_))
         .Times(::testing::AnyNumber())
         .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setWakeupSrcConfiguration"),
-        _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[{\"voice\":true,\"wifi\":true,\"ir\":true,\"powerKey\":true,\"cec\":true,\"lan\":true,\"timer\":true,\"bluetooth\":true,\"presenceDetection\":true}]}"),
+        _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":["
+           "{\"wakeupSource\":\"WAKEUPSRC_VOICE\",\"enabled\":true},"
+           "{\"wakeupSource\":\"WAKEUPSRC_WIFI\",\"enabled\":true},"
+           "{\"wakeupSource\":\"WAKEUPSRC_IR\",\"enabled\":true},"
+           "{\"wakeupSource\":\"WAKEUPSRC_POWER_KEY\",\"enabled\":true},"
+           "{\"wakeupSource\":\"WAKEUPSRC_CEC\",\"enabled\":true},"
+           "{\"wakeupSource\":\"WAKEUPSRC_LAN\",\"enabled\":true},"
+           "{\"wakeupSource\":\"WAKEUPSRC_TIMER\",\"enabled\":true},"
+           "{\"wakeupSource\":\"WAKEUPSRC_BLUETOOTH\",\"enabled\":true},"
+           "{\"wakeupSource\":\"WAKEUPSRC_PRESENCE_DETECTION\",\"enabled\":true}"
+           "]}"),
         response));
 
     JsonObject jsonResponse;
@@ -11219,16 +11235,19 @@ TEST_F(SystemServicesTest, Conv_AllWakeupSrcStrings_ViaSWConfig)
 
 TEST_F(SystemServicesTest, GetWakeupSrcString_AllSrcValues_ViaGetWakeupSrcConfig)
 {
-    // getWakeupSrcConfiguration is not a registered JSON-RPC handler.
-    // Cover getWakeupSrcString() indirectly via setWakeupSrcConfiguration
-    // which iterates through WakeupSources struct and calls PM::SetWakeupSourceConfig.
+    // Cover wakeup source string conversion via setWakeupSrcConfiguration using the
+    // new struct-based format: each element has {"wakeupSource":"WAKEUPSRC_*","enabled":true}
     EXPECT_CALL(PowerManagerMock::Mock(), SetWakeupSourceConfig(::testing::_))
         .Times(::testing::AnyNumber())
         .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
 
     // voice + presenceDetection + bluetooth each map to a specific WakeupSrcType
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setWakeupSrcConfiguration"),
-        _T("{\"powerState\":\"DEEP_SLEEP\",\"wakeupSources\":[{\"voice\":true,\"presenceDetection\":true,\"bluetooth\":true}]}"),
+        _T("{\"powerState\":\"DEEP_SLEEP\",\"wakeupSources\":["
+           "{\"wakeupSource\":\"WAKEUPSRC_VOICE\",\"enabled\":true},"
+           "{\"wakeupSource\":\"WAKEUPSRC_PRESENCE_DETECTION\",\"enabled\":false},"
+           "{\"wakeupSource\":\"WAKEUPSRC_BLUETOOTH\",\"enabled\":false}"
+           "]}"),
         response));
 
     JsonObject jsonResponse;
@@ -11357,17 +11376,15 @@ TEST_F(SystemServicesTest, GetWakeupSrcConfiguration_PMSuccess_PopulatesResponse
     // getWakeupSrcConfiguration is not a registered JSON-RPC handler.
     // Cover the SetWakeupSrcConfiguration path with all fields disabled (no PM call).
     // wakeupSources with all false fields → configs is empty → PM not called → success=false
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setWakeupSrcConfiguration"),
+    EXPECT_EQ(Core::ERROR_GENERAL, handler.Invoke(connection, _T("setWakeupSrcConfiguration"),
         _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[]}"),
         response));
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
-    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
-    bool success = jsonResponse["success"].Boolean();
+    ASSERT_FALSE(jsonResponse.HasLabel("success")) << "Unexpected success field in error response: " << response;
 
-    TEST_LOG("GetWakeupSrcConfiguration_PMSuccess - Response: %s, success: %d", response.c_str(), success);
+    TEST_LOG("GetWakeupSrcConfiguration_PMSuccess - Response: %s", response.c_str());
 }
 
 TEST_F(SystemServicesTest, GetWakeupSrcConfiguration_PMFailure_ReturnsError)
@@ -11378,17 +11395,15 @@ TEST_F(SystemServicesTest, GetWakeupSrcConfiguration_PMFailure_ReturnsError)
         .Times(::testing::AnyNumber())
         .WillRepeatedly(::testing::Return(Core::ERROR_GENERAL));
 
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setWakeupSrcConfiguration"),
-        _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[{\"voice\":true}]}"),
+    EXPECT_EQ(Core::ERROR_GENERAL, handler.Invoke(connection, _T("setWakeupSrcConfiguration"),
+        _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[{\"wakeupSource\":\"WAKEUPSRC_VOICE\",\"enabled\":true}]}"),
         response));
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response));
-    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
-    bool success = jsonResponse["success"].Boolean();
+    ASSERT_FALSE(jsonResponse.HasLabel("success")) << "Unexpected success field in error response: " << response;
 
-    TEST_LOG("GetWakeupSrcConfiguration_PMFailure - Response: %s, success: %d", response.c_str(), success);
+    TEST_LOG("GetWakeupSrcConfiguration_PMFailure - Response: %s", response.c_str());
 }
 
 // =============================================================================
@@ -11421,9 +11436,9 @@ TEST_F(SystemServicesTest, SetWakeupSrc_RF4CE_CoversConvRF4CEBranch)
         .Times(::testing::AnyNumber())
         .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
 
-    // lan + timer fields cover WAKEUP_SRC_LAN and WAKEUP_SRC_TIMER branches
+    // lan and timer sources use new struct-based format covering WAKEUP_SRC_LAN and WAKEUP_SRC_TIMER
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setWakeupSrcConfiguration"),
-        _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[{\"lan\":true,\"timer\":true}]}"),
+        _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[{\"wakeupSource\":\"WAKEUPSRC_LAN\",\"enabled\":false},{\"wakeupSource\":\"WAKEUPSRC_TIMER\",\"enabled\":true}]}"),
         response));
     TEST_LOG("SetWakeupSrc_IRAndTimer - Response: %s", response.c_str());
 }
@@ -11434,9 +11449,9 @@ TEST_F(SystemServicesTest, SetWakeupSrc_PresenceDetection_CoversConvBranch)
         .Times(::testing::AnyNumber())
         .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
 
-    // presenceDetection=true covers the WAKEUP_SRC_PRESENCEDETECTED branch
+    // presenceDetection and cec sources use new struct-based format
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setWakeupSrcConfiguration"),
-        _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[{\"presenceDetection\":true,\"cec\":true}]}"),
+        _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[{\"wakeupSource\":\"WAKEUPSRC_PRESENCE_DETECTION\",\"enabled\":true},{\"wakeupSource\":\"WAKEUPSRC_CEC\",\"enabled\":true}]}"),
         response));
     TEST_LOG("SetWakeupSrc_PresenceDetectionCec - Response: %s", response.c_str());
 }
@@ -11592,17 +11607,17 @@ TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_AllSources_True_CoversField
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection,
               _T("setWakeupSrcConfiguration"),
               _T("{\"powerState\":\"STANDBY\","
-                 "\"wakeupSources\":[{"
-                 "\"voice\":true,"
-                 "\"presenceDetection\":true,"
-                 "\"bluetooth\":true,"
-                 "\"wifi\":true,"
-                 "\"ir\":true,"
-                 "\"powerKey\":true,"
-                 "\"cec\":true,"
-                 "\"lan\":true,"
-                 "\"timer\":true"
-                 "}]}"),
+                 "\"wakeupSources\":["
+                 "{\"wakeupSource\":\"WAKEUPSRC_VOICE\",\"enabled\":true},"
+                 "{\"wakeupSource\":\"WAKEUPSRC_PRESENCE_DETECTION\",\"enabled\":true},"
+                 "{\"wakeupSource\":\"WAKEUPSRC_BLUETOOTH\",\"enabled\":true},"
+                 "{\"wakeupSource\":\"WAKEUPSRC_WIFI\",\"enabled\":true},"
+                 "{\"wakeupSource\":\"WAKEUPSRC_IR\",\"enabled\":true},"
+                 "{\"wakeupSource\":\"WAKEUPSRC_POWER_KEY\",\"enabled\":true},"
+                 "{\"wakeupSource\":\"WAKEUPSRC_CEC\",\"enabled\":true},"
+                 "{\"wakeupSource\":\"WAKEUPSRC_LAN\",\"enabled\":true},"
+                 "{\"wakeupSource\":\"WAKEUPSRC_TIMER\",\"enabled\":true}"
+                 "]}"),
               response));
 
     JsonObject jsonResponse;
@@ -11623,9 +11638,7 @@ TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_SingleSource_Voice_CoversVo
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection,
               _T("setWakeupSrcConfiguration"),
               _T("{\"powerState\":\"ON\","
-                 "\"wakeupSources\":[{"
-                 "\"voice\":true"
-                 "}]}"),
+                 "\"wakeupSources\":[{\"wakeupSource\":\"WAKEUPSRC_VOICE\",\"enabled\":true}]}"),
               response));
 
     JsonObject jsonResponse;
@@ -11639,26 +11652,20 @@ TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_SingleSource_Voice_CoversVo
 
 TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_AllFalse_NoConfigSent)
 {
-    // All false → configs list stays empty → SetWakeupSourceConfig NOT called
+    // Empty wakeupSources array → configs list stays empty → SetWakeupSourceConfig NOT called
     EXPECT_CALL(PowerManagerMock::Mock(), SetWakeupSourceConfig(::testing::_))
         .Times(0);
 
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection,
+    EXPECT_EQ(Core::ERROR_GENERAL, handler.Invoke(connection,
               _T("setWakeupSrcConfiguration"),
-              _T("{\"powerState\":\"STANDBY\","
-                 "\"wakeupSources\":[{"
-                 "\"voice\":false,"
-                 "\"bluetooth\":false"
-                 "}]}"),
+              _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[]}"),
               response));
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response));
-    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
-    bool success = jsonResponse["success"].Boolean();
+    ASSERT_FALSE(jsonResponse.HasLabel("success")) << "Unexpected success field in error response: " << response;
 
-    TEST_LOG("SetWakeupSrcConfiguration_AllFalse - Response: %s, success: %d", response.c_str(), success);
+    TEST_LOG("SetWakeupSrcConfiguration_AllFalse - Response: %s", response.c_str());
 }
 
 TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_PresenceOnly_CoversPresenceField)
@@ -11670,9 +11677,7 @@ TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_PresenceOnly_CoversPresence
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection,
               _T("setWakeupSrcConfiguration"),
               _T("{\"powerState\":\"STANDBY\","
-                 "\"wakeupSources\":[{"
-                 "\"presenceDetection\":true"
-                 "}]}"),
+                 "\"wakeupSources\":[{\"wakeupSource\":\"WAKEUPSRC_PRESENCE_DETECTION\",\"enabled\":true}]}"),
               response));
 
     JsonObject jsonResponse;
@@ -11690,20 +11695,17 @@ TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_PowerManagerFailure_Returns
         .Times(::testing::AnyNumber())
         .WillRepeatedly(::testing::Return(Core::ERROR_GENERAL));
 
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection,
+    EXPECT_EQ(Core::ERROR_GENERAL, handler.Invoke(connection,
               _T("setWakeupSrcConfiguration"),
               _T("{\"powerState\":\"STANDBY\","
-                 "\"wakeupSources\":[{\"timer\":true}]}"),
+                 "\"wakeupSources\":[{\"wakeupSource\":\"WAKEUPSRC_TIMER\",\"enabled\":true}]}"),
               response));
 
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response));
-    ASSERT_TRUE(jsonResponse.HasLabel("success")) << "Missing success: " << response;
-    ASSERT_TRUE(jsonResponse["success"].IsSet()) << "success is not set: " << response;
-    bool success = jsonResponse["success"].Boolean();
-    EXPECT_FALSE(success);
+    ASSERT_FALSE(jsonResponse.HasLabel("success")) << "Unexpected success field in error response: " << response;
 
-    TEST_LOG("SetWakeupSrcConfiguration_PMFailure - Response: %s, success: %d", response.c_str(), success);
+    TEST_LOG("SetWakeupSrcConfiguration_PMFailure - Response: %s", response.c_str());
 }
 
 // =============================================================================
@@ -12704,7 +12706,7 @@ TEST_F(SystemServicesIarmCbTest, SetWakeupSrcConfiguration_DirectImpl_VoiceSourc
     string resp;
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection,
         _T("setWakeupSrcConfiguration"),
-        _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[{\"voice\":true,\"wifi\":true}]}"),
+        _T("{\"powerState\":\"STANDBY\",\"wakeupSources\":[{\"wakeupSource\":\"WAKEUPSRC_VOICE\",\"enabled\":true},{\"wakeupSource\":\"WAKEUPSRC_WIFI\",\"enabled\":true}]}"),
         resp));
     TEST_LOG("SetWakeupSrcConfiguration_Direct - Response: %s", resp.c_str());
 }
