@@ -522,15 +522,14 @@ namespace WPEFramework
             curPowerState = powerModeEnumToString(currentState);
             newPowerState = powerModeEnumToString(newState);
 
-                LOGWARN("IARM Event triggered for PowerStateChange.\
-                        Old State %s, New State: %s\n",
-                        curPowerState.c_str(), newPowerState.c_str());
-                if (SystemServicesImplementation::_instance) {
-                    SystemServicesImplementation::_instance->OnSystemPowerStateChanged(std::move(curPowerState), std::move(newPowerState));
-                } else {
-                    LOGERR("SystemServicesImplementation::_instance is NULL.\n");
-                }
-            }));
+            LOGWARN("IARM Event triggered for PowerStateChange.\
+                    Old State %s, New State: %s\n",
+                    curPowerState.c_str() , newPowerState.c_str());
+            if (SystemServicesImplementation::_instance) {
+                SystemServicesImplementation::_instance->OnSystemPowerStateChanged(std::move(curPowerState), std::move(newPowerState));
+            } else {
+                LOGERR("SystemServicesImplementation::_instance is NULL.\n");
+            }
         }
 
         std::string SystemServicesImplementation::powerModeEnumToString(PowerState state)
