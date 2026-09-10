@@ -517,19 +517,19 @@ namespace WPEFramework
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
             }
 
-            m_powerModeChangedThread = Utils::ThreadRAII(std::thread([this, currentState, newState]() {
-                std::string curPowerState = powerModeEnumToString(currentState);
-                std::string newPowerState = powerModeEnumToString(newState);
+            std::string curPowerState,newPowerState = "";
 
-                LOGWARN("IARM Event triggered for PowerStateChange.\
-                        Old State %s, New State: %s\n",
-                        curPowerState.c_str(), newPowerState.c_str());
-                if (SystemServicesImplementation::_instance) {
-                    SystemServicesImplementation::_instance->OnSystemPowerStateChanged(std::move(curPowerState), std::move(newPowerState));
-                } else {
-                    LOGERR("SystemServicesImplementation::_instance is NULL.\n");
-                }
-            }));
+            curPowerState = powerModeEnumToString(currentState);
+            newPowerState = powerModeEnumToString(newState);
+
+            LOGWARN("IARM Event triggered for PowerStateChange.\
+                    Old State %s, New State: %s\n",
+                    curPowerState.c_str() , newPowerState.c_str());
+            if (SystemServicesImplementation::_instance) {
+                SystemServicesImplementation::_instance->OnSystemPowerStateChanged(std::move(curPowerState), std::move(newPowerState));
+            } else {
+                LOGERR("SystemServicesImplementation::_instance is NULL.\n");
+            }
         }
 
         std::string SystemServicesImplementation::powerModeEnumToString(PowerState state)

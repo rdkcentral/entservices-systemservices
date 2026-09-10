@@ -327,7 +327,6 @@ namespace WPEFramework
             Utils::ThreadRAII m_getFirmwareInfoThread;
             std::mutex m_getFirmwareInfoThreadMutex;
             bool m_deepSleepInProgress;
-            Utils::ThreadRAII m_powerModeChangedThread;
             PluginHost::IShell* m_shellService { nullptr };
             regex_t m_regexUnallowedChars;
             int m_FwUpdateState_LatestEvent;
