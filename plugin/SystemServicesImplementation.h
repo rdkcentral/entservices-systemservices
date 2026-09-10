@@ -264,6 +264,7 @@ namespace WPEFramework
             Core::hresult UploadLogsAsync(SystemResult& result) override;
             Core::hresult AbortLogUpload(SystemResult& result) override;
             Core::hresult SetFSRFlag(const bool fsrFlag, SystemResult& result) override;
+            Core::hresult TriggerGetSetEnv(const bool trigger, SystemResult& result) override;
             Core::hresult GetFSRFlag(bool &fsrFlag, bool& success) override;
             Core::hresult SetBlocklistFlag(const bool blocklist, SetBlocklistResult& result) override;
             Core::hresult GetBlocklistFlag(BlocklistResult& result) override;
