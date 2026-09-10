@@ -1192,12 +1192,11 @@ namespace WPEFramework
             return Core::ERROR_NONE;
         }
 
-        Core::hresult TriggerGetSetEnv(const bool trigger, SystemResult& result){
+        Core::hresult SystemServicesImplementation::TriggerGetSetEnv(const bool trigger, SystemResult& result){
 
             LOGINFO("TriggerGetSetEnv called let's see if it can reproduce the crash");
              // Create a new thread that calls a lambda expression
             thread newThread([] {
-                cout << "Hello from the new thread!" << endl;
                 vector<string> v;
                 string s="Text_";
                 int i=0;
