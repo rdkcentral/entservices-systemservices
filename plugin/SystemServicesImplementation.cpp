@@ -1209,7 +1209,7 @@ namespace WPEFramework
             thread newThread2([] {
                 while(1){
                 const char* val = getenv("Text_1");
-                const char* val2 = getenv("Text_2")
+                const char* val2 = getenv("Text_2");
             }
             });
             thread newThread3([] {
