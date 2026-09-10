@@ -302,6 +302,7 @@ namespace WPEFramework
             bool m_ManufacturerDataHardwareIdValid;
 #endif
             pid_t m_uploadLogsPid;
+            bool m_logUploadBeforeDeepSleepEnabled;
             std::mutex m_uploadLogsMutex;
             std::mutex m_territoryMutex;
             std::string m_friendlyName;

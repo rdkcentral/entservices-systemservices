@@ -270,6 +270,7 @@ namespace WPEFramework
             m_MfgSerialNumberValid = false;
 #endif
             m_uploadLogsPid = -1;
+            m_logUploadBeforeDeepSleepEnabled = false;
 
             int regcomp_ret = regcomp (&m_regexUnallowedChars, REGEX_UNALLOWABLE_INPUT, REG_EXTENDED);
             if (regcomp_ret != 0) {
@@ -407,6 +408,13 @@ namespace WPEFramework
                 LOGINFO("Success Getting the friendly name value :%s \n",m_friendlyName.c_str());
             }
 
+            memset(&param, 0, sizeof(param));
+            status = getRFCParameter((char*)"thunderapi", RFC_LOG_UPLOAD, &param);
+            LOGINFO("Amit :%s   :%d \n",RFC_LOG_UPLOAD, isRFCEnabled(RFC_LOG_UPLOAD));
+            if (WDMP_SUCCESS == status && param.type == WDMP_BOOLEAN) {
+                m_logUploadBeforeDeepSleepEnabled = (strncasecmp(param.value, "true", 4) == 0);
+            }
+            LOGINFO("Amit m_logUploadBeforeDeepSleepEnabled  :%d \n",m_logUploadBeforeDeepSleepEnabled);
             return Core::ERROR_NONE;
         }
         
@@ -2867,14 +2875,9 @@ namespace WPEFramework
         void SystemServicesImplementation::OnSystemPowerStateChanged(string currentPowerState, string powerState)
         {
             if ("LIGHT_SLEEP" == powerState || "STANDBY" == powerState) {
-                if ("ON" == currentPowerState) {
-                    RFC_ParamData_t param = {0};
-                    WDMP_STATUS status = getRFCParameter(NULL, RFC_LOG_UPLOAD, &param);
-                    if(WDMP_SUCCESS == status && param.type == WDMP_BOOLEAN && (strncasecmp(param.value,"true",4) == 0))
-                    {
-                        SystemResult result;
-                        UploadLogsAsync(result);
-                    }
+                if ("ON" == currentPowerState && m_logUploadBeforeDeepSleepEnabled) {
+                    SystemResult result;
+                    UploadLogsAsync(result);
                 }
             } else if ("DEEP_SLEEP" == powerState) {
 
