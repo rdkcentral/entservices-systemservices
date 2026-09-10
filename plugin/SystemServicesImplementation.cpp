@@ -494,29 +494,6 @@ namespace WPEFramework
 
         void SystemServicesImplementation::OnPowerModeChanged(const PowerState currentState, const PowerState newState)
         {
-            if (newState == WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP) {
-                m_operatingModeTimer.stop();
-                m_operatingModeTimer.join();
-                {
-                    std::lock_guard<std::mutex> lock(m_getFirmwareInfoThreadMutex);
-                    m_deepSleepInProgress = true;
-                    if (m_getFirmwareInfoThread.get().joinable()) {
-                        m_getFirmwareInfoThread.get().join();
-                    }
-                }
-#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
-                DeinitializeIARM();
-#endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
-            } else if (currentState == WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP) {
-                {
-                    std::lock_guard<std::mutex> lock(m_getFirmwareInfoThreadMutex);
-                    m_deepSleepInProgress = false;
-                }
-#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
-                RegisterIARMEventHandlers();
-#endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
-            }
-
             std::string curPowerState,newPowerState = "";
 
             curPowerState = powerModeEnumToString(currentState);
