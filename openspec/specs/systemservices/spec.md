@@ -24,7 +24,7 @@ RDK devices require a unified interface for system management operations that ab
 **System Integration:**
 The plugin integrates with multiple RDK subsystems:
 - **IARM Bus**: Inter-process communication for system-wide coordination
-- **Device Settings HAL**: Hardware abstraction for display and audio
+- **Device Settings Plugin**: COM-RPC communication for display and audio control
 - **PowerManager Plugin**: Coordinated power state management
 - **FirmwareUpdate Plugin**: Firmware update orchestration
 - **RFC Service**: Dynamic feature flag configuration
@@ -231,7 +231,7 @@ COM-RPC → PowerManager Plugin
     ↓
 IARM Bus → System Manager
     ↓
-Device Settings HAL → Hardware
+COM-RPC → Device Settings Plugin → Hardware
     ↓
 Hardware State Change
     ↓
@@ -302,7 +302,7 @@ Event Callback Registration
 
 **Required Services:**
 - **IARM Bus**: Inter-process communication backbone
-- **Device Settings HAL**: Hardware control abstraction
+- **Device Settings Plugin**: COM-RPC communication for display and audio hardware control
 - **RFC Service**: Remote Feature Control for dynamic configuration
 - **SysMgr**: System manager for device state coordination
 
@@ -327,9 +327,9 @@ SystemServices exposes its public API via the **`Exchange::ISystemServices`** CO
 **Automatic JSON-RPC Binding:**
 The JSON-RPC interface is automatically generated from the COM-RPC interface using `Exchange::JSystemServices::Register()`. This ensures that both protocols expose identical functionality with maintained consistency.
 
-#### Outgoing: PowerManager Integration
+#### Outgoing: PowerManager and DeviceSettings Integration
 
-SystemServices also uses WPEFramework's **COM-RPC** mechanism to communicate with the PowerManager plugin as a client. COM-RPC provides inter-plugin communication through socket-based interfaces.
+SystemServices uses WPEFramework's **COM-RPC** mechanism to communicate with other plugins as a client. COM-RPC provides inter-plugin communication through socket-based interfaces.
 
 **PowerManager Integration:**
 - **Connection Method**: COM-RPC socket connection via `PowerManagerInterfaceBuilder`
@@ -338,6 +338,13 @@ SystemServices also uses WPEFramework's **COM-RPC** mechanism to communicate wit
 - **Interface**: `Exchange::IPowerManager` for bidirectional communication
 - **Notifications**: Receives power state changes, thermal events, and reboot notifications
 - **Thread Safety**: Mutex-protected access to shared PowerManager instance
+
+**DeviceSettings Integration:**
+- **Connection Method**: COM-RPC via `DSHelper` base class
+- **Target Plugin**: `org.rdk.DeviceSettings` (entservices-devicesettings)
+- **Interfaces**: `Exchange::IDeviceSettingsHost`, `Exchange::IDeviceSettingsAudio`
+- **Purpose**: Query device capabilities (preferred sleep mode, audio MS11 decode status)
+- **Lifecycle**: Opened during `Configure()`, closed during plugin deinitialization
 
 **Bidirectional Communication Flow:**
 ```
@@ -854,8 +861,8 @@ Critical states are persisted to survive reboots:
 
 **Required:**
 - WPEFramework (Thunder) R4.4+
+- WPEFramework Definitions (COM-RPC interface definitions)
 - IARM Bus library
-- Device Settings HAL
 - RFC library
 - libcurl (HTTP/HTTPS)
 - libprocps (process info)
@@ -872,7 +879,7 @@ Critical states are persisted to survive reboots:
 - IARM Bus daemon
 - SysMgr (System Manager)
 - RFC service
-- Device Settings service
+- Device Settings plugin (org.rdk.DeviceSettings)
 
 **Optional Services:**
 - PowerManager plugin
@@ -1033,7 +1040,7 @@ ws.send(JSON.stringify({
 
 - Requires Linux-based RDK platform
 - IARM Bus must be available and initialized
-- Device Settings HAL must be present
+- Device Settings plugin must be available for COM-RPC communication
 - RFC service must be running
 
 ### Performance Limits
