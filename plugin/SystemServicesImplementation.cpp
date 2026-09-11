@@ -344,7 +344,7 @@ namespace WPEFramework
             }
             else
             {
-                LOGERR("notification not found");
+                LOGERR("Failure in getting notification");
             }
 
             _adminLock.Unlock();
