@@ -936,7 +936,7 @@ namespace WPEFramework
 
             // Check if the file was successfully opened
             if (!file.is_open()) {
-                LOGERR(" preeja Error opening file for reading: %s", filename.c_str());
+                LOGERR("Error opening file for reading: %s", filename.c_str());
                 return false;
             }
 
