@@ -251,7 +251,7 @@ namespace WPEFramework
             , _pwrMgrNotification(*this)
             , _registeredEventHandlers(false)
         {
-            LOGINFO("Create SystemServicesImplementation Instance");
+            LOGINFO("preeja Create SystemServicesImplementation Instance");
 
             SystemServicesImplementation::_instance = this;
 
@@ -340,7 +340,7 @@ namespace WPEFramework
             }
             else
             {
-                LOGERR("notification not found");
+                LOGERR("failed to find notification");
             }
 
             _adminLock.Unlock();
