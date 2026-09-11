@@ -12,7 +12,7 @@ on:
   pull_request:
     types: [closed]
     branches:
-      - dummy_develop
+      - dummy_develop_poc
       - 'support/**'
       - 'release/**'
 
