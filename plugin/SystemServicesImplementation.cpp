@@ -271,6 +271,7 @@ namespace WPEFramework
 #endif
             m_uploadLogsPid = -1;
             m_logUploadBeforeDeepSleepEnabled = false;
+            LOGWARN("const m_logUploadBeforeDeepSleepEnabled :%d", m_logUploadBeforeDeepSleepEnabled);
 
             int regcomp_ret = regcomp (&m_regexUnallowedChars, REGEX_UNALLOWABLE_INPUT, REG_EXTENDED);
             if (regcomp_ret != 0) {
@@ -354,6 +355,7 @@ namespace WPEFramework
 
         uint32_t SystemServicesImplementation::Configure(PluginHost::IShell* service)
         {
+            LOGWARN("init configure :%d", m_logUploadBeforeDeepSleepEnabled);
             #if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
             InitializeIARM();
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
@@ -410,11 +412,11 @@ namespace WPEFramework
 
             memset(&param, 0, sizeof(param));
             status = getRFCParameter((char*)"thunderapi", RFC_LOG_UPLOAD, &param);
-            LOGINFO("Amit :%s   :%d \n",RFC_LOG_UPLOAD, isRFCEnabled(RFC_LOG_UPLOAD));
             if (WDMP_SUCCESS == status && param.type == WDMP_BOOLEAN) {
                 m_logUploadBeforeDeepSleepEnabled = (strncasecmp(param.value, "true", 4) == 0);
             }
-            LOGINFO("Amit m_logUploadBeforeDeepSleepEnabled  :%d \n",m_logUploadBeforeDeepSleepEnabled);
+            LOGWARN("init configure :%d", m_logUploadBeforeDeepSleepEnabled);
+
             return Core::ERROR_NONE;
         }
         
@@ -2875,6 +2877,7 @@ namespace WPEFramework
         void SystemServicesImplementation::OnSystemPowerStateChanged(string currentPowerState, string powerState)
         {
             if ("LIGHT_SLEEP" == powerState || "STANDBY" == powerState) {
+                LOGWARN("m_logUploadBeforeDeepSleepEnabled :%d", m_logUploadBeforeDeepSleepEnabled);
                 if ("ON" == currentPowerState && m_logUploadBeforeDeepSleepEnabled) {
                     SystemResult result;
                     UploadLogsAsync(result);
