@@ -1,0 +1,240 @@
+name: PR - Validate Backport Target
+
+# Runs when PR is opened/updated targeting dummy_develop or support/* branches.
+# Checks that the PR description contains a valid 'backport_to:' field
+# AND that the target branch actually exists on the remote.
+#
+# Valid values:
+#   backport_to: none       → no backport needed
+#   backport_to: 8.3.4.0   → backport to support/8.3.4.0
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+    branches:
+      - dummy_develop
+      - 'support/**'
+      - 'release/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate-release-version:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RDKCM_RDKE }}
+
+      - name: Validate backport_to
+        env:
+          PR_BODY:   ${{ github.event.pull_request.body }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          
+          echo "PR branch       : $PR_BRANCH"
+          echo "PR number       : #$PR_NUMBER"
+          echo ""
+          echo "╔══════════════════════════════════════════════════════════════════╗"
+          echo "║  BACKPORT TARGET VALIDATION                                     ║"
+          echo "╚══════════════════════════════════════════════════════════════════╝"
+          echo ""
+
+          # ────────────────────────────────────────────────────────────────────
+          # Rule 1: Check for multiple occurrences (enforce single source of truth)
+          # ────────────────────────────────────────────────────────────────────
+          echo "▶ Rule 1: Checking for multiple 'backport_to' fields..."
+          
+          # grep -c exits 1 on zero matches; || true prevents pipefail from killing the script
+          OCCURRENCE_COUNT=$(echo "$PR_BODY" | grep -ciE '^\s*backport_to\s*:' || true)
+
+          if [ "$OCCURRENCE_COUNT" -eq 0 ]; then
+            echo "  ❌ VALIDATION FAILED: 'backport_to:' field not found in PR description."
+            echo ""
+            echo "  ┌─ RULES ───────────────────────────────────────────────────────┐"
+            echo "  │  1. Field 'backport_to:' is REQUIRED in every PR description. │"
+            echo "  │  2. Only ONE occurrence is allowed.                           │"
+            echo "  │  3. Value must be 'none' or a version like 8.3.4.0            │"
+            echo "  │  4. The target branch must exist on remote.                   │"
+            echo "  ├───────────────────────────────────────────────────────────────┤"
+            echo "  │  VALID FORMAT:                                                │"
+            echo "  │    backport_to: none      → no backport needed                │"
+            echo "  │    backport_to: 8.3.4.0   → backport to support/8.3.4.0       │"
+            echo "  └───────────────────────────────────────────────────────────────┘"
+            echo ""
+            git fetch origin --quiet || true
+            echo "    Remote support/release branches (origin):"
+            git ls-remote --heads origin | grep -E 'refs/heads/(support|release)/' | awk '{print "      - " $2}' | sed 's@refs/heads/@@' || echo "      (none found)"
+            echo ""
+            exit 1
+          fi
+          
+          if [ "$OCCURRENCE_COUNT" -gt 1 ]; then
+            echo "  ❌ VALIDATION FAILED: Multiple 'backport_to' fields found ($OCCURRENCE_COUNT occurrences)."
+            echo ""
+            echo "  Found entries:"
+            echo "$PR_BODY" | grep -inE '^\s*backport_to\s*:' | sed 's/^/    │ Line /' || true
+            echo ""
+            echo "  ┌─ RULES ───────────────────────────────────────────────────┐"
+            echo "  │  1. Field 'backport_to:' is REQUIRED in every PR description. │"
+            echo "  │  2. Only ONE occurrence is allowed.                           │"
+            echo "  │  3. Value must be 'none' or a version like 8.3.4.0            │"
+            echo "  │  4. The target branch must exist on remote.                   │"
+            echo "  ├───────────────────────────────────────────────────┤"
+            echo "  │  VALID FORMAT:                                                │"
+            echo "  │    backport_to: none      → no backport needed                │"
+            echo "  │    backport_to: 8.3.4.0   → backport to support/8.3.4.0       │"
+            echo "  └───────────────────────────────────────────────────┘"
+            exit 1
+          fi
+          
+          echo "  ✅ Found exactly 1 occurrence (single source of truth)"
+          echo ""
+
+          # ────────────────────────────────────────────────────────────────────
+          # Rule 2: Extract and normalize the value
+          # ────────────────────────────────────────────────────────────────────
+          echo "▶ Rule 2: Extracting and normalizing value..."
+          
+          # Extract the line (case-insensitive, flexible colon spacing)
+          RAW_LINE=$(echo "$PR_BODY" | grep -iE '^\s*backport_to\s*:' | head -1)
+          echo "  Raw line: '$RAW_LINE'"
+          
+          # Extract value after colon (handle multi-line YAML format)
+          # If value is empty after colon, check next non-empty line
+          VALUE_ON_SAME_LINE=$(echo "$RAW_LINE" | sed -E 's/^[^:]*:\s*//' | sed 's/#.*//' | xargs)
+          
+          if [ -z "$VALUE_ON_SAME_LINE" ]; then
+            # Multi-line YAML format: check next non-empty line
+            echo "  ⚠️  Value not on same line, checking next line (multi-line YAML)..."
+            LINE_NUM=$(echo "$PR_BODY" | grep -inE '^\s*backport_to\s*:' | head -1 | cut -d: -f1)
+            VALUE_ON_SAME_LINE=$(echo "$PR_BODY" | tail -n +$((LINE_NUM + 1)) | grep -v '^[[:space:]]*$' | head -1 | sed 's/#.*//' | xargs)
+            echo "  Next line value: '$VALUE_ON_SAME_LINE'"
+          fi
+          
+          # Strip leading/trailing spaces, newlines, carriage returns, and remove trailing comments
+          VERSION=$(echo "$VALUE_ON_SAME_LINE" | sed 's/#.*//' | tr -d '\n\r' | xargs)
+          
+          echo "  Normalized value: '$VERSION'"
+          echo ""
+
+          # ────────────────────────────────────────────────────────────────────
+          # Rule 3: Handle 'none' (no backport needed)
+          # ────────────────────────────────────────────────────────────────────
+          echo "▶ Rule 3: Checking if backport is needed..."
+          
+          if echo "$VERSION" | grep -qiE '^none$'; then
+            echo "  ✅ backport_to: none — no backport needed for this PR."
+            echo ""
+            echo "╔══════════════════════════════════════════════════════════════════╗"
+            echo "║  ✅ VALIDATION PASSED: NO BACKPORT                              ║"
+            echo "╚══════════════════════════════════════════════════════════════════╝"
+            exit 0
+          fi
+          
+          echo "  ℹ️  Backport required for version: $VERSION"
+          echo ""
+
+          # ────────────────────────────────────────────────────────────────────
+          # Rule 4: Validate version format and map to target branch
+          # ────────────────────────────────────────────────────────────────────
+          echo "▶ Rule 4: Validating version format..."
+
+          # If explicitly 'develop', accept and map to develop
+          if echo "$VERSION" | grep -qiE '^develop$'; then
+            SUPPORT_BRANCH="develop"
+            echo "  ✅ 'develop' accepted → branch: develop"
+          else
+            # Accept numeric semantic versions: X.Y.Z or X.Y.Z.W
+            if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$'; then
+              echo "  ❌ VALIDATION FAILED: Invalid version value '$VERSION'"
+              echo ""
+              echo "  ┌─ RULES ───────────────────────────────────────────────────┐"
+              echo "  │  1. Field 'backport_to:' is REQUIRED in every PR description. │"
+              echo "  │  2. Only ONE occurrence is allowed.                           │"
+              echo "  │  3. Value must be 'none' or a version like 8.3.4.0            │"
+              echo "  │  4. The target branch must exist on remote.                   │"
+              echo "  ├───────────────────────────────────────────────────┤"
+              echo "  │  VALID FORMAT:                                                │"
+              echo "  │    backport_to: none      → no backport needed                │"
+              echo "  │    backport_to: 8.3.4.0   → backport to support/8.3.4.0       │"
+              echo "  └───────────────────────────────────────────────────┘"
+              exit 1
+            fi
+
+            # Simple leading-zero check for parts (e.g., disallow '08')
+            IFS='.' read -ra PARTS <<< "$VERSION"
+            for PART in "${PARTS[@]}"; do
+              if [[ "$PART" =~ ^0[0-9]+ ]]; then
+                echo "  ❌ VALIDATION FAILED: Version part has leading zero: '$PART'"
+                echo ""
+                echo "  ┌─ RULES ───────────────────────────────────────────────────┐"
+                echo "  │  1. Field 'backport_to:' is REQUIRED in every PR description. │"
+                echo "  │  2. Only ONE occurrence is allowed.                           │"
+                echo "  │  3. Value must be 'none' or a version like 8.3.4.0            │"
+                echo "  │  4. The target branch must exist on remote.                   │"
+                echo "  ├───────────────────────────────────────────────────┤"
+                echo "  │  VALID FORMAT:                                                │"
+                echo "  │    backport_to: none      → no backport needed                │"
+                echo "  │    backport_to: 8.3.4.0   → backport to support/8.3.4.0       │"
+                echo "  └───────────────────────────────────────────────────┘"
+                exit 1
+              fi
+            done
+
+            # Map 3-part versions to support/X.Y.Z.0 (backwards compatibility)
+            if [ "${#PARTS[@]}" -eq 3 ]; then
+              SUPPORT_BRANCH="support/${VERSION}.0"
+            else
+              SUPPORT_BRANCH="support/${VERSION}"
+            fi
+
+            echo "  ✅ Numeric version accepted → branch: $SUPPORT_BRANCH"
+          fi
+
+          # ────────────────────────────────────────────────────────────────────
+          # Rule 5: Verify target branch exists on remote
+          # ────────────────────────────────────────────────────────────────────
+          echo "▶ Rule 5: Verifying target branch exists on remote..."
+          echo "  (This catches configuration errors BEFORE merge)"
+          
+          git fetch origin 2>/dev/null || true
+
+          if git ls-remote --exit-code --heads origin "$SUPPORT_BRANCH" > /dev/null 2>&1; then
+            echo "  ✅ Target branch found: $SUPPORT_BRANCH"
+          else
+            echo "  ❌ VALIDATION FAILED: Branch '$SUPPORT_BRANCH' does NOT exist on remote."
+            echo ""
+            echo "    Available support/release branches:"
+            git branch -r | grep -E 'origin/(support|release)/' | sed 's/.*origin\//      /' || echo "      (none found)"
+            echo ""
+            echo "  ┌─ BRANCH NOT FOUND ───────────────────────────────────────────┐"
+            echo "  │  backport_to: $VERSION"
+            echo "  │  Expected   : $SUPPORT_BRANCH  ← NOT FOUND                  │"
+            echo "  │                                                               │"
+            echo "  │  Choose a version matching an existing support/release branch│"
+            echo "  └───────────────────────────────────────────────────────────────┘"
+            exit 1
+          fi
+          echo ""
+
+          # ────────────────────────────────────────────────────────────────────
+          # SUCCESS
+          # ────────────────────────────────────────────────────────────────────
+          echo "╔══════════════════════════════════════════════════════════════════╗"
+          echo "║  ✅ VALIDATION PASSED                                           ║"
+          echo "╠══════════════════════════════════════════════════════════════════╣"
+          echo "║  backport_to   : $VERSION"
+          echo "║  Target branch : $SUPPORT_BRANCH"
+          echo "║  Branch status   : EXISTS on remote"
+          echo "║                                                                  ║"
+          echo "║  When this PR merges → automatic backport will be created       ║"
+          echo "╚══════════════════════════════════════════════════════════════════╝"
