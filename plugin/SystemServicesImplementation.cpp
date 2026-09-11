@@ -410,11 +410,11 @@ namespace WPEFramework
 
             memset(&param, 0, sizeof(param));
             status = getRFCParameter((char*)"thunderapi", RFC_LOG_UPLOAD, &param);
-            LOGINFO("Amit :%s   :%d \n",RFC_LOG_UPLOAD, isRFCEnabled(RFC_LOG_UPLOAD));
             if (WDMP_SUCCESS == status && param.type == WDMP_BOOLEAN) {
                 m_logUploadBeforeDeepSleepEnabled = (strncasecmp(param.value, "true", 4) == 0);
             }
-            LOGINFO("Amit m_logUploadBeforeDeepSleepEnabled  :%d \n",m_logUploadBeforeDeepSleepEnabled);
+            LOGWARN("Bootup value for m_logUploadBeforeDeepSleepEnabled :%d", m_logUploadBeforeDeepSleepEnabled);
+
             return Core::ERROR_NONE;
         }
         
