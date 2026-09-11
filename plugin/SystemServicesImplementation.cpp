@@ -373,7 +373,7 @@ namespace WPEFramework
                 modeinfo.duration = -1;
                 modeinfo.mode = MODE_NORMAL;
 
-                LOGINFO("first boot so setting mode to '%s' ('%s' does not contain(\"mode\"))\n",
+                LOGINFO("preeja first boot so setting mode to '%s' ('%s' does not contain(\"mode\"))\n",
                         modeinfo.mode.c_str(), SYSTEM_SERVICE_TEMP_FILE);
 
                 SetMode(modeinfo, SysSrv_Status, errorMessage, success);
