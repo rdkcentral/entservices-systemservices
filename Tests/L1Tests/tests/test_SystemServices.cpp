@@ -9374,10 +9374,10 @@ TEST_F(SystemServicesTest, AbortLogUpload_NoPidActive_ReturnsSuccess)
 }
 
 // =============================================================================
-// OnSystemPowerStateChanged() — LIGHT_SLEEP path triggers UploadLogsAsync check
+// OnSystemPowerStateChanged() — LIGHT_SLEEP uses the cached log-upload RFC value
 // =============================================================================
 
-TEST_F(SystemServicesTest, Dispatch_OnSystemPowerStateChanged_LIGHT_SLEEP_RFCCheck)
+TEST_F(SystemServicesTest, Dispatch_OnSystemPowerStateChanged_LIGHT_SLEEP_DoesNotReadRFC)
 {
     ASSERT_NE(nullptr, m_sysServices);
     ASSERT_NE(nullptr, m_pmModeNotif);
@@ -9386,16 +9386,10 @@ TEST_F(SystemServicesTest, Dispatch_OnSystemPowerStateChanged_LIGHT_SLEEP_RFCChe
     m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
 
-    RFC_ParamData_t rfcParam;
-    memset(&rfcParam, 0, sizeof(rfcParam));
-    rfcParam.type = WDMP_BOOLEAN;
-    strncpy(rfcParam.value, "true", sizeof(rfcParam.value) - 1);
-
-    // RFC returns "true" for RFC_LOG_UPLOAD → UploadLogsAsync is called
+    // RFC_LOG_UPLOAD is read during initialization and cached. A power-mode
+    // transition must not query RFC again.
     EXPECT_CALL(*p_rfcApiMock, getRFCParameter(::testing::_, ::testing::_, ::testing::_))
-        .WillRepeatedly(::testing::DoAll(
-            ::testing::SetArgPointee<2>(rfcParam),
-            ::testing::Return(WDMP_SUCCESS)));
+        .Times(0);
 
     // Trigger via IModeChangedNotification: ON → LIGHT_SLEEP
     m_pmModeNotif->OnPowerModeChanged(
@@ -10055,21 +10049,16 @@ TEST_F(SystemServicesTest, ReportFirmwareUpdateInfo_WithRebootImmediatelyRespons
 // OnSystemPowerStateChanged — RFC log-upload branch
 // =============================================================================
 
-TEST_F(SystemServicesTest, OnPowerModeChanged_ON_to_LIGHTSLEEEP_RFCLogUploadEnabled)
+TEST_F(SystemServicesTest, OnPowerModeChanged_ON_to_LIGHTSLEEEP_DoesNotReadRFC)
 {
     ASSERT_NE(nullptr, m_pmModeNotif) << "IModeChangedNotification not saved";
 
-    // Mock RFC to return WDMP_SUCCESS with WDMP_BOOLEAN type and value "true"
-    // This covers the UploadLogsAsync call inside OnSystemPowerStateChanged
+    // The RFC value is cached during initialization, not read during a power
+    // mode change.
     EXPECT_CALL(*p_rfcApiMock, getRFCParameter(::testing::_, ::testing::_, ::testing::_))
-        .WillOnce(::testing::Invoke(
-            [](char* callerID, const char* paramName, RFC_ParamData_t* param) {
-                param->type = WDMP_BOOLEAN;
-                strncpy(param->value, "true", sizeof(param->value) - 1);
-                return WDMP_SUCCESS;
-            }));
+        .Times(0);
 
-    // ON → LIGHT_SLEEP triggers RFC check for log upload
+    // ON → LIGHT_SLEEP uses the cached RFC value.
     m_pmModeNotif->OnPowerModeChanged(
         Exchange::IPowerManager::POWER_STATE_ON,
         Exchange::IPowerManager::POWER_STATE_STANDBY_LIGHT_SLEEP);
