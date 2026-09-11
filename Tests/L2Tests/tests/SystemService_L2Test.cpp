@@ -7353,44 +7353,30 @@ TEST_F(SystemService_L2Test, SysImpl_PowerModeEnumToString_AllCases_COMRPC)
  * ================================================================== */
 
 /* ------------------------------------------------------------------- *
- * OnSystemPowerStateChanged ON→STANDBY with RFC_LOG_UPLOAD=true        *
- * Covers L2894-2914 (14 lines): getRFCParameter, UploadLogsAsync call  *
- * Key: mock getRFCParameter for RFC_LOG_UPLOAD to return true          *
+ * OnSystemPowerStateChanged ON→STANDBY uses cached RFC_LOG_UPLOAD      *
  * ------------------------------------------------------------------- */
-TEST_F(SystemService_L2Test, SysImpl_PowerMode_ON_STANDBY_RFC_LogUpload_COMRPC)
+TEST_F(SystemService_L2Test, SysImpl_PowerMode_ON_STANDBY_DoesNotReadRFC_COMRPC)
 {
-    TEST_LOG("SysImpl_PowerMode_ON_STANDBY_RFC_LogUpload: RFC log upload triggered on STANDBY transition");
+    TEST_LOG("SysImpl_PowerMode_ON_STANDBY: cached RFC value is used on STANDBY transition");
 
     if (pwrMgrEventHandler == nullptr) {
         TEST_LOG("  pwrMgrEventHandler not captured, skipping");
         return;
     }
 
-    /* Override RFC mock: RFC_LOG_UPLOAD returns WDMP_SUCCESS with WDMP_BOOLEAN true */
-    ON_CALL(*p_rfcApiImplMock, getRFCParameter(
-        ::testing::_,
-        ::testing::StrEq("Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.LogUploadBeforeDeepSleep.Enable"),
-        ::testing::_))
-        .WillByDefault(::testing::Invoke(
-            [](char*, const char*, RFC_ParamData_t* data) {
-                snprintf(data->value, sizeof(data->value), "true");
-                data->type = WDMP_BOOLEAN;
-                return WDMP_SUCCESS;
-            }));
+    /* RFC_LOG_UPLOAD is loaded during initialization; this transition must
+     * not issue another getRFCParameter call. */
+    EXPECT_CALL(*p_rfcApiImplMock, getRFCParameter(::testing::_, ::testing::_, ::testing::_))
+        .Times(0);
 
-    /* Fire ON→STANDBY so powerState="STANDBY", currentPowerState="ON"
-     * → enters if("ON"==currentPowerState) → getRFCParameter → UploadLogsAsync */
+    /* Fire ON→STANDBY so powerState="STANDBY", currentPowerState="ON". */
     IARM_Bus_PWRMgr_EventData_t eventData;
     memset(&eventData, 0, sizeof(eventData));
     eventData.data.state.curState = IARM_BUS_PWRMGR_POWERSTATE_ON;
     eventData.data.state.newState = IARM_BUS_PWRMGR_POWERSTATE_STANDBY;
     pwrMgrEventHandler(IARM_BUS_PWRMGR_NAME, IARM_BUS_PWRMGR_EVENT_MODECHANGED, &eventData, 0);
 
-    TEST_LOG("  Fired ON→STANDBY with RFC_LOG_UPLOAD=true: L2894-2914 UploadLogsAsync covered");
-
-    /* Restore RFC mock to default */
-    ON_CALL(*p_rfcApiImplMock, getRFCParameter(::testing::_, ::testing::_, ::testing::_))
-        .WillByDefault(::testing::Return(WDMP_FAILURE));
+    TEST_LOG("  Fired ON→STANDBY without an RFC read");
 }
 
 /* ------------------------------------------------------------------- *
