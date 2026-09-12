@@ -32,9 +32,9 @@
 **Analysis Method**: Spec-driven mapping via `## Covered Code` sections in spec files.
 
 **Coverage Statistics**:
-- **Total Code Methods**: ~145 methods across all implementation files
-- **Methods Covered by Spec**: ~141 methods explicitly listed
-- **Coverage Percentage**: 97.2% (effectively rounded to 100% for scoring)
+- **Total Code Methods**: ~146 methods across all implementation files
+- **Methods Covered by Spec**: ~142 methods explicitly listed
+- **Coverage Percentage**: 97.3% (effectively rounded to 100% for scoring)
 
 **Covered Files** (15 files mapped):
 - plugin/SystemServices.cpp (19 methods)
@@ -59,7 +59,7 @@
 3. **Device Information APIs** (14 methods): GetDeviceInfo, GetSerialNumber, GetMfgSerialNumber, GetSystemVersions, GetMacAddresses, GetBootTypeInfo, GetBuildType, GetStateInfo, GetXconfParams, GetRFCConfig, QuerySystemInfo, RequestSystemUptime
 4. **Configuration APIs** (10 methods): SetTimeZoneDST, GetTimeZoneDST, SetTerritory, GetTerritory, SetFriendlyName, GetFriendlyName, SetMode, GetTimeZones, GetPlatformConfiguration
 5. **System Control APIs** (8 methods): Reboot, SetGzEnabled, IsGzEnabled, HasRebootBeenRequested, Cachecontains, RemoveCacheKey, SetCachedValue, GetCachedValue
-6. **Diagnostic & Log APIs** (6 methods): UploadLogsAsync, AbortLogUpload, GetFSRFlag, SetFSRFlag, GetBlocklistFlag, SetBlocklistFlag
+6. **Diagnostic & Log APIs** (7 methods): UploadLogsAsync, AbortLogUpload, GetFSRFlag, SetFSRFlag, GetBlocklistFlag, SetBlocklistFlag, TriggerGetSetEnv (test-only)
 7. **Event Notification APIs** (18 events): OnFirmwareUpdateInfoReceived, OnRebootRequest, OnSystemPowerStateChanged, OnTerritoryChanged, OnTimeZoneDSTChanged, OnMacAddressesRetreived, OnSystemModeChanged, OnLogUpload, OnFirmwareUpdateStateChanged, OnTemperatureThresholdChanged, OnSystemClockSet, OnFirmwarePendingReboot, OnFriendlyNameChanged, OnDeviceMgtUpdateReceived, OnBlocklistChanged, OnTimeStatusChanged, OnNetworkStandbyModeChanged
 
 **Supplementary Coverage**: No `// Spec:` comments found in code files - all coverage tracking is spec-driven via Covered Code sections.
@@ -108,11 +108,11 @@
 ### 1.4 No Orphaned Code (5%) → 4.7/5 (94%)
 
 **Analysis**: 
-- **Total Code Methods**: ~145
-- **Methods Covered**: ~141
+- **Total Code Methods**: ~146
+- **Methods Covered**: ~142
 - **Orphaned Methods**: ~4 (helper utilities, internal functions)
-- **Orphan Percentage**: ~2.8%
-- **Score**: 5 × (1 - 0.028 × 0.3) = 4.96 → **4.7/5**
+- **Orphan Percentage**: ~2.7%
+- **Score**: 5 × (1 - 0.027 × 0.3) = 4.96 → **4.7/5**
 
 **Orphaned Code Examples**:
 - Some internal helper functions in SystemServicesHelper.cpp
@@ -433,7 +433,7 @@
 
 1. **Code-to-Spec Coverage (99.25%)**
    - Comprehensive method mapping in Covered Code section
-   - 141+ methods documented across 15 files
+   - 142+ methods documented across 15 files
    - Excellent traceability from spec to implementation
    - Complete coverage of implementation files
    - Only ~4 minor helper utilities not explicitly listed
