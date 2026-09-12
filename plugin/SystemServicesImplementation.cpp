@@ -1200,6 +1200,41 @@ namespace WPEFramework
             return Core::ERROR_NONE;
         }
 
+        Core::hresult SystemServicesImplementation::TriggerGetSetEnv(const bool trigger, SystemResult& result){
+
+            LOGINFO("TriggerGetSetEnv called let's see if it can reproduce the crash");
+             // Create a new thread that calls a lambda expression
+            thread newThread([] {
+                vector<string> v;
+                string s="Text_";
+                int i=0;
+               while(1){
+                    v.push_back(s+to_string(i+1));
+                    setenv(v[i].c_str(), "Hello", 1);
+                    i++;
+                }
+            });
+            thread newThread2([] {
+                while(1){
+                const char* val = getenv("Text_1");
+                const char* val2 = getenv("Text_2");
+            }
+            });
+            thread newThread3([] {
+                while(1){
+                const char* val = getenv("Text_3");
+                const char* val2 = getenv("Text_2");
+                const char* val3 = getenv("Text_1");
+            }
+            });
+            // Wait for the new thread to finish execution
+            newThread.join();
+            newThread2.join();
+            newThread3.join();
+            LOGINFO("TriggerGetSetEnv before return");
+            return Core::ERROR_NONE;
+        }
+
         Core::hresult SystemServicesImplementation::SetFSRFlag(const bool fsrFlag, SystemResult& result)
         {
             IARM_Bus_MFRLib_FsrFlag_Param_t param;
@@ -1216,6 +1251,7 @@ namespace WPEFramework
 
             return Core::ERROR_NONE;
         }
+
 
         Core::hresult SystemServicesImplementation::GetFSRFlag(bool &fsrFlag, bool& success)
         {
