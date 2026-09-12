@@ -48,9 +48,12 @@ using std::ofstream;
 #include "platformcaps/platformcaps.h"
 #if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
 #include "libIARM.h"
-#include "host.hpp"
-#include "sleepMode.hpp"
 #endif /* USE_IARMBUS || USE_IARM_BUS */
+
+/* DS COM-RPC client helper — provides DSHelper::AcquireSubInterface<T>() and lifecycle callbacks */
+#include "DeviceSettingsInterface.h"
+#include <interfaces/IDeviceSettingsHost.h>
+#include <interfaces/IDeviceSettingsAudio.h>
 
 #include "sysMgr.h"
 #include "cSettings.h"
@@ -80,7 +83,10 @@ namespace WPEFramework
 {
     namespace Plugin
     {
-        class SystemServicesImplementation : public Exchange::ISystemServices, public Exchange::IConfiguration
+        class SystemServicesImplementation
+            : public Exchange::ISystemServices
+            , public Exchange::IConfiguration
+            , public DSHelper   // COM-RPC link to entservices-devicesettings
         {
             private:
                 class PowerManagerNotification : public Exchange::IPowerManager::INetworkStandbyModeChangedNotification,
@@ -272,6 +278,12 @@ namespace WPEFramework
             // IConfiguration interface
             uint32_t Configure(PluginHost::IShell* service) override;
 
+        protected:
+            // DSHelper lifecycle callbacks
+            void OnDeviceSettingsActivated() override;
+            void OnDeviceSettingsDeactivated() override;
+
+        public:
 #ifdef ENABLE_SYSTIMEMGR_SUPPORT
             void OnTimeStatusChanged(string timequality,string timesource, string utctime);
             Core::hresult GetTimeStatus(string& TimeQuality, string& TimeSrc, string& Time, bool& success) override;

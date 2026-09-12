@@ -27,6 +27,7 @@ find_package(${NAMESPACE}Definitions REQUIRED)
 find_package(CompileSettingsDebug CONFIG REQUIRED)
 find_package(${NAMESPACE}Helpers REQUIRED)
 find_library(PROCPS_LIBRARIES NAMES procps)
+find_library(SECURE_WRAPPER_LIBRARIES NAMES secure_wrapper)
 
 find_package(Telemetry)
 
@@ -67,6 +68,13 @@ set_target_properties(${PLUGIN_IMPLEMENTATION} PROPERTIES
         CXX_STANDARD 11
         CXX_STANDARD_REQUIRED YES)
 
+# DeviceSettings is queried over COM-RPC from entservices-devicesettings.
+find_package(${NAMESPACE}Definitions REQUIRED)
+find_package(${NAMESPACE}Helpers REQUIRED)
+target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE
+    ${NAMESPACE}Definitions::${NAMESPACE}Definitions
+    ${NAMESPACE}::${NAMESPACE}Helpers)
+
 target_compile_definitions(${PLUGIN_IMPLEMENTATION} PRIVATE MODULE_NAME=Plugin_${PLUGIN_NAME})
 
 if (NOT RDK_SERVICES_L1_TEST)
@@ -90,16 +98,18 @@ if(PROCPS_LIBRARIES)
     target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${PROCPS_LIBRARIES})
 endif(PROCPS_LIBRARIES)
 
-find_package(DS)
-if (DS_FOUND)
-	find_package(IARMBus)
-    add_definitions(-DDS_FOUND)
+if(SECURE_WRAPPER_LIBRARIES)
+    target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${SECURE_WRAPPER_LIBRARIES})
+endif(SECURE_WRAPPER_LIBRARIES)
+
+# IARM is still used for sysmode, mfrMgr, deep-sleep and timer messaging.
+find_package(IARMBus)
+if (IARMBUS_FOUND)
     target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ${IARMBUS_INCLUDE_DIRS})
-    target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ${DS_INCLUDE_DIRS})
-    target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${NAMESPACE}Plugins::${NAMESPACE}Plugins ${IARMBUS_LIBRARIES} ${DS_LIBRARIES})
-else (DS_FOUND)
+    target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${NAMESPACE}Plugins::${NAMESPACE}Plugins ${IARMBUS_LIBRARIES})
+else (IARMBUS_FOUND)
     target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${NAMESPACE}Plugins::${NAMESPACE}Plugins)
-endif(DS_FOUND)
+endif(IARMBUS_FOUND)
 
 find_package(CURL)
 if (CURL_FOUND)
