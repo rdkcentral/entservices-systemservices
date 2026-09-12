@@ -313,6 +313,9 @@ namespace WPEFramework
             PowerManagerInterfaceRef _powerManagerPlugin;
             Core::Sink<PowerManagerNotification> _pwrMgrNotification;
             bool _registeredEventHandlers;
+#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
+            bool m_iarmEventHandlersRegistered;
+#endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
             Utils::ThreadRAII thread_getMacAddresses;
             static const string MODEL_NAME;
             static const string HARDWARE_ID;
@@ -323,6 +326,8 @@ namespace WPEFramework
             static cTimer m_operatingModeTimer;
             static int m_remainingDuration;
             Utils::ThreadRAII m_getFirmwareInfoThread;
+            std::mutex m_getFirmwareInfoThreadMutex;
+            bool m_deepSleepInProgress;
             PluginHost::IShell* m_shellService { nullptr };
             regex_t m_regexUnallowedChars;
             int m_FwUpdateState_LatestEvent;
@@ -363,6 +368,7 @@ namespace WPEFramework
 #if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
             void InitializeIARM();
             void DeinitializeIARM();
+            void RegisterIARMEventHandlers();
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
 
             /* Events : Begin */
