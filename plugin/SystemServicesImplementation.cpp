@@ -251,7 +251,7 @@ namespace WPEFramework
             , _pwrMgrNotification(*this)
             , _registeredEventHandlers(false)
         {
-            LOGINFO("preeja Create SystemServicesImplementation Instance");
+            LOGINFO("Create SystemServicesImplementation Instance");
 
             SystemServicesImplementation::_instance = this;
 
