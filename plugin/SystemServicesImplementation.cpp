@@ -483,7 +483,6 @@ namespace WPEFramework
 
         std::string SystemServicesImplementation::powerModeEnumToString(PowerState state)
         {
-            std::string powerState = "";
             switch (state) 
             {
                 case WPEFramework::Exchange::IPowerManager::POWER_STATE_ON: powerState = "ON"; break;
