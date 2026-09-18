@@ -4086,9 +4086,9 @@ namespace WPEFramework
             } else if (errno == EEXIST) {
                 // Directory already exists, which is fine
                 return true;
-            } else {
-                LOGERR(" --- Failed to create directory: %d", ret);
-                return false;
+            } 
+            LOGERR(" --- Failed to create directory: %d", ret);
+            return false;
             }
         }
 
