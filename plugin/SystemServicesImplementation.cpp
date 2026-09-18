@@ -1137,8 +1137,8 @@ namespace WPEFramework
 
         void SystemServicesImplementation::OnBlocklistChanged(bool newBlocklistFlag, bool oldBlocklistFlag)
         {
-            JsonObject params;
             string newBloklistStr = (newBlocklistFlag? "true":"false");
+			JsonObject params;
             string oldBloklistStr = (oldBlocklistFlag? "true":"false");
 
             params["oldBlocklistFlag"] = oldBlocklistFlag;
