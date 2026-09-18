@@ -20,6 +20,8 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <cstdio>
+#include <climits>
+#include <sys/stat.h>
 #include <regex>
 #include <fstream>
 #include <string>
@@ -2415,6 +2417,36 @@ namespace WPEFramework
         {
             LOGINFO("path=%s", path.c_str());
             string strBLSplashScreenPath = path;
+
+            /* Security: canonicalize path and verify it is a regular file within
+             * an allowed directory before passing it to the privileged MFR flash
+             * operation.  This prevents symlink-follow and path-traversal attacks. */
+            static const std::vector<std::string> allowedPrefixes = {"/opt/", "/tmp/", "/media/"};
+            char resolvedBuf[PATH_MAX] = {0};
+            bool pathAllowed = false;
+            if (!strBLSplashScreenPath.empty() && realpath(strBLSplashScreenPath.c_str(), resolvedBuf) != nullptr) {
+                strBLSplashScreenPath = resolvedBuf;
+                for (const auto &prefix : allowedPrefixes) {
+                    if (strBLSplashScreenPath.rfind(prefix, 0) == 0) {
+                        pathAllowed = true;
+                        break;
+                    }
+                }
+                /* Verify it's a regular file, not a symlink, directory, or device node */
+                struct stat st;
+                if (pathAllowed && (lstat(resolvedBuf, &st) != 0 || !S_ISREG(st.st_mode))) {
+                    LOGERR("Path is not a regular file: %s", resolvedBuf);
+                    pathAllowed = false;
+                }
+            }
+            if (!pathAllowed) {
+                LOGERR("Rejected splash screen path (outside allowed dirs or not a regular file): %s", path.c_str());
+                error.message = "Invalid path";
+                error.code = "-32001";
+                success = false;
+                return Core::ERROR_NONE;
+            }
+
             bool fileExists = Utils::fileExists(strBLSplashScreenPath.c_str());
             if((strBLSplashScreenPath != "") && fileExists)
             {
