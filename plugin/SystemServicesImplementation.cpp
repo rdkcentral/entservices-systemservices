@@ -186,6 +186,10 @@ const char* getWakeupSrcString(uint32_t src)
          return "";
     }
 }
+std::string getPowerStateDescription()
+{
+    return "Support Power State";
+}
 
 #if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
 
