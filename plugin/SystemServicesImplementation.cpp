@@ -3259,6 +3259,26 @@ namespace WPEFramework
         {
             bool ret = true;
 
+            /* Security: reject shell metacharacters in the entry before passing to popen.
+             * Only allow characters valid in Olson timezone paths: alphanumeric, '/', '-', '_', '+', '.' */
+            for (char c : entry) {
+                if (!std::isalnum(static_cast<unsigned char>(c)) && c != '/' && c != '-' && c != '_' && c != '+' && c != '.') {
+                    LOGERR("Rejected timezone entry with invalid character 0x%02x: '%s'", (unsigned char)c, entry.c_str());
+                    return false;
+                }
+            }
+
+            /* Canonicalize the path and verify it stays within ZONEINFO_DIR */
+            char resolvedPath[PATH_MAX] = {0};
+            if (realpath(entry.c_str(), resolvedPath) != nullptr) {
+                std::string zoneinfoPrefix(ZONEINFO_DIR);
+                if (std::string(resolvedPath).rfind(zoneinfoPrefix, 0) != 0) {
+                    LOGERR("Timezone path escapes ZONEINFO_DIR: '%s' -> '%s'", entry.c_str(), resolvedPath);
+                    return false;
+                }
+                entry = resolvedPath;
+            }
+
             std::string cmd = "zdump ";
             cmd += entry;
             
@@ -3383,6 +3403,13 @@ namespace WPEFramework
                 {
                     if (tz.empty())
                         continue;
+
+                    /* Security: reject traversal sequences and absolute paths to prevent
+                     * directory listing / file-existence oracle outside ZONEINFO_DIR */
+                    if (tz.find("..") != std::string::npos || tz[0] == '/') {
+                        LOGERR("Rejected timezone with path traversal: %s", tz.c_str());
+                        continue;
+                    }
 
                     std::string path = std::string(ZONEINFO_DIR) + "/" + tz;
                     bool status = processTimeZones(std::move(path), dirObject);
