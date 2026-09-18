@@ -1148,14 +1148,14 @@ namespace WPEFramework
 
         void SystemServicesImplementation::OnBlocklistChanged(bool newBlocklistFlag, bool oldBlocklistFlag)
         {
-            JsonObject params;
+            JsonObject params1;
             string newBloklistStr = (newBlocklistFlag? "true":"false");
             string oldBloklistStr = (oldBlocklistFlag? "true":"false");
 
-            params["oldBlocklistFlag"] = oldBlocklistFlag;
-            params["newBlocklistFlag"] = newBlocklistFlag;
+            params1["oldBlocklistFlag"] = oldBlocklistFlag;
+            params1["newBlocklistFlag"] = newBlocklistFlag;
             LOGINFO("blocklist changed from %s to '%s'\n", oldBloklistStr.c_str(), newBloklistStr.c_str());
-            dispatchEvent(SYSTEMSERVICES_EVT_ONBLOCKLISTCHANGED, params);
+            dispatchEvent(SYSTEMSERVICES_EVT_ONBLOCKLISTCHANGED, params1);
         }
 
         Core::hresult SystemServicesImplementation::SetBlocklistFlag(const bool blocklist, SetBlocklistResult& result)
