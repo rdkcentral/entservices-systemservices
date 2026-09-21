@@ -481,7 +481,7 @@ namespace WPEFramework
             LOGWARN("IARM Event triggered for PowerStateChange.\
                     Old State %s, New State: %s\n",
                     curPowerState.c_str() , newPowerState.c_str());
-            if (SystemServicesImplementation::_instance) {
+            if (SystemServicesImplementation::_instance == nullptr) {
                 SystemServicesImplementation::_instance->OnSystemPowerStateChanged(std::move(curPowerState), std::move(newPowerState));
             } else {
                 LOGERR("SystemServicesImplementation::_instance is NULL.\n");
