@@ -21,9 +21,17 @@ permissions:
   pull-requests: write
 
 jobs:
-  backport:
+  parse-targets:
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.info.outputs.skip }}
+      ticket: ${{ steps.info.outputs.ticket }}
+      merge_sha: ${{ steps.info.outputs.merge_sha }}
+      pr_title: ${{ steps.info.outputs.pr_title }}
+      pr_url: ${{ steps.info.outputs.pr_url }}
+      pr_number: ${{ steps.info.outputs.pr_number }}
+      targets: ${{ steps.info.outputs.targets }}
 
     steps:
 
@@ -40,6 +48,9 @@ jobs:
           git config user.email "github-actions@users.noreply.github.com"
 
       # ── 1. Extract and validate backport_to + ticket ────────────────────────
+      # Resolves backport_to (single value, full branch name, or comma separated
+      # list) into a JSON array of { support_branch, feature_branch, label }
+      # targets consumed by the matrix "backport" job below.
       - name: Extract PR info and validate backport_to
         id: info
         env:
@@ -97,30 +108,10 @@ jobs:
           if echo "$VERSION" | grep -qiE '^none$'; then
             echo "ℹ️  backport_to: none — no backport needed"
             echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "targets=[]" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          
-          # ── Validate: Simplified rules (none | develop | X.Y.Z(.W)) ────────
-          # Accept 'develop' (any case) and numeric versions. Keep rules simple
-          # to avoid accidental removal of existing functionality.
-          if echo "$VERSION" | grep -qiE '^develop$'; then
-            SUPPORT_BRANCH="develop"
-            echo "✅ Target mapped: backport_to 'develop' → branch: $SUPPORT_BRANCH"
-          elif echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$'; then
-            # Map 3-part versions to support/X.Y.Z.0 for compatibility
-            IFS='.' read -ra PARTS <<< "$VERSION"
-            if [ "${#PARTS[@]}" -eq 3 ]; then
-              SUPPORT_BRANCH="support/${VERSION}.0"
-            else
-              SUPPORT_BRANCH="support/${VERSION}"
-            fi
-            echo "✅ Numeric version accepted → branch: $SUPPORT_BRANCH"
-          else
-            echo "❌ Invalid backport_to: '$VERSION'"
-            echo "   Allowed values: 'none', 'develop', or semantic numeric like 8.3.4 or 8.3.4.0"
-            exit 1
-          fi
-          
+
           # ── Extract and validate ticket (prefer PR title, then branch, then fallback) ─────────
           TICKET=$(echo "$PR_TITLE" | grep -oE '[A-Z]+-[0-9]+' | head -1 || true)
 
@@ -139,33 +130,124 @@ jobs:
             TICKET="BACKPORT_$PR_NUMBER"
           fi
 
-          FEATURE_BRANCH="feature/${TICKET}"
-          
+          # ── Resolve backport_to into one or more target branches ──────────
+          # Supported formats (all previously supported formats still work):
+          #   backport_to: 8.3.4.0                                  (legacy bare version)
+          #   backport_to: develop                                   (legacy literal)
+          #   backport_to: support/8.6.3.0                           (full branch name)
+          #   backport_to: support/8.6.3.0, develop, dummy_develop   (multiple targets)
+          IFS=',' read -ra RAW_TOKENS <<< "$VERSION"
+
+          declare -a SUPPORT_BRANCHES=()
+          declare -a LABELS=()
+
+          for RAW_TOKEN in "${RAW_TOKENS[@]}"; do
+            TOKEN=$(echo "$RAW_TOKEN" | xargs)
+            [ -z "$TOKEN" ] && continue
+
+            if echo "$TOKEN" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$'; then
+              # Legacy: bare numeric version → map to support/X.Y.Z(.0)
+              IFS='.' read -ra PARTS <<< "$TOKEN"
+              if [ "${#PARTS[@]}" -eq 3 ]; then
+                MAPPED_BRANCH="support/${TOKEN}.0"
+              else
+                MAPPED_BRANCH="support/${TOKEN}"
+              fi
+              SUPPORT_BRANCHES+=("$MAPPED_BRANCH")
+              LABELS+=("$TOKEN")
+              echo "✅ Numeric version '$TOKEN' accepted → branch: $MAPPED_BRANCH"
+            else
+              # Full branch name given directly (support/8.6.3.0, develop, dummy_develop, ...)
+              SUPPORT_BRANCHES+=("$TOKEN")
+              LABELS+=("$TOKEN")
+              echo "✅ Target mapped: backport_to '$TOKEN' → branch: $TOKEN"
+            fi
+          done
+
+          if [ "${#SUPPORT_BRANCHES[@]}" -eq 0 ]; then
+            echo "❌ Invalid backport_to: '$VERSION'"
+            echo "   Allowed values: 'none', a branch name (support/8.6.3.0, develop, ...),"
+            echo "   or a comma separated list of branch names."
+            exit 1
+          fi
+
+          MULTI_TARGET=false
+          if [ "${#SUPPORT_BRANCHES[@]}" -gt 1 ]; then
+            MULTI_TARGET=true
+          fi
+
+          # ── Build the JSON targets array consumed by the matrix job ────────
+          TARGETS_JSON="[]"
+          for i in "${!SUPPORT_BRANCHES[@]}"; do
+            SUPPORT_BRANCH="${SUPPORT_BRANCHES[$i]}"
+            LABEL="${LABELS[$i]}"
+
+            if [ "$MULTI_TARGET" = true ]; then
+              SANITIZED_BRANCH=$(echo "$SUPPORT_BRANCH" | tr '/' '-')
+              FEATURE_BRANCH="feature/${TICKET}_${SANITIZED_BRANCH}"
+            else
+              FEATURE_BRANCH="feature/${TICKET}"
+            fi
+
+            ENTRY=$(jq -n \
+              --arg support_branch "$SUPPORT_BRANCH" \
+              --arg feature_branch "$FEATURE_BRANCH" \
+              --arg label "$LABEL" \
+              '{support_branch: $support_branch, feature_branch: $feature_branch, label: $label}')
+
+            TARGETS_JSON=$(echo "$TARGETS_JSON" | jq -c ". + [$ENTRY]")
+          done
+
           # ── Set outputs ────────────────────────────────────────────────────
           echo "skip=false"                       >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION"                 >> "$GITHUB_OUTPUT"
           echo "ticket=$TICKET"                   >> "$GITHUB_OUTPUT"
-          echo "support_branch=$SUPPORT_BRANCH"   >> "$GITHUB_OUTPUT"
-          echo "feature_branch=$FEATURE_BRANCH"   >> "$GITHUB_OUTPUT"
           echo "merge_sha=$MERGE_SHA"             >> "$GITHUB_OUTPUT"
           echo "pr_title=$PR_TITLE"               >> "$GITHUB_OUTPUT"
           echo "pr_url=$PR_URL"                   >> "$GITHUB_OUTPUT"
-          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "pr_number=$PR_NUMBER"              >> "$GITHUB_OUTPUT"
+          echo "targets=$TARGETS_JSON"            >> "$GITHUB_OUTPUT"
           
           echo ""
           echo "┌─ BACKPORT PLAN ────────────────────────────────────────────────┐"
           echo "│  Ticket          : $TICKET"
-          echo "│  Release version : $VERSION"
-          echo "│  Support branch  : $SUPPORT_BRANCH"
-          echo "│  Feature branch  : $FEATURE_BRANCH"
           echo "│  Merge commit    : $MERGE_SHA"
+          echo "│  Target branch(es):"
+          for SUPPORT_BRANCH in "${SUPPORT_BRANCHES[@]}"; do
+            echo "│    - $SUPPORT_BRANCH"
+          done
           echo "└────────────────────────────────────────────────────────────────┘"
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # One matrix job per resolved target branch. fail-fast is disabled so that a
+  # conflict/failure while backporting to one branch never stops the others.
+  # ══════════════════════════════════════════════════════════════════════════
+  backport:
+    needs: parse-targets
+    if: needs.parse-targets.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJson(needs.parse-targets.outputs.targets) }}
+
+    steps:
+
+      # ── 0. Checkout ──────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RDKCM_RDKE }}
+
+      - name: Configure Git
+        run: |
+          git config user.name  "GitHub Actions [Backport]"
+          git config user.email "github-actions@users.noreply.github.com"
 
       # ── 2. Validate support branch exists ────────────────────────────────────
       - name: Validate support branch exists
-        if: steps.info.outputs.skip != 'true'
         env:
-          SUPPORT_BRANCH: ${{ steps.info.outputs.support_branch }}
+          SUPPORT_BRANCH: ${{ matrix.target.support_branch }}
         run: |
           set -euo pipefail
           
@@ -187,10 +269,9 @@ jobs:
       # ── 3. Create or checkout feature branch from support ────────────────────
       - name: Create or checkout feature branch
         id: setup_feature
-        if: steps.info.outputs.skip != 'true'
         env:
-          SUPPORT_BRANCH: ${{ steps.info.outputs.support_branch }}
-          FEATURE_BRANCH: ${{ steps.info.outputs.feature_branch }}
+          SUPPORT_BRANCH: ${{ matrix.target.support_branch }}
+          FEATURE_BRANCH: ${{ matrix.target.feature_branch }}
         run: |
           set -euo pipefail
           
@@ -260,9 +341,7 @@ jobs:
           echo "Using feature branch: $FEATURE_BRANCH"
 
           echo "Creating new feature branch '$FEATURE_BRANCH' from '$SUPPORT_BRANCH'..."
-          # git checkout -b "$FEATURE_BRANCH" "origin/$SUPPORT_BRANCH"
-          FEATURE_BRANCH=dummy_support8.6.3
-          git checkout $FEATURE_BRANCH
+          git checkout -b "$FEATURE_BRANCH" "origin/$SUPPORT_BRANCH"
 
           # Verify checkout succeeded
           CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
@@ -281,13 +360,13 @@ jobs:
        # ── 4a. Apply PR changes and detect real conflicts ────────────────────────
         # ── 4a. Apply PR changes and detect real conflicts ────────────────────────
       - name: "Phase 1: Apply PR changes and detect conflicts"
-        if: steps.info.outputs.skip != 'true'
         id: cherry_pick
         env:
-          MERGE_SHA:      ${{ steps.info.outputs.merge_sha }}
-          TICKET:         ${{ steps.info.outputs.ticket }}
-          VERSION:        ${{ steps.info.outputs.version }}
-          PR_TITLE:       ${{ steps.info.outputs.pr_title }}
+          MERGE_SHA:      ${{ needs.parse-targets.outputs.merge_sha }}
+          TICKET:         ${{ needs.parse-targets.outputs.ticket }}
+          VERSION:        ${{ matrix.target.label }}
+          SUPPORT_BRANCH: ${{ matrix.target.support_branch }}
+          PR_TITLE:       ${{ needs.parse-targets.outputs.pr_title }}
           FEATURE_BRANCH: ${{ steps.setup_feature.outputs.feature_branch }}
 
         run: |
@@ -974,7 +1053,7 @@ jobs:
             echo "▶ Committing..."
 
             git commit \
-              -m "${TICKET}: Backport to support/${VERSION} — ${PR_TITLE}"
+              -m "${TICKET}: Backport to ${SUPPORT_BRANCH} — ${PR_TITLE}"
 
             echo "✅ Changes committed successfully."
 
@@ -1084,7 +1163,7 @@ jobs:
             echo "▶ Committing changes..."
 
             git commit \
-              -m "${TICKET}: Backport to support/${VERSION} — ${PR_TITLE}"
+              -m "${TICKET}: Backport to ${SUPPORT_BRANCH} — ${PR_TITLE}"
 
             echo "✅ Changes committed successfully."
 
@@ -1124,14 +1203,16 @@ jobs:
 
         # ── 4b. Analyze conflicts ─────────────────────────────────────────────────
       - name: "Phase 4b: Analyze conflicts"
-        if: steps.info.outputs.skip != 'true' && steps.cherry_pick.outputs.has_conflicts == 'true'
+        if: steps.cherry_pick.outputs.has_conflicts == 'true'
         id: analyze
         env:
           FEATURE_BRANCH: ${{ steps.setup_feature.outputs.feature_branch }}
-          SUPPORT_BRANCH: ${{ steps.info.outputs.support_branch }}
+          SUPPORT_BRANCH: ${{ matrix.target.support_branch }}
           CONFLICT_COUNT: ${{ steps.cherry_pick.outputs.conflict_count }}
-          VERSION:        ${{ steps.info.outputs.version }}
-          MERGE_SHA:      ${{ steps.info.outputs.merge_sha }}
+          VERSION:        ${{ matrix.target.label }}
+          MERGE_SHA:      ${{ needs.parse-targets.outputs.merge_sha }}
+          TICKET:         ${{ needs.parse-targets.outputs.ticket }}
+          PR_TITLE:       ${{ needs.parse-targets.outputs.pr_title }}
         run: |
           set -euo pipefail
 
@@ -1448,7 +1529,7 @@ jobs:
             echo "   ║  ────────────────────────────────────────────────────────║"
             echo "   ║  SOURCE BEFORE = dummy_develop BEFORE your PR (BASE)      ║"
             echo "   ║  SOURCE AFTER  = dummy_develop AFTER your PR (THEIRS)     ║"
-            echo "   ║  TARGET        = support/$VERSION current state (OURS)    ║"
+            echo "   ║  TARGET        = $SUPPORT_BRANCH current state (OURS)    ║"
             echo "   ║                                                           ║"
             echo "   ║  CHANGE = What your PR modified (BASE → THEIRS)           ║"
             echo "   ╚═══════════════════════════════════════════════════════════╝"
@@ -1576,7 +1657,7 @@ jobs:
                 # 3. TARGET CURRENT STATE = EXACT OURS SECTION
                 # --------------------------------------------------------------
 
-                echo "   ║ 3️⃣  TARGET CURRENT STATE (support/$VERSION has):"
+                echo "   ║ 3️⃣  TARGET CURRENT STATE ($SUPPORT_BRANCH has):"
                 echo "   ║    ─────────────────────────────────────────────────"
 
                 if [ -n "$BASE_MARKER_LINE" ]; then
@@ -1751,7 +1832,7 @@ jobs:
 
           echo "5️⃣  Commit and push:"
           echo "    git add ."
-          echo "    git commit -m \"${TICKET}: Backport to support/${VERSION} — ${PR_TITLE}\""
+          echo "    git commit -m \"${TICKET}: Backport to ${SUPPORT_BRANCH} — ${PR_TITLE}\""
           echo "    git push origin $FEATURE_BRANCH"
           echo ""
 
@@ -1767,7 +1848,6 @@ jobs:
       
       # ── Output consolidation for downstream steps ─────────────────────────────
       - name: Set final apply status
-        if: steps.info.outputs.skip != 'true'
         id: apply
         run: |
           # Only runs if NO conflicts (Phase 2 exits with error if conflicts detected)
@@ -1783,7 +1863,7 @@ jobs:
 
      # ── 5. Push feature branch ───────────────────────────────────────────────
       - name: Push feature branch
-        if: steps.info.outputs.skip != 'true' && steps.apply.outputs.applied == 'true'
+        if: steps.apply.outputs.applied == 'true'
         env:
           FEATURE_BRANCH: ${{ steps.setup_feature.outputs.feature_branch }}
         run: |
@@ -1799,15 +1879,14 @@ jobs:
 
           # ── 6. Create Pull Request ───────────────────────────────────────────────
       - name: Create Pull Request
-        if: steps.info.outputs.skip != 'true' && steps.apply.outputs.applied == 'true'
+        if: steps.apply.outputs.applied == 'true'
         env:
           GH_TOKEN:          ${{ secrets.RDKCM_RDKE }}
           FEATURE_BRANCH:    ${{ steps.setup_feature.outputs.feature_branch }}
-          SUPPORT_BRANCH:    ${{ steps.info.outputs.support_branch }}
-          TICKET:            ${{ steps.info.outputs.ticket }}
-          VERSION:           ${{ steps.info.outputs.version }}
-          PR_TITLE:          ${{ steps.info.outputs.pr_title }}
-          ORIGINAL_PR:       ${{ steps.info.outputs.pr_url }}
+          SUPPORT_BRANCH:    ${{ matrix.target.support_branch }}
+          TICKET:            ${{ needs.parse-targets.outputs.ticket }}
+          PR_TITLE:          ${{ needs.parse-targets.outputs.pr_title }}
+          ORIGINAL_PR:       ${{ needs.parse-targets.outputs.pr_url }}
           CONFLICT_RESOLVED: ${{ steps.apply.outputs.conflict_resolved }}
           ORIGINAL_PR_BODY:  ${{ github.event.pull_request.body }}
         run: |

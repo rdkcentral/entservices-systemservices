@@ -5,8 +5,10 @@ name: PR - Validate Backport Target
 # AND that the target branch actually exists on the remote.
 #
 # Valid values:
-#   backport_to: none       → no backport needed
-#   backport_to: 8.3.4.0   → backport to support/8.3.4.0
+#   backport_to: none                                      → no backport needed
+#   backport_to: 8.3.4.0                                    → backport to support/8.3.4.0
+#   backport_to: support/8.6.3.0                            → backport to support/8.6.3.0 (full branch name)
+#   backport_to: support/8.6.3.0, develop, dummy_develop    → backport to all listed branches
 
 on:
   pull_request:
@@ -144,83 +146,132 @@ jobs:
           echo ""
 
           # ────────────────────────────────────────────────────────────────────
-          # Rule 4: Validate version format and map to target branch
+          # Rule 4: Validate value(s) and map each to a target branch
+          #
+          # backport_to now supports:
+          #   • A single bare version   : 8.3.4.0            (legacy, unchanged)
+          #   • A full branch name      : support/8.6.3.0    (new)
+          #   • A comma separated list  : support/8.6.3.0, develop, dummy_develop
           # ────────────────────────────────────────────────────────────────────
-          echo "▶ Rule 4: Validating version format..."
+          echo "▶ Rule 4: Validating value(s) and resolving target branch(es)..."
 
-          # If explicitly 'develop', accept and map to develop
-          if echo "$VERSION" | grep -qiE '^develop$'; then
-            SUPPORT_BRANCH="develop"
-            echo "  ✅ 'develop' accepted → branch: develop"
-          else
-            # Accept numeric semantic versions: X.Y.Z or X.Y.Z.W
-            if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$'; then
-              echo "  ❌ VALIDATION FAILED: Invalid version value '$VERSION'"
-              echo ""
-              echo "  ┌─ RULES ───────────────────────────────────────────────────┐"
-              echo "  │  1. Field 'backport_to:' is REQUIRED in every PR description. │"
-              echo "  │  2. Only ONE occurrence is allowed.                           │"
-              echo "  │  3. Value must be 'none' or a version like 8.3.4.0            │"
-              echo "  │  4. The target branch must exist on remote.                   │"
-              echo "  ├───────────────────────────────────────────────────┤"
-              echo "  │  VALID FORMAT:                                                │"
-              echo "  │    backport_to: none      → no backport needed                │"
-              echo "  │    backport_to: 8.3.4.0   → backport to support/8.3.4.0       │"
-              echo "  └───────────────────────────────────────────────────┘"
-              exit 1
+          IFS=',' read -ra RAW_TOKENS <<< "$VERSION"
+
+          declare -a RESOLVED_BRANCHES=()
+          declare -a INVALID_TOKENS=()
+
+          for RAW_TOKEN in "${RAW_TOKENS[@]}"; do
+            TOKEN=$(echo "$RAW_TOKEN" | xargs)
+            [ -z "$TOKEN" ] && continue
+
+            if echo "$TOKEN" | grep -qiE '^none$'; then
+              INVALID_TOKENS+=("$TOKEN (→ 'none' cannot be combined with other targets)")
+              continue
             fi
 
-            # Simple leading-zero check for parts (e.g., disallow '08')
-            IFS='.' read -ra PARTS <<< "$VERSION"
-            for PART in "${PARTS[@]}"; do
-              if [[ "$PART" =~ ^0[0-9]+ ]]; then
-                echo "  ❌ VALIDATION FAILED: Version part has leading zero: '$PART'"
-                echo ""
-                echo "  ┌─ RULES ───────────────────────────────────────────────────┐"
-                echo "  │  1. Field 'backport_to:' is REQUIRED in every PR description. │"
-                echo "  │  2. Only ONE occurrence is allowed.                           │"
-                echo "  │  3. Value must be 'none' or a version like 8.3.4.0            │"
-                echo "  │  4. The target branch must exist on remote.                   │"
-                echo "  ├───────────────────────────────────────────────────┤"
-                echo "  │  VALID FORMAT:                                                │"
-                echo "  │    backport_to: none      → no backport needed                │"
-                echo "  │    backport_to: 8.3.4.0   → backport to support/8.3.4.0       │"
-                echo "  └───────────────────────────────────────────────────┘"
-                exit 1
+            # Full branch name already given, e.g. support/8.6.3.0, release/x, develop, dummy_develop
+            if echo "$TOKEN" | grep -qE '^(support|release)/' || echo "$TOKEN" | grep -qE '^[A-Za-z0-9._-]+$'; then
+              # Numeric-only tokens are handled below as legacy version mapping,
+              # everything else (has a '/' or letters) is treated as a literal branch name.
+              if echo "$TOKEN" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$'; then
+                :
+              else
+                RESOLVED_BRANCHES+=("$TOKEN")
+                echo "  ✅ '$TOKEN' accepted as literal branch name"
+                continue
               fi
-            done
-
-            # Map 3-part versions to support/X.Y.Z.0 (backwards compatibility)
-            if [ "${#PARTS[@]}" -eq 3 ]; then
-              SUPPORT_BRANCH="support/${VERSION}.0"
-            else
-              SUPPORT_BRANCH="support/${VERSION}"
             fi
 
-            echo "  ✅ Numeric version accepted → branch: $SUPPORT_BRANCH"
+            # Legacy: bare numeric version → map to support/X.Y.Z(.0)
+            if echo "$TOKEN" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$'; then
+              LEADING_ZERO=false
+              IFS='.' read -ra PARTS <<< "$TOKEN"
+              for PART in "${PARTS[@]}"; do
+                if [[ "$PART" =~ ^0[0-9]+ ]]; then
+                  LEADING_ZERO=true
+                fi
+              done
+
+              if [ "$LEADING_ZERO" = true ]; then
+                INVALID_TOKENS+=("$TOKEN (version part has leading zero)")
+                continue
+              fi
+
+              if [ "${#PARTS[@]}" -eq 3 ]; then
+                MAPPED_BRANCH="support/${TOKEN}.0"
+              else
+                MAPPED_BRANCH="support/${TOKEN}"
+              fi
+
+              RESOLVED_BRANCHES+=("$MAPPED_BRANCH")
+              echo "  ✅ Numeric version '$TOKEN' accepted → branch: $MAPPED_BRANCH"
+              continue
+            fi
+
+            INVALID_TOKENS+=("$TOKEN (unrecognized format)")
+          done
+
+          if [ "${#INVALID_TOKENS[@]}" -gt 0 ]; then
+            echo ""
+            echo "  ❌ VALIDATION FAILED: Invalid backport_to value(s):"
+            for BAD in "${INVALID_TOKENS[@]}"; do
+              echo "     • $BAD"
+            done
+            echo ""
+            echo "  ┌─ RULES ───────────────────────────────────────────────────┐"
+            echo "  │  1. Field 'backport_to:' is REQUIRED in every PR description. │"
+            echo "  │  2. Only ONE occurrence is allowed.                           │"
+            echo "  │  3. Value must be 'none', a version (8.3.4.0), a full branch  │"
+            echo "  │     name (support/8.3.4.0), or a comma separated list of      │"
+            echo "  │     branch names.                                             │"
+            echo "  │  4. Every target branch must exist on remote.                 │"
+            echo "  ├───────────────────────────────────────────────────┤"
+            echo "  │  VALID FORMAT:                                                │"
+            echo "  │    backport_to: none                                          │"
+            echo "  │    backport_to: 8.3.4.0                                       │"
+            echo "  │    backport_to: support/8.6.3.0                               │"
+            echo "  │    backport_to: support/8.6.3.0, develop, dummy_develop       │"
+            echo "  └───────────────────────────────────────────────────┘"
+            exit 1
           fi
 
+          if [ "${#RESOLVED_BRANCHES[@]}" -eq 0 ]; then
+            echo "  ❌ VALIDATION FAILED: No valid target branch could be resolved from '$VERSION'"
+            exit 1
+          fi
+
+          echo ""
+
           # ────────────────────────────────────────────────────────────────────
-          # Rule 5: Verify target branch exists on remote
+          # Rule 5: Verify every target branch exists on remote
           # ────────────────────────────────────────────────────────────────────
-          echo "▶ Rule 5: Verifying target branch exists on remote..."
+          echo "▶ Rule 5: Verifying target branch(es) exist on remote..."
           echo "  (This catches configuration errors BEFORE merge)"
-          
+
           git fetch origin 2>/dev/null || true
 
-          if git ls-remote --exit-code --heads origin "$SUPPORT_BRANCH" > /dev/null 2>&1; then
-            echo "  ✅ Target branch found: $SUPPORT_BRANCH"
-          else
-            echo "  ❌ VALIDATION FAILED: Branch '$SUPPORT_BRANCH' does NOT exist on remote."
+          declare -a MISSING_BRANCHES=()
+
+          for SUPPORT_BRANCH in "${RESOLVED_BRANCHES[@]}"; do
+            if git ls-remote --exit-code --heads origin "$SUPPORT_BRANCH" > /dev/null 2>&1; then
+              echo "  ✅ Target branch found: $SUPPORT_BRANCH"
+            else
+              echo "  ❌ Target branch NOT found: $SUPPORT_BRANCH"
+              MISSING_BRANCHES+=("$SUPPORT_BRANCH")
+            fi
+          done
+
+          if [ "${#MISSING_BRANCHES[@]}" -gt 0 ]; then
             echo ""
             echo "    Available support/release branches:"
             git branch -r | grep -E 'origin/(support|release)/' | sed 's/.*origin\//      /' || echo "      (none found)"
             echo ""
             echo "  ┌─ BRANCH NOT FOUND ───────────────────────────────────────────┐"
-            echo "  │  backport_to: $VERSION"
-            echo "  │  Expected   : $SUPPORT_BRANCH  ← NOT FOUND                  │"
+            for MISSING in "${MISSING_BRANCHES[@]}"; do
+              echo "  │  Expected   : $MISSING  ← NOT FOUND"
+            done
             echo "  │                                                               │"
-            echo "  │  Choose a version matching an existing support/release branch│"
+            echo "  │  Choose value(s) matching existing support/release branches  │"
             echo "  └───────────────────────────────────────────────────────────────┘"
             exit 1
           fi
@@ -233,8 +284,12 @@ jobs:
           echo "║  ✅ VALIDATION PASSED                                           ║"
           echo "╠══════════════════════════════════════════════════════════════════╣"
           echo "║  backport_to   : $VERSION"
-          echo "║  Target branch : $SUPPORT_BRANCH"
+          echo "║  Target branch(es):"
+          for SUPPORT_BRANCH in "${RESOLVED_BRANCHES[@]}"; do
+            echo "║    - $SUPPORT_BRANCH"
+          done
           echo "║  Branch status   : EXISTS on remote"
           echo "║                                                                  ║"
-          echo "║  When this PR merges → automatic backport will be created       ║"
+          echo "║  When this PR merges → automatic backport will be created for   ║"
+          echo "║  each listed branch                                             ║"
           echo "╚══════════════════════════════════════════════════════════════════╝"
