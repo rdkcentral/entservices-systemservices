@@ -336,7 +336,7 @@ namespace WPEFramework
             void Dispatch(Event event, const JsonObject &params);
 
             static void getMacAddressesAsync(SystemServicesImplementation *p);
-            static void startModeTimer(int duration);
+            static int startModeTimer(int duration);
             static void stopModeTimer();
             static void updateDuration();
             bool processTimeZones(std::string entry, JsonObject& out);

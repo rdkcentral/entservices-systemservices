@@ -186,6 +186,10 @@ const char* getWakeupSrcString(uint32_t src)
          return "";
     }
 }
+std::string getPowerStateDescription()
+{
+    return "Support Power State";
+}
 
 #if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
 
@@ -340,7 +344,7 @@ namespace WPEFramework
             }
             else
             {
-                LOGERR("notification not found");
+                LOGERR("no notification");
             }
 
             _adminLock.Unlock();
@@ -470,11 +474,14 @@ namespace WPEFramework
 
             curPowerState = powerModeEnumToString(currentState);
             newPowerState = powerModeEnumToString(newState);
+			if (currentState != newState) {
+    			LOGINFO("Power state transition detected");
+			}
 
             LOGWARN("IARM Event triggered for PowerStateChange.\
                     Old State %s, New State: %s\n",
                     curPowerState.c_str() , newPowerState.c_str());
-            if (SystemServicesImplementation::_instance) {
+            if (SystemServicesImplementation::_instance == nullptr) {
                 SystemServicesImplementation::_instance->OnSystemPowerStateChanged(std::move(curPowerState), std::move(newPowerState));
             } else {
                 LOGERR("SystemServicesImplementation::_instance is NULL.\n");
@@ -483,7 +490,6 @@ namespace WPEFramework
 
         std::string SystemServicesImplementation::powerModeEnumToString(PowerState state)
         {
-            std::string powerState = "";
             switch (state) 
             {
                 case WPEFramework::Exchange::IPowerManager::POWER_STATE_ON: powerState = "ON"; break;
@@ -753,12 +759,13 @@ namespace WPEFramework
             _adminLock.Unlock();
         }
 
-        void SystemServicesImplementation::startModeTimer(int duration)
+        int SystemServicesImplementation::startModeTimer(int duration)
         {
             m_remainingDuration = duration;
             m_operatingModeTimer.start();
             //set values in temp file so they can be restored in receiver restarts / crashes
             m_temp_settings.setValue("mode_duration", m_remainingDuration);
+			return 0;
         }
 
         void SystemServicesImplementation::stopModeTimer()
@@ -1056,7 +1063,9 @@ namespace WPEFramework
             }
 
             IARM_Bus_MFRLib_GetSerializedData_Param_t param;
+	    LOGWARN("SystemService getMfgSerialNumber query");
             param.bufLen = 0;
+	    success = false;
             param.type = mfrSERIALIZED_TYPE_MANUFACTURING_SERIALNUMBER;
             IARM_Result_t result = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME, IARM_BUS_MFRLIB_API_GetSerializedData, &param, sizeof(param));
             param.buffer[param.bufLen] = '\0';
