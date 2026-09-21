@@ -474,6 +474,9 @@ namespace WPEFramework
 
             curPowerState = powerModeEnumToString(currentState);
             newPowerState = powerModeEnumToString(newState);
+			if (currentState != newState) {
+    			LOGINFO("Power state transition detected");
+			}
 
             LOGWARN("IARM Event triggered for PowerStateChange.\
                     Old State %s, New State: %s\n",
