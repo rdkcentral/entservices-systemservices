@@ -38,7 +38,7 @@ api to get coretemperature  and notifications when thresholds are crossed.
  */
 
 
-namespace WPEFramework {
+namespace Thunder {
     namespace Plugin {
 
         static CThermalMonitor s_instance;
@@ -49,11 +49,11 @@ namespace WPEFramework {
             return &s_instance;
         }
 
-        void CThermalMonitor::addEventObserver(WPEFramework::Plugin::SystemServicesImplementation* service)
+        void CThermalMonitor::addEventObserver(Thunder::Plugin::SystemServicesImplementation* service)
         {
         }
 
-        void CThermalMonitor::removeEventObserver(WPEFramework::Plugin::SystemServicesImplementation* service)
+        void CThermalMonitor::removeEventObserver(Thunder::Plugin::SystemServicesImplementation* service)
         {
             LOGWARN("%s: Removing event observer for temperature threshold change.", __FUNCTION__);
         }
@@ -63,7 +63,7 @@ namespace WPEFramework {
             Core::hresult retStatus = Core::ERROR_GENERAL;
             temperature = 0;
             bool result = false;
-            WPEFramework::Exchange::IPowerManager* _powerManagerPlugin = SystemServicesImplementation::_instance->getPwrMgrPluginInstance();
+            Thunder::Exchange::IPowerManager* _powerManagerPlugin = SystemServicesImplementation::_instance->getPwrMgrPluginInstance();
 
             ASSERT (nullptr != _powerManagerPlugin);
             if (nullptr != _powerManagerPlugin){
@@ -84,7 +84,7 @@ namespace WPEFramework {
         {
             Core::hresult retStatus = Core::ERROR_GENERAL;
             bool result = false;
-            WPEFramework::Exchange::IPowerManager* _powerManagerPlugin = SystemServicesImplementation::_instance->getPwrMgrPluginInstance();
+            Thunder::Exchange::IPowerManager* _powerManagerPlugin = SystemServicesImplementation::_instance->getPwrMgrPluginInstance();
 
             ASSERT (nullptr != _powerManagerPlugin);
             if (nullptr != _powerManagerPlugin){
@@ -106,7 +106,7 @@ namespace WPEFramework {
         {
             Core::hresult retStatus = Core::ERROR_GENERAL;
             bool result = false;
-            WPEFramework::Exchange::IPowerManager* _powerManagerPlugin = SystemServicesImplementation::_instance->getPwrMgrPluginInstance();
+            Thunder::Exchange::IPowerManager* _powerManagerPlugin = SystemServicesImplementation::_instance->getPwrMgrPluginInstance();
 
             ASSERT (nullptr != _powerManagerPlugin);
             if (nullptr != _powerManagerPlugin){
@@ -128,7 +128,7 @@ namespace WPEFramework {
         {
             Core::hresult retStatus = Core::ERROR_GENERAL;
             bool result = false;
-            WPEFramework::Exchange::IPowerManager* _powerManagerPlugin = SystemServicesImplementation::_instance->getPwrMgrPluginInstance();
+            Thunder::Exchange::IPowerManager* _powerManagerPlugin = SystemServicesImplementation::_instance->getPwrMgrPluginInstance();
 
             ASSERT (nullptr != _powerManagerPlugin);
             if (nullptr != _powerManagerPlugin){
@@ -150,7 +150,7 @@ namespace WPEFramework {
         {
             bool result = false;
             Core::hresult retStatus = Core::ERROR_GENERAL;
-            WPEFramework::Exchange::IPowerManager* _powerManagerPlugin = SystemServicesImplementation::_instance->getPwrMgrPluginInstance();
+            Thunder::Exchange::IPowerManager* _powerManagerPlugin = SystemServicesImplementation::_instance->getPwrMgrPluginInstance();
 
             ASSERT (nullptr != _powerManagerPlugin);
             if (nullptr != _powerManagerPlugin){

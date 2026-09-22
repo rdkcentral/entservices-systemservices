@@ -45,7 +45,7 @@
 #define MAX_LENGTH 1024
 
 using namespace std;
-using namespace WPEFramework;
+using namespace Thunder;
 
 /* Thunder-Security: Security Token */
 unsigned char g_ucSecToken[MAX_LENGTH] = {0};

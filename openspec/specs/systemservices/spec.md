@@ -2,14 +2,14 @@
 
 ## Overview
 
-The SystemServices plugin is a WPEFramework (Thunder) plugin that provides comprehensive system management capabilities for RDK devices including power management, firmware updates, system configuration, device diagnostics, and log management through dual protocol interfaces: JSON-RPC for external clients and COM-RPC for plugin interoperability (callsign: `org.rdk.System`, version: 3.4.1).
+The SystemServices plugin is a Thunder (Thunder) plugin that provides comprehensive system management capabilities for RDK devices including power management, firmware updates, system configuration, device diagnostics, and log management through dual protocol interfaces: JSON-RPC for external clients and COM-RPC for plugin interoperability (callsign: `org.rdk.System`, version: 3.4.1).
 
 ## Description
 
 The SystemServices plugin serves as the central control point for system-level operations on RDK (Reference Design Kit) devices. It abstracts hardware-specific functionality through HAL (Hardware Abstraction Layer) interfaces and exposes a rich set of APIs through dual protocol support for managing device lifecycle, power states, firmware updates, system configuration, and diagnostic operations.
 
 **Key Characteristics:**
-- **Plugin Type**: WPEFramework R4.4+ plugin
+- **Plugin Type**: Thunder R4.4+ plugin
 - **Callsign**: `org.rdk.System`
 - **Version**: 3.4.1 (Major: 3, Minor: 4, Patch: 1)
 - **API Protocols**: 
@@ -115,17 +115,17 @@ The plugin integrates with multiple RDK subsystems:
 #### Security
 - **NFR-SEC-001**: All external inputs SHALL be validated using regex patterns to prevent injection attacks
 - **NFR-SEC-002**: Sensitive data SHALL be stored in `/opt/secure/persistent` with appropriate permissions
-- **NFR-SEC-003**: WPEFramework security token validation SHALL be supported (configurable)
+- **NFR-SEC-003**: Thunder security token validation SHALL be supported (configurable)
 - **NFR-SEC-004**: Plugin SHALL run with minimal required system privileges
 
 #### Compatibility
-- **NFR-COMPAT-001**: Plugin SHALL be compatible with WPEFramework R4.4+
+- **NFR-COMPAT-001**: Plugin SHALL be compatible with Thunder R4.4+
 - **NFR-COMPAT-002**: Plugin SHALL follow RDK plugin architecture patterns
 - **NFR-COMPAT-003**: API SHALL maintain backward compatibility within major version
 - **NFR-COMPAT-004**: Conditional compilation flags SHALL enable platform-specific features without breaking other platforms
 
 #### Maintainability
-- **NFR-MAINT-001**: Code SHALL follow C++11/14 standards and WPEFramework conventions
+- **NFR-MAINT-001**: Code SHALL follow C++11/14 standards and Thunder conventions
 - **NFR-MAINT-002**: All public APIs SHALL be documented with parameter descriptions and error codes
 - **NFR-MAINT-003**: Code SHALL use enterprise error code framework for consistent error reporting
 - **NFR-MAINT-004**: Changes SHALL be tracked in CHANGELOG.md with version updates
@@ -166,11 +166,11 @@ SystemServices Plugin
 
 ### High-Level System Architecture
 
-The SystemServices plugin follows a layered architecture pattern, sitting between the WPEFramework core and the hardware abstraction layer, with **dual protocol support** for maximum flexibility:
+The SystemServices plugin follows a layered architecture pattern, sitting between the Thunder core and the hardware abstraction layer, with **dual protocol support** for maximum flexibility:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                   WPEFramework Core                         │
+│                   Thunder Core                         │
 │              (Thunder Plugin Framework)                      │
 │         • JSON-RPC Protocol Handler                          │
 │         • Service Discovery & Registration                   │
@@ -329,7 +329,7 @@ The JSON-RPC interface is automatically generated from the COM-RPC interface usi
 
 #### Outgoing: PowerManager Integration
 
-SystemServices also uses WPEFramework's **COM-RPC** mechanism to communicate with the PowerManager plugin as a client. COM-RPC provides inter-plugin communication through socket-based interfaces.
+SystemServices also uses Thunder's **COM-RPC** mechanism to communicate with the PowerManager plugin as a client. COM-RPC provides inter-plugin communication through socket-based interfaces.
 
 **PowerManager Integration:**
 - **Connection Method**: COM-RPC socket connection via `PowerManagerInterfaceBuilder`
@@ -378,7 +378,7 @@ The SystemServices plugin exposes its functionality through **dual protocol inte
 
 **JSON-RPC Interface:**
 - **Purpose**: External client access (Web UIs, scripts, REST APIs)
-- **Transport**: WebSocket over WPEFramework
+- **Transport**: WebSocket over Thunder
 - **Access**: Via callsign `org.rdk.System` and method names (e.g., `org.rdk.System.1.getPowerState`)
 - **Data Format**: JSON request/response with string-based parameters
 - **Use Case**: Language-agnostic clients, remote access, web applications
@@ -386,7 +386,7 @@ The SystemServices plugin exposes its functionality through **dual protocol inte
 **COM-RPC Interface:**
 - **Purpose**: C++ plugin interoperability
 - **Transport**: Direct C++ interface via `Exchange::ISystemServices`
-- **Access**: Via WPEFramework QueryInterface mechanism
+- **Access**: Via Thunder QueryInterface mechanism
 - **Data Format**: Typed C++ parameters and return values
 - **Use Case**: Other Thunder plugins calling SystemServices, high-performance local IPC
 
@@ -844,7 +844,7 @@ Critical states are persisted to survive reboots:
 
 ### Access Control
 
-- WPEFramework security token validation
+- Thunder security token validation
 - Can be disabled for development builds
 - Appropriate system privileges for hardware access
 
@@ -853,7 +853,7 @@ Critical states are persisted to survive reboots:
 ### Build Dependencies
 
 **Required:**
-- WPEFramework (Thunder) R4.4+
+- Thunder (Thunder) R4.4+
 - IARM Bus library
 - Device Settings HAL
 - RFC library
@@ -915,7 +915,7 @@ Conditional compilation flags control optional features:
 
 ### Compatibility Guarantees
 - **Backward Compatibility**: APIs maintain compatibility within major version
-- **Platform Compatibility**: Requires WPEFramework R4.4+
+- **Platform Compatibility**: Requires Thunder R4.4+
 - **HAL Compatibility**: Platform-specific HAL versions may vary
 - **Conditional Features**: Build flags enable/disable features without breaking other platforms
 
@@ -959,7 +959,7 @@ The SystemServices plugin employs a multi-layered testing approach to ensure con
 ### Coding Standards
 
 - C++11/14 standards
-- WPEFramework coding conventions
+- Thunder coding conventions
 - Enterprise error code framework
 
 ### Documentation
@@ -1044,7 +1044,7 @@ ws.send(JSON.stringify({
 
 ### Compatibility
 
-- WPEFramework R4.4+ required
+- Thunder R4.4+ required
 - Specific HAL versions may have compatibility requirements
 - Some features require platform-specific HAL support
 
@@ -1251,7 +1251,7 @@ _No open queries at this time._
 ## References
 
 ### Related RDK Documentation
-- WPEFramework (Thunder) Plugin Development Guide
+- Thunder (Thunder) Plugin Development Guide
 - RDK Device Settings HAL Specification
 - IARM Bus Architecture Documentation
 - RFC (Remote Feature Control) Service Specification

@@ -23,7 +23,7 @@
 #define API_VERSION_NUMBER_MINOR 0
 #define API_VERSION_NUMBER_PATCH 0
 
-namespace WPEFramework
+namespace Thunder
 {
 
     namespace {
@@ -44,7 +44,7 @@ namespace WPEFramework
     {
 
     /*
-     *Register SystemServices module as wpeframework plugin
+     *Register SystemServices module as thunder plugin
      **/
     SERVICE_REGISTRATION(SystemServices, API_VERSION_NUMBER_MAJOR, API_VERSION_NUMBER_MINOR, API_VERSION_NUMBER_PATCH);
 
@@ -91,7 +91,7 @@ namespace WPEFramework
             }
             // Register for notifications
             _systemServices->Register(&_systemServicesNotification);
-            // Invoking Plugin API register to wpeframework
+            // Invoking Plugin API register to thunder
             Exchange::JSystemServices::Register(*this, _systemServices);
         }
         else
@@ -176,4 +176,4 @@ namespace WPEFramework
         }
     }
 } // namespace Plugin
-} // namespace WPEFramework
+} // namespace Thunder

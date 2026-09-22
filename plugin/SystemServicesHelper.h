@@ -141,7 +141,7 @@ bool dirExists(std::string fname);
  */
 bool readFromFile(const char* filename, string &content);
 
-namespace WPEFramework {
+namespace Thunder {
     namespace Plugin {
         /***
          * @brief   : Used to construct response with module error status.
@@ -158,7 +158,7 @@ namespace WPEFramework {
         string convertCase(string str);
         bool convert(string str3,string firm);
     } //namespace Plugin
-} //namespace WPEFramework
+} //namespace Thunder
 
 /***
  * @brief  : Used to construct JSON response from Vector.

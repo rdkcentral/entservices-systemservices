@@ -69,14 +69,14 @@ using std::ofstream;
 
 #include "PowerManagerInterface.h"
 
-using namespace WPEFramework::Exchange;
-using PowerState = WPEFramework::Exchange::IPowerManager::PowerState;
-using WakeupReason = WPEFramework::Exchange::IPowerManager::WakeupReason;
-using ThermalTemperature = WPEFramework::Exchange::IPowerManager::ThermalTemperature;
+using namespace Thunder::Exchange;
+using PowerState = Thunder::Exchange::IPowerManager::PowerState;
+using WakeupReason = Thunder::Exchange::IPowerManager::WakeupReason;
+using ThermalTemperature = Thunder::Exchange::IPowerManager::ThermalTemperature;
 
 #define TERRITORYFILE "/opt/secure/persistent/System/Territory.txt"
 
-namespace WPEFramework
+namespace Thunder
 {
     namespace Plugin
     {
@@ -381,4 +381,4 @@ namespace WPEFramework
             friend class Job;
         };
     } // namespace Plugin
-} // namespace WPEFramework
+} // namespace Thunder

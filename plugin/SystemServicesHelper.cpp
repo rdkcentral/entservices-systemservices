@@ -116,7 +116,7 @@ bool readFromFile(const char* filename, string &content)
     return retStatus;
 }
 
-namespace WPEFramework {
+namespace Thunder {
     namespace Plugin {
         /***
          * @brief	: Used to construct response with module error status.
@@ -230,7 +230,7 @@ namespace WPEFramework {
             return status;
         }
     } //namespace Plugin
-} //namespace WPEFramework
+} //namespace Thunder
 
 /***
  * @brief	: Used to construct JSON response from Vector.

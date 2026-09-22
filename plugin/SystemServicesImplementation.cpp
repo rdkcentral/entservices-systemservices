@@ -73,14 +73,14 @@
 #include "UtilsProcess.h"
 
 using namespace std;
-using namespace WPEFramework;
-using PowerState = WPEFramework::Exchange::IPowerManager::PowerState;
-using WakeupReason = WPEFramework::Exchange::IPowerManager::WakeupReason;
-using ThermalTemperature = WPEFramework::Exchange::IPowerManager::ThermalTemperature;
-using WakeupSrcType             = WPEFramework::Exchange::IPowerManager::WakeupSrcType;
-using WakeupSrcConfig           = WPEFramework::Exchange::IPowerManager::WakeupSourceConfig;
-using IWakeupSourceConfigIterator  = WPEFramework::Exchange::IPowerManager::IWakeupSourceConfigIterator;
-using WakeupSourceConfigIteratorImpl = WPEFramework::Core::Service<WPEFramework::RPC::IteratorType<IWakeupSourceConfigIterator>>;
+using namespace Thunder;
+using PowerState = Thunder::Exchange::IPowerManager::PowerState;
+using WakeupReason = Thunder::Exchange::IPowerManager::WakeupReason;
+using ThermalTemperature = Thunder::Exchange::IPowerManager::ThermalTemperature;
+using WakeupSrcType             = Thunder::Exchange::IPowerManager::WakeupSrcType;
+using WakeupSrcConfig           = Thunder::Exchange::IPowerManager::WakeupSourceConfig;
+using IWakeupSourceConfigIterator  = Thunder::Exchange::IPowerManager::IWakeupSourceConfigIterator;
+using WakeupSourceConfigIteratorImpl = Thunder::Core::Service<Thunder::RPC::IteratorType<IWakeupSourceConfigIterator>>;
 
 #define MAX_REBOOT_DELAY 86400 /* 24Hr = 86400 sec */
 #define TR181_FW_DELAY_REBOOT "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AutoReboot.fwDelayReboot"
@@ -162,25 +162,25 @@ const char* getWakeupSrcString(uint32_t src)
 {
     switch (src)
     {
-    case WPEFramework::Exchange::IPowerManager::WAKEUP_SRC_VOICE:
+    case Thunder::Exchange::IPowerManager::WAKEUP_SRC_VOICE:
          return "WAKEUPSRC_VOICE";
-    case WPEFramework::Exchange::IPowerManager::WAKEUP_SRC_PRESENCEDETECTED:
+    case Thunder::Exchange::IPowerManager::WAKEUP_SRC_PRESENCEDETECTED:
          return "WAKEUPSRC_PRESENCE_DETECTION";
-    case WPEFramework::Exchange::IPowerManager::WAKEUP_SRC_BLUETOOTH:
+    case Thunder::Exchange::IPowerManager::WAKEUP_SRC_BLUETOOTH:
          return "WAKEUPSRC_BLUETOOTH";
-    case WPEFramework::Exchange::IPowerManager::WAKEUP_SRC_RF4CE:
+    case Thunder::Exchange::IPowerManager::WAKEUP_SRC_RF4CE:
          return "WAKEUPSRC_RF4CE";
-    case WPEFramework::Exchange::IPowerManager::WAKEUP_SRC_WIFI:
+    case Thunder::Exchange::IPowerManager::WAKEUP_SRC_WIFI:
          return "WAKEUPSRC_WIFI";
-    case WPEFramework::Exchange::IPowerManager::WAKEUP_SRC_IR:
+    case Thunder::Exchange::IPowerManager::WAKEUP_SRC_IR:
          return "WAKEUPSRC_IR";
-    case WPEFramework::Exchange::IPowerManager::WAKEUP_SRC_POWERKEY:
+    case Thunder::Exchange::IPowerManager::WAKEUP_SRC_POWERKEY:
          return "WAKEUPSRC_POWER_KEY";
-    case WPEFramework::Exchange::IPowerManager::WAKEUP_SRC_TIMER:
+    case Thunder::Exchange::IPowerManager::WAKEUP_SRC_TIMER:
          return "WAKEUPSRC_TIMER";
-    case WPEFramework::Exchange::IPowerManager::WAKEUP_SRC_CEC:
+    case Thunder::Exchange::IPowerManager::WAKEUP_SRC_CEC:
          return "WAKEUPSRC_CEC";
-    case WPEFramework::Exchange::IPowerManager::WAKEUP_SRC_LAN:
+    case Thunder::Exchange::IPowerManager::WAKEUP_SRC_LAN:
          return "WAKEUPSRC_LAN";
     default:
          return "";
@@ -213,7 +213,7 @@ void stringToIarmMode(std::string mode, IARM_Bus_Daemon_SysMode_t& iarmMode)
 
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
 
-namespace WPEFramework
+namespace Thunder
 {
     namespace Plugin
     {
@@ -497,11 +497,11 @@ namespace WPEFramework
             std::string powerState = "";
             switch (state) 
             {
-                case WPEFramework::Exchange::IPowerManager::POWER_STATE_ON: powerState = "ON"; break;
-                case WPEFramework::Exchange::IPowerManager::POWER_STATE_OFF: powerState = "OFF"; break;
-                case WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY: powerState = "LIGHT_SLEEP"; break;
-                case WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_LIGHT_SLEEP: powerState = "LIGHT_SLEEP"; break;
-                case WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP: powerState = "DEEP_SLEEP"; break;
+                case Thunder::Exchange::IPowerManager::POWER_STATE_ON: powerState = "ON"; break;
+                case Thunder::Exchange::IPowerManager::POWER_STATE_OFF: powerState = "OFF"; break;
+                case Thunder::Exchange::IPowerManager::POWER_STATE_STANDBY: powerState = "LIGHT_SLEEP"; break;
+                case Thunder::Exchange::IPowerManager::POWER_STATE_STANDBY_LIGHT_SLEEP: powerState = "LIGHT_SLEEP"; break;
+                case Thunder::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP: powerState = "DEEP_SLEEP"; break;
                 default: break;
             }
             return powerState;
@@ -1465,8 +1465,8 @@ namespace WPEFramework
 #if defined(HAS_API_SYSTEM) && defined(HAS_API_POWERSTATE)
         Core::hresult SystemServicesImplementation::GetPowerState (string& powerState, bool& success)
         {
-            PowerState pwrStateCur = WPEFramework::Exchange::IPowerManager::POWER_STATE_UNKNOWN;
-            PowerState pwrStatePrev = WPEFramework::Exchange::IPowerManager::POWER_STATE_UNKNOWN;
+            PowerState pwrStateCur = Thunder::Exchange::IPowerManager::POWER_STATE_UNKNOWN;
+            PowerState pwrStatePrev = Thunder::Exchange::IPowerManager::POWER_STATE_UNKNOWN;
             powerState= "UNKNOWN";
             Core::hresult retStatus = Core::ERROR_GENERAL;
 
@@ -1477,9 +1477,9 @@ namespace WPEFramework
 
 
             if (Core::ERROR_NONE == retStatus){
-                if (pwrStateCur == WPEFramework::Exchange::IPowerManager::POWER_STATE_ON)
+                if (pwrStateCur == Thunder::Exchange::IPowerManager::POWER_STATE_ON)
                     powerState = "ON";
-                else if ((pwrStateCur == WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY) || (pwrStateCur == WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_LIGHT_SLEEP) || (pwrStateCur == WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP))
+                else if ((pwrStateCur == Thunder::Exchange::IPowerManager::POWER_STATE_STANDBY) || (pwrStateCur == Thunder::Exchange::IPowerManager::POWER_STATE_STANDBY_LIGHT_SLEEP) || (pwrStateCur == Thunder::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP))
                     powerState = "STANDBY";
             }
 
@@ -1539,17 +1539,17 @@ namespace WPEFramework
         bool SystemServicesImplementation::setPowerStateConversion(std::string powerState)
         {
             Core::hresult status = Core::ERROR_GENERAL;
-            WPEFramework::Exchange::IPowerManager::PowerState pwrMgrState;
+            Thunder::Exchange::IPowerManager::PowerState pwrMgrState;
             int keyCode = 0;
 
             if (powerState == "STANDBY") {
-                pwrMgrState = WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY;
+                pwrMgrState = Thunder::Exchange::IPowerManager::POWER_STATE_STANDBY;
             } else if (powerState == "ON") {
-                pwrMgrState = WPEFramework::Exchange::IPowerManager::POWER_STATE_ON;
+                pwrMgrState = Thunder::Exchange::IPowerManager::POWER_STATE_ON;
             } else if (powerState == "DEEP_SLEEP") {
-                pwrMgrState = WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP;
+                pwrMgrState = Thunder::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP;
             } else if (powerState == "LIGHT_SLEEP") {
-                pwrMgrState = WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY;
+                pwrMgrState = Thunder::Exchange::IPowerManager::POWER_STATE_STANDBY;
             } else {
                 return false;
             }
@@ -1735,7 +1735,7 @@ namespace WPEFramework
                 }
             }
 
-            v_secure_system("/lib/rdk/xconfImageCheck.sh  >> /opt/logs/wpeframework.log");
+            v_secure_system("/lib/rdk/xconfImageCheck.sh  >> /opt/logs/thunder.log");
 
             //get xconf http code
             string httpCodeStr ="";
@@ -1947,7 +1947,7 @@ namespace WPEFramework
         
         Core::hresult SystemServicesImplementation::GetPowerStateBeforeReboot(string& state, bool& success)
         {
-            PowerState pwrStateBeforeReboot = WPEFramework::Exchange::IPowerManager::POWER_STATE_UNKNOWN;
+            PowerState pwrStateBeforeReboot = Thunder::Exchange::IPowerManager::POWER_STATE_UNKNOWN;
 
             if (m_powerStateBeforeRebootValid) {
                 state = m_powerStateBeforeReboot;
@@ -1980,7 +1980,7 @@ namespace WPEFramework
         Core::hresult SystemServicesImplementation::GetWakeupReason(string& wakeupReason, bool& success)
         {
             Core::hresult retStatus = Core::ERROR_GENERAL;
-            WakeupReason param = WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_UNKNOWN;
+            WakeupReason param = Thunder::Exchange::IPowerManager::WAKEUP_REASON_UNKNOWN;
             wakeupReason = "WAKEUP_REASON_UNKNOWN";
 
             ASSERT (_powerManagerPlugin);
@@ -2043,23 +2043,23 @@ namespace WPEFramework
             std::string reasonString = "";
             switch (reason) 
             {
-                case WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_IR: reasonString = "WAKEUP_REASON_IR"; break;
-                case WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_BLUETOOTH : reasonString = "WAKEUP_REASON_RCU_BT"; break;
-                case WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_RF4CE : reasonString = "WAKEUP_REASON_RCU_RF4CE"; break;
-                case WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_GPIO : reasonString = "WAKEUP_REASON_GPIO"; break;
-                case WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_LAN : reasonString = "WAKEUP_REASON_LAN"; break;
-                case WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_WIFI : reasonString = "WAKEUP_REASON_WLAN"; break;
-                case WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_TIMER : reasonString = "WAKEUP_REASON_TIMER"; break;
-                case WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_FRONTPANEL : reasonString = "WAKEUP_REASON_FRONT_PANEL"; break;
-                case WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_WATCHDOG : reasonString = "WAKEUP_REASON_WATCHDOG"; break;
-                case WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_SOFTWARERESET : reasonString = "WAKEUP_REASON_SOFTWARE_RESET"; break;
-                case WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_THERMALRESET : reasonString = "WAKEUP_REASON_THERMAL_RESET"; break;
-                case WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_WARMRESET : reasonString = "WAKEUP_REASON_WARM_RESET"; break;
-                case WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_COLDBOOT : reasonString = "WAKEUP_REASON_COLDBOOT"; break;
-                case WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_STRAUTHFAIL : reasonString = "WAKEUP_REASON_STR_AUTH_FAILURE"; break;
-                case WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_CEC : reasonString = "WAKEUP_REASON_CEC"; break;
-                case WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_PRESENCE : reasonString = "WAKEUP_REASON_PRESENCE"; break;
-                case WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_VOICE : reasonString = "WAKEUP_REASON_VOICE"; break;
+                case Thunder::Exchange::IPowerManager::WAKEUP_REASON_IR: reasonString = "WAKEUP_REASON_IR"; break;
+                case Thunder::Exchange::IPowerManager::WAKEUP_REASON_BLUETOOTH : reasonString = "WAKEUP_REASON_RCU_BT"; break;
+                case Thunder::Exchange::IPowerManager::WAKEUP_REASON_RF4CE : reasonString = "WAKEUP_REASON_RCU_RF4CE"; break;
+                case Thunder::Exchange::IPowerManager::WAKEUP_REASON_GPIO : reasonString = "WAKEUP_REASON_GPIO"; break;
+                case Thunder::Exchange::IPowerManager::WAKEUP_REASON_LAN : reasonString = "WAKEUP_REASON_LAN"; break;
+                case Thunder::Exchange::IPowerManager::WAKEUP_REASON_WIFI : reasonString = "WAKEUP_REASON_WLAN"; break;
+                case Thunder::Exchange::IPowerManager::WAKEUP_REASON_TIMER : reasonString = "WAKEUP_REASON_TIMER"; break;
+                case Thunder::Exchange::IPowerManager::WAKEUP_REASON_FRONTPANEL : reasonString = "WAKEUP_REASON_FRONT_PANEL"; break;
+                case Thunder::Exchange::IPowerManager::WAKEUP_REASON_WATCHDOG : reasonString = "WAKEUP_REASON_WATCHDOG"; break;
+                case Thunder::Exchange::IPowerManager::WAKEUP_REASON_SOFTWARERESET : reasonString = "WAKEUP_REASON_SOFTWARE_RESET"; break;
+                case Thunder::Exchange::IPowerManager::WAKEUP_REASON_THERMALRESET : reasonString = "WAKEUP_REASON_THERMAL_RESET"; break;
+                case Thunder::Exchange::IPowerManager::WAKEUP_REASON_WARMRESET : reasonString = "WAKEUP_REASON_WARM_RESET"; break;
+                case Thunder::Exchange::IPowerManager::WAKEUP_REASON_COLDBOOT : reasonString = "WAKEUP_REASON_COLDBOOT"; break;
+                case Thunder::Exchange::IPowerManager::WAKEUP_REASON_STRAUTHFAIL : reasonString = "WAKEUP_REASON_STR_AUTH_FAILURE"; break;
+                case Thunder::Exchange::IPowerManager::WAKEUP_REASON_CEC : reasonString = "WAKEUP_REASON_CEC"; break;
+                case Thunder::Exchange::IPowerManager::WAKEUP_REASON_PRESENCE : reasonString = "WAKEUP_REASON_PRESENCE"; break;
+                case Thunder::Exchange::IPowerManager::WAKEUP_REASON_VOICE : reasonString = "WAKEUP_REASON_VOICE"; break;
                 default: break;
             }
             return reasonString;
@@ -2367,7 +2367,7 @@ namespace WPEFramework
             if (firmwareupdateObject)
             {
                 retStatus = firmwareupdateObject->SetAutoReboot(enable, res);
-                if (WPEFramework::Core::ERROR_NONE == retStatus)
+                if (Thunder::Core::ERROR_NONE == retStatus)
                 {
                     result.success = res.success;
                 }
@@ -2748,7 +2748,7 @@ namespace WPEFramework
                     continue;
                 }
                 LOGINFO("wakeupSource=%u enabled=%s", static_cast<uint16_t>(src.wakeupSource), src.enabled ? "true" : "false");
-                configs.emplace_back(WakeupSrcConfig{static_cast<WPEFramework::Exchange::IPowerManager::WakeupSrcType>(src.wakeupSource),src.enabled});
+                configs.emplace_back(WakeupSrcConfig{static_cast<Thunder::Exchange::IPowerManager::WakeupSrcType>(src.wakeupSource),src.enabled});
             }
 
             LOGINFO("configs size=%zu", configs.size());
@@ -3111,11 +3111,11 @@ namespace WPEFramework
             std::string thermLevel;
 
             switch (newThermalLevel) {
-                case WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL:
+                case Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL:
                     {
                         switch (currentThermalLevel) {
-                            case WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH:
-                            case WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL:
+                            case Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH:
+                            case Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL:
                                 crossOver = false;
                                 thermLevel = "WARN";
                                 break;
@@ -3126,14 +3126,14 @@ namespace WPEFramework
 
                     }
                     break;
-                case WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH:
+                case Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH:
                     {
                         switch (currentThermalLevel) {
-                            case WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL:
+                            case Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL:
                                 crossOver = true;
                                 thermLevel = "WARN";
                                 break;
-                            case WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL:
+                            case Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL:
                                 crossOver = false;
                                 thermLevel = "MAX";
                                 break;
@@ -3144,11 +3144,11 @@ namespace WPEFramework
 
                     }
                     break;
-                case WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL:
+                case Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL:
                     {
                         switch (currentThermalLevel) {
-                            case WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH:
-                            case WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL:
+                            case Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH:
+                            case Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL:
                                 crossOver = true;
                                 thermLevel = "MAX";
                                 break;
@@ -4082,4 +4082,4 @@ namespace WPEFramework
         }
 
     } // namespace Plugin
-} // namespace WPEFramework
+} // namespace Thunder

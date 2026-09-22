@@ -24,7 +24,7 @@
 #include <interfaces/IAuthService.h>
 #include <interfaces/IDeviceInfo.h>
 
-namespace WPEFramework {
+namespace Thunder {
 namespace Plugin {
 
 class PlatformCapsData {
@@ -217,7 +217,7 @@ private:
     };
 
     typedef JSONRPCDirectLink Client;
-    typedef WPEFramework::Core::ProxyType<Client> ClientProxy;
+    typedef Thunder::Core::ProxyType<Client> ClientProxy;
 
   public:
     JsonRpc(PluginHost::IShell* service) : _service(service) {}
@@ -244,4 +244,4 @@ private:
 };
 
 } // namespace Plugin
-} // namespace WPEFramework
+} // namespace Thunder

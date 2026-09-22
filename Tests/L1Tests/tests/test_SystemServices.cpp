@@ -58,12 +58,12 @@
 #define TEST_LOG(x, ...) fprintf(stderr, "\033[1;32m[%s:%d](%s)<PID:%d><TID:%d>" x "\n\033[0m", __FILE__, __LINE__, __FUNCTION__, getpid(), gettid(), ##__VA_ARGS__); fflush(stderr);
 
 using ::testing::NiceMock;
-using namespace WPEFramework;
+using namespace Thunder;
 
 // Forward-declare uploadlogs.cpp internal functions so tests can call them directly
 // without needing /usr/bin/logupload to exist (which requires root in CI).
 // These are defined in the UploadLogs namespace but not exposed via the header.
-namespace WPEFramework { namespace Plugin { namespace UploadLogs {
+namespace Thunder { namespace Plugin { namespace UploadLogs {
     bool checkmTlsLogUploadFlag();
     bool getDCMconfigDetails(std::string& upload_protocol, std::string& httplink, std::string& uploadCheck);
     std::int32_t getUploadLogParameters(std::string& tftp_server, std::string& upload_protocol, std::string& upload_httplink);
@@ -2579,7 +2579,7 @@ TEST_F(SystemServicesTest, GetWakeupReason_IRWakeup)
 {
     EXPECT_CALL(PowerManagerMock::Mock(), GetLastWakeupReason(::testing::_))
         .WillOnce(::testing::DoAll(
-            ::testing::SetArgReferee<0>(static_cast<WakeupReason>(WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_IR)),
+            ::testing::SetArgReferee<0>(static_cast<WakeupReason>(Thunder::Exchange::IPowerManager::WAKEUP_REASON_IR)),
             ::testing::Return(Core::ERROR_NONE)));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getWakeupReason"), _T("{}"), response));
@@ -2601,7 +2601,7 @@ TEST_F(SystemServicesTest, GetWakeupReason_PowerKeyWakeup)
 {
     EXPECT_CALL(PowerManagerMock::Mock(), GetLastWakeupReason(::testing::_))
         .WillOnce(::testing::DoAll(
-            ::testing::SetArgReferee<0>(static_cast<WakeupReason>(WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_FRONTPANEL)),
+            ::testing::SetArgReferee<0>(static_cast<WakeupReason>(Thunder::Exchange::IPowerManager::WAKEUP_REASON_FRONTPANEL)),
             ::testing::Return(Core::ERROR_NONE)));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getWakeupReason"), _T("{}"), response));
@@ -2623,7 +2623,7 @@ TEST_F(SystemServicesTest, GetWakeupReason_CECWakeup)
 {
     EXPECT_CALL(PowerManagerMock::Mock(), GetLastWakeupReason(::testing::_))
         .WillOnce(::testing::DoAll(
-            ::testing::SetArgReferee<0>(static_cast<WakeupReason>(WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_CEC)),
+            ::testing::SetArgReferee<0>(static_cast<WakeupReason>(Thunder::Exchange::IPowerManager::WAKEUP_REASON_CEC)),
             ::testing::Return(Core::ERROR_NONE)));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getWakeupReason"), _T("{}"), response));
@@ -2645,7 +2645,7 @@ TEST_F(SystemServicesTest, GetWakeupReason_TimerWakeup)
 {
     EXPECT_CALL(PowerManagerMock::Mock(), GetLastWakeupReason(::testing::_))
         .WillOnce(::testing::DoAll(
-            ::testing::SetArgReferee<0>(static_cast<WakeupReason>(WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_TIMER)),
+            ::testing::SetArgReferee<0>(static_cast<WakeupReason>(Thunder::Exchange::IPowerManager::WAKEUP_REASON_TIMER)),
             ::testing::Return(Core::ERROR_NONE)));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getWakeupReason"), _T("{}"), response));
@@ -3047,7 +3047,7 @@ TEST_F(SystemServicesTest, GetWakeupReason_Unknown)
     // there's no case for UNKNOWN in the switch statement. This is the actual behavior.
     EXPECT_CALL(PowerManagerMock::Mock(), GetLastWakeupReason(::testing::_))
         .WillOnce(::testing::DoAll(
-            ::testing::SetArgReferee<0>(static_cast<WakeupReason>(WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_UNKNOWN)),
+            ::testing::SetArgReferee<0>(static_cast<WakeupReason>(Thunder::Exchange::IPowerManager::WAKEUP_REASON_UNKNOWN)),
             ::testing::Return(Core::ERROR_NONE)));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getWakeupReason"), _T("{}"), response));
@@ -3074,7 +3074,7 @@ TEST_F(SystemServicesTest, GetWakeupReason_LAN)
 {
     EXPECT_CALL(PowerManagerMock::Mock(), GetLastWakeupReason(::testing::_))
         .WillOnce(::testing::DoAll(
-            ::testing::SetArgReferee<0>(static_cast<WakeupReason>(WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_LAN)),
+            ::testing::SetArgReferee<0>(static_cast<WakeupReason>(Thunder::Exchange::IPowerManager::WAKEUP_REASON_LAN)),
             ::testing::Return(Core::ERROR_NONE)));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getWakeupReason"), _T("{}"), response));
@@ -3785,7 +3785,7 @@ TEST_F(SystemServicesTest, GetWakeupReason_DefaultReason)
     // Configure mock to return a valid wakeup reason (GPIO)
     EXPECT_CALL(PowerManagerMock::Mock(), GetLastWakeupReason(::testing::_))
         .WillOnce(::testing::DoAll(
-            ::testing::SetArgReferee<0>(static_cast<WakeupReason>(WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_GPIO)),
+            ::testing::SetArgReferee<0>(static_cast<WakeupReason>(Thunder::Exchange::IPowerManager::WAKEUP_REASON_GPIO)),
             ::testing::Return(Core::ERROR_NONE)));
     
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getWakeupReason"), _T("{}"), response));
@@ -4993,7 +4993,7 @@ TEST_F(SystemServicesTest, GetPowerStateBeforeReboot_CachedAfterFirstCall)
     EXPECT_CALL(PowerManagerMock::Mock(), GetPowerStateBeforeReboot(::testing::_))
         .WillOnce(::testing::DoAll(
             ::testing::SetArgReferee<0>(static_cast<Exchange::IPowerManager::PowerState>(
-                WPEFramework::Exchange::IPowerManager::POWER_STATE_ON)),
+                Thunder::Exchange::IPowerManager::POWER_STATE_ON)),
             ::testing::Return(Core::ERROR_NONE)));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getPowerStateBeforeReboot"), _T("{}"), response));
@@ -6142,7 +6142,7 @@ TEST_F(SystemServicesTest, GetPowerState_PMReturnsStandby)
     EXPECT_CALL(PowerManagerMock::Mock(), GetPowerState(::testing::_, ::testing::_))
         .WillOnce(::testing::DoAll(
             ::testing::SetArgReferee<0>(static_cast<Exchange::IPowerManager::PowerState>(
-                WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY)),
+                Thunder::Exchange::IPowerManager::POWER_STATE_STANDBY)),
             ::testing::Return(Core::ERROR_NONE)));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getPowerState"), _T("{}"), response));
@@ -6982,7 +6982,7 @@ TEST_F(SystemServicesTest, GetPowerStateBeforeReboot_SecondCall_UsesCachedValue)
     EXPECT_CALL(PowerManagerMock::Mock(), GetPowerStateBeforeReboot(::testing::_))
         .Times(1)   // PM called exactly once; second call uses m_powerStateBeforeRebootValid
         .WillOnce(::testing::DoAll(
-            ::testing::SetArgReferee<0>(WPEFramework::Exchange::IPowerManager::POWER_STATE_ON),
+            ::testing::SetArgReferee<0>(Thunder::Exchange::IPowerManager::POWER_STATE_ON),
             ::testing::Return(Core::ERROR_NONE)));
 
     handler.Invoke(connection, _T("getPowerStateBeforeReboot"), _T("{}"), response);
@@ -7130,7 +7130,7 @@ TEST_F(SystemServicesTest, GetWakeupReason_IRReason_Success)
 {
     EXPECT_CALL(PowerManagerMock::Mock(), GetLastWakeupReason(::testing::_))
         .WillOnce(::testing::DoAll(
-            ::testing::SetArgReferee<0>(WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_IR),
+            ::testing::SetArgReferee<0>(Thunder::Exchange::IPowerManager::WAKEUP_REASON_IR),
             ::testing::Return(Core::ERROR_NONE)));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getWakeupReason"), _T("{}"), response));
@@ -7152,7 +7152,7 @@ TEST_F(SystemServicesTest, GetWakeupReason_TimerReason_Success)
 {
     EXPECT_CALL(PowerManagerMock::Mock(), GetLastWakeupReason(::testing::_))
         .WillOnce(::testing::DoAll(
-            ::testing::SetArgReferee<0>(WPEFramework::Exchange::IPowerManager::WAKEUP_REASON_TIMER),
+            ::testing::SetArgReferee<0>(Thunder::Exchange::IPowerManager::WAKEUP_REASON_TIMER),
             ::testing::Return(Core::ERROR_NONE)));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getWakeupReason"), _T("{}"), response));
@@ -7814,8 +7814,8 @@ TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_HighToNormal_Emi
     ASSERT_NE(nullptr, m_pmThermalNotif) << "IThermalModeChangedNotification not registered";
     // HIGH→NORMAL: crossOver=false, "WARN"
     m_pmThermalNotif->OnThermalModeChanged(
-        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH,
-        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL,
+        Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH,
+        Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL,
         50.0f);
 
     TEST_LOG("CThermalMonitor_OnThermalModeChanged_HighToNormal - PASSED");
@@ -7826,8 +7826,8 @@ TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_CriticalToNormal
     ASSERT_NE(nullptr, m_pmThermalNotif) << "IThermalModeChangedNotification not registered";
     // CRITICAL→NORMAL: crossOver=false, "WARN"
     m_pmThermalNotif->OnThermalModeChanged(
-        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL,
-        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL,
+        Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL,
+        Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL,
         48.0f);
 
     TEST_LOG("CThermalMonitor_OnThermalModeChanged_CriticalToNormal - PASSED");
@@ -7838,8 +7838,8 @@ TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_NormalToHigh_Emi
     ASSERT_NE(nullptr, m_pmThermalNotif) << "IThermalModeChangedNotification not registered";
     // NORMAL→HIGH: crossOver=true, "WARN"
     m_pmThermalNotif->OnThermalModeChanged(
-        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL,
-        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH,
+        Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL,
+        Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH,
         88.0f);
 
     TEST_LOG("CThermalMonitor_OnThermalModeChanged_NormalToHigh - PASSED");
@@ -7850,8 +7850,8 @@ TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_CriticalToHigh_E
     ASSERT_NE(nullptr, m_pmThermalNotif) << "IThermalModeChangedNotification not registered";
     // CRITICAL→HIGH: crossOver=false, "MAX"
     m_pmThermalNotif->OnThermalModeChanged(
-        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL,
-        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH,
+        Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL,
+        Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH,
         105.0f);
 
     TEST_LOG("CThermalMonitor_OnThermalModeChanged_CriticalToHigh - PASSED");
@@ -7862,8 +7862,8 @@ TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_HighToCritical_E
     ASSERT_NE(nullptr, m_pmThermalNotif) << "IThermalModeChangedNotification not registered";
     // HIGH→CRITICAL: crossOver=true, "MAX"
     m_pmThermalNotif->OnThermalModeChanged(
-        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH,
-        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL,
+        Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH,
+        Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL,
         115.0f);
 
     TEST_LOG("CThermalMonitor_OnThermalModeChanged_HighToCritical - PASSED");
@@ -7874,8 +7874,8 @@ TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_NormalToCritical
     ASSERT_NE(nullptr, m_pmThermalNotif) << "IThermalModeChangedNotification not registered";
     // NORMAL→CRITICAL: crossOver=true, "MAX"
     m_pmThermalNotif->OnThermalModeChanged(
-        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL,
-        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL,
+        Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL,
+        Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL,
         120.0f);
 
     TEST_LOG("CThermalMonitor_OnThermalModeChanged_NormalToCritical - PASSED");
@@ -7886,8 +7886,8 @@ TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_NormalToNormal_I
     ASSERT_NE(nullptr, m_pmThermalNotif) << "IThermalModeChangedNotification not registered";
     // NORMAL→NORMAL: default→default in inner switch, validparams=false
     m_pmThermalNotif->OnThermalModeChanged(
-        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL,
-        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL,
+        Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL,
+        Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_NORMAL,
         45.0f);
 
     TEST_LOG("CThermalMonitor_OnThermalModeChanged_NormalToNormal_Invalid - PASSED");
@@ -7898,8 +7898,8 @@ TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_HighToHigh_Inval
     ASSERT_NE(nullptr, m_pmThermalNotif) << "IThermalModeChangedNotification not registered";
     // HIGH→HIGH: default in inner switch, validparams=false
     m_pmThermalNotif->OnThermalModeChanged(
-        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH,
-        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH,
+        Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH,
+        Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_HIGH,
         90.0f);
 
     TEST_LOG("CThermalMonitor_OnThermalModeChanged_HighToHigh_Invalid - PASSED");
@@ -7910,8 +7910,8 @@ TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_CriticalToCritic
     ASSERT_NE(nullptr, m_pmThermalNotif) << "IThermalModeChangedNotification not registered";
     // CRITICAL→CRITICAL: default in inner switch, validparams=false
     m_pmThermalNotif->OnThermalModeChanged(
-        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL,
-        WPEFramework::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL,
+        Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL,
+        Thunder::Exchange::IPowerManager::THERMAL_TEMPERATURE_CRITICAL,
         118.0f);
 
     TEST_LOG("CThermalMonitor_OnThermalModeChanged_CriticalToCritical_Invalid - PASSED");
@@ -7924,7 +7924,7 @@ TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_CriticalToCritic
 TEST_F(SystemServicesTest, UploadLogs_CheckMtlsFlag_AlwaysReturnsTrue)
 {
     // Covers: uploadlogs.cpp lines 43-46 (the entire function)
-    bool result = WPEFramework::Plugin::UploadLogs::checkmTlsLogUploadFlag();
+    bool result = Thunder::Plugin::UploadLogs::checkmTlsLogUploadFlag();
     EXPECT_TRUE(result) << "checkmTlsLogUploadFlag must always return true";
     TEST_LOG("UploadLogs_CheckMtlsFlag_AlwaysReturnsTrue - PASSED");
 }
@@ -7936,7 +7936,7 @@ TEST_F(SystemServicesTest, UploadLogs_GetDCMconfigDetails_FileAbsent_ReturnsFals
 {
     removeFile("/tmp/DCMSettings.conf");
     std::string protocol, httplink, uploadCheck;
-    bool result = WPEFramework::Plugin::UploadLogs::getDCMconfigDetails(protocol, httplink, uploadCheck);
+    bool result = Thunder::Plugin::UploadLogs::getDCMconfigDetails(protocol, httplink, uploadCheck);
     EXPECT_FALSE(result) << "Must return false when /tmp/DCMSettings.conf is absent";
     EXPECT_TRUE(protocol.empty() && httplink.empty() && uploadCheck.empty());
     TEST_LOG("UploadLogs_GetDCMconfigDetails_FileAbsent - PASSED");
@@ -7949,7 +7949,7 @@ TEST_F(SystemServicesTest, UploadLogs_GetDCMconfigDetails_EmptyFile_ReturnsFalse
 {
     std::ofstream("/tmp/DCMSettings.conf").close(); // create empty file
     std::string protocol, httplink, uploadCheck;
-    bool result = WPEFramework::Plugin::UploadLogs::getDCMconfigDetails(protocol, httplink, uploadCheck);
+    bool result = Thunder::Plugin::UploadLogs::getDCMconfigDetails(protocol, httplink, uploadCheck);
     EXPECT_FALSE(result) << "Must return false when /tmp/DCMSettings.conf is empty";
     removeFile("/tmp/DCMSettings.conf");
     TEST_LOG("UploadLogs_GetDCMconfigDetails_EmptyFile - PASSED");
@@ -7962,7 +7962,7 @@ TEST_F(SystemServicesTest, UploadLogs_GetDCMconfigDetails_NoKeyMatch_ReturnsTrue
 {
     createFile("/tmp/DCMSettings.conf", "RANDOM_INVALID_DATA_NO_MATCHING_KEYS");
     std::string protocol, httplink, uploadCheck;
-    bool result = WPEFramework::Plugin::UploadLogs::getDCMconfigDetails(protocol, httplink, uploadCheck);
+    bool result = Thunder::Plugin::UploadLogs::getDCMconfigDetails(protocol, httplink, uploadCheck);
     EXPECT_TRUE(result) << "Must return true when file has content but no keys match";
     EXPECT_TRUE(protocol.empty()) << "Protocol should be empty when no match";
     EXPECT_TRUE(httplink.empty()) << "httplink should be empty when no match";
@@ -7980,7 +7980,7 @@ TEST_F(SystemServicesTest, UploadLogs_GetDCMconfigDetails_AllKeysMatch_FieldsPop
         "LogUploadSettings:UploadRepository:URL=http://example.com/cgi-bin/logs.sh\n"
         "LogUploadSettings:UploadOnReboot=true");
     std::string protocol, httplink, uploadCheck;
-    bool result = WPEFramework::Plugin::UploadLogs::getDCMconfigDetails(protocol, httplink, uploadCheck);
+    bool result = Thunder::Plugin::UploadLogs::getDCMconfigDetails(protocol, httplink, uploadCheck);
     EXPECT_TRUE(result);
     EXPECT_EQ("tftp", protocol);
     EXPECT_EQ("http://example.com/cgi-bin/logs.sh", httplink);
@@ -7996,7 +7996,7 @@ TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_NoBuildType_ReturnsENOK
 {
     std::ofstream("/etc/device.properties").close(); // empty — no BUILD_TYPE
     std::string tftp, protocol, httplink;
-    std::int32_t result = WPEFramework::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
+    std::int32_t result = Thunder::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
     EXPECT_EQ(-1, result) << "Must return E_NOK when BUILD_TYPE missing";
     std::ofstream("/etc/device.properties").close();
     TEST_LOG("UploadLogs_GetUploadLogParams_NoBuildType - PASSED");
@@ -8010,7 +8010,7 @@ TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_ProdNoLogServer_Returns
     createFile("/etc/device.properties", "BUILD_TYPE=prod");
     std::ofstream("/etc/dcm.properties").close(); // empty
     std::string tftp, protocol, httplink;
-    std::int32_t result = WPEFramework::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
+    std::int32_t result = Thunder::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
     EXPECT_EQ(-1, result) << "Must return E_NOK when LOG_SERVER missing from ETC_DCM";
     std::ofstream("/etc/device.properties").close();
     std::ofstream("/etc/dcm.properties").close();
@@ -8026,7 +8026,7 @@ TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_DevOptDCMPath_ReturnsEN
     createFile("/opt/dcm.properties", "LOG_SERVER=logs.example.com");
     removeFile("/tmp/DCMSettings.conf"); // getDCMconfigDetails → false → E_NOK
     std::string tftp, protocol, httplink;
-    std::int32_t result = WPEFramework::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
+    std::int32_t result = Thunder::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
     EXPECT_EQ(-1, result) << "Must return E_NOK when DCMSettings absent";
     std::ofstream("/etc/device.properties").close();
     removeFile("/opt/dcm.properties");
@@ -8042,7 +8042,7 @@ TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_DevOptDCMAbsent_EtcFall
     removeFile("/opt/dcm.properties");
     std::ofstream("/etc/dcm.properties").close(); // empty → LOG_SERVER absent → E_NOK
     std::string tftp, protocol, httplink;
-    std::int32_t result = WPEFramework::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
+    std::int32_t result = Thunder::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
     EXPECT_EQ(-1, result);
     std::ofstream("/etc/device.properties").close();
     std::ofstream("/etc/dcm.properties").close();
@@ -8061,7 +8061,7 @@ TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_SuccessPath_RegexReplac
         "LogUploadSettings:UploadRepository:URL=http://example.com/cgi-bin/logs.sh\n"
         "LogUploadSettings:UploadOnReboot=true");
     std::string tftp, protocol, httplink;
-    std::int32_t result = WPEFramework::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
+    std::int32_t result = Thunder::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
     EXPECT_EQ(0, result) << "Must return E_OK on full success path";
     EXPECT_EQ("logs.example.com", tftp);
     EXPECT_EQ("tftp", protocol);
@@ -8085,7 +8085,7 @@ TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_ForceMTLS_True_SkipsRep
         "LogUploadSettings:UploadRepository:URL=http://example.com/cgi-bin/logs.sh\n"
         "LogUploadSettings:UploadOnReboot=true");
     std::string tftp, protocol, httplink;
-    std::int32_t result = WPEFramework::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
+    std::int32_t result = Thunder::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
     EXPECT_EQ(0, result);
     // force_mtls=="true" → inner if is false → regex_replace NOT called, URL unchanged
     EXPECT_EQ(std::string::npos, httplink.find("secure/cgi-bin")) << "URL must NOT be replaced when FORCE_MTLS=true: " << httplink;
@@ -8107,7 +8107,7 @@ TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_ForceMTLS_False_RegexAp
         "LogUploadSettings:UploadRepository:URL=http://example.com/cgi-bin/upload.sh\n"
         "LogUploadSettings:UploadOnReboot=false");
     std::string tftp, protocol, httplink;
-    std::int32_t result = WPEFramework::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
+    std::int32_t result = Thunder::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
     EXPECT_EQ(0, result);
     // force_mtls="false" → "true" != "false" is true → regex_replace applied
     EXPECT_NE(std::string::npos, httplink.find("secure/cgi-bin")) << "URL should have secure/cgi-bin: " << httplink;
@@ -8129,7 +8129,7 @@ TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_URLNoCgiBin_ReplaceNoEf
         "LogUploadSettings:UploadRepository:URL=http://example.com/logs.sh\n"
         "LogUploadSettings:UploadOnReboot=false");
     std::string tftp, protocol, httplink;
-    std::int32_t result = WPEFramework::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
+    std::int32_t result = Thunder::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
     EXPECT_EQ(0, result);
     EXPECT_EQ("http://example.com/logs.sh", httplink) << "URL without cgi-bin must remain unchanged: " << httplink;
     std::ofstream("/etc/device.properties").close();
@@ -8615,68 +8615,68 @@ TEST_F(SystemServicesTest, Helper_ParseConfigFile_FileAbsent)
 }
 
 // ------------------------------------------------------------------
-// WPEFramework::Plugin::ltrim, rtrim, trim
+// Thunder::Plugin::ltrim, rtrim, trim
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, Helper_Ltrim_LeadingWhitespace_Stripped)
 {
-    EXPECT_EQ("hello", WPEFramework::Plugin::ltrim("   hello"));
-    EXPECT_EQ("hello   ", WPEFramework::Plugin::ltrim("hello   "));
-    EXPECT_EQ("", WPEFramework::Plugin::ltrim("   "));
+    EXPECT_EQ("hello", Thunder::Plugin::ltrim("   hello"));
+    EXPECT_EQ("hello   ", Thunder::Plugin::ltrim("hello   "));
+    EXPECT_EQ("", Thunder::Plugin::ltrim("   "));
 }
 TEST_F(SystemServicesTest, Helper_Rtrim_TrailingWhitespace_Stripped)
 {
-    EXPECT_EQ("   hello", WPEFramework::Plugin::rtrim("   hello   "));
-    EXPECT_EQ("", WPEFramework::Plugin::rtrim("   "));
+    EXPECT_EQ("   hello", Thunder::Plugin::rtrim("   hello   "));
+    EXPECT_EQ("", Thunder::Plugin::rtrim("   "));
 }
 TEST_F(SystemServicesTest, Helper_Trim_BothEndsStripped)
 {
-    EXPECT_EQ("hello world", WPEFramework::Plugin::trim("  hello world  "));
-    EXPECT_EQ("a", WPEFramework::Plugin::trim("   a   "));
-    EXPECT_EQ("", WPEFramework::Plugin::trim("   "));
+    EXPECT_EQ("hello world", Thunder::Plugin::trim("  hello world  "));
+    EXPECT_EQ("a", Thunder::Plugin::trim("   a   "));
+    EXPECT_EQ("", Thunder::Plugin::trim("   "));
 }
 
 // ------------------------------------------------------------------
-// WPEFramework::Plugin::convertCase — converts to uppercase
+// Thunder::Plugin::convertCase — converts to uppercase
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, Helper_ConvertCase_Lowercase_ReturnsUpper)
 {
-    EXPECT_EQ("HELLO", WPEFramework::Plugin::convertCase("hello"));
-    EXPECT_EQ("FIRMWARE", WPEFramework::Plugin::convertCase("firmware"));
+    EXPECT_EQ("HELLO", Thunder::Plugin::convertCase("hello"));
+    EXPECT_EQ("FIRMWARE", Thunder::Plugin::convertCase("firmware"));
 }
 TEST_F(SystemServicesTest, Helper_ConvertCase_AlreadyUpper_Unchanged)
 {
-    EXPECT_EQ("ABC123", WPEFramework::Plugin::convertCase("ABC123"));
+    EXPECT_EQ("ABC123", Thunder::Plugin::convertCase("ABC123"));
 }
 
 // ------------------------------------------------------------------
-// WPEFramework::Plugin::convert — substring found vs not found
+// Thunder::Plugin::convert — substring found vs not found
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, Helper_Convert_SubstringFound_ReturnsTrue)
 {
-    EXPECT_TRUE(WPEFramework::Plugin::convert("FIRMWARE", "my_FIRMWARE_update"));
-    EXPECT_TRUE(WPEFramework::Plugin::convert("ABC", "XABCX"));
+    EXPECT_TRUE(Thunder::Plugin::convert("FIRMWARE", "my_FIRMWARE_update"));
+    EXPECT_TRUE(Thunder::Plugin::convert("ABC", "XABCX"));
 }
 TEST_F(SystemServicesTest, Helper_Convert_SubstringNotFound_ReturnsFalse)
 {
-    EXPECT_FALSE(WPEFramework::Plugin::convert("XYZ", "hello_world"));
+    EXPECT_FALSE(Thunder::Plugin::convert("XYZ", "hello_world"));
 }
 
 // ------------------------------------------------------------------
-// WPEFramework::Plugin::caseInsensitive — model / model_number / neither
+// Thunder::Plugin::caseInsensitive — model / model_number / neither
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, Helper_CaseInsensitive_ModelMatch)
 {
-    std::string result = WPEFramework::Plugin::caseInsensitive("Model=TestDevice\n");
+    std::string result = Thunder::Plugin::caseInsensitive("Model=TestDevice\n");
     EXPECT_EQ("TestDevice", result);
 }
 TEST_F(SystemServicesTest, Helper_CaseInsensitive_ModelNumberMatch)
 {
-    std::string result = WPEFramework::Plugin::caseInsensitive("model_number=Device123\n");
+    std::string result = Thunder::Plugin::caseInsensitive("model_number=Device123\n");
     EXPECT_EQ("Device123", result);
 }
 TEST_F(SystemServicesTest, Helper_CaseInsensitive_NoMatch_ReturnsERROR)
 {
-    std::string result = WPEFramework::Plugin::caseInsensitive("random_key=data\n");
+    std::string result = Thunder::Plugin::caseInsensitive("random_key=data\n");
     EXPECT_EQ("ERROR", result);
 }
 
@@ -10542,7 +10542,7 @@ TEST_F(SystemServicesTest, GetPowerStateBeforeReboot_ReturnsSTANDBY_CoversPowerM
     // POWER_STATE_STANDBY → powerModeEnumToString returns "LIGHT_SLEEP" (line 489)
     EXPECT_CALL(PowerManagerMock::Mock(), GetPowerStateBeforeReboot(::testing::_))
         .WillOnce(::testing::DoAll(
-            ::testing::SetArgReferee<0>(WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY),
+            ::testing::SetArgReferee<0>(Thunder::Exchange::IPowerManager::POWER_STATE_STANDBY),
             ::testing::Return(Core::ERROR_NONE)));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getPowerStateBeforeReboot"),
@@ -10562,7 +10562,7 @@ TEST_F(SystemServicesTest, GetPowerStateBeforeReboot_ReturnsLIGHTSLEEP_CoversPow
 {
     EXPECT_CALL(PowerManagerMock::Mock(), GetPowerStateBeforeReboot(::testing::_))
         .WillOnce(::testing::DoAll(
-            ::testing::SetArgReferee<0>(WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_LIGHT_SLEEP),
+            ::testing::SetArgReferee<0>(Thunder::Exchange::IPowerManager::POWER_STATE_STANDBY_LIGHT_SLEEP),
             ::testing::Return(Core::ERROR_NONE)));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getPowerStateBeforeReboot"),
@@ -10577,7 +10577,7 @@ TEST_F(SystemServicesTest, GetPowerStateBeforeReboot_ReturnsDEEPSLEEP_CoversPowe
 {
     EXPECT_CALL(PowerManagerMock::Mock(), GetPowerStateBeforeReboot(::testing::_))
         .WillOnce(::testing::DoAll(
-            ::testing::SetArgReferee<0>(WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP),
+            ::testing::SetArgReferee<0>(Thunder::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP),
             ::testing::Return(Core::ERROR_NONE)));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getPowerStateBeforeReboot"),
@@ -10592,7 +10592,7 @@ TEST_F(SystemServicesTest, GetPowerStateBeforeReboot_ReturnsOFF_CoversPowerModeE
 {
     EXPECT_CALL(PowerManagerMock::Mock(), GetPowerStateBeforeReboot(::testing::_))
         .WillOnce(::testing::DoAll(
-            ::testing::SetArgReferee<0>(WPEFramework::Exchange::IPowerManager::POWER_STATE_OFF),
+            ::testing::SetArgReferee<0>(Thunder::Exchange::IPowerManager::POWER_STATE_OFF),
             ::testing::Return(Core::ERROR_NONE)));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getPowerStateBeforeReboot"),
@@ -10851,8 +10851,8 @@ TEST_F(SystemServicesTest, GetPowerState_ReturnsSTANDBY_LIGHT_CoversPowerModeEnu
 {
     EXPECT_CALL(PowerManagerMock::Mock(), GetPowerState(::testing::_, ::testing::_))
         .WillOnce(::testing::DoAll(
-            ::testing::SetArgReferee<0>(WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_LIGHT_SLEEP),
-            ::testing::SetArgReferee<1>(WPEFramework::Exchange::IPowerManager::POWER_STATE_ON),
+            ::testing::SetArgReferee<0>(Thunder::Exchange::IPowerManager::POWER_STATE_STANDBY_LIGHT_SLEEP),
+            ::testing::SetArgReferee<1>(Thunder::Exchange::IPowerManager::POWER_STATE_ON),
             ::testing::Return(Core::ERROR_NONE)));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getPowerState"),
@@ -11567,18 +11567,18 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_InvalidValueInFile_CoversReadParamsE
 // MigrationMock: minimal IMigration implementation for coverage tests.
 // adding mock
 // =============================================================================
-class MigrationMock : public WPEFramework::Exchange::IMigration {
+class MigrationMock : public Thunder::Exchange::IMigration {
 public:
     MigrationMock() = default;
     virtual ~MigrationMock() = default;
 
-    MOCK_METHOD(WPEFramework::Core::hresult, GetBootTypeInfo,
-                (WPEFramework::Exchange::IMigration::BootTypeInfo& bootTypeInfo), (override));
-    MOCK_METHOD(WPEFramework::Core::hresult, SetMigrationStatus,
-                (const WPEFramework::Exchange::IMigration::MigrationStatus status,
-                 WPEFramework::Exchange::IMigration::MigrationResult& migrationResult), (override));
-    MOCK_METHOD(WPEFramework::Core::hresult, GetMigrationStatus,
-                (WPEFramework::Exchange::IMigration::MigrationStatusInfo& migrationStatusInfo), (override));
+    MOCK_METHOD(Thunder::Core::hresult, GetBootTypeInfo,
+                (Thunder::Exchange::IMigration::BootTypeInfo& bootTypeInfo), (override));
+    MOCK_METHOD(Thunder::Core::hresult, SetMigrationStatus,
+                (const Thunder::Exchange::IMigration::MigrationStatus status,
+                 Thunder::Exchange::IMigration::MigrationResult& migrationResult), (override));
+    MOCK_METHOD(Thunder::Core::hresult, GetMigrationStatus,
+                (Thunder::Exchange::IMigration::MigrationStatusInfo& migrationStatusInfo), (override));
     MOCK_METHOD(uint32_t, AddRef, (), (const, override));
     MOCK_METHOD(uint32_t, Release, (), (const, override));
     MOCK_METHOD(void*, QueryInterface, (const uint32_t interfacenumber), (override));
@@ -11768,8 +11768,8 @@ TEST_F(SystemServicesTest, GetMigrationStatus_WithMigrationPlugin_MigrationCompl
     ON_CALL(migrationMock, Release()).WillByDefault(::testing::Return(1));
     ON_CALL(migrationMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
-    WPEFramework::Exchange::IMigration::MigrationStatusInfo statusInfo;
-    statusInfo.migrationStatus = WPEFramework::Exchange::IMigration::MIGRATION_STATUS_MIGRATION_COMPLETED;
+    Thunder::Exchange::IMigration::MigrationStatusInfo statusInfo;
+    statusInfo.migrationStatus = Thunder::Exchange::IMigration::MIGRATION_STATUS_MIGRATION_COMPLETED;
     ON_CALL(migrationMock, GetMigrationStatus(::testing::_))
         .WillByDefault(::testing::DoAll(
             ::testing::SetArgReferee<0>(statusInfo),
@@ -11786,14 +11786,14 @@ TEST_F(SystemServicesTest, GetMigrationStatus_WithMigrationPlugin_MigrationCompl
 TEST_F(SystemServicesTest, GetMigrationStatus_AllStatusValues_CoversAllMapEntries)
 {
     // Test each status value to cover all entries in statusToString map (lines 1381-1388)
-    const std::vector<WPEFramework::Exchange::IMigration::MigrationStatus> statuses = {
-        WPEFramework::Exchange::IMigration::MIGRATION_STATUS_NOT_STARTED,
-        WPEFramework::Exchange::IMigration::MIGRATION_STATUS_NOT_NEEDED,
-        WPEFramework::Exchange::IMigration::MIGRATION_STATUS_STARTED,
-        WPEFramework::Exchange::IMigration::MIGRATION_STATUS_PRIORITY_SETTINGS_MIGRATED,
-        WPEFramework::Exchange::IMigration::MIGRATION_STATUS_DEVICE_SETTINGS_MIGRATED,
-        WPEFramework::Exchange::IMigration::MIGRATION_STATUS_CLOUD_SETTINGS_MIGRATED,
-        WPEFramework::Exchange::IMigration::MIGRATION_STATUS_APP_DATA_MIGRATED,
+    const std::vector<Thunder::Exchange::IMigration::MigrationStatus> statuses = {
+        Thunder::Exchange::IMigration::MIGRATION_STATUS_NOT_STARTED,
+        Thunder::Exchange::IMigration::MIGRATION_STATUS_NOT_NEEDED,
+        Thunder::Exchange::IMigration::MIGRATION_STATUS_STARTED,
+        Thunder::Exchange::IMigration::MIGRATION_STATUS_PRIORITY_SETTINGS_MIGRATED,
+        Thunder::Exchange::IMigration::MIGRATION_STATUS_DEVICE_SETTINGS_MIGRATED,
+        Thunder::Exchange::IMigration::MIGRATION_STATUS_CLOUD_SETTINGS_MIGRATED,
+        Thunder::Exchange::IMigration::MIGRATION_STATUS_APP_DATA_MIGRATED,
     };
 
     for (const auto& status : statuses) {
@@ -11805,7 +11805,7 @@ TEST_F(SystemServicesTest, GetMigrationStatus_AllStatusValues_CoversAllMapEntrie
         ON_CALL(migrationMock, Release()).WillByDefault(::testing::Return(1));
         ON_CALL(migrationMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
-        WPEFramework::Exchange::IMigration::MigrationStatusInfo statusInfo;
+        Thunder::Exchange::IMigration::MigrationStatusInfo statusInfo;
         statusInfo.migrationStatus = status;
         ON_CALL(migrationMock, GetMigrationStatus(::testing::_))
             .WillByDefault(::testing::DoAll(
@@ -11833,8 +11833,8 @@ TEST_F(SystemServicesTest, GetBootTypeInfo_WithMigrationPlugin_BootMigration)
     ON_CALL(migrationMock, Release()).WillByDefault(::testing::Return(1));
     ON_CALL(migrationMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
-    WPEFramework::Exchange::IMigration::BootTypeInfo bootTypeInfo;
-    bootTypeInfo.bootType = WPEFramework::Exchange::IMigration::BOOT_TYPE_MIGRATION;
+    Thunder::Exchange::IMigration::BootTypeInfo bootTypeInfo;
+    bootTypeInfo.bootType = Thunder::Exchange::IMigration::BOOT_TYPE_MIGRATION;
     ON_CALL(migrationMock, GetBootTypeInfo(::testing::_))
         .WillByDefault(::testing::DoAll(
             ::testing::SetArgReferee<0>(bootTypeInfo),
@@ -11850,11 +11850,11 @@ TEST_F(SystemServicesTest, GetBootTypeInfo_WithMigrationPlugin_BootMigration)
 
 TEST_F(SystemServicesTest, GetBootTypeInfo_AllBootTypes_CoversAllMapEntries)
 {
-    const std::vector<WPEFramework::Exchange::IMigration::BootType> bootTypes = {
-        WPEFramework::Exchange::IMigration::BOOT_TYPE_INIT,
-        WPEFramework::Exchange::IMigration::BOOT_TYPE_NORMAL,
-        WPEFramework::Exchange::IMigration::BOOT_TYPE_MIGRATION,
-        WPEFramework::Exchange::IMigration::BOOT_TYPE_UPDATE,
+    const std::vector<Thunder::Exchange::IMigration::BootType> bootTypes = {
+        Thunder::Exchange::IMigration::BOOT_TYPE_INIT,
+        Thunder::Exchange::IMigration::BOOT_TYPE_NORMAL,
+        Thunder::Exchange::IMigration::BOOT_TYPE_MIGRATION,
+        Thunder::Exchange::IMigration::BOOT_TYPE_UPDATE,
     };
 
     for (const auto& bootType : bootTypes) {
@@ -11866,7 +11866,7 @@ TEST_F(SystemServicesTest, GetBootTypeInfo_AllBootTypes_CoversAllMapEntries)
         ON_CALL(migrationMock, Release()).WillByDefault(::testing::Return(1));
         ON_CALL(migrationMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
-        WPEFramework::Exchange::IMigration::BootTypeInfo info;
+        Thunder::Exchange::IMigration::BootTypeInfo info;
         info.bootType = bootType;
         ON_CALL(migrationMock, GetBootTypeInfo(::testing::_))
             .WillByDefault(::testing::DoAll(
@@ -12306,7 +12306,7 @@ TEST_F(SystemServicesTest, SetMigrationStatus_WithMigrationPlugin_MigrationCompl
     ON_CALL(migrationMock, Release()).WillByDefault(::testing::Return(1));
     ON_CALL(migrationMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
 
-    WPEFramework::Exchange::IMigration::MigrationResult migrationResult;
+    Thunder::Exchange::IMigration::MigrationResult migrationResult;
     migrationResult.success = true;
     ON_CALL(migrationMock, SetMigrationStatus(::testing::_, ::testing::_))
         .WillByDefault(::testing::DoAll(

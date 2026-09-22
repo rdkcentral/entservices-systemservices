@@ -22,7 +22,7 @@
 
 #include <string>
 
-namespace WPEFramework
+namespace Thunder
 {
 namespace Plugin
 {
@@ -35,6 +35,6 @@ namespace UploadLogs
     std::string errToText(err_t err);
 } // namespace UploadLogs
 } // namespace Plugin
-} // namespace WPEFramework
+} // namespace Thunder
 
 #endif //RDKSERVICES_UPLOADLOGS_H

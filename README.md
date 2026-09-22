@@ -1,6 +1,6 @@
 # SystemServices Plugin
 
-The SystemServices plugin is a WPEFramework (Thunder) plugin that provides comprehensive system-level management capabilities for RDK-based entertainment devices. It serves as the central point for controlling device power states, firmware updates, system configuration, and monitoring critical system parameters.
+The SystemServices plugin is a Thunder (Thunder) plugin that provides comprehensive system-level management capabilities for RDK-based entertainment devices. It serves as the central point for controlling device power states, firmware updates, system configuration, and monitoring critical system parameters.
 
 ## Overview
 

@@ -138,7 +138,7 @@
 
 **Status**: Excellent diagram coverage
 - **Component Structure** diagram (ASCII art, clear layering)
-- **High-Level System Architecture** (7-layer diagram: WPEFramework → SystemServices → Subsystems → HAL → Hardware)
+- **High-Level System Architecture** (7-layer diagram: Thunder → SystemServices → Subsystems → HAL → Hardware)
 - **Power State Transition Flow** (8-step data flow)
 - **Firmware Update Flow** (7-step process)
 - **Configuration Persistence Flow** (6-step data flow)
@@ -153,7 +153,7 @@
 **Status**: Good component mapping
 - Core components mapped: Plugin, Implementation, Helpers, HAL
 - Major subsystems documented: Power, Firmware, Config, Diagnostics
-- Integration points detailed: WPEFramework, PowerManager, IARM Bus
+- Integration points detailed: Thunder, PowerManager, IARM Bus
 - Minor gap: platformcaps subsystem could use more detailed component breakdown
 
 **Score**: 1.75/2 (-0.25 for subsystem detail depth)
@@ -251,7 +251,7 @@
   - Connection method and retry strategy
   - Bidirectional communication flow diagram
   - Notification callback types
-- WPEFramework integration documented
+- Thunder integration documented
 - IARM Bus interfaces specified
 - Device Settings HAL abstraction explained
 - Overview, Description, and Key Terminology updated to emphasize dual protocols
@@ -306,7 +306,7 @@
 **Status**: Core security requirements present
 - Input validation requirements
 - Secure storage requirements (/opt/secure/persistent)
-- Access control requirements (WPEFramework tokens)
+- Access control requirements (Thunder tokens)
 - Gap: No specific requirements for firmware signature verification
 - Gap: No authentication requirements for remote log upload
 
@@ -354,7 +354,7 @@
 
 **Status**: Compatibility guarantees documented
 - Backward compatibility within major version guaranteed
-- Platform compatibility requirements specified (WPEFramework R4.4+)
+- Platform compatibility requirements specified (Thunder R4.4+)
 - HAL compatibility considerations documented
 - Conditional features for platform variations
 
@@ -477,7 +477,7 @@
    - Input validation documented with regex patterns
    - Secure storage approach defined (/opt/secure/persistent)
    - Security considerations present
-   - Access control documented (WPEFramework tokens)
+   - Access control documented (Thunder tokens)
    - *Improvement needed*: Formal threat model (STRIDE or similar)
    - *Improvement needed*: Enhanced security testing strategy
    - *Improvement needed*: Security-specific test cases
