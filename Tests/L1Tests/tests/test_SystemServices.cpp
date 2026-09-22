@@ -46,6 +46,35 @@ TEST(SystemServicesSecurityTest, ValidatesTimeZoneNames)
     EXPECT_FALSE(isSafeTimeZoneName("America/New_York\nnext"));
     EXPECT_FALSE(isSafeTimeZoneName(""));
 }
+
+bool resolveSafeSplashScreenPath(const std::string& input, std::string& resolved);
+
+TEST(SystemServicesSecurityTest, ValidatesSplashScreenPaths)
+{
+    std::string resolved;
+
+    // Valid paths within allowed prefixes
+    EXPECT_TRUE(resolveSafeSplashScreenPath("/opt/splash.png", resolved));
+    EXPECT_TRUE(resolveSafeSplashScreenPath("/tmp/splash.jpg", resolved));
+    EXPECT_TRUE(resolveSafeSplashScreenPath("/media/usb/splash.bmp", resolved));
+
+    // Empty path rejected
+    EXPECT_FALSE(resolveSafeSplashScreenPath("", resolved));
+
+    // Paths outside allowed prefixes rejected
+    EXPECT_FALSE(resolveSafeSplashScreenPath("/etc/passwd", resolved));
+    EXPECT_FALSE(resolveSafeSplashScreenPath("/root/.ssh", resolved));
+    EXPECT_FALSE(resolveSafeSplashScreenPath("/home/user/image.png", resolved));
+
+    // Symlinks rejected
+    EXPECT_FALSE(resolveSafeSplashScreenPath("/opt/symlink", resolved));
+
+    // Nonexistent files rejected
+    EXPECT_FALSE(resolveSafeSplashScreenPath("/opt/nonexistent.png", resolved));
+
+    // Traversal sequences rejected by lexical check
+    EXPECT_FALSE(resolveSafeSplashScreenPath("/opt/../etc/passwd", resolved));
+}
 #include "UtilsFile.h"
 #include "UtilsProcess.h"
 #include "thermonitor.h"

@@ -93,6 +93,26 @@ bool isSafeTimeZoneName(const std::string& timeZone)
     return true;
 }
 
+bool resolveSafeSplashScreenPath(const std::string& input, std::string& resolved)
+{
+    struct stat inputStat;
+    if (input.empty() || lstat(input.c_str(), &inputStat) != 0 || !S_ISREG(inputStat.st_mode) || S_ISLNK(inputStat.st_mode))
+        return false;
+
+    char resolvedBuffer[PATH_MAX] = {0};
+    if (realpath(input.c_str(), resolvedBuffer) == nullptr)
+        return false;
+    resolved = resolvedBuffer;
+
+    static const std::vector<std::string> allowedPrefixes = {"/opt/", "/tmp/", "/media/"};
+    for (const auto& prefix : allowedPrefixes) {
+        if (resolved.rfind(prefix, 0) == 0)
+            return true;
+    }
+    resolved.clear();
+    return false;
+}
+
 #define MAX_REBOOT_DELAY 86400 /* 24Hr = 86400 sec */
 #define TR181_FW_DELAY_REBOOT "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AutoReboot.fwDelayReboot"
 #define TR181_AUTOREBOOT_ENABLE "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AutoReboot.Enable"
@@ -2425,32 +2445,30 @@ namespace WPEFramework
         Core::hresult SystemServicesImplementation::SetBootLoaderSplashScreen(const string& path, ErrorInfo& error, bool& success)
         {
             LOGINFO("path=%s", path.c_str());
-            string strBLSplashScreenPath = path;
-            bool fileExists = Utils::fileExists(strBLSplashScreenPath.c_str());
-            if((strBLSplashScreenPath != "") && fileExists)
+            string strBLSplashScreenPath;
+            if (!resolveSafeSplashScreenPath(path, strBLSplashScreenPath))
             {
-                IARM_Bus_MFRLib_SetBLSplashScreen_Param_t mfrparam;
-                std::strncpy(mfrparam.path, strBLSplashScreenPath.c_str(), sizeof(mfrparam.path));
-                mfrparam.path[sizeof(mfrparam.path) - 1] = '\0';
-                IARM_Result_t result = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME, IARM_BUS_MFRLIB_API_SetBlSplashScreen, (void *)&mfrparam, sizeof(mfrparam));
-                if (result != IARM_RESULT_SUCCESS){
-                    LOGERR("Update failed. path: %s, fileExists %s, IARM result %d ",strBLSplashScreenPath.c_str(),fileExists ? "true" : "false",result);
-                    error.message = "Update failed";
-                    error.code = "-32002";
-                    success = false;
-                }
-                else 
-                {
-                    LOGINFO("BootLoaderSplashScreen updated successfully");
-                    success =true;
-                }
-            }
-            else
-            {
-                LOGERR("Invalid path. path: %s, fileExists %s ",strBLSplashScreenPath.c_str(),fileExists ? "true" : "false");
+                LOGERR("Invalid or unsafe splash screen path: %s", path.c_str());
                 error.message = "Invalid path";
                 error.code = "-32001";
                 success = false;
+                return Core::ERROR_NONE;
+            }
+
+            IARM_Bus_MFRLib_SetBLSplashScreen_Param_t mfrparam;
+            std::strncpy(mfrparam.path, strBLSplashScreenPath.c_str(), sizeof(mfrparam.path));
+            mfrparam.path[sizeof(mfrparam.path) - 1] = '\0';
+            IARM_Result_t result = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME, IARM_BUS_MFRLIB_API_SetBlSplashScreen, (void *)&mfrparam, sizeof(mfrparam));
+            if (result != IARM_RESULT_SUCCESS){
+                LOGERR("Update failed. path: %s, IARM result %d ",strBLSplashScreenPath.c_str(),result);
+                error.message = "Update failed";
+                error.code = "-32002";
+                success = false;
+            }
+            else
+            {
+                LOGINFO("BootLoaderSplashScreen updated successfully");
+                success =true;
             }
             LOGINFO("response: error.code=%s, error.message=%s, success=%s", error.code.c_str(), error.message.c_str(), success ? "true" : "false");
             return Core::ERROR_NONE;
