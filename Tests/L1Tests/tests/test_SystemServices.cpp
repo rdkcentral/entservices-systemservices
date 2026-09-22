@@ -33,6 +33,19 @@
 #include "SystemServices.h"
 #include "SystemServicesImplementation.h"
 #include "UtilsString.h"
+
+bool isSafeTimeZoneName(const std::string& timeZone);
+
+TEST(SystemServicesSecurityTest, ValidatesTimeZoneNames)
+{
+    EXPECT_TRUE(isSafeTimeZoneName("America/New_York"));
+    EXPECT_TRUE(isSafeTimeZoneName("Etc/GMT+5"));
+    EXPECT_FALSE(isSafeTimeZoneName("../etc/passwd"));
+    EXPECT_FALSE(isSafeTimeZoneName("/etc/passwd"));
+    EXPECT_FALSE(isSafeTimeZoneName("America/New_York;command"));
+    EXPECT_FALSE(isSafeTimeZoneName("America/New_York\nnext"));
+    EXPECT_FALSE(isSafeTimeZoneName(""));
+}
 #include "UtilsFile.h"
 #include "UtilsProcess.h"
 #include "thermonitor.h"

@@ -82,6 +82,17 @@ using WakeupSrcConfig           = WPEFramework::Exchange::IPowerManager::WakeupS
 using IWakeupSourceConfigIterator  = WPEFramework::Exchange::IPowerManager::IWakeupSourceConfigIterator;
 using WakeupSourceConfigIteratorImpl = WPEFramework::Core::Service<WPEFramework::RPC::IteratorType<IWakeupSourceConfigIterator>>;
 
+bool isSafeTimeZoneName(const std::string& timeZone)
+{
+    if (timeZone.empty() || timeZone[0] == '/' || timeZone.find("..") != std::string::npos)
+        return false;
+    for (unsigned char character : timeZone) {
+        if (!std::isalnum(character) && character != '/' && character != '-' && character != '_' && character != '+' && character != '.')
+            return false;
+    }
+    return true;
+}
+
 #define MAX_REBOOT_DELAY 86400 /* 24Hr = 86400 sec */
 #define TR181_FW_DELAY_REBOOT "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AutoReboot.fwDelayReboot"
 #define TR181_AUTOREBOOT_ENABLE "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AutoReboot.Enable"
@@ -3406,7 +3417,7 @@ namespace WPEFramework
 
                     /* Security: reject traversal sequences and absolute paths to prevent
                      * directory listing / file-existence oracle outside ZONEINFO_DIR */
-                    if (tz.find("..") != std::string::npos || tz[0] == '/') {
+                    if (!isSafeTimeZoneName(tz)) {
                         LOGERR("Rejected timezone with path traversal: %s", tz.c_str());
                         continue;
                     }
