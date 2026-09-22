@@ -22,7 +22,7 @@
 #include "../Module.h"
 #include "../SystemServices.h"
 
-namespace WPEFramework {
+namespace Thunder {
 namespace Plugin {
 
 class PlatformCaps : public Core::JSON::Container {
@@ -97,4 +97,4 @@ public:
 };
 
 } // namespace Plugin
-} // namespace WPEFramework
+} // namespace Thunder

@@ -114,7 +114,7 @@ namespace {
   }
 }
 
-namespace WPEFramework {
+namespace Thunder {
 namespace Plugin {
 
 PlatformCapsData::PlatformCapsData(PluginHost::IShell* service) : jsonRpc(service), _service(service)
@@ -259,7 +259,7 @@ PlatformCapsData::BrowserInfo PlatformCapsData::GetBrowser() const {
 
     type = json["html_view"].String();
   } else {
-    TRACE(WPEFramework::Trace::Error, (_T("%s File '%s' : %" PRIu32 "\n"),
+    TRACE(Thunder::Trace::Error, (_T("%s File '%s' : %" PRIu32 "\n"),
         __FILE__, file.Name().c_str(), file.ErrorCode()));
   }
 
@@ -550,4 +550,4 @@ bool PlatformCapsData::verifyLibraries(const JsonArray &libraries) const {
 }
 
 } // namespace Plugin
-} // namespace WPEFramework
+} // namespace Thunder

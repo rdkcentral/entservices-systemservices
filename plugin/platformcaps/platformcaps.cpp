@@ -23,7 +23,7 @@
 
 #include <regex>
 
-namespace WPEFramework {
+namespace Thunder {
 namespace Plugin {
 
 bool PlatformCaps::Load(PluginHost::IShell* service, const string &query, Exchange::ISystemServices::PlatformConfig& platformConfig) {
@@ -333,4 +333,4 @@ bool PlatformCaps::DeviceInfo::Load(PluginHost::IShell* service, const string &q
 }
 
 } // namespace Plugin
-} // namespace WPEFramework
+} // namespace Thunder

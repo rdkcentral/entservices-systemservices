@@ -2,7 +2,7 @@
 
 ## Overview
 
-The SystemServices plugin is a WPEFramework (Thunder) plugin that provides comprehensive system-level management capabilities for RDK-based devices. It serves as the central point for controlling device power states, firmware updates, system configuration, and monitoring critical system parameters.
+The SystemServices plugin is a Thunder plugin that provides comprehensive system-level management capabilities for RDK-based devices. It serves as the central point for controlling device power states, firmware updates, system configuration, and monitoring critical system parameters.
 
 ## System Architecture
 
@@ -10,7 +10,7 @@ The SystemServices plugin is a WPEFramework (Thunder) plugin that provides compr
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                   WPEFramework Core                         │
+│                   Thunder Core                         │
 │              (Thunder Plugin Framework)                      │
 └──────────────────────┬──────────────────────────────────────┘
                        │
@@ -36,7 +36,7 @@ The SystemServices plugin is a WPEFramework (Thunder) plugin that provides compr
 
 #### 1. Plugin Framework Integration
 - **Base Classes**: Inherits from `PluginHost::IPlugin` and implements JSON-RPC support
-- **Service Registration**: Registered as a WPEFramework service with versioning (Major: 3, Minor: 4, Patch: 1)
+- **Service Registration**: Registered as a Thunder service with versioning (Major: 3, Minor: 4, Patch: 1)
 - **Multi-Handler Support**: Supports multiple JSON-RPC handlers for flexible API versioning
 
 #### 2. Power Management Subsystem
@@ -91,8 +91,8 @@ Configuration Change → Validation → cSettings Writer
 
 ## Plugin Integration Points
 
-### WPEFramework Integration
-- **JSON-RPC Protocol**: All APIs exposed through WPEFramework's JSON-RPC mechanism
+### Thunder Integration
+- **JSON-RPC Protocol**: All APIs exposed through Thunder's JSON-RPC mechanism
 - **Service Discovery**: Discoverable through Thunder controller
 - **Event Notifications**: Publishes events to subscribed clients
 - **Configuration Management**: Uses Thunder's configuration framework
@@ -133,7 +133,7 @@ Configuration Change → Validation → cSettings Writer
 ## Dependencies
 
 ### Required Libraries
-- **WPEFramework**: Core plugin framework and JSON-RPC support
+- **Thunder**: Core plugin framework and JSON-RPC support
 - **IARM Bus**: Inter-process communication for RDK components
 - **Device Settings (DS)**: Hardware abstraction for display and audio
 - **RFC**: Remote Feature Control for dynamic configuration

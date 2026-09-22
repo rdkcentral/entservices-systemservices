@@ -36,7 +36,7 @@ namespace {
   }
 }
 
-namespace WPEFramework {
+namespace Thunder {
 namespace Plugin {
 
 /**
@@ -73,7 +73,7 @@ string PlatformCapsData::GetDeviceType() {
   {
     TRACE(Trace::Information, (_T("AuthService plugin is available.\n")));
     std::string hex;
-    WPEFramework::Exchange::IAuthService::GetDeviceInfoResult diRes;
+    Thunder::Exchange::IAuthService::GetDeviceInfoResult diRes;
     auto rc = authservicePlugin->GetDeviceInfo(diRes);
     if (rc == Core::ERROR_NONE) {
       hex = diRes.deviceInfo;
@@ -171,7 +171,7 @@ string PlatformCapsData::GetX1DeviceId() {
     return string();
   }
   
-  WPEFramework::Exchange::IAuthService::GetXDeviceIdResult xdiRes;
+  Thunder::Exchange::IAuthService::GetXDeviceIdResult xdiRes;
   auto rc = authservicePlugin->GetXDeviceId(xdiRes);
   if (rc == Core::ERROR_NONE)
   {
@@ -188,7 +188,7 @@ bool PlatformCapsData::XCALSessionTokenAvailable() {
     return false;
   }
 
-  WPEFramework::Exchange::IAuthService::GetSessionTokenResult stRes;
+  Thunder::Exchange::IAuthService::GetSessionTokenResult stRes;
   auto rc = authservicePlugin->GetSessionToken(stRes);
 
   return (rc == Core::ERROR_NONE && !stRes.token.empty());
@@ -201,7 +201,7 @@ string PlatformCapsData::GetExperience() {
     return string();
   }
 
-  WPEFramework::Exchange::IAuthService::GetExpResult exRes;
+  Thunder::Exchange::IAuthService::GetExpResult exRes;
   auto rc = authservicePlugin->GetExperience(exRes);
   if (rc == Core::ERROR_NONE)
   {
@@ -288,4 +288,4 @@ PlatformCapsData::JsonRpc::ClientProxy PlatformCapsData::JsonRpc::getClient(
 }
 
 } // namespace Plugin
-} // namespace WPEFramework
+} // namespace Thunder

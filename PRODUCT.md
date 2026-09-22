@@ -2,7 +2,7 @@
 
 ## Product Overview
 
-The SystemServices plugin is a comprehensive system management solution for RDK (Reference Design Kit) devices, providing essential functionality for controlling device operations, managing firmware updates, and monitoring system health. As a WPEFramework (Thunder) plugin, it exposes a rich JSON-RPC API that enables applications to interact with core system capabilities through a standardized interface.
+The SystemServices plugin is a comprehensive system management solution for RDK (Reference Design Kit) devices, providing essential functionality for controlling device operations, managing firmware updates, and monitoring system health. As a Thunder (Thunder) plugin, it exposes a rich JSON-RPC API that enables applications to interact with core system capabilities through a standardized interface.
 
 ## Key Features
 
@@ -88,7 +88,7 @@ Real-time notifications for system state changes including power state transitio
 ### For Device Manufacturers
 - **Platform Abstraction**: Hardware-agnostic interface through HAL integration
 - **Customizable Features**: Conditional compilation flags for platform-specific capabilities
-- **Standards Compliance**: Built on WPEFramework industry-standard plugin architecture
+- **Standards Compliance**: Built on Thunder industry-standard plugin architecture
 - **Test Framework**: Integrated L1 (unit) and L2 (integration) test support
 
 ### For Service Providers
@@ -111,14 +111,14 @@ Real-time notifications for system state changes including power state transitio
 - **Secure Storage**: Sensitive data stored in protected filesystem locations
 
 ### Scalability
-- **Multi-Instance Support**: Can coexist with other WPEFramework plugins
+- **Multi-Instance Support**: Can coexist with other Thunder plugins
 - **Event Broadcasting**: Efficient notification mechanism for multiple subscribers
 - **Modular Design**: Easy integration of additional features through helper framework
 
 ## Deployment Considerations
 
 ### System Requirements
-- **WPEFramework**: Thunder R4.4+ compatible
+- **Thunder**: Thunder R4.4+ compatible
 - **Operating System**: Linux-based RDK platform
 - **Required Services**: IARM Bus, Device Settings HAL, RFC service
 - **Optional Dependencies**: Deep Sleep HAL, Thermal Monitor (for advanced features)

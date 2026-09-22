@@ -27,7 +27,7 @@
 #include "UtilsLogging.h"
 #include "tracing/Logging.h"
 
-namespace WPEFramework 
+namespace Thunder 
 {
     namespace Plugin
     {
@@ -203,4 +203,4 @@ namespace WPEFramework
                     Exchange::IConfiguration* _configure{};
        };
     } // namespace Plugin
-} // namespace WPEFramework
+} // namespace Thunder

@@ -44,7 +44,7 @@
 #define L2TEST_CALLSIGN _T("L2tests.1")
 
 using ::testing::NiceMock;
-using namespace WPEFramework;
+using namespace Thunder;
 using testing::StrictMock;
 
 typedef enum : uint32_t {
@@ -2532,14 +2532,14 @@ TEST_F(SystemService_L2Test, ThermalMonitor_Cov_Instance_Singleton)
 {
     TEST_LOG("Testing CThermalMonitor::instance() - singleton pattern");
 
-    WPEFramework::Plugin::CThermalMonitor* monitor1 =
-        WPEFramework::Plugin::CThermalMonitor::instance();
+    Thunder::Plugin::CThermalMonitor* monitor1 =
+        Thunder::Plugin::CThermalMonitor::instance();
 
     ASSERT_NE(monitor1, nullptr);
     TEST_LOG("First call: %p", (void*)monitor1);
 
-    WPEFramework::Plugin::CThermalMonitor* monitor2 =
-        WPEFramework::Plugin::CThermalMonitor::instance();
+    Thunder::Plugin::CThermalMonitor* monitor2 =
+        Thunder::Plugin::CThermalMonitor::instance();
 
     ASSERT_NE(monitor2, nullptr);
     EXPECT_EQ(monitor1, monitor2);
@@ -2555,8 +2555,8 @@ TEST_F(SystemService_L2Test, ThermalMonitor_Cov_AddRemoveEventObserver)
 {
     TEST_LOG("Testing CThermalMonitor::addEventObserver() and removeEventObserver()");
 
-    WPEFramework::Plugin::CThermalMonitor* monitor =
-        WPEFramework::Plugin::CThermalMonitor::instance();
+    Thunder::Plugin::CThermalMonitor* monitor =
+        Thunder::Plugin::CThermalMonitor::instance();
 
     ASSERT_NE(monitor, nullptr);
 
@@ -2578,8 +2578,8 @@ TEST_F(SystemService_L2Test, ThermalMonitor_Cov_GetCoreTemperature)
 {
     TEST_LOG("Testing CThermalMonitor::getCoreTemperature()");
 
-    WPEFramework::Plugin::CThermalMonitor* monitor =
-        WPEFramework::Plugin::CThermalMonitor::instance();
+    Thunder::Plugin::CThermalMonitor* monitor =
+        Thunder::Plugin::CThermalMonitor::instance();
 
     ASSERT_NE(monitor, nullptr);
 
@@ -2606,8 +2606,8 @@ TEST_F(SystemService_L2Test, ThermalMonitor_Cov_GetCoreTempThresholds)
 {
     TEST_LOG("Testing CThermalMonitor::getCoreTempThresholds()");
 
-    WPEFramework::Plugin::CThermalMonitor* monitor =
-        WPEFramework::Plugin::CThermalMonitor::instance();
+    Thunder::Plugin::CThermalMonitor* monitor =
+        Thunder::Plugin::CThermalMonitor::instance();
 
     ASSERT_NE(monitor, nullptr);
 
@@ -2638,15 +2638,15 @@ TEST_F(SystemService_L2Test, ThermalMonitor_Cov_SetCoreTempThresholds)
 {
     TEST_LOG("Testing CThermalMonitor::setCoreTempThresholds()");
 
-    WPEFramework::Plugin::CThermalMonitor* monitor =
-        WPEFramework::Plugin::CThermalMonitor::instance();
+    Thunder::Plugin::CThermalMonitor* monitor =
+        Thunder::Plugin::CThermalMonitor::instance();
 
     ASSERT_NE(monitor, nullptr);
 
     /* Guard: setCoreTempThresholds calls ASSERT(PowerManagerPlugin != nullptr) internally.
        Only call if the plugin instance is available to avoid an abort. */
-    if (WPEFramework::Plugin::SystemServicesImplementation::_instance == nullptr ||
-        WPEFramework::Plugin::SystemServicesImplementation::_instance->getPwrMgrPluginInstance() == nullptr) {
+    if (Thunder::Plugin::SystemServicesImplementation::_instance == nullptr ||
+        Thunder::Plugin::SystemServicesImplementation::_instance->getPwrMgrPluginInstance() == nullptr) {
         TEST_LOG("  PowerManager not available - skipping setCoreTempThresholds calls");
         return;
     }
@@ -2671,8 +2671,8 @@ TEST_F(SystemService_L2Test, ThermalMonitor_Cov_GetOvertempGraceInterval)
 {
     TEST_LOG("Testing CThermalMonitor::getOvertempGraceInterval()");
 
-    WPEFramework::Plugin::CThermalMonitor* monitor =
-        WPEFramework::Plugin::CThermalMonitor::instance();
+    Thunder::Plugin::CThermalMonitor* monitor =
+        Thunder::Plugin::CThermalMonitor::instance();
 
     ASSERT_NE(monitor, nullptr);
 
@@ -2700,8 +2700,8 @@ TEST_F(SystemService_L2Test, ThermalMonitor_Cov_SetOvertempGraceInterval)
 {
     TEST_LOG("Testing CThermalMonitor::setOvertempGraceInterval()");
 
-    WPEFramework::Plugin::CThermalMonitor* monitor =
-        WPEFramework::Plugin::CThermalMonitor::instance();
+    Thunder::Plugin::CThermalMonitor* monitor =
+        Thunder::Plugin::CThermalMonitor::instance();
 
     ASSERT_NE(monitor, nullptr);
 
@@ -2731,8 +2731,8 @@ TEST_F(SystemService_L2Test, ThermalMonitor_Cov_EmitTemperatureThresholdChange)
 {
     TEST_LOG("Testing CThermalMonitor::emitTemperatureThresholdChange()");
 
-    WPEFramework::Plugin::CThermalMonitor* monitor =
-        WPEFramework::Plugin::CThermalMonitor::instance();
+    Thunder::Plugin::CThermalMonitor* monitor =
+        Thunder::Plugin::CThermalMonitor::instance();
 
     ASSERT_NE(monitor, nullptr);
 
@@ -2762,8 +2762,8 @@ TEST_F(SystemService_L2Test, ThermalMonitor_Cov_ReportTemperatureThresholdChange
 {
     TEST_LOG("Testing CThermalMonitor::reportTemperatureThresholdChange()");
 
-    WPEFramework::Plugin::CThermalMonitor* monitor =
-        WPEFramework::Plugin::CThermalMonitor::instance();
+    Thunder::Plugin::CThermalMonitor* monitor =
+        Thunder::Plugin::CThermalMonitor::instance();
 
     ASSERT_NE(monitor, nullptr);
 
@@ -2788,8 +2788,8 @@ TEST_F(SystemService_L2Test, ThermalMonitor_Cov_AllFunctions_Coverage)
     TEST_LOG("Testing all CThermalMonitor functions for complete coverage");
 
     /* 1. instance() - singleton */
-    WPEFramework::Plugin::CThermalMonitor* monitor =
-        WPEFramework::Plugin::CThermalMonitor::instance();
+    Thunder::Plugin::CThermalMonitor* monitor =
+        Thunder::Plugin::CThermalMonitor::instance();
     ASSERT_NE(monitor, nullptr);
     TEST_LOG("1. instance() OK: %p", (void*)monitor);
 
@@ -2814,8 +2814,8 @@ TEST_F(SystemService_L2Test, ThermalMonitor_Cov_AllFunctions_Coverage)
              r5 ? "true" : "false", high, critical);
 
     /* 6. setCoreTempThresholds() - only if PowerManager available */
-    if (WPEFramework::Plugin::SystemServicesImplementation::_instance != nullptr &&
-        WPEFramework::Plugin::SystemServicesImplementation::_instance->getPwrMgrPluginInstance() != nullptr) {
+    if (Thunder::Plugin::SystemServicesImplementation::_instance != nullptr &&
+        Thunder::Plugin::SystemServicesImplementation::_instance->getPwrMgrPluginInstance() != nullptr) {
         /* Note: the L2 test fixture mock for mfrSetTempThresholds expects exactly (100, 110) */
         bool r6 = monitor->setCoreTempThresholds(100.0f, 110.0f);
         TEST_LOG("6. setCoreTempThresholds(100.0, 110.0): result=%s",
@@ -2831,8 +2831,8 @@ TEST_F(SystemService_L2Test, ThermalMonitor_Cov_AllFunctions_Coverage)
              r7 ? "true" : "false", interval);
 
     /* 8. setOvertempGraceInterval() - only if PowerManager available */
-    if (WPEFramework::Plugin::SystemServicesImplementation::_instance != nullptr &&
-        WPEFramework::Plugin::SystemServicesImplementation::_instance->getPwrMgrPluginInstance() != nullptr) {
+    if (Thunder::Plugin::SystemServicesImplementation::_instance != nullptr &&
+        Thunder::Plugin::SystemServicesImplementation::_instance->getPwrMgrPluginInstance() != nullptr) {
         bool r8 = monitor->setOvertempGraceInterval(30);
         TEST_LOG("8. setOvertempGraceInterval(30): result=%s",
                  r8 ? "true" : "false");
@@ -3694,7 +3694,7 @@ TEST_F(SystemService_L2Test, Helper_Cov_ReadFromFile_NonExisting)
     TEST_LOG("  Non-existing file returns false");
 }
 
-/* populateResponseWithError() — WPEFramework::Plugin */
+/* populateResponseWithError() — Thunder::Plugin */
 
 TEST_F(SystemService_L2Test, Helper_Cov_PopulateResponseWithError_NonZero)
 {
@@ -3743,7 +3743,7 @@ TEST_F(SystemService_L2Test, Helper_Cov_PopulateResponseWithError_ZeroCode)
     TEST_LOG("  After zero code: status=%u, message='%s'", sysSrvStatus, errorMessage.c_str());
 }
 
-/* caseInsensitive() — WPEFramework::Plugin */
+/* caseInsensitive() — Thunder::Plugin */
 
 TEST_F(SystemService_L2Test, Helper_Cov_Plugin_CaseInsensitive_ModelMatch)
 {
@@ -3781,7 +3781,7 @@ TEST_F(SystemService_L2Test, Helper_Cov_Plugin_CaseInsensitive_NoMatch)
     TEST_LOG("  No-match returns 'ERROR'");
 }
 
-/* ltrim(), rtrim(), trim() — WPEFramework::Plugin */
+/* ltrim(), rtrim(), trim() — Thunder::Plugin */
 
 TEST_F(SystemService_L2Test, Helper_Cov_Plugin_LtrimRtrimTrim)
 {
@@ -3804,7 +3804,7 @@ TEST_F(SystemService_L2Test, Helper_Cov_Plugin_LtrimRtrimTrim)
     TEST_LOG("  trim OK");
 }
 
-/* convertCase() — WPEFramework::Plugin */
+/* convertCase() — Thunder::Plugin */
 
 TEST_F(SystemService_L2Test, Helper_Cov_Plugin_ConvertCase)
 {
@@ -3819,7 +3819,7 @@ TEST_F(SystemService_L2Test, Helper_Cov_Plugin_ConvertCase)
     TEST_LOG("  convertCase to uppercase OK");
 }
 
-/* convert() — WPEFramework::Plugin */
+/* convert() — Thunder::Plugin */
 
 TEST_F(SystemService_L2Test, Helper_Cov_Plugin_Convert)
 {
@@ -5158,11 +5158,11 @@ TEST_F(SystemService_L2Test, CTimer_Coverage_Join)
  * conv() is defined at file scope in SystemServicesImplementation.cpp  *
  * with external linkage, so we can extern-declare and call directly.  *
  * ------------------------------------------------------------------ */
-extern WPEFramework::Exchange::IPowerManager::WakeupSrcType conv(const std::string& wakeupSrc);
+extern Thunder::Exchange::IPowerManager::WakeupSrcType conv(const std::string& wakeupSrc);
 
 TEST_F(SystemService_L2Test, SysImpl_Conv_AllBranches)
 {
-    using WPEFramework::Exchange::IPowerManager;
+    using Thunder::Exchange::IPowerManager;
 
     TEST_LOG("conv(): exercising all wakeup-source string branches");
 
@@ -5196,7 +5196,7 @@ extern const char* getWakeupSrcString(uint32_t src);
 
 TEST_F(SystemService_L2Test, SysImpl_GetWakeupSrcString_AllCases)
 {
-    using WPEFramework::Exchange::IPowerManager;
+    using Thunder::Exchange::IPowerManager;
 
     TEST_LOG("getWakeupSrcString(): exercising all switch cases");
 
@@ -7596,8 +7596,8 @@ TEST_F(SystemService_L2Test, SysImpl_OnTemperatureThresholdChanged_COMRPC)
     uint32_t regResult = m_SystemServicesPlugin->Register(&m_notificationHandler);
     EXPECT_EQ(regResult, Core::ERROR_NONE);
 
-    WPEFramework::Plugin::SystemServicesImplementation* inst =
-        WPEFramework::Plugin::SystemServicesImplementation::_instance;
+    Thunder::Plugin::SystemServicesImplementation* inst =
+        Thunder::Plugin::SystemServicesImplementation::_instance;
 
     if (inst) {
         m_notificationHandler.ResetEvent();
@@ -7668,8 +7668,8 @@ TEST_F(SystemService_L2Test, SysImpl_OnNetworkStandbyAndClockSet_COMRPC)
 
     m_SystemServicesPlugin->Register(&m_notificationHandler);
 
-    WPEFramework::Plugin::SystemServicesImplementation* inst =
-        WPEFramework::Plugin::SystemServicesImplementation::_instance;
+    Thunder::Plugin::SystemServicesImplementation* inst =
+        Thunder::Plugin::SystemServicesImplementation::_instance;
 
     if (inst) {
         m_notificationHandler.ResetEvent();
@@ -7699,8 +7699,8 @@ TEST_F(SystemService_L2Test, SysImpl_ReportFirmwareInfo_EmptySwUpdateConf_COMRPC
 
     m_SystemServicesPlugin->Register(&m_notificationHandler);
 
-    WPEFramework::Plugin::SystemServicesImplementation* inst =
-        WPEFramework::Plugin::SystemServicesImplementation::_instance;
+    Thunder::Plugin::SystemServicesImplementation* inst =
+        Thunder::Plugin::SystemServicesImplementation::_instance;
 
     if (inst) {
         /* httpStatus=460 → STATUS_CODE_NO_SWUPDATE_CONF branch */
@@ -7753,8 +7753,8 @@ TEST_F(SystemService_L2Test, SysImpl_ReportFirmwareInfo_WithResponseString_COMRP
 
     TEST_LOG("reportFirmwareUpdateInfoReceived: with rebootImmediately in JSON responseString");
 
-    WPEFramework::Plugin::SystemServicesImplementation* inst =
-        WPEFramework::Plugin::SystemServicesImplementation::_instance;
+    Thunder::Plugin::SystemServicesImplementation* inst =
+        Thunder::Plugin::SystemServicesImplementation::_instance;
 
     if (inst) {
         /* responseString contains valid JSON with rebootImmediately=true */
@@ -9948,7 +9948,7 @@ TEST_F(SystemService_L2Test, SysImpl_HandleThermalLevelChange_AllBranches)
 {
     TEST_LOG("SysImpl_HandleThermalLevelChange_AllBranches: all combinations via OnTemperatureThresholdChanged");
 
-    auto* inst = WPEFramework::Plugin::SystemServicesImplementation::_instance;
+    auto* inst = Thunder::Plugin::SystemServicesImplementation::_instance;
     if (!inst) {
         TEST_LOG("  _instance is NULL - skipping");
         return;

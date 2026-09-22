@@ -39,7 +39,7 @@ target_compile_definitions(${MODULE_NAME}
             ENABLE_SYSTIMEMGR_SUPPORT)
 
 target_compile_options(${MODULE_NAME} PRIVATE -Wno-error)
-target_link_directories(${MODULE_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/lib ${CMAKE_INSTALL_PREFIX}/lib/wpeframework/plugins)
+target_link_directories(${MODULE_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/lib ${CMAKE_INSTALL_PREFIX}/lib/thunder/plugins)
 target_link_libraries(${MODULE_NAME} PRIVATE ${NAMESPACE}Plugins::${NAMESPACE}Plugins)
 
 if(PLUGIN_SYSTEMSERVICES)

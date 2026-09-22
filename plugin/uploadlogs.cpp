@@ -34,7 +34,7 @@
 #include "UtilsfileExists.h"
 #include "secure_wrapper.h"
 
-namespace WPEFramework
+namespace Thunder
 {
 namespace Plugin
 {
@@ -173,4 +173,4 @@ pid_t logUploadAsync(void)
 
 } // namespace UploadLogs
 } // namespace Plugin
-} // namespace WPEFramework
+} // namespace Thunder
