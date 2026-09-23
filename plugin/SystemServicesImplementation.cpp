@@ -753,12 +753,13 @@ namespace WPEFramework
             _adminLock.Unlock();
         }
 
-        void SystemServicesImplementation::startModeTimer(int duration)
+        int SystemServicesImplementation::startModeTimer(int duration)
         {
             m_remainingDuration = duration;
             m_operatingModeTimer.start();
             //set values in temp file so they can be restored in receiver restarts / crashes
             m_temp_settings.setValue("mode_duration", m_remainingDuration);
+			return 0;
         }
 
         void SystemServicesImplementation::stopModeTimer()
