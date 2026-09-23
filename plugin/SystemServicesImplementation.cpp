@@ -1060,7 +1060,7 @@ namespace WPEFramework
             }
 
             IARM_Bus_MFRLib_GetSerializedData_Param_t param;
-            param.bufLen = 0;
+            param.bufLen = 10;
             param.type = mfrSERIALIZED_TYPE_MANUFACTURING_SERIALNUMBER;
             IARM_Result_t result = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME, IARM_BUS_MFRLIB_API_GetSerializedData, &param, sizeof(param));
             param.buffer[param.bufLen] = '\0';
