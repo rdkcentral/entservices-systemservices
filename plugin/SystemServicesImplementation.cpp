@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <cstdio>
+#include <dirent.h>
 #include <regex>
 #include <fstream>
 #include <string>
@@ -3290,16 +3291,37 @@ namespace WPEFramework
                 LOGERR("stat() failed: %s", strerror(errno));
             }
 
-            FILE *p = nullptr;
             if (isDir)
             {
-                std::string globPattern = entry + "/*";
-                p = v_secure_popen("r", "zdump %s", globPattern.c_str());
+                DIR* directory = opendir(entry.c_str());
+                if (directory == nullptr)
+                {
+                    LOGERR("opendir() failed for %s: %s", entry.c_str(), strerror(errno));
+                    return false;
+                }
+
+                bool directoryStatus = true;
+                while (dirent* child = readdir(directory))
+                {
+                    const std::string name(child->d_name);
+                    if (name == "." || name == "..")
+                        continue;
+
+                    JsonObject childObject;
+                    const std::string childPath = entry + "/" + name;
+                    struct stat childStat;
+                    if (lstat(childPath.c_str(), &childStat) != 0 || S_ISLNK(childStat.st_mode))
+                        continue;
+                    if (!processTimeZones(childPath, childObject))
+                        directoryStatus = false;
+                    if (!childObject.IsNull())
+                        out[name.c_str()] = childObject;
+                }
+                closedir(directory);
+                return directoryStatus;
             }
-            else
-            {
-                p = v_secure_popen("r", "zdump %s", entry.c_str());
-            }
+
+            FILE *p = v_secure_popen("r", "zdump %s", entry.c_str());
 
             if(!p)
             {
@@ -3429,7 +3451,7 @@ namespace WPEFramework
                 dirObject.ToString(zoneinfo);
             }
 
-            return success ? Core::ERROR_NONE : Core::ERROR_GENERAL;
+            return Core::ERROR_NONE;
         }
         
         Core::hresult SystemServicesImplementation::GetRFCConfig( IStringIterator* const& rfcList, string& RFCConfig, uint32_t& SysSrv_Status, string& errorMessage, bool& success)

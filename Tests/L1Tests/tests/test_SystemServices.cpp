@@ -1886,6 +1886,18 @@ TEST_F(SystemServicesTest, GetTimeZones_Success)
     TEST_LOG("GetTimeZones test - Response: %s", response.c_str());
 }
 
+TEST_F(SystemServicesTest, GetTimeZonesRejectsUnsafeInputBeforeExecution)
+{
+    EXPECT_CALL(*p_wrapsMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_)).Times(0);
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTimeZones"), _T("{\"timeZones\":[\"UTC;invalid\"]}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response));
+    ASSERT_TRUE(jsonResponse.HasLabel("success"));
+    EXPECT_FALSE(jsonResponse["success"].Boolean());
+}
+
 TEST_F(SystemServicesTest, Reboot_Success)
 {
     EXPECT_CALL(PowerManagerMock::Mock(), Reboot(::testing::_, ::testing::_, ::testing::_))

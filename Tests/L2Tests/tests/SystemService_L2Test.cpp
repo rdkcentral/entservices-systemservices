@@ -9849,18 +9849,7 @@ TEST_F(SystemService_L2Test, SysImpl_ProcessTimeZones_RejectShellMetachars_JSONR
 {
     TEST_LOG("SysImpl_ProcessTimeZones_RejectShellMetachars: getTimeZones with malicious inputs");
 
-    /* Verify the service is reachable before testing validation logic.
-     * A no-param call exercises the else-branch; if it fails at the
-     * transport level the plugin may not be loaded in this CI config. */
-    {
-        JsonObject probe;
-        JsonObject probeResp;
-        uint32_t probeResult = InvokeServiceMethod("org.rdk.System.1", "getTimeZones", probe, probeResp);
-        if (probeResult != Core::ERROR_NONE) {
-            TEST_LOG("  getTimeZones service unavailable (result=%u) - skipping", probeResult);
-            return;
-        }
-    }
+    EXPECT_CALL(*p_wrapsImplMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_)).Times(0);
 
     /* Each of these inputs contains shell metacharacters or path traversal
      * that could lead to command injection if passed to popen() unsanitized. */
@@ -9912,6 +9901,16 @@ TEST_F(SystemService_L2Test, SysImpl_ProcessTimeZones_AcceptValidTimezones_JSONR
         TEST_LOG("  /usr/share/zoneinfo not found - skipping");
         return;
     }
+
+    ON_CALL(*p_wrapsImplMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_))
+        .WillByDefault(::testing::Invoke([](const char*, const char*, va_list) -> FILE* {
+            FILE* output = tmpfile();
+            fputs("/usr/share/zoneinfo/UTC UTC\n", output);
+            rewind(output);
+            return output;
+        }));
+    ON_CALL(*p_wrapsImplMock, v_secure_pclose(::testing::_))
+        .WillByDefault(::testing::Invoke([](FILE* output) -> int { return fclose(output); }));
 
     const std::vector<std::string> validInputs = {
         "America/New_York",
