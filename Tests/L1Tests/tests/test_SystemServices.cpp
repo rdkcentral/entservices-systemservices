@@ -1519,6 +1519,37 @@ TEST_F(SystemServicesTest, SetBootLoaderSplashScreen_Success)
     
     (void)std::remove("/tmp/test_splash.png");
 }
+
+TEST_F(SystemServicesTest, SetBootLoaderSplashScreenUsesStableStagedFile)
+{
+    const char* sourcePath = "/tmp/test_splash_stable.png";
+    {
+        std::ofstream file(sourcePath);
+        file << "validated-content";
+    }
+
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke([sourcePath](const char*, const char*, void* argument, size_t) {
+            {
+                std::ofstream replacement(sourcePath, std::ios::trunc);
+                replacement << "replacement-content";
+            }
+            const auto* parameters = static_cast<IARM_Bus_MFRLib_SetBLSplashScreen_Param_t*>(argument);
+            EXPECT_THAT(std::string(parameters->path), ::testing::StartsWith("/tmp/systemservices-splash-"));
+            std::ifstream staged(parameters->path);
+            std::string content;
+            std::getline(staged, content);
+            EXPECT_EQ("validated-content", content);
+            return IARM_RESULT_SUCCESS;
+        }));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBootLoaderSplashScreen"), _T("{\"path\":\"/tmp/test_splash_stable.png\"}"), response));
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response));
+    EXPECT_TRUE(jsonResponse["success"].Boolean());
+    (void)std::remove(sourcePath);
+}
+
 TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_Success)
 {
     EXPECT_CALL(PowerManagerMock::Mock(), SetWakeupSourceConfig(::testing::_))
