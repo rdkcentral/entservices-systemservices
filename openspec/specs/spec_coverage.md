@@ -44,7 +44,7 @@
 - plugin/SystemServicesHelper.cpp (helper utilities)
 - plugin/cTimer.cpp (timer management)
 - plugin/thermonitor.cpp (thermal monitoring)
-- plugin/uploadlogs.cpp (log upload functionality)
+- plugin/uploadlogsnew.cpp (log upload functionality)
 - plugin/platformcaps/platformcaps.cpp (capability discovery)
 - plugin/platformcaps/platformcapsdata.cpp (data management)
 - plugin/platformcaps/platformcapsdatarpc.cpp (RPC interface)
