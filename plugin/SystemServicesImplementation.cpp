@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <cstdio>
+#include <dirent.h>
 #include <regex>
 #include <fstream>
 #include <string>
@@ -3255,13 +3256,24 @@ namespace WPEFramework
         }
 #endif// ENABLE_SYSTIMEMGR_SUPPORT
 
+        static bool isValidTimezonePath(const std::string& path)
+        {
+            static const std::regex validTz("^[A-Za-z0-9/_+.-]+$");
+            if (path.empty() || path.find("..") != std::string::npos)
+                return false;
+            return std::regex_match(path, validTz);
+        }
+
         bool SystemServicesImplementation::processTimeZones(std::string entry, JsonObject& out)
         {
             bool ret = true;
 
-            std::string cmd = "zdump ";
-            cmd += entry;
-            
+            if (!isValidTimezonePath(entry))
+            {
+                LOGERR("Timezone path contains invalid characters ('%s')", entry.c_str());
+                return false;
+            }
+
             if (0 != access(entry.c_str(), F_OK))
             {
                 LOGERR("Timezone is not in olson format ('%s')", entry.c_str());
@@ -3269,23 +3281,51 @@ namespace WPEFramework
             }
 
             struct stat deStat;
+            bool isDir = false;
             if (0 == stat(entry.c_str(), &deStat))
             {
-                if (S_ISDIR(deStat.st_mode))
-                {
-                    cmd += "/*";
-                }
+                isDir = S_ISDIR(deStat.st_mode);
             }
             else
             {
                 LOGERR("stat() failed: %s", strerror(errno));
             }
 
-            FILE *p = popen(cmd.c_str(), "r");
+            if (isDir)
+            {
+                DIR* directory = opendir(entry.c_str());
+                if (directory == nullptr)
+                {
+                    LOGERR("opendir() failed for %s: %s", entry.c_str(), strerror(errno));
+                    return false;
+                }
+
+                bool directoryStatus = true;
+                while (dirent* child = readdir(directory))
+                {
+                    const std::string name(child->d_name);
+                    if (name == "." || name == "..")
+                        continue;
+
+                    JsonObject childObject;
+                    const std::string childPath = entry + "/" + name;
+                    struct stat childStat;
+                    if (lstat(childPath.c_str(), &childStat) != 0 || S_ISLNK(childStat.st_mode))
+                        continue;
+                    if (!processTimeZones(childPath, childObject))
+                        directoryStatus = false;
+                    if (!childObject.IsNull())
+                        out[name.c_str()] = childObject;
+                }
+                closedir(directory);
+                return directoryStatus;
+            }
+
+            FILE *p = v_secure_popen("r", "zdump %s", entry.c_str());
 
             if(!p)
             {
-                LOGERR("failed to start %s: %s", cmd.c_str(), strerror(errno));
+                LOGERR("failed to start zdump %s: %s", entry.c_str(), strerror(errno));
                 return false;
             }
 
@@ -3340,11 +3380,11 @@ namespace WPEFramework
                 }
             }
 
-            int err = pclose(p);
+            int err = v_secure_pclose(p);
 
             if (0 != err)
             {    
-                LOGERR("%s failed with code %d", cmd.c_str(), err);
+                LOGERR("zdump %s failed with code %d", entry.c_str(), err);
                 return false;
             }
 
@@ -3378,19 +3418,27 @@ namespace WPEFramework
 
             if (timeZones && (timeZones->Count() != 0))
             {
+                success = true;
                 string tz;
                 while (timeZones->Next(tz))
                 {
                     if (tz.empty())
                         continue;
 
+                    if (!isValidTimezonePath(tz))
+                    {
+                        LOGERR("Rejected invalid timezone input: '%s'", tz.c_str());
+                        success = false;
+                        continue;
+                    }
+
                     std::string path = std::string(ZONEINFO_DIR) + "/" + tz;
                     bool status = processTimeZones(std::move(path), dirObject);
-                    success = status;
 
                     if (!status)
                     {
                         LOGERR("Failed timezone %s", tz.c_str());
+                        success = false;
                     }
                 }
             }
@@ -3403,7 +3451,7 @@ namespace WPEFramework
                 dirObject.ToString(zoneinfo);
             }
 
-            return success ? Core::ERROR_NONE : Core::ERROR_GENERAL;
+            return Core::ERROR_NONE;
         }
         
         Core::hresult SystemServicesImplementation::GetRFCConfig( IStringIterator* const& rfcList, string& RFCConfig, uint32_t& SysSrv_Status, string& errorMessage, bool& success)
