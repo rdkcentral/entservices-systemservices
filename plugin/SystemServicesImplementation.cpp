@@ -20,6 +20,10 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <cstdio>
+#include <climits>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
 #include <regex>
 #include <fstream>
 #include <string>
@@ -2411,35 +2415,102 @@ namespace WPEFramework
             return retStatus;
         }
         
+        static bool stageBootLoaderSplashScreen(const std::string& path, std::string& stagedPath)
+        {
+            static const std::vector<std::string> allowedPrefixes = {"/opt/", "/tmp/", "/media/"};
+            struct stat inputInfo;
+            char resolved[PATH_MAX] = {0};
+            if (path.empty() || lstat(path.c_str(), &inputInfo) != 0 || S_ISLNK(inputInfo.st_mode) || realpath(path.c_str(), resolved) == nullptr)
+                return false;
+
+            const std::string canonicalPath(resolved);
+            if (std::none_of(allowedPrefixes.begin(), allowedPrefixes.end(), [&canonicalPath](const std::string& prefix) {
+                    return canonicalPath.rfind(prefix, 0) == 0;
+                }))
+                return false;
+
+            const int source = open(canonicalPath.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+            if (source < 0)
+                return false;
+
+            struct stat sourceInfo;
+            if (fstat(source, &sourceInfo) != 0 || !S_ISREG(sourceInfo.st_mode))
+            {
+                close(source);
+                return false;
+            }
+
+            char stagingTemplate[] = "/tmp/systemservices-splash-XXXXXX";
+            const int destination = mkstemp(stagingTemplate);
+            if (destination < 0)
+            {
+                close(source);
+                return false;
+            }
+
+            bool copied = true;
+            char buffer[16384];
+            ssize_t bytesRead;
+            while ((bytesRead = read(source, buffer, sizeof(buffer))) > 0)
+            {
+                ssize_t offset = 0;
+                while (offset < bytesRead)
+                {
+                    const ssize_t bytesWritten = write(destination, buffer + offset, bytesRead - offset);
+                    if (bytesWritten <= 0)
+                    {
+                        copied = false;
+                        break;
+                    }
+                    offset += bytesWritten;
+                }
+                if (!copied)
+                    break;
+            }
+            if (bytesRead < 0 || fsync(destination) != 0)
+                copied = false;
+
+            close(source);
+            close(destination);
+            if (!copied)
+            {
+                unlink(stagingTemplate);
+                return false;
+            }
+
+            stagedPath = stagingTemplate;
+            return true;
+        }
+
         Core::hresult SystemServicesImplementation::SetBootLoaderSplashScreen(const string& path, ErrorInfo& error, bool& success)
         {
-            LOGINFO("path=%s", path.c_str());
-            string strBLSplashScreenPath = path;
-            bool fileExists = Utils::fileExists(strBLSplashScreenPath.c_str());
-            if((strBLSplashScreenPath != "") && fileExists)
+            LOGINFO("SetBootLoaderSplashScreen called");
+            std::string stagedPath;
+            if (!stageBootLoaderSplashScreen(path, stagedPath))
             {
-                IARM_Bus_MFRLib_SetBLSplashScreen_Param_t mfrparam;
-                std::strncpy(mfrparam.path, strBLSplashScreenPath.c_str(), sizeof(mfrparam.path));
-                mfrparam.path[sizeof(mfrparam.path) - 1] = '\0';
-                IARM_Result_t result = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME, IARM_BUS_MFRLIB_API_SetBlSplashScreen, (void *)&mfrparam, sizeof(mfrparam));
-                if (result != IARM_RESULT_SUCCESS){
-                    LOGERR("Update failed. path: %s, fileExists %s, IARM result %d ",strBLSplashScreenPath.c_str(),fileExists ? "true" : "false",result);
-                    error.message = "Update failed";
-                    error.code = "-32002";
-                    success = false;
-                }
-                else 
-                {
-                    LOGINFO("BootLoaderSplashScreen updated successfully");
-                    success =true;
-                }
-            }
-            else
-            {
-                LOGERR("Invalid path. path: %s, fileExists %s ",strBLSplashScreenPath.c_str(),fileExists ? "true" : "false");
+                LOGERR("Rejected invalid splash screen input");
                 error.message = "Invalid path";
                 error.code = "-32001";
                 success = false;
+                return Core::ERROR_NONE;
+            }
+
+            IARM_Bus_MFRLib_SetBLSplashScreen_Param_t mfrparam;
+            std::strncpy(mfrparam.path, stagedPath.c_str(), sizeof(mfrparam.path));
+            mfrparam.path[sizeof(mfrparam.path) - 1] = '\0';
+            const IARM_Result_t result = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME, IARM_BUS_MFRLIB_API_SetBlSplashScreen, (void *)&mfrparam, sizeof(mfrparam));
+            unlink(stagedPath.c_str());
+            if (result != IARM_RESULT_SUCCESS)
+            {
+                LOGERR("BootLoaderSplashScreen update failed: IARM result %d", result);
+                error.message = "Update failed";
+                error.code = "-32002";
+                success = false;
+            }
+            else
+            {
+                LOGINFO("BootLoaderSplashScreen updated successfully");
+                success = true;
             }
             LOGINFO("response: error.code=%s, error.message=%s, success=%s", error.code.c_str(), error.message.c_str(), success ? "true" : "false");
             return Core::ERROR_NONE;
