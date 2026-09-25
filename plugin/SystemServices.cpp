@@ -50,7 +50,7 @@ namespace WPEFramework
 
     SystemServices::SystemServices() : _service(nullptr), _connectionId(0), _systemServices(nullptr), _systemServicesNotification(this)
     {
-        SYSLOG(Logging::Startup, (_T("Systemservices Constructor")));
+        SYSLOG(Logging::Startup, (_T("manipulate conflict")));
     }
 
     SystemServices::~SystemServices()
