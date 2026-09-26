@@ -54,9 +54,16 @@ TEST(SystemServicesSecurityTest, ValidatesSplashScreenPaths)
     std::string resolved;
 
     // Valid paths within allowed prefixes
-    EXPECT_TRUE(resolveSafeSplashScreenPath("/opt/splash.png", resolved));
-    EXPECT_TRUE(resolveSafeSplashScreenPath("/tmp/splash.jpg", resolved));
-    EXPECT_TRUE(resolveSafeSplashScreenPath("/media/usb/splash.bmp", resolved));
+    const char* validPath = "/tmp/systemservices_splash.jpg";
+    const char* symlinkPath = "/tmp/systemservices_splash_link.jpg";
+    std::remove(symlinkPath);
+    std::remove(validPath);
+    {
+        std::ofstream image(validPath);
+        image << "splash";
+    }
+    ASSERT_EQ(0, symlink(validPath, symlinkPath));
+    EXPECT_TRUE(resolveSafeSplashScreenPath(validPath, resolved));
 
     // Empty path rejected
     EXPECT_FALSE(resolveSafeSplashScreenPath("", resolved));
@@ -67,13 +74,15 @@ TEST(SystemServicesSecurityTest, ValidatesSplashScreenPaths)
     EXPECT_FALSE(resolveSafeSplashScreenPath("/home/user/image.png", resolved));
 
     // Symlinks rejected
-    EXPECT_FALSE(resolveSafeSplashScreenPath("/opt/symlink", resolved));
+    EXPECT_FALSE(resolveSafeSplashScreenPath(symlinkPath, resolved));
 
     // Nonexistent files rejected
     EXPECT_FALSE(resolveSafeSplashScreenPath("/opt/nonexistent.png", resolved));
 
     // Traversal sequences rejected by lexical check
     EXPECT_FALSE(resolveSafeSplashScreenPath("/opt/../etc/passwd", resolved));
+    std::remove(symlinkPath);
+    std::remove(validPath);
 }
 #include "UtilsFile.h"
 #include "UtilsProcess.h"
