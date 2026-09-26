@@ -33,6 +33,57 @@
 #include "SystemServices.h"
 #include "SystemServicesImplementation.h"
 #include "UtilsString.h"
+
+bool isSafeTimeZoneName(const std::string& timeZone);
+
+TEST(SystemServicesSecurityTest, ValidatesTimeZoneNames)
+{
+    EXPECT_TRUE(isSafeTimeZoneName("America/New_York"));
+    EXPECT_TRUE(isSafeTimeZoneName("Etc/GMT+5"));
+    EXPECT_FALSE(isSafeTimeZoneName("../etc/passwd"));
+    EXPECT_FALSE(isSafeTimeZoneName("/etc/passwd"));
+    EXPECT_FALSE(isSafeTimeZoneName("America/New_York;command"));
+    EXPECT_FALSE(isSafeTimeZoneName("America/New_York\nnext"));
+    EXPECT_FALSE(isSafeTimeZoneName(""));
+}
+
+bool resolveSafeSplashScreenPath(const std::string& input, std::string& resolved);
+
+TEST(SystemServicesSecurityTest, ValidatesSplashScreenPaths)
+{
+    std::string resolved;
+
+    // Valid paths within allowed prefixes
+    const char* validPath = "/tmp/systemservices_splash.jpg";
+    const char* symlinkPath = "/tmp/systemservices_splash_link.jpg";
+    std::remove(symlinkPath);
+    std::remove(validPath);
+    {
+        std::ofstream image(validPath);
+        image << "splash";
+    }
+    ASSERT_EQ(0, symlink(validPath, symlinkPath));
+    EXPECT_TRUE(resolveSafeSplashScreenPath(validPath, resolved));
+
+    // Empty path rejected
+    EXPECT_FALSE(resolveSafeSplashScreenPath("", resolved));
+
+    // Paths outside allowed prefixes rejected
+    EXPECT_FALSE(resolveSafeSplashScreenPath("/etc/passwd", resolved));
+    EXPECT_FALSE(resolveSafeSplashScreenPath("/root/.ssh", resolved));
+    EXPECT_FALSE(resolveSafeSplashScreenPath("/home/user/image.png", resolved));
+
+    // Symlinks rejected
+    EXPECT_FALSE(resolveSafeSplashScreenPath(symlinkPath, resolved));
+
+    // Nonexistent files rejected
+    EXPECT_FALSE(resolveSafeSplashScreenPath("/opt/nonexistent.png", resolved));
+
+    // Traversal sequences rejected by lexical check
+    EXPECT_FALSE(resolveSafeSplashScreenPath("/opt/../etc/passwd", resolved));
+    std::remove(symlinkPath);
+    std::remove(validPath);
+}
 #include "UtilsFile.h"
 #include "UtilsProcess.h"
 #include "thermonitor.h"
