@@ -20,6 +20,10 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <cstdio>
+#include <climits>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
 #include <regex>
 #include <fstream>
 #include <string>
@@ -93,24 +97,58 @@ bool isSafeTimeZoneName(const std::string& timeZone)
     return true;
 }
 
-bool resolveSafeSplashScreenPath(const std::string& input, std::string& resolved)
+bool stageSafeSplashScreen(const std::string& input, std::string& stagedPath)
 {
     struct stat inputStat;
-    if (input.empty() || lstat(input.c_str(), &inputStat) != 0 || !S_ISREG(inputStat.st_mode) || S_ISLNK(inputStat.st_mode))
-        return false;
-
     char resolvedBuffer[PATH_MAX] = {0};
-    if (realpath(input.c_str(), resolvedBuffer) == nullptr)
+    if (input.empty() || lstat(input.c_str(), &inputStat) != 0 || S_ISLNK(inputStat.st_mode) || realpath(input.c_str(), resolvedBuffer) == nullptr)
         return false;
-    resolved = resolvedBuffer;
 
+    const std::string resolved(resolvedBuffer);
     static const std::vector<std::string> allowedPrefixes = {"/opt/", "/tmp/", "/media/"};
-    for (const auto& prefix : allowedPrefixes) {
-        if (resolved.rfind(prefix, 0) == 0)
-            return true;
+    if (std::none_of(allowedPrefixes.begin(), allowedPrefixes.end(), [&resolved](const std::string& prefix) { return resolved.rfind(prefix, 0) == 0; }))
+        return false;
+
+    const int source = open(resolved.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+    if (source < 0 || fstat(source, &inputStat) != 0 || !S_ISREG(inputStat.st_mode)) {
+        if (source >= 0)
+            close(source);
+        return false;
     }
-    resolved.clear();
-    return false;
+
+    char stagingTemplate[] = "/tmp/systemservices-splash-XXXXXX";
+    const int destination = mkstemp(stagingTemplate);
+    if (destination < 0) {
+        close(source);
+        return false;
+    }
+
+    bool copied = true;
+    char buffer[16384];
+    ssize_t bytesRead;
+    while ((bytesRead = read(source, buffer, sizeof(buffer))) > 0) {
+        ssize_t offset = 0;
+        while (offset < bytesRead) {
+            const ssize_t bytesWritten = write(destination, buffer + offset, bytesRead - offset);
+            if (bytesWritten <= 0) {
+                copied = false;
+                break;
+            }
+            offset += bytesWritten;
+        }
+        if (!copied)
+            break;
+    }
+    if (bytesRead < 0 || fsync(destination) != 0)
+        copied = false;
+    close(source);
+    close(destination);
+    if (!copied) {
+        unlink(stagingTemplate);
+        return false;
+    }
+    stagedPath = stagingTemplate;
+    return true;
 }
 
 #define MAX_REBOOT_DELAY 86400 /* 24Hr = 86400 sec */
@@ -2444,11 +2482,11 @@ namespace WPEFramework
         
         Core::hresult SystemServicesImplementation::SetBootLoaderSplashScreen(const string& path, ErrorInfo& error, bool& success)
         {
-            LOGINFO("path=%s", path.c_str());
+            LOGINFO("SetBootLoaderSplashScreen called");
             string strBLSplashScreenPath;
-            if (!resolveSafeSplashScreenPath(path, strBLSplashScreenPath))
+            if (!stageSafeSplashScreen(path, strBLSplashScreenPath))
             {
-                LOGERR("Invalid or unsafe splash screen path: %s", path.c_str());
+                LOGERR("Rejected invalid splash screen input");
                 error.message = "Invalid path";
                 error.code = "-32001";
                 success = false;
@@ -2459,8 +2497,9 @@ namespace WPEFramework
             std::strncpy(mfrparam.path, strBLSplashScreenPath.c_str(), sizeof(mfrparam.path));
             mfrparam.path[sizeof(mfrparam.path) - 1] = '\0';
             IARM_Result_t result = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME, IARM_BUS_MFRLIB_API_SetBlSplashScreen, (void *)&mfrparam, sizeof(mfrparam));
+            unlink(strBLSplashScreenPath.c_str());
             if (result != IARM_RESULT_SUCCESS){
-                LOGERR("Update failed. path: %s, IARM result %d ",strBLSplashScreenPath.c_str(),result);
+                LOGERR("BootLoaderSplashScreen update failed: IARM result %d", result);
                 error.message = "Update failed";
                 error.code = "-32002";
                 success = false;

@@ -47,7 +47,7 @@ TEST(SystemServicesSecurityTest, ValidatesTimeZoneNames)
     EXPECT_FALSE(isSafeTimeZoneName(""));
 }
 
-bool resolveSafeSplashScreenPath(const std::string& input, std::string& resolved);
+bool stageSafeSplashScreen(const std::string& input, std::string& resolved);
 
 TEST(SystemServicesSecurityTest, ValidatesSplashScreenPaths)
 {
@@ -63,24 +63,25 @@ TEST(SystemServicesSecurityTest, ValidatesSplashScreenPaths)
         image << "splash";
     }
     ASSERT_EQ(0, symlink(validPath, symlinkPath));
-    EXPECT_TRUE(resolveSafeSplashScreenPath(validPath, resolved));
+    EXPECT_TRUE(stageSafeSplashScreen(validPath, resolved));
 
     // Empty path rejected
-    EXPECT_FALSE(resolveSafeSplashScreenPath("", resolved));
+    EXPECT_FALSE(stageSafeSplashScreen("", resolved));
 
     // Paths outside allowed prefixes rejected
-    EXPECT_FALSE(resolveSafeSplashScreenPath("/etc/passwd", resolved));
-    EXPECT_FALSE(resolveSafeSplashScreenPath("/root/.ssh", resolved));
-    EXPECT_FALSE(resolveSafeSplashScreenPath("/home/user/image.png", resolved));
+    EXPECT_FALSE(stageSafeSplashScreen("/etc/passwd", resolved));
+    EXPECT_FALSE(stageSafeSplashScreen("/root/.ssh", resolved));
+    EXPECT_FALSE(stageSafeSplashScreen("/home/user/image.png", resolved));
 
     // Symlinks rejected
-    EXPECT_FALSE(resolveSafeSplashScreenPath(symlinkPath, resolved));
+    EXPECT_FALSE(stageSafeSplashScreen(symlinkPath, resolved));
 
     // Nonexistent files rejected
-    EXPECT_FALSE(resolveSafeSplashScreenPath("/opt/nonexistent.png", resolved));
+    EXPECT_FALSE(stageSafeSplashScreen("/opt/nonexistent.png", resolved));
 
     // Traversal sequences rejected by lexical check
-    EXPECT_FALSE(resolveSafeSplashScreenPath("/opt/../etc/passwd", resolved));
+    EXPECT_FALSE(stageSafeSplashScreen("/opt/../etc/passwd", resolved));
+    std::remove(resolved.c_str());
     std::remove(symlinkPath);
     std::remove(validPath);
 }
@@ -1570,6 +1571,37 @@ TEST_F(SystemServicesTest, SetBootLoaderSplashScreen_Success)
     
     (void)std::remove("/tmp/test_splash.png");
 }
+
+TEST_F(SystemServicesTest, SetBootLoaderSplashScreenUsesStableStagedFile)
+{
+    const char* sourcePath = "/tmp/test_splash_stable.png";
+    {
+        std::ofstream file(sourcePath);
+        file << "validated-content";
+    }
+
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke([sourcePath](const char*, const char*, void* argument, size_t) {
+            {
+                std::ofstream replacement(sourcePath, std::ios::trunc);
+                replacement << "replacement-content";
+            }
+            const auto* parameters = static_cast<IARM_Bus_MFRLib_SetBLSplashScreen_Param_t*>(argument);
+            EXPECT_THAT(std::string(parameters->path), ::testing::StartsWith("/tmp/systemservices-splash-"));
+            std::ifstream staged(parameters->path);
+            std::string content;
+            std::getline(staged, content);
+            EXPECT_EQ("validated-content", content);
+            return IARM_RESULT_SUCCESS;
+        }));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBootLoaderSplashScreen"), _T("{\"path\":\"/tmp/test_splash_stable.png\"}"), response));
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response));
+    EXPECT_TRUE(jsonResponse["success"].Boolean());
+    (void)std::remove(sourcePath);
+}
+
 TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_Success)
 {
     EXPECT_CALL(PowerManagerMock::Mock(), SetWakeupSourceConfig(::testing::_))
