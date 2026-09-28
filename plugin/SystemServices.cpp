@@ -127,7 +127,6 @@ namespace WPEFramework
             VARIABLE_IS_NOT_USED uint32_t result = _systemServices->Release();
 
             _systemServices = nullptr;
-            _systemServices->Release();
 
             // It should have been the last reference we are releasing,
             // so it should endup in a DESTRUCTION_SUCCEEDED, if not we
