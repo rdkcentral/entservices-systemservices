@@ -36,6 +36,7 @@ SystemServices exposes a rich JSON-RPC API that enables applications to interact
 ├── plugin/                 # Thunder plugin source code (C++)
 │   ├── platformcaps/      # Platform capabilities subsystem
 │   └── TestClient/        # Test client for API validation
+├── powercontroller/        # PowerController client library (optional)
 ├── ARCHITECTURE.md         # Technical architecture documentation
 ├── CHANGELOG.md            # Version history
 ├── CMakeLists.txt          # Top-level CMake build definition
@@ -83,6 +84,31 @@ cmake -G Ninja \
   -DUSE_THUNDER_R4=ON
 
 # 3. Build and install
+cmake --build build -j$(nproc)
+cmake --install build
+```
+
+### Build Options
+
+| Option | Default | Description |
+|---|---|---|
+| `PLUGIN_SYSTEMSERVICES` | OFF | Build the SystemServices plugin |
+| `POWERCONTROLLER` | OFF | Build the PowerController client library (provides COM-RPC interface to PowerManager plugin) |
+| `USE_THUNDER_R4` | OFF | Use Thunder R4 APIs |
+| `TESTBINARIES` | OFF | Build test binaries (L1 and L2 tests) |
+
+**PowerController Client Library**: The `POWERCONTROLLER` option builds an optional client library (`libWPEFrameworkPowerController.so`) that provides a C API for communicating with the PowerManager plugin via Thunder's COM-RPC mechanism. This library was previously distributed as a patch and is maintained in this repository for convenience.
+
+To build with PowerController support:
+
+```bash
+cmake -G Ninja \
+  -S . \
+  -B build \
+  -DCMAKE_INSTALL_PREFIX="$PWD/install/usr" \
+  -DPOWERCONTROLLER=ON \
+  -DUSE_THUNDER_R4=ON
+
 cmake --build build -j$(nproc)
 cmake --install build
 ```
