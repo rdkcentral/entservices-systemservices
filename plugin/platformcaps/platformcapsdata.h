@@ -73,11 +73,7 @@ private:
       uint32_t mId{ 0 };
       std::string mCallSign{};
 
-#if ((THUNDER_VERSION >= 4) && (THUNDER_VERSION_MINOR == 4))
-      PluginHost::ILocalDispatcher * dispatcher_ {nullptr};
-#else
       PluginHost::IDispatcher* dispatcher_{ nullptr };
-#endif
 
       Core::ProxyType<Core::JSONRPC::Message> Message() const
       {
