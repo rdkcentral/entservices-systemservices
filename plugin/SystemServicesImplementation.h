@@ -196,7 +196,7 @@ namespace Thunder
             public:
                 static Core::ProxyType<Core::IDispatch> Create(SystemServicesImplementation* systemServicesImplementation, Event event, JsonObject  params) {
 #ifndef USE_THUNDER_R4
-                    return (Core::proxy_cast<Core::IDispatch>(Core::ProxyType<Job>::Create(systemServicesImplementation, event, params)));
+                    return (Core::ProxyType<Core::IDispatch>(Core::ProxyType<Job>::Create(systemServicesImplementation, event, params)));
 #else
                     return (Core::ProxyType<Core::IDispatch>(Core::ProxyType<Job>::Create(systemServicesImplementation, event, params)));
 #endif
