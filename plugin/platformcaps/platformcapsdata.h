@@ -159,7 +159,7 @@ private:
         message->Designator = Core::JSON::String(mCallSign + ".1." + method);
         ToMessage(parameters, message);
         const uint32_t channelId = ~0;
-#if ((THUNDER_VERSION >= 4) && (THUNDER_VERSION_MINOR == 4))
+#if ((THUNDER_VERSION >= 4))
             string output = "";
             uint32_t result = Core::ERROR_BAD_REQUEST;
 	    if (dispatcher_  != nullptr) {
