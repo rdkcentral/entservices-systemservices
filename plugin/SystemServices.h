@@ -69,7 +69,7 @@ namespace WPEFramework
 
                         void OnFirmwareUpdateInfoReceived(const int status, const string& responseString, const string& firmwareUpdateVersion, const bool rebootImmediately, const bool updateAvailable, const int updateAvailableEnum, const bool success) override
                         {
-                            LOGINFO("TEST Cherrypick demo FirmwareUpdateInfo");
+                            LOGINFO("FirmwareUpdateInfo");
                             Exchange::JSystemServices::Event::OnFirmwareUpdateInfoReceived(_parent, status, responseString, firmwareUpdateVersion, rebootImmediately, updateAvailable, updateAvailableEnum, success);
                         }
 
