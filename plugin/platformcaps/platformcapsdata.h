@@ -24,10 +24,13 @@
 #include <interfaces/IAuthService.h>
 #include <interfaces/IDeviceInfo.h>
 
+/* DS COM-RPC client helper — provides DSHelper::AcquireSubInterface<T>() and lifecycle callbacks */
+#include "DeviceSettingsInterface.h"
+
 namespace WPEFramework {
 namespace Plugin {
 
-class PlatformCapsData {
+class PlatformCapsData : public DSHelper {
 public:
   typedef std::tuple <string, string, string> BrowserInfo;
   
@@ -50,6 +53,10 @@ public:
 private:
   std::map <string, uint8_t> getAvailablePlugins() const;
   bool verifyLibraries(const JsonArray &libraries) const;
+
+  // DSHelper lifecycle callbacks
+  void OnDeviceSettingsActivated() override;
+  void OnDeviceSettingsDeactivated() override;
 
 public:
   /**
