@@ -163,11 +163,7 @@ private:
             string output = "";
             uint32_t result = Core::ERROR_BAD_REQUEST;
 	    if (dispatcher_  != nullptr) {
-                PluginHost::ILocalDispatcher* localDispatcher = dispatcher_->Local();
-                ASSERT(localDispatcher != nullptr);
-
-                if (localDispatcher != nullptr)
-                    result =  dispatcher_->Invoke(channelId, message->Id.Value(), "", message->Designator.Value(), message->Parameters.Value(),output);
+              result = dispatcher_->Invoke(channelId, message->Id.Value(), "", message->Designator.Value(), message->Parameters.Value(), output);
             }
 
             if (message.IsValid() == true) {
