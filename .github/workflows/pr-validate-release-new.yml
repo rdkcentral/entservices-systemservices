@@ -1,22 +1,18 @@
 name: PR - Validate Backport Target
 
-# Runs when PR is opened/updated targeting dummy_develop or support/* branches.
-# Checks that the PR description contains a valid 'backport_to:' field
+# Runs when a PR is opened/updated against ANY base branch.
+# Checks that the PR description contains a valid 'backport_to' field
 # AND that the target branch actually exists on the remote.
 #
 # Valid values:
 #   backport_to: none       → no backport needed
 #   backport_to: 8.3.4.0   → backport to support/8.3.4.0
 
+# No 'branches:' filter: must match backport.yml exactly, otherwise a PR
+# could merge unvalidated and still reach the backport job.
 on:
   pull_request:
     types: [opened, edited, reopened, synchronize]
-    branches:
-      - dummy_develop
-      - dummy_develop_poc
-      - dummy_support-old
-      - 'support/**'
-      - 'release/**'
 
 permissions:
   contents: read
@@ -90,21 +86,34 @@ jobs:
           
           # Extract value after colon (handle multi-line YAML format)
           # If value is empty after colon, check next non-empty line
-          VALUE_ON_SAME_LINE=$(echo "$RAW_LINE" | sed -E 's/^[^:]*:\s*//' | sed 's/#.*//' | xargs)
+          VALUE_ON_SAME_LINE=$(echo "$RAW_LINE" | sed -E 's/^[^:]*:\s*//' | sed 's/#.*//' | xargs || true)
           
           if [ -z "$VALUE_ON_SAME_LINE" ]; then
             # Multi-line YAML format: check next non-empty line
             echo "  ⚠️  Value not on same line, checking next line (multi-line YAML)..."
             LINE_NUM=$(echo "$PR_BODY" | grep -inE '^\s*backport_to\s*:' | tail -1 | cut -d: -f1)
-            VALUE_ON_SAME_LINE=$(echo "$PR_BODY" | tail -n +$((LINE_NUM + 1)) | grep -v '^[[:space:]]*$' | head -1 | sed 's/#.*//' | xargs)
+            VALUE_ON_SAME_LINE=$(echo "$PR_BODY" | tail -n +$((LINE_NUM + 1)) | grep -v '^[[:space:]]*$' | head -1 | sed 's/#.*//' | xargs || true)
             echo "  Next line value: '$VALUE_ON_SAME_LINE'"
           fi
           
           # Strip leading/trailing spaces, newlines, carriage returns, and remove trailing comments
-          VERSION=$(echo "$VALUE_ON_SAME_LINE" | sed 's/#.*//' | tr -d '\n\r' | xargs)
+          VERSION=$(echo "$VALUE_ON_SAME_LINE" | sed 's/#.*//' | tr -d '\n\r' | xargs || true)
           
           echo "  Normalized value: '$VERSION'"
           echo ""
+
+          # ────────────────────────────────────────────────────────────────────
+          # Rule 2b: Empty value after parsing → nothing to do, not an error
+          # (matches backport.yml, which skips on an empty backport_to)
+          # ────────────────────────────────────────────────────────────────────
+          if [ -z "$VERSION" ]; then
+            echo "  ℹ️  backport_to field is empty — treated as 'none' (no backport)."
+            echo ""
+            echo "╔══════════════════════════════════════════════════════════════════╗"
+            echo "║  ✅ VALIDATION PASSED: NO BACKPORT (empty value)                ║"
+            echo "╚══════════════════════════════════════════════════════════════════╝"
+            exit 0
+          fi
 
           # ────────────────────────────────────────────────────────────────────
           # Rule 3: Handle 'none' (no backport needed)
@@ -135,6 +144,16 @@ jobs:
             v_trimmed=$(echo "$v" | xargs)
             [ -n "$v_trimmed" ] && CLEAN_LIST+=("$v_trimmed")
           done
+
+          # Separators only (e.g. ",,,") leave no usable target — same as 'none'
+          if [ "${#CLEAN_LIST[@]}" -eq 0 ]; then
+            echo "  ℹ️  backport_to has no usable values — treated as 'none' (no backport)."
+            echo ""
+            echo "╔══════════════════════════════════════════════════════════════════╗"
+            echo "║  ✅ VALIDATION PASSED: NO BACKPORT (no usable values)           ║"
+            echo "╚══════════════════════════════════════════════════════════════════╝"
+            exit 0
+          fi
 
           if [ "${#CLEAN_LIST[@]}" -gt 1 ]; then
             for v in "${CLEAN_LIST[@]}"; do
