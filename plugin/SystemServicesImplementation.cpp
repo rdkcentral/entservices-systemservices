@@ -250,10 +250,6 @@ namespace WPEFramework
             , _service(nullptr)
             , _pwrMgrNotification(*this)
             , _registeredEventHandlers(false)
-#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
-            , m_iarmEventHandlersRegistered(false)
-#endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
-                , m_deepSleepInProgress(false)
         {
             LOGINFO("Create SystemServicesImplementation Instance");
 
@@ -285,13 +281,6 @@ namespace WPEFramework
         {
             regfree (&m_regexUnallowedChars);
 
-            {
-                std::lock_guard<std::mutex> lock(m_getFirmwareInfoThreadMutex);
-                if (m_getFirmwareInfoThread.get().joinable()) {
-                    m_getFirmwareInfoThread.get().join();
-                }
-            }
-
             if (_powerManagerPlugin) {
                 _powerManagerPlugin->Unregister(_pwrMgrNotification.baseInterface<Exchange::IPowerManager::INetworkStandbyModeChangedNotification>());
                 _powerManagerPlugin->Unregister(_pwrMgrNotification.baseInterface<Exchange::IPowerManager::IThermalModeChangedNotification>());
@@ -302,7 +291,6 @@ namespace WPEFramework
 
             _registeredEventHandlers = false;
             m_operatingModeTimer.stop();
-            m_operatingModeTimer.join();
 #if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
             DeinitializeIARM();
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
@@ -441,36 +429,23 @@ namespace WPEFramework
             {
                 IARM_Result_t res;
                 IARM_CHECK( IARM_Bus_RegisterCall(IARM_BUS_COMMON_API_SysModeChange, _SysModeChange));
-                RegisterIARMEventHandlers();
-            }
-        }
-
-        void SystemServicesImplementation::RegisterIARMEventHandlers()
-        {
-            if (!m_iarmEventHandlersRegistered && Utils::IARM::isConnected())
-            {
-				IARM_Result_t res;
                 IARM_CHECK( IARM_Bus_RegisterEventHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, _systemStateChanged));
                 IARM_CHECK( IARM_Bus_RegisterEventHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_DEVICE_UPDATE_RECEIVED, _deviceMgtUpdateReceived));
 #ifdef ENABLE_SYSTIMEMGR_SUPPORT
                 IARM_CHECK( IARM_Bus_RegisterEventHandler(IARM_BUS_SYSTIME_MGR_NAME, cTIMER_STATUS_UPDATE, _timerStatusEventHandler));
 #endif// ENABLE_SYSTIMEMGR_SUPPORT
-                m_iarmEventHandlersRegistered = true;
             }
+	    
         }
 
         void SystemServicesImplementation::DeinitializeIARM()
         {
-            if (m_iarmEventHandlersRegistered && Utils::IARM::isConnected())
+            if (Utils::IARM::isConnected())
             {
                 IARM_Result_t res;
                 IARM_CHECK( IARM_Bus_RemoveEventHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, _systemStateChanged));
-                IARM_CHECK( IARM_Bus_RemoveEventHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_DEVICE_UPDATE_RECEIVED, _deviceMgtUpdateReceived));
-#ifdef ENABLE_SYSTIMEMGR_SUPPORT
-                IARM_CHECK( IARM_Bus_RemoveEventHandler(IARM_BUS_SYSTIME_MGR_NAME, cTIMER_STATUS_UPDATE, _timerStatusEventHandler));
-#endif// ENABLE_SYSTIMEMGR_SUPPORT
+		        IARM_CHECK( IARM_Bus_RemoveEventHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_DEVICE_UPDATE_RECEIVED, _deviceMgtUpdateReceived));
             }
-            m_iarmEventHandlersRegistered = false;
         }
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
 
@@ -494,42 +469,19 @@ namespace WPEFramework
 
         void SystemServicesImplementation::OnPowerModeChanged(const PowerState currentState, const PowerState newState)
         {
-            if (newState == WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP) {
-                m_operatingModeTimer.stop();
-                m_operatingModeTimer.join();
-                {
-                    std::lock_guard<std::mutex> lock(m_getFirmwareInfoThreadMutex);
-                    m_deepSleepInProgress = true;
-                    if (m_getFirmwareInfoThread.get().joinable()) {
-                        m_getFirmwareInfoThread.get().join();
-                    }
+            m_powerModeChangedThread = Utils::ThreadRAII(std::thread([this, currentState, newState]() {
+                std::string curPowerState = powerModeEnumToString(currentState);
+                std::string newPowerState = powerModeEnumToString(newState);
+
+                LOGWARN("IARM Event triggered for PowerStateChange.\
+                        Old State %s, New State: %s\n",
+                        curPowerState.c_str(), newPowerState.c_str());
+                if (SystemServicesImplementation::_instance) {
+                    SystemServicesImplementation::_instance->OnSystemPowerStateChanged(std::move(curPowerState), std::move(newPowerState));
+                } else {
+                    LOGERR("SystemServicesImplementation::_instance is NULL.\n");
                 }
-#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
-                DeinitializeIARM();
-#endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
-            } else if (currentState == WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP) {
-                {
-                    std::lock_guard<std::mutex> lock(m_getFirmwareInfoThreadMutex);
-                    m_deepSleepInProgress = false;
-                }
-#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
-                RegisterIARMEventHandlers();
-#endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
-            }
-
-            std::string curPowerState,newPowerState = "";
-
-            curPowerState = powerModeEnumToString(currentState);
-            newPowerState = powerModeEnumToString(newState);
-
-            LOGWARN("IARM Event triggered for PowerStateChange.\
-                    Old State %s, New State: %s\n",
-                    curPowerState.c_str() , newPowerState.c_str());
-            if (SystemServicesImplementation::_instance) {
-                SystemServicesImplementation::_instance->OnSystemPowerStateChanged(std::move(curPowerState), std::move(newPowerState));
-            } else {
-                LOGERR("SystemServicesImplementation::_instance is NULL.\n");
-            }
+            }));
         }
 
         std::string SystemServicesImplementation::powerModeEnumToString(PowerState state)
@@ -1846,13 +1798,6 @@ namespace WPEFramework
             LOGINFO("GUID=%s", GUID.c_str());
             try
             {
-                std::lock_guard<std::mutex> lock(m_getFirmwareInfoThreadMutex);
-                if (m_deepSleepInProgress) {
-                    asyncResponse = false;
-                    success = false;
-                    LOGWARN("Firmware update check skipped during deep sleep");
-                    return Core::ERROR_NONE;
-                }
                 if (m_getFirmwareInfoThread.get().joinable()) {
                     m_getFirmwareInfoThread.get().join();
                 }
