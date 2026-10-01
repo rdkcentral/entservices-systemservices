@@ -36,6 +36,7 @@ SystemServices exposes a rich JSON-RPC API that enables applications to interact
 ├── plugin/                 # Thunder plugin source code (C++)
 │   ├── platformcaps/      # Platform capabilities subsystem
 │   └── TestClient/        # Test client for API validation
+├── powercontroller/        # PowerController client library component
 ├── ARCHITECTURE.md         # Technical architecture documentation
 ├── CHANGELOG.md            # Version history
 ├── CMakeLists.txt          # Top-level CMake build definition
@@ -80,12 +81,21 @@ cmake -G Ninja \
   -B build \
   -DCMAKE_INSTALL_PREFIX="$PWD/install/usr" \
   -DPLUGIN_SYSTEMSERVICES=ON \
+  -DPOWERCONTROLLER=ON \
   -DUSE_THUNDER_R4=ON
 
 # 3. Build and install
 cmake --build build -j$(nproc)
 cmake --install build
 ```
+
+#### Build Options
+
+| Option | Default | Description |
+|---|---|---|
+| `PLUGIN_SYSTEMSERVICES` | OFF | Build the SystemServices Thunder plugin |
+| `POWERCONTROLLER` | OFF | Build the PowerController client library (libWPEFrameworkPowerController.so) |
+| `USE_THUNDER_R4` | OFF | Enable Thunder R4 API compatibility |
 
 ## Testing
 
