@@ -163,7 +163,7 @@ private:
             string output = "";
             uint32_t result = Core::ERROR_BAD_REQUEST;
 	    if (dispatcher_  != nullptr) {
-                PluginHost::ILocalDispatcher* localDispatcher = dispatcher_->Local();
+                PluginHost::IDispatcher* localDispatcher = dispatcher_->Local();
                 ASSERT(localDispatcher != nullptr);
 
                 if (localDispatcher != nullptr)
