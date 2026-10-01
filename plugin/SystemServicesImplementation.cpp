@@ -4152,7 +4152,7 @@ namespace WPEFramework
                 // Directory already exists, which is fine
                 return true;
             } else {
-                LOGERR("Directory setup was unsuccessful, return status: %d", ret);
+                LOGERR("Failed to set up the directory, return status: %d", ret);
                 return false;
             }
         }
