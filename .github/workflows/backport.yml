@@ -1,6 +1,6 @@
 name: backport PR
 
-# Runs when a PR is MERGED into dummy_develop / support/** / release/**
+# Runs when a PR is MERGED into ANY base branch.
 # Reads backport_to from PR description:
 #   backport_to omitted                 → no backport needed (not an error)
 #   backport_to: none                   → no backport needed
@@ -11,15 +11,12 @@ name: backport PR
 # If cherry-pick has conflicts → resolves them inline (diff3 / take incoming)
 # No second workflow needed. No workflow_run dependency. Self-contained.
 
+# No 'branches:' filter: runs for a PR into ANY base branch so teams with
+# their own naming (RDK6.1, QA1.2, ...) need no workflow edit. The real gate
+# is the PR body - a missing/none 'backport_to' exits early below.
 on:
   pull_request:
     types: [closed]
-    branches:
-      - dummy_develop
-      - dummy_develop_poc
-      - dummy_support-old
-      - 'support/**'
-      - 'release/**'
 
 permissions:
   contents: write
@@ -152,6 +149,16 @@ jobs:
             elif echo "$v" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$'; then
               # Map 3-part versions to support/X.Y.Z.0 for compatibility
               IFS='.' read -ra PARTS <<< "$v"
+              LEADING_ZERO=false
+              for PART in "${PARTS[@]}"; do
+                if [[ "$PART" =~ ^0[0-9]+ ]]; then
+                  LEADING_ZERO=true
+                fi
+              done
+              if [ "$LEADING_ZERO" = true ]; then
+                echo "❌ Invalid backport_to: version part has a leading zero in '$v'"
+                exit 1
+              fi
               if [ "${#PARTS[@]}" -eq 3 ]; then
                 b="support/${v}.0"
               else
