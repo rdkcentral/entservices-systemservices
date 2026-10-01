@@ -19,6 +19,8 @@
 
 #include <thread>
 #include <chrono>
+#include <condition_variable>
+#include <mutex>
 
 using namespace std;
 
@@ -28,6 +30,8 @@ class cTimer{
         int interval;
         void (*callBack_function)() = NULL;
         std::thread timerThread;
+        std::condition_variable timerCondition;
+        std::mutex timerMutex;
         void timerFunction();
     public:
         /***
@@ -53,7 +57,6 @@ class cTimer{
          * @return   : nil
          */
         void stop();
-        void detach();
         void join();
 
         /***

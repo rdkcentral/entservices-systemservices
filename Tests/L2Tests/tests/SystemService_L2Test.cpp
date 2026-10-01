@@ -5112,33 +5112,25 @@ TEST_F(SystemService_L2Test, CTimer_Coverage_StartStopJoin)
     EXPECT_GT(callCount, 0);
 }
 
-/* cTimer: start/stop/detach → covers detach() safely
- * Strategy: use 10ms interval, stop immediately, sleep 150ms (>>10ms),
- * then detach the already-finished thread. No race condition possible. */
-TEST_F(SystemService_L2Test, CTimer_Coverage_Detach)
+/* cTimer: stopping a waiting timer must allow the owner to join promptly. */
+TEST_F(SystemService_L2Test, CTimer_Coverage_StopJoinInterruptsWait)
 {
-    TEST_LOG("cTimer_StartStopDetach: start/stop/detach cycle");
-
-    static bool executed = false;
-    executed = false;
+    TEST_LOG("cTimer_StopJoinInterruptsWait: stop interrupts timer wait");
 
     cTimer timer;
-    /* 10ms interval: thread exits quickly after stop() */
-    timer.setInterval([]() { executed = true; }, 10);
+    timer.setInterval([]() {}, 1000);
 
     bool startResult = timer.start();
     EXPECT_TRUE(startResult);
 
-    /* Immediately stop: thread will see clear=true within one 10ms iteration */
+    const auto stopStart = std::chrono::steady_clock::now();
     timer.stop();
+    timer.join();
+    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - stopStart);
 
-    /* Wait 150ms >> 10ms interval — thread has definitely finished */
-    std::this_thread::sleep_for(std::chrono::milliseconds(150));
-
-    /* Detach the already-finished thread (safe: thread already exited) */
-    timer.detach();
-
-    TEST_LOG("  timer detach completed safely, executed=%s", executed ? "true" : "false");
+    EXPECT_LT(elapsed.count(), 250);
+    TEST_LOG("  timer stopped and joined in %lldms", static_cast<long long>(elapsed.count()));
 }
 
 /* cTimer: start/stop/join sequence → covers join() */
