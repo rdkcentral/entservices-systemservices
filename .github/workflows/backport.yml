@@ -512,11 +512,9 @@ jobs:
           echo ""
 
           echo "1️⃣  WORKFLOW RUN URL "
-          echo ""
           echo "Copy the GitHub Actions workflow run page URL shown above."
 
           echo "2️⃣  OPEN FLOW IDE / AI WORKBENCH"
-          echo ""
           echo "Open a new VS Code window."
           echo "Go to: AI Workbench → My Teams → RDK"
           echo "Select: Resolve Git Merge Conflicts"
@@ -529,12 +527,9 @@ jobs:
           echo ""
 
           echo "3️⃣  REVIEW THE CHANGES"
-          echo ""
           echo "Open the backport workspace created by the AI prompt:"
           echo "backport-workspace-${{ github.run_id }}"
-          echo ""
           echo "Open the repository inside the workspace."
-          echo ""
           echo "Verify the changes:"
           echo "git status"
           echo "git diff HEAD --"
@@ -543,7 +538,7 @@ jobs:
           echo "4️⃣  COMMIT AND PUSH"
           echo ""
           echo "Add the resolved files:"
-          echo "git add ."
+          echo "git add <resolved_file_1> <resolved_file_2> ..."
           echo ""
           echo "Commit the changes:"
           echo "git commit -m \"${TICKET}: Backport to ${SUPPORT_BRANCH} — ${PR_TITLE}\""
