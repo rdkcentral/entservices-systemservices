@@ -4153,6 +4153,7 @@ namespace WPEFramework
                 return true;
             } else {
                 LOGERR("Failed to set up the directory, return status: %d", ret);
+				LOGERR("Unable to set up directory return status: %d", ret);
                 return false;
             }
         }
