@@ -511,10 +511,9 @@ jobs:
           echo "============================================================"
           echo ""
 
-          echo "1️⃣  COPY WORKFLOW RUN URL"
+          echo "1️⃣  WORKFLOW RUN URL "
           echo ""
-          echo "Copy the GitHub Actions workflow run URL shown above."
-          echo ""
+          echo "Copy the GitHub Actions workflow run page URL shown above."
 
           echo "2️⃣  OPEN FLOW IDE / AI WORKBENCH"
           echo ""
