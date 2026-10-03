@@ -4089,6 +4089,7 @@ namespace WPEFramework
                 return true;
             } else {
                 LOGERR("Unable to create directory. Error code: %d", ret);
+				LOGERR("Failed. Error code: %d", ret);
                 return false;
             }
         }
