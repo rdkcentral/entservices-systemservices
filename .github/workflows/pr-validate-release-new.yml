@@ -1,15 +1,5 @@
 name: PR - Validate Backport Target
 
-# Runs when a PR is opened/updated against ANY base branch.
-# Checks that the PR description contains a valid 'backport_to' field
-# AND that the target branch actually exists on the remote.
-#
-# Valid values:
-#   backport_to: none       → no backport needed
-#   backport_to: 8.3.4.0   → backport to support/8.3.4.0
-
-# No 'branches:' filter: must match backport.yml exactly, otherwise a PR
-# could merge unvalidated and still reach the backport job.
 on:
   pull_request:
     types: [opened, edited, reopened, synchronize]
