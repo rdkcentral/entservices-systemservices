@@ -1,19 +1,5 @@
 name: backport PR
 
-# Runs when a PR is MERGED into ANY base branch.
-# Reads backport_to from PR description:
-#   backport_to omitted                 → no backport needed (not an error)
-#   backport_to: none                   → no backport needed
-#   backport_to: 8.3.4.0                → backport to support/8.3.4.0
-#   backport_to: dummy_develop,8.3.4.0  → backport to BOTH targets
-# If 'backport_to:' appears more than once, the LAST occurrence wins.
-#
-# If cherry-pick has conflicts → resolves them inline (diff3 / take incoming)
-# No second workflow needed. No workflow_run dependency. Self-contained.
-
-# No 'branches:' filter: runs for a PR into ANY base branch so teams with
-# their own naming (RDK6.1, QA1.2, ...) need no workflow edit. The real gate
-# is the PR body - a missing/none 'backport_to' exits early below.
 on:
   pull_request:
     types: [closed]
