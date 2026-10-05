@@ -325,6 +325,7 @@ namespace WPEFramework
             static cTimer m_operatingModeTimer;
             static int m_remainingDuration;
             Utils::ThreadRAII m_getFirmwareInfoThread;
+            Utils::ThreadRAII m_powerModeChangedThread;
             std::mutex m_getFirmwareInfoThreadMutex;
             bool m_deepSleepInProgress;
             PluginHost::IShell* m_shellService { nullptr };
