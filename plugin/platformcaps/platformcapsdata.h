@@ -247,7 +247,7 @@ private:
 private:
   JsonRpc jsonRpc;
   PluginHost::IShell* _service;
-  Exchange::IAuthService *authservicePlugin;
+  Exchange::IAuthService *authservicePlugin { nullptr };
 };
 
 } // namespace Plugin
