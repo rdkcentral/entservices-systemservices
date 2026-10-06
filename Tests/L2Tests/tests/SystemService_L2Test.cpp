@@ -4459,9 +4459,10 @@ TEST_F(SystemService_L2Test, SysImpl_SetDeepSleepTimer_ZeroSeconds_JSONRPC)
     JsonObject result;
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setDeepSleepTimer", params, result);
     TEST_LOG("  status=%u", status);
+    EXPECT_EQ(status, Core::ERROR_GENERAL);
 }
 
-/* setDeepSleepTimer seconds=999999: covers overflow clamping branch (>864000 → clamp to 0) */
+/* setDeepSleepTimer seconds=999999: covers overflow clamping branch (>864000 → clamp to 0 then call PM) */
 TEST_F(SystemService_L2Test, SysImpl_SetDeepSleepTimer_OverflowSeconds_JSONRPC)
 {
     TEST_LOG("SysImpl_SetDeepSleepTimer_OverflowSeconds: seconds=999999 clamped (exceeds 864000)");
@@ -4470,6 +4471,9 @@ TEST_F(SystemService_L2Test, SysImpl_SetDeepSleepTimer_OverflowSeconds_JSONRPC)
     JsonObject result;
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setDeepSleepTimer", params, result);
     TEST_LOG("  status=%u", status);
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    ASSERT_TRUE(result.HasLabel("success"));
+    EXPECT_TRUE(result["success"].Boolean());
 }
 
 /* setBootLoaderSplashScreen empty path → covers invalid path branch */
@@ -4481,6 +4485,9 @@ TEST_F(SystemService_L2Test, SysImpl_SetBootLoaderSplashScreen_EmptyPath_JSONRPC
     JsonObject result;
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setBootLoaderSplashScreen", params, result);
     TEST_LOG("  status=%u", status);
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    ASSERT_TRUE(result.HasLabel("success"));
+    EXPECT_FALSE(result["success"].Boolean());
 }
 
 /* setBootLoaderSplashScreen non-existent path → covers fileExists==false branch */
@@ -4492,6 +4499,9 @@ TEST_F(SystemService_L2Test, SysImpl_SetBootLoaderSplashScreen_NonExistentPath_J
     JsonObject result;
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setBootLoaderSplashScreen", params, result);
     TEST_LOG("  status=%u", status);
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    ASSERT_TRUE(result.HasLabel("success"));
+    EXPECT_FALSE(result["success"].Boolean());
 }
 
 
@@ -4958,6 +4968,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetTerritory_InvalidFormat_JSONRPC)
     JsonObject result;
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setTerritory", params, result);
     TEST_LOG("  status=%u", status);
+    EXPECT_EQ(status, Core::ERROR_GENERAL);
 }
 
 /* setMode with empty mode → covers populateResponseWithError(SysSrv_MissingKeyValues) */
@@ -5001,6 +5012,9 @@ TEST_F(SystemService_L2Test, SysImpl_SetTimeZoneDST_Empty_JSONRPC)
     JsonObject result;
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setTimeZoneDST", params, result);
     TEST_LOG("  status=%u", status);
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    ASSERT_TRUE(result.HasLabel("success"));
+    EXPECT_TRUE(result["success"].Boolean());
 }
 
 /* updateFirmware via JSON-RPC */
@@ -5056,11 +5070,16 @@ TEST_F(SystemService_L2Test, SysImpl_SetMode_WAREHOUSE_NegDuration_JSONRPC)
     JsonObject result;
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
     TEST_LOG("  status=%u", status);
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    ASSERT_TRUE(result.HasLabel("success"));
+    EXPECT_TRUE(result["success"].Boolean());
+
     /* Cleanup: reset to NORMAL */
     JsonObject params2, result2;
     params2["mode"] = "NORMAL";
     params2["duration"] = -1;
-    InvokeServiceMethod("org.rdk.System.1", "setMode", params2, result2);
+    uint32_t cleanupStatus = InvokeServiceMethod("org.rdk.System.1", "setMode", params2, result2);
+    EXPECT_EQ(cleanupStatus, Core::ERROR_NONE);
 }
 
 /***********************************************************************
