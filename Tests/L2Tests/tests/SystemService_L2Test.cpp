@@ -4985,9 +4985,9 @@ TEST_F(SystemService_L2Test, SysImpl_SetMode_Empty_JSONRPC)
     JsonObject result;
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
     TEST_LOG("  status=%u", status);
-    if (result.HasLabel("success")) {
-        TEST_LOG("  success=%s", result["success"].Boolean() ? "true" : "false");
-    }
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    ASSERT_TRUE(result.HasLabel("success"));
+    EXPECT_FALSE(result["success"].Boolean());
 }
 
 /* setMode with completely invalid mode string → covers invalid-mode early return */
@@ -5002,10 +5002,9 @@ TEST_F(SystemService_L2Test, SysImpl_SetMode_InvalidMode_JSONRPC)
     JsonObject result;
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
     TEST_LOG("  status=%u", status);
-    if (result.HasLabel("success")) {
-        bool s = result["success"].Boolean();
-        TEST_LOG("  success=%s (expect false for invalid mode)", s ? "true" : "false");
-    }
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    ASSERT_TRUE(result.HasLabel("success"));
+    EXPECT_FALSE(result["success"].Boolean());
 }
 
 /* setTimeZoneDST with empty string → covers MissingKeyValues branch */
