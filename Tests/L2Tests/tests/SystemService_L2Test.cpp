@@ -3043,8 +3043,10 @@ TEST_F(SystemService_L2Test, SysImpl_Cov_SetMode_NORMAL_JSONRPC)
     TEST_LOG("SysImpl_Cov: Testing setMode NORMAL via JSON-RPC");
 
     JsonObject params;
-    params["mode"] = "NORMAL";
-    params["duration"] = -1;
+    JsonObject modeInfo;
+    modeInfo["mode"] = "NORMAL";
+    modeInfo["duration"] = -1;
+    params["modeInfo"] = modeInfo;
     JsonObject result;
 
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
@@ -4976,8 +4978,10 @@ TEST_F(SystemService_L2Test, SysImpl_SetMode_Empty_JSONRPC)
 {
     TEST_LOG("SysImpl_SetMode_EmptyModeString: empty mode string returns MissingKeyValues error");
     JsonObject params;
-    params["mode"] = "";
-    params["duration"] = 0;
+    JsonObject modeInfo;
+    modeInfo["mode"] = "";
+    modeInfo["duration"] = 0;
+    params["modeInfo"] = modeInfo;
     JsonObject result;
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
     TEST_LOG("  status=%u", status);
@@ -4991,8 +4995,10 @@ TEST_F(SystemService_L2Test, SysImpl_SetMode_InvalidMode_JSONRPC)
 {
     TEST_LOG("SysImpl_SetMode_InvalidMode: invalid mode name is rejected");
     JsonObject params;
-    params["mode"] = "INVALID_XYZ_MODE";
-    params["duration"] = 0;
+    JsonObject modeInfo;
+    modeInfo["mode"] = "INVALID_XYZ_MODE";
+    modeInfo["duration"] = 0;
+    params["modeInfo"] = modeInfo;
     JsonObject result;
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
     TEST_LOG("  status=%u", status);
@@ -5065,8 +5071,10 @@ TEST_F(SystemService_L2Test, SysImpl_SetMode_WAREHOUSE_NegDuration_JSONRPC)
 {
     TEST_LOG("SysImpl: setMode WAREHOUSE duration=-1 (stopModeTimer, no thread)");
     JsonObject params;
-    params["mode"] = "WAREHOUSE";
-    params["duration"] = -1;
+    JsonObject modeInfo;
+    modeInfo["mode"] = "WAREHOUSE";
+    modeInfo["duration"] = -1;
+    params["modeInfo"] = modeInfo;
     JsonObject result;
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
     TEST_LOG("  status=%u", status);
@@ -5076,8 +5084,10 @@ TEST_F(SystemService_L2Test, SysImpl_SetMode_WAREHOUSE_NegDuration_JSONRPC)
 
     /* Cleanup: reset to NORMAL */
     JsonObject params2, result2;
-    params2["mode"] = "NORMAL";
-    params2["duration"] = -1;
+    JsonObject modeInfo2;
+    modeInfo2["mode"] = "NORMAL";
+    modeInfo2["duration"] = -1;
+    params2["modeInfo"] = modeInfo2;
     uint32_t cleanupStatus = InvokeServiceMethod("org.rdk.System.1", "setMode", params2, result2);
     EXPECT_EQ(cleanupStatus, Core::ERROR_NONE);
 }
