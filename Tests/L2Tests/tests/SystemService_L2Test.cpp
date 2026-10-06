@@ -6365,6 +6365,9 @@ TEST_F(SystemService_L2Test, SysImpl_GetPlatformConfiguration_MultiQuery_JSONRPC
         params["query"] = q;
         JsonObject result;
         uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
+        EXPECT_EQ(status, Core::ERROR_NONE) << "query='" << q << "'";
+        ASSERT_TRUE(result.HasLabel("success")) << "query='" << q << "'";
+        EXPECT_TRUE(result["success"].Boolean()) << "query='" << q << "'";
         TEST_LOG("  query='%s' status=%u", q, status);
     }
 }
@@ -7248,6 +7251,11 @@ TEST_F(SystemService_L2Test, SysImpl_GetDeviceInfo_UnallowableChars_JSONRPC)
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getDeviceInfo", params, result);
     EXPECT_EQ(status, Core::ERROR_NONE);
     TEST_LOG("  status=%u", status);
+
+    ASSERT_TRUE(result.HasLabel("message"));
+    EXPECT_STREQ(result["message"].String().c_str(), "Input has unallowable characters");
+    ASSERT_TRUE(result.HasLabel("success"));
+    EXPECT_FALSE(result["success"].Boolean());
 }
 
 /* ------------------------------------------------------------------- *
