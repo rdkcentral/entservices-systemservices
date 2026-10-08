@@ -24,6 +24,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <cstring>
 #include <regex>
 #include <fstream>
 #include <string>
@@ -2390,16 +2391,18 @@ namespace WPEFramework
         Core::hresult SystemServicesImplementation::GetTimeStatus(string& TimeQuality, string& TimeSrc, string& Time, bool& success)
         {
             IARM_Result_t ret = IARM_RESULT_SUCCESS;
-            TimerMsg param;
+            TimerMsg param{};
+            success = false;
             ret = IARM_Bus_Call(IARM_BUS_SYSTIME_MGR_NAME, TIMER_STATUS_MSG, (void*)&param, sizeof(param));
             if (ret != IARM_RESULT_SUCCESS ) {
               LOGWARN ("Query to get Timer Status Failed..\n");
               return Core::ERROR_GENERAL;
             }
            
-            TimeQuality = std::string(param.message,cTIMER_STATUS_MESSAGE_LENGTH);
-            TimeSrc = std::string(param.timerSrc,cTIMER_STATUS_MESSAGE_LENGTH);
-            Time = std::string(param.currentTime,cTIMER_STATUS_MESSAGE_LENGTH);
+            // COM-RPC returns these strings directly, so exclude IARM buffer padding.
+            TimeQuality.assign(param.message, strnlen(param.message, sizeof(param.message)));
+            TimeSrc.assign(param.timerSrc, strnlen(param.timerSrc, sizeof(param.timerSrc)));
+            Time.assign(param.currentTime, strnlen(param.currentTime, sizeof(param.currentTime)));
             success = true;
             LOGINFO("response: TimeQuality=%s, TimeSrc=%s, Time=%s, success=%s", TimeQuality.c_str(), TimeSrc.c_str(), Time.c_str(), success ? "true" : "false");
             return Core::ERROR_NONE;
@@ -3170,9 +3173,9 @@ namespace WPEFramework
             if ((!strcmp(IARM_BUS_SYSTIME_MGR_NAME, owner)) && (0 == eventId)) {
                     LOGWARN("IARM_BUS_SYSTIME_MGR_NAME event received\n");
                     TimerMsg* pMsg = (TimerMsg*)data;
-                    string timequality = std::string(pMsg->message,cTIMER_STATUS_MESSAGE_LENGTH);
-                    string timersrc = std::string(pMsg->timerSrc,cTIMER_STATUS_MESSAGE_LENGTH);
-                    string timerStr = std::string(pMsg->currentTime,cTIMER_STATUS_MESSAGE_LENGTH);
+                    string timequality(pMsg->message, strnlen(pMsg->message, sizeof(pMsg->message)));
+                    string timersrc(pMsg->timerSrc, strnlen(pMsg->timerSrc, sizeof(pMsg->timerSrc)));
+                    string timerStr(pMsg->currentTime, strnlen(pMsg->currentTime, sizeof(pMsg->currentTime)));
 
                 if (SystemServicesImplementation::_instance) {
                     SystemServicesImplementation::_instance->OnTimeStatusChanged(std::move(timequality),std::move(timersrc),std::move(timerStr));
