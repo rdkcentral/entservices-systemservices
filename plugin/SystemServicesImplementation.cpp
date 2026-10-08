@@ -100,36 +100,46 @@ bool isSafeTimeZoneName(const std::string& timeZone)
 bool stageSafeSplashScreen(const std::string& input, std::string& stagedPath)
 {
     struct stat inputStat;
-    char resolvedBuffer[PATH_MAX] = {0};
-    if (input.empty() || lstat(input.c_str(), &inputStat) != 0 || S_ISLNK(inputStat.st_mode) || realpath(input.c_str(), resolvedBuffer) == nullptr)
+    if (input.empty())
         return false;
 
-    const std::string resolved(resolvedBuffer);
-    static const std::vector<std::string> allowedPrefixes = {"/opt/", "/tmp/", "/media/"};
-    if (std::none_of(allowedPrefixes.begin(), allowedPrefixes.end(), [&resolved](const std::string& prefix) { return resolved.rfind(prefix, 0) == 0; }))
-        return false;
-
-    const int source = open(resolved.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+    const int source = open(input.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
     if (source < 0 || fstat(source, &inputStat) != 0 || !S_ISREG(inputStat.st_mode)) {
         if (source >= 0)
             close(source);
         return false;
     }
 
+    char resolvedBuffer[PATH_MAX] = {0};
+    const std::string descriptorPath = "/proc/self/fd/" + std::to_string(source);
+    const ssize_t resolvedLength = readlink(descriptorPath.c_str(), resolvedBuffer, sizeof(resolvedBuffer) - 1);
+    if (resolvedLength < 0) {
+        close(source);
+        return false;
+    }
+    const std::string resolved(resolvedBuffer, static_cast<size_t>(resolvedLength));
+    static const std::vector<std::string> allowedPrefixes = {"/opt/", "/tmp/", "/media/"};
+    if (std::none_of(allowedPrefixes.begin(), allowedPrefixes.end(), [&resolved](const std::string& prefix) { return resolved.rfind(prefix, 0) == 0; })) {
+        close(source);
+        return false;
+    }
+
     char stagingTemplate[] = "/tmp/systemservices-splash-XXXXXX";
+    const mode_t previousMask = umask(S_IRWXG | S_IRWXO);
     const int destination = mkstemp(stagingTemplate);
+    umask(previousMask);
     if (destination < 0) {
         close(source);
         return false;
     }
 
     bool copied = true;
-    char buffer[16384];
+    std::vector<char> buffer(8192);
     ssize_t bytesRead;
-    while ((bytesRead = read(source, buffer, sizeof(buffer))) > 0) {
+    while ((bytesRead = read(source, buffer.data(), buffer.size())) > 0) {
         ssize_t offset = 0;
         while (offset < bytesRead) {
-            const ssize_t bytesWritten = write(destination, buffer + offset, bytesRead - offset);
+            const ssize_t bytesWritten = write(destination, buffer.data() + offset, static_cast<size_t>(bytesRead - offset));
             if (bytesWritten <= 0) {
                 copied = false;
                 break;
@@ -144,7 +154,8 @@ bool stageSafeSplashScreen(const std::string& input, std::string& stagedPath)
     close(source);
     close(destination);
     if (!copied) {
-        unlink(stagingTemplate);
+        if (unlink(stagingTemplate) != 0)
+            LOGWARN("Failed to remove staged splash file");
         return false;
     }
     stagedPath = stagingTemplate;
@@ -2497,7 +2508,8 @@ namespace WPEFramework
             std::strncpy(mfrparam.path, strBLSplashScreenPath.c_str(), sizeof(mfrparam.path));
             mfrparam.path[sizeof(mfrparam.path) - 1] = '\0';
             IARM_Result_t result = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME, IARM_BUS_MFRLIB_API_SetBlSplashScreen, (void *)&mfrparam, sizeof(mfrparam));
-            unlink(strBLSplashScreenPath.c_str());
+            if (unlink(strBLSplashScreenPath.c_str()) != 0)
+                LOGWARN("Failed to remove staged splash file");
             if (result != IARM_RESULT_SUCCESS){
                 LOGERR("BootLoaderSplashScreen update failed: IARM result %d", result);
                 error.message = "Update failed";
