@@ -24,6 +24,7 @@
 #include <string>
 #include <vector>
 #include <cstdio>
+#include <cstring>
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -51,6 +52,10 @@
 #include "ThunderPortability.h"
 #include "WorkerPoolImplementation.h"
 #include "COMLinkMock.h"
+
+#ifdef ENABLE_SYSTIMEMGR_SUPPORT
+#include "systimerifc/itimermsg.h"
+#endif
 
 // GCC 14+ does not suppress warn_unused_result via (void) cast; use pragma instead
 #pragma GCC diagnostic ignored "-Wunused-result"
@@ -1388,6 +1393,88 @@ TEST_F(SystemServicesTest, GetTimeStatus_Success)
 
     TEST_LOG("GetTimeStatus test - Result: %u, Response: %s", result, response.c_str());
 }
+
+#ifdef ENABLE_SYSTIMEMGR_SUPPORT
+// Exercise the COM interface directly: JSON-RPC serialization masks NUL padding.
+TEST_F(SystemServicesTest, GetTimeStatus_ComRpcTrimsPadding)
+{
+    ASSERT_NE(nullptr, m_sysServices);
+
+    for (const char* quality : {"Good", "Secure", "Stale", ""}) {
+        for (const char padding : {'\0', 'x'}) {
+            SCOPED_TRACE(quality);
+            SCOPED_TRACE(padding);
+            TimerMsg timerStatus{};
+            std::memset(timerStatus.message, padding, sizeof(timerStatus.message));
+            std::memset(timerStatus.timerSrc, padding, sizeof(timerStatus.timerSrc));
+            std::memset(timerStatus.currentTime, padding, sizeof(timerStatus.currentTime));
+            std::strcpy(timerStatus.message, quality);
+            std::strcpy(timerStatus.timerSrc, "NTP");
+            std::strcpy(timerStatus.currentTime, "1789025584");
+
+            EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(
+                ::testing::StrEq(IARM_BUS_SYSTIME_MGR_NAME),
+                ::testing::StrEq(TIMER_STATUS_MSG), ::testing::_, sizeof(TimerMsg)))
+                .WillOnce(::testing::Invoke(
+                    [timerStatus](const char*, const char*, void* arg, size_t) -> IARM_Result_t {
+                        *static_cast<TimerMsg*>(arg) = timerStatus;
+                        return IARM_RESULT_SUCCESS;
+                    }));
+
+            string timeQuality, timeSrc, time;
+            bool success = false;
+            ASSERT_EQ(Core::ERROR_NONE,
+                m_sysServices->GetTimeStatus(timeQuality, timeSrc, time, success));
+            EXPECT_TRUE(success);
+            EXPECT_EQ(quality, timeQuality);
+            EXPECT_EQ("NTP", timeSrc);
+            EXPECT_EQ("1789025584", time);
+        }
+    }
+}
+
+TEST_F(SystemServicesTest, GetTimeStatus_ComRpcBoundsUnterminatedBuffers)
+{
+    ASSERT_NE(nullptr, m_sysServices);
+    TimerMsg timerStatus{};
+    std::memset(timerStatus.message, 'Q', sizeof(timerStatus.message));
+    std::memset(timerStatus.timerSrc, 'S', sizeof(timerStatus.timerSrc));
+    std::memset(timerStatus.currentTime, 'T', sizeof(timerStatus.currentTime));
+
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(
+        ::testing::StrEq(IARM_BUS_SYSTIME_MGR_NAME),
+        ::testing::StrEq(TIMER_STATUS_MSG), ::testing::_, sizeof(TimerMsg)))
+        .WillOnce(::testing::Invoke(
+            [timerStatus](const char*, const char*, void* arg, size_t) -> IARM_Result_t {
+                *static_cast<TimerMsg*>(arg) = timerStatus;
+                return IARM_RESULT_SUCCESS;
+            }));
+
+    string timeQuality, timeSrc, time;
+    bool success = false;
+    ASSERT_EQ(Core::ERROR_NONE,
+        m_sysServices->GetTimeStatus(timeQuality, timeSrc, time, success));
+    EXPECT_TRUE(success);
+    EXPECT_EQ(string(sizeof(timerStatus.message), 'Q'), timeQuality);
+    EXPECT_EQ(string(sizeof(timerStatus.timerSrc), 'S'), timeSrc);
+    EXPECT_EQ(string(sizeof(timerStatus.currentTime), 'T'), time);
+}
+
+TEST_F(SystemServicesTest, GetTimeStatus_ComRpcFailureClearsSuccess)
+{
+    ASSERT_NE(nullptr, m_sysServices);
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(
+        ::testing::StrEq(IARM_BUS_SYSTIME_MGR_NAME),
+        ::testing::StrEq(TIMER_STATUS_MSG), ::testing::_, sizeof(TimerMsg)))
+        .WillOnce(::testing::Return(IARM_RESULT_IPCCORE_FAIL));
+
+    string timeQuality, timeSrc, time;
+    bool success = true;
+    EXPECT_EQ(Core::ERROR_GENERAL,
+        m_sysServices->GetTimeStatus(timeQuality, timeSrc, time, success));
+    EXPECT_FALSE(success);
+}
+#endif
 
 TEST_F(SystemServicesTest, GetTimeZoneDST_Success)
 {
