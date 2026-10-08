@@ -4075,6 +4075,7 @@ namespace WPEFramework
 			    }
 		    } else {
 			    LOGERR("file %s open failed\n", VERSION_FILE_NAME);
+				LOGINFO("New Log Added");
 			    return "unknown";
 		    }
 	    }
