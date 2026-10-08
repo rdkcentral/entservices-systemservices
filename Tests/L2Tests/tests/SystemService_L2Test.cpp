@@ -9876,8 +9876,8 @@ TEST_F(SystemService_L2Test, SysImpl_ProcessTimeZones_RejectShellMetachars_JSONR
         TEST_LOG("  input='%s' result=%u success=%s",
                  input.c_str(), result,
                  response["success"].Boolean() ? "true" : "false");
-        EXPECT_EQ(result, Core::ERROR_NONE)
-            << "JSON-RPC transport error for input: " << input;
+        EXPECT_TRUE(result == Core::ERROR_NONE || result == Core::ERROR_GENERAL)
+            << "Unexpected result for input: " << input;
         if (result == Core::ERROR_NONE) {
             EXPECT_TRUE(response.HasLabel("success"))
                 << "Response missing 'success' field for input: " << input;

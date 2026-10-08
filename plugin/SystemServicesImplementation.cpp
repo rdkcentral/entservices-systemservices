@@ -3308,11 +3308,11 @@ namespace WPEFramework
                         continue;
 
                     JsonObject childObject;
-                    const std::string childPath = entry + "/" + name;
+                    std::string childPath = entry + "/" + name;
                     struct stat childStat;
                     if (lstat(childPath.c_str(), &childStat) != 0 || S_ISLNK(childStat.st_mode))
                         continue;
-                    if (!processTimeZones(childPath, childObject))
+                    if (!processTimeZones(std::move(childPath), childObject))
                         directoryStatus = false;
                     if (!childObject.IsNull())
                         out[name.c_str()] = childObject;
