@@ -2418,18 +2418,10 @@ namespace WPEFramework
         static bool stageBootLoaderSplashScreen(const std::string& path, std::string& stagedPath)
         {
             static const std::vector<std::string> allowedPrefixes = {"/opt/", "/tmp/", "/media/"};
-            struct stat inputInfo;
-            char resolved[PATH_MAX] = {0};
-            if (path.empty() || lstat(path.c_str(), &inputInfo) != 0 || S_ISLNK(inputInfo.st_mode) || realpath(path.c_str(), resolved) == nullptr)
+            if (path.empty())
                 return false;
 
-            const std::string canonicalPath(resolved);
-            if (std::none_of(allowedPrefixes.begin(), allowedPrefixes.end(), [&canonicalPath](const std::string& prefix) {
-                    return canonicalPath.rfind(prefix, 0) == 0;
-                }))
-                return false;
-
-            const int source = open(canonicalPath.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+            const int source = open(path.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
             if (source < 0)
                 return false;
 
@@ -2440,8 +2432,27 @@ namespace WPEFramework
                 return false;
             }
 
+            char resolved[PATH_MAX] = {0};
+            const std::string descriptorPath = "/proc/self/fd/" + std::to_string(source);
+            const ssize_t resolvedLength = readlink(descriptorPath.c_str(), resolved, sizeof(resolved) - 1);
+            if (resolvedLength < 0)
+            {
+                close(source);
+                return false;
+            }
+            const std::string canonicalPath(resolved, static_cast<size_t>(resolvedLength));
+            if (std::none_of(allowedPrefixes.begin(), allowedPrefixes.end(), [&canonicalPath](const std::string& prefix) {
+                    return canonicalPath.rfind(prefix, 0) == 0;
+                }))
+            {
+                close(source);
+                return false;
+            }
+
             char stagingTemplate[] = "/tmp/systemservices-splash-XXXXXX";
+            const mode_t previousMask = umask(S_IRWXG | S_IRWXO);
             const int destination = mkstemp(stagingTemplate);
+            umask(previousMask);
             if (destination < 0)
             {
                 close(source);
@@ -2449,14 +2460,14 @@ namespace WPEFramework
             }
 
             bool copied = true;
-            char buffer[16384];
+            std::vector<char> buffer(8192);
             ssize_t bytesRead;
-            while ((bytesRead = read(source, buffer, sizeof(buffer))) > 0)
+            while ((bytesRead = read(source, buffer.data(), buffer.size())) > 0)
             {
                 ssize_t offset = 0;
                 while (offset < bytesRead)
                 {
-                    const ssize_t bytesWritten = write(destination, buffer + offset, bytesRead - offset);
+                    const ssize_t bytesWritten = write(destination, buffer.data() + offset, static_cast<size_t>(bytesRead - offset));
                     if (bytesWritten <= 0)
                     {
                         copied = false;
@@ -2474,7 +2485,8 @@ namespace WPEFramework
             close(destination);
             if (!copied)
             {
-                unlink(stagingTemplate);
+                if (unlink(stagingTemplate) != 0)
+                    LOGWARN("Failed to remove staged splash file");
                 return false;
             }
 
@@ -2499,7 +2511,8 @@ namespace WPEFramework
             std::strncpy(mfrparam.path, stagedPath.c_str(), sizeof(mfrparam.path));
             mfrparam.path[sizeof(mfrparam.path) - 1] = '\0';
             const IARM_Result_t result = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME, IARM_BUS_MFRLIB_API_SetBlSplashScreen, (void *)&mfrparam, sizeof(mfrparam));
-            unlink(stagedPath.c_str());
+            if (unlink(stagedPath.c_str()) != 0)
+                LOGWARN("Failed to remove staged splash file");
             if (result != IARM_RESULT_SUCCESS)
             {
                 LOGERR("BootLoaderSplashScreen update failed: IARM result %d", result);
