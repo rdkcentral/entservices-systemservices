@@ -712,6 +712,7 @@ namespace WPEFramework
                     break;
                 }
                 
+#ifdef ENABLE_SYSTIMEMGR_SUPPORT
                 case SYSTEMSERVICES_EVT_ONTIMESTATUSCHANGED:
                 {
                     string timeQuality = params["TimeQuality"].String();
@@ -725,6 +726,7 @@ namespace WPEFramework
                     }
                     break;
                 }
+#endif// ENABLE_SYSTIMEMGR_SUPPORT
                 
                 case SYSTEMSERVICES_EVT_ONMACADDRESSRETRIEVED:
                 {
@@ -2326,6 +2328,17 @@ namespace WPEFramework
             success = true;
             LOGINFO("response: TimeQuality=%s, TimeSrc=%s, Time=%s, success=%s", TimeQuality.c_str(), TimeSrc.c_str(), Time.c_str(), success ? "true" : "false");
             return Core::ERROR_NONE;
+        }
+#else
+        Core::hresult SystemServicesImplementation::GetTimeStatus(string& TimeQuality, string& TimeSrc, string& Time, bool& success)
+        {
+            // built without systimemgr: the time status comes from another service
+            TimeQuality.clear();
+            TimeSrc.clear();
+            Time.clear();
+            success = false;
+            LOGWARN("getTimeStatus: not supported without systimemgr");
+            return Core::ERROR_UNAVAILABLE;
         }
 #endif// ENABLE_SYSTIMEMGR_SUPPORT
 

@@ -26,8 +26,10 @@ ls -la ${GITHUB_WORKSPACE}
 # Build entservices-systemservices
 echo "buliding entservices-systemservices"
 
+# configure_build <build dir> <extra CXX flags>
+configure_build() {
 cd ${GITHUB_WORKSPACE}
-cmake -G Ninja -S "$GITHUB_WORKSPACE" -B build/entservices-systemservices \
+cmake -G Ninja -S "$GITHUB_WORKSPACE" -B "$1" \
 -DUSE_THUNDER_R4=ON \
 -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/install/usr" \
 -DCMAKE_MODULE_PATH="$GITHUB_WORKSPACE/install/tools/cmake" \
@@ -70,11 +72,17 @@ cmake -G Ninja -S "$GITHUB_WORKSPACE" -B build/entservices-systemservices \
 -DUSE_IARMBUS \
 -DENABLE_DEEP_SLEEP \
 -DENABLE_THERMAL_PROTECTION \
--DENABLE_SYSTIMEMGR_SUPPORT \
+$2 \
 -DHAS_API_SYSTEM -DHAS_API_POWERSTATE \
 -DENABLE_DEVICE_MANUFACTURER_INFO \
- -DTHUNDER_VERSION=4 -DTHUNDER_VERSION_MAJOR=4 -DTHUNDER_VERSION_MINOR=4" \
+ -DTHUNDER_VERSION=4 -DTHUNDER_VERSION_MAJOR=4 -DTHUNDER_VERSION_MINOR=4"
+}
 
+configure_build build/entservices-systemservices "-DENABLE_SYSTIMEMGR_SUPPORT"
 cmake --build build/entservices-systemservices --target install
+
+# Also build without systimemgr support (BUILD_ENABLE_SYSTIMEMGR_SUPPORT off), which no other job covers
+configure_build build/entservices-systemservices-no-systimemgr ""
+cmake --build build/entservices-systemservices-no-systimemgr
 echo "======================================================================================"
 exit 0
