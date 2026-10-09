@@ -24,9 +24,8 @@
 #include <fstream>
 #include <algorithm>
 
-#include "host.hpp"
-#include "videoOutputPort.hpp"
-#include "audioOutputPort.hpp"
+/* COM-RPC path: no libds headers needed */
+#include <interfaces/IDeviceSettingsAudio.h>
 
 #include "rfcapi.h"
 
@@ -122,6 +121,11 @@ PlatformCapsData::PlatformCapsData(PluginHost::IShell* service) : jsonRpc(servic
   ASSERT(_service != nullptr);
   _service->AddRef();
 
+  const uint32_t dsResult = DSHelper::Open(_service, "PlatformCapsData");
+  if (dsResult != Core::ERROR_NONE) {
+    TRACE(Trace::Error, (_T("Failed to open DeviceSettings link (result=%u)\n"), dsResult));
+  }
+
   authservicePlugin = service->QueryInterfaceByCallsign<Exchange::IAuthService>("org.rdk.AuthService");
   if (authservicePlugin)
   {
@@ -135,6 +139,8 @@ PlatformCapsData::PlatformCapsData(PluginHost::IShell* service) : jsonRpc(servic
 
 PlatformCapsData::~PlatformCapsData()
 {
+  DSHelper::Close();
+
   if (authservicePlugin)
     authservicePlugin->Release();
 
@@ -142,6 +148,16 @@ PlatformCapsData::~PlatformCapsData()
     _service->Release();
     _service = nullptr;
   }
+}
+
+void PlatformCapsData::OnDeviceSettingsActivated()
+{
+  TRACE(Trace::Information, (_T("PlatformCapsData: DeviceSettings plugin activated\n")));
+}
+
+void PlatformCapsData::OnDeviceSettingsDeactivated()
+{
+  TRACE(Trace::Information, (_T("PlatformCapsData: DeviceSettings plugin deactivated\n")));
 }
 
 /**
@@ -303,20 +319,22 @@ bool PlatformCapsData::SupportsTrueSD() const {
  */
 
 bool PlatformCapsData::CanMixPCMWithSurround() {
+  /* COM-RPC path: query IDeviceSettingsAudio::IsAudioMSDecoded via the
+   * DeviceSettings plugin, acquired through the shared DSHelper link. */
   bool result = false;
 
-  try {
-    device::List<device::VideoOutputPort> vPorts =
-        device::Host::getInstance().getVideoOutputPorts();
-    // Coverity Fix: ID 589 - Structurally dead code: Remove pointless loop
-    if (vPorts.size() > 0) {
-      device::AudioOutputPort &aPort = vPorts.at(0).getAudioOutputPort();
-      result = aPort.isAudioMSDecode();
+  auto* audio = AcquireSubInterface<Exchange::IDeviceSettingsAudio>();
+  if (audio != nullptr) {
+    int32_t handle = -1;
+    if (audio->GetAudioPort(Exchange::IDeviceSettingsAudio::AUDIO_PORT_TYPE_HDMI, 0, handle) == Core::ERROR_NONE) {
+      bool hasMS11 = false;
+      if (audio->IsAudioMSDecoded(handle, hasMS11) == Core::ERROR_NONE) {
+        result = hasMS11;
+      }
     }
-  } catch (...) {
-    result = false;
-    TRACE(Trace::Error, 
-        (_T("Exception Caught with device settings calls to get the MS11 Decode status..")));
+    audio->Release();
+  } else {
+    TRACE(Trace::Warning, (_T("CanMixPCMWithSurround: IDeviceSettingsAudio not available")));
   }
 
   TRACE(Trace::Information, (_T("canMixPCMWithSurround: %s"), result ? "YES" : "NO"));
