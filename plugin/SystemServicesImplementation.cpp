@@ -2604,21 +2604,7 @@ namespace WPEFramework
                          // If distro uses writable localtime and the link file is missing,
                         // recreate it so the configured timezone remains active.
                         if (!Utils::fileExists(LOCALTIME_FILE)) {
-                            if (Utils::fileExists(city.c_str())) {
-                                std::string localtimeDir = dirnameOf(LOCALTIME_FILE);
-                                if (!dirExists(localtimeDir)) {
-                                    if (Core::Directory(localtimeDir.c_str()).CreatePath() == false) {
-                                        LOGERR("Failed to create directory for %s", LOCALTIME_FILE);
-                                    }
-                                }
-                                if (0 != symlink(city.c_str(), LOCALTIME_FILE)) {
-                                    LOGERR("Failed to symlink %s -> %s : %s", city.c_str(), LOCALTIME_FILE, strerror(errno));
-                                } else {
-                                    LOGWARN("Linux localtime linked to %s\n", city.c_str());
-                                }
-                            } else {
-                                LOGERR("Zoneinfo file for city '%s' not found. Cannot create localtime symlink.", city.c_str());
-                            }
+                           symlink(city.c_str(), LOCALTIME_FILE);
                         }
                     }
 #endif
