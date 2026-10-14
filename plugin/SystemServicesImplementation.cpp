@@ -255,10 +255,6 @@ namespace WPEFramework
             , m_iarmEventHandlersRegistered(false)
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
                 , m_deepSleepInProgress(false)
-#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
-            , m_iarmEventHandlersRegistered(false)
-#endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
-                , m_deepSleepInProgress(false)
         {
             LOGINFO("Create SystemServicesImplementation Instance");
 
