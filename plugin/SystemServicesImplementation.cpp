@@ -2603,7 +2603,18 @@ namespace WPEFramework
                                     resp = false;
                                 }
                             }
-
+#ifdef ENABLE_LINK_LOCALTIME
+                            // RDKEMW-27280: During the migration from RDK-V to RDK-E entOS stack, 
+                            // ensure the localtime link is correctly set though timeZoneDST file might be available with the correct timezone information
+                            // If the localtime link does not exist, create it
+                            else {
+                                LOGWARN("Given TimeZone and timeZoneDST file has the same value, checking the localtime link status.");
+                                if (!Utils::fileExists(LOCALTIME_FILE)) {
+                                    LOGWARN("Localtime link does not exist. Creating link to %s", city.c_str());
+                                    symlink(city.c_str(), LOCALTIME_FILE);
+                                }
+                            }
+#endif/*ENABLE_LINK_LOCALTIME*/
                             std::string oldAccuracy = getTimeZoneAccuracyDSTHelper();
                             std::string currentAccuracy = accuracy;
 
