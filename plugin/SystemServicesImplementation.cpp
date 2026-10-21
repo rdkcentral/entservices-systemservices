@@ -2787,15 +2787,6 @@ namespace Thunder
 
                     result.success = (retStatus == Core::ERROR_NONE);
                 }
-                LOGINFO("wakeupSource=%u enabled=%s", static_cast<uint16_t>(src.wakeupSource), src.enabled ? "true" : "false");
-                configs.emplace_back(WakeupSrcConfig{static_cast<Thunder::Exchange::IPowerManager::WakeupSrcType>(src.wakeupSource),src.enabled});
-            }
-
-            LOGINFO("configs size=%zu", configs.size());
-
-            if (configs.empty()) {
-                LOGWARN("No wakeup source configuration provided");
-                return Core::ERROR_GENERAL;
             }
             LOGINFO("response: success=%s", result.success ? "true" : "false");
             return retStatus;
