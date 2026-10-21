@@ -73,11 +73,7 @@ private:
       uint32_t mId{ 0 };
       std::string mCallSign{};
 
-#if ((THUNDER_VERSION >= 4) && (THUNDER_VERSION_MINOR == 4))
-      PluginHost::ILocalDispatcher * dispatcher_ {nullptr};
-#else
       PluginHost::IDispatcher* dispatcher_{ nullptr };
-#endif
 
       Core::ProxyType<Core::JSONRPC::Message> Message() const
       {
@@ -163,15 +159,11 @@ private:
         message->Designator = Core::JSON::String(mCallSign + ".1." + method);
         ToMessage(parameters, message);
         const uint32_t channelId = ~0;
-#if ((THUNDER_VERSION >= 4) && (THUNDER_VERSION_MINOR == 4))
+#if ((THUNDER_VERSION >= 4))
             string output = "";
             uint32_t result = Core::ERROR_BAD_REQUEST;
 	    if (dispatcher_  != nullptr) {
-                PluginHost::ILocalDispatcher* localDispatcher = dispatcher_->Local();
-                ASSERT(localDispatcher != nullptr);
-
-                if (localDispatcher != nullptr)
-                    result =  dispatcher_->Invoke(channelId, message->Id.Value(), "", message->Designator.Value(), message->Parameters.Value(),output);
+                result = dispatcher_->Invoke(channelId, message->Id.Value(), "", message->Designator.Value(), message->Parameters.Value(), output);
             }
 
             if (message.IsValid() == true) {
