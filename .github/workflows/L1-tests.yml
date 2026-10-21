@@ -343,7 +343,6 @@ jobs:
           -B build/entservices-helpers
           -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/install/usr"
           -DCMAKE_MODULE_PATH="$GITHUB_WORKSPACE/install/tools/cmake"
-          -DUSE_THUNDER_R4=ON
           -DHIDE_NON_EXTERNAL_SYMBOLS=OFF
           -DPLUGIN_HELPERS=ON
           "-DCMAKE_CXX_FLAGS=
@@ -363,8 +362,7 @@ jobs:
           -S "$GITHUB_WORKSPACE/entservices-testframework/Tests/mocks"
           -B build/mocks
           -DBUILD_SHARED_LIBS=ON
-          -DRDK_SERVICES_L1_TEST=${{env.RDK_SERVICES_L1_TEST == 'ON'}}
-          -DUSE_THUNDER_R4=ON
+          -DRDK_SERVICES_L1_TEST=${{env.RDK_SERVICES_L1_TEST == 'ON'}}        
           -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
           -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/install/usr"
           -DCMAKE_MODULE_PATH="$GITHUB_WORKSPACE/install/tools/cmake"
@@ -373,7 +371,6 @@ jobs:
           -fprofile-arcs
           -ftest-coverage
           -DEXCEPTIONS_ENABLE=ON
-          -DUSE_THUNDER_R4=ON
           -DTHUNDER_VERSION=4
           -DTHUNDER_VERSION_MAJOR=4
           -DTHUNDER_VERSION_MINOR=4
@@ -437,7 +434,6 @@ jobs:
           -fprofile-arcs
           -ftest-coverage
           -DEXCEPTIONS_ENABLE=ON
-          -DUSE_THUNDER_R4=ON
           -DTHUNDER_VERSION=4
           -DTHUNDER_VERSION_MAJOR=4
           -DTHUNDER_VERSION_MINOR=4
@@ -501,7 +497,6 @@ jobs:
           -DBUILD_RPI=ON
           -DHAS_FRONT_PANEL=ON
           -DRDK_SERVICES_L1_TEST=${{env.RDK_SERVICES_L1_TEST == 'ON'}}
-          -DUSE_THUNDER_R4=ON
           -DHIDE_NON_EXTERNAL_SYMBOLS=OFF
           -DPLUGIN_SYSTEMSERVICES=ON
           &&
@@ -520,7 +515,6 @@ jobs:
           -fprofile-arcs
           -ftest-coverage
           -DEXCEPTIONS_ENABLE=ON
-          -DUSE_THUNDER_R4=ON
           -DTHUNDER_VERSION=4
           -DTHUNDER_VERSION_MAJOR=4
           -DTHUNDER_VERSION_MINOR=4
@@ -581,7 +575,6 @@ jobs:
           -DHAS_FRONT_PANEL=ON
           -DPLUGIN_SYSTEMSERVICES=ON
           -DRDK_SERVICES_L1_TEST=${{env.RDK_SERVICES_L1_TEST}}
-          -DUSE_THUNDER_R4=ON
           -DHIDE_NON_EXTERNAL_SYMBOLS=OFF
           &&
           cmake --build build/entservices-testframework -j8

@@ -17,11 +17,7 @@
 
 set(PLUGIN_NAME systemServiceTestClient)
 
-if (USE_THUNDER_R4)
-    find_package(${NAMESPACE}COM REQUIRED)
-else ()
-    find_package(${NAMESPACE}Protocols REQUIRED)
-endif (USE_THUNDER_R4)
+find_package(${NAMESPACE}COM REQUIRED)
 find_package(CompileSettingsDebug CONFIG REQUIRED)
 
 add_executable(${PLUGIN_NAME} systemServiceTestClient.cpp)
@@ -37,11 +33,7 @@ target_link_libraries(${PLUGIN_NAME}
     ${SECURITY_TOKEN_LIBRARY}
     )
 
-if (USE_THUNDER_R4)
 target_link_libraries(${PLUGIN_NAME} PRIVATE ${NAMESPACE}COM::${NAMESPACE}COM)
-else ()
-target_link_libraries(${PLUGIN_NAME} PRIVATE ${NAMESPACE}Protocols::${NAMESPACE}Protocols)
-endif (USE_THUNDER_R4)
 
 install(TARGETS ${PLUGIN_NAME} DESTINATION bin)
 

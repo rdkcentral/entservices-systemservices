@@ -348,7 +348,6 @@ jobs:
           -B build/entservices-helpers
           -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/install/usr"
           -DCMAKE_MODULE_PATH="$GITHUB_WORKSPACE/install/tools/cmake"
-          -DUSE_THUNDER_R4=ON
           -DHIDE_NON_EXTERNAL_SYMBOLS=OFF
           -DPLUGIN_HELPERS=ON
           "-DCMAKE_CXX_FLAGS=
@@ -375,8 +374,6 @@ jobs:
           -DEXCEPTIONS_ENABLE=ON
           -fprofile-arcs
           -ftest-coverage
-          -DUSE_THUNDER_R4=ON
-          -DTHUNDER_VERSION=4
           -DTHUNDER_VERSION_MAJOR=4
           -DTHUNDER_VERSION_MINOR=4
           -DDEVICE_TYPE=AVOutputTV
@@ -429,7 +426,6 @@ jobs:
           -DCMAKE_DISABLE_FIND_PACKAGE_RBus=ON
           -DPLUGIN_POWERMANAGER=ON
           -DPLUGIN_SYSTEMSERVICES=ON
-          -DUSE_THUNDER_R4=ON
           -DPLUGIN_L2Tests=ON
           -DRDK_SERVICE_L2_TEST=ON
           -DDS_FOUND=ON
@@ -453,8 +449,6 @@ jobs:
           -DEXCEPTIONS_ENABLE=ON
           -fprofile-arcs
           -ftest-coverage
-          -DUSE_THUNDER_R4=ON
-          -DTHUNDER_VERSION=4
           -DTHUNDER_VERSION_MAJOR=4
           -DTHUNDER_VERSION_MINOR=4
           -DDEVICE_TYPE=AVOutputTV
@@ -508,7 +502,6 @@ jobs:
           -DCMAKE_DISABLE_FIND_PACKAGE_RFC=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_RBus=ON
           -DPLUGIN_MIGRATION=ON
-          -DUSE_THUNDER_R4=ON
           -DPLUGIN_L2Tests=ON
           -DRDK_SERVICE_L2_TEST=ON
           -DDS_FOUND=ON
@@ -539,8 +532,6 @@ jobs:
           -DEXCEPTIONS_ENABLE=ON
           -fprofile-arcs
           -ftest-coverage
-          -DUSE_THUNDER_R4=ON
-          -DTHUNDER_VERSION=4
           -DTHUNDER_VERSION_MAJOR=4
           -DTHUNDER_VERSION_MINOR=4
           -DDEVICE_TYPE=AVOutputTV
@@ -594,7 +585,6 @@ jobs:
           -DCMAKE_DISABLE_FIND_PACKAGE_RFC=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_RBus=ON
           -DPLUGIN_TELEMETRY=ON
-          -DUSE_THUNDER_R4=ON
           -DPLUGIN_L2Tests=ON
           -DRDK_SERVICE_L2_TEST=ON
           -DDS_FOUND=ON
@@ -624,8 +614,6 @@ jobs:
           -DEXCEPTIONS_ENABLE=ON
           -fprofile-arcs
           -ftest-coverage
-          -DUSE_THUNDER_R4=ON
-          -DTHUNDER_VERSION=4
           -DTHUNDER_VERSION_MAJOR=4
           -DTHUNDER_VERSION_MINOR=4
           -DDEVICE_TYPE=AVOutputTV
@@ -679,7 +667,6 @@ jobs:
           -DCMAKE_DISABLE_FIND_PACKAGE_RFC=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_RBus=ON
           -DPLUGIN_DEVICEINFO=ON
-          -DUSE_THUNDER_R4=ON
           -DPLUGIN_L2Tests=ON
           -DRDK_SERVICE_L2_TEST=ON
           -DDS_FOUND=ON
@@ -710,8 +697,6 @@ jobs:
           -DEXCEPTIONS_ENABLE=ON
           -fprofile-arcs
           -ftest-coverage
-          -DUSE_THUNDER_R4=ON
-          -DTHUNDER_VERSION=4
           -DTHUNDER_VERSION_MAJOR=4
           -DTHUNDER_VERSION_MINOR=4
           -DDEVICE_TYPE=AVOutputTV
@@ -759,7 +744,6 @@ jobs:
           -DCMAKE_DISABLE_FIND_PACKAGE_RFC=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_RBus=ON
           -DPLUGIN_FIRMWAREUPDATE=ON
-          -DUSE_THUNDER_R4=ON
           -DPLUGIN_L2Tests=ON
           -DRDK_SERVICE_L2_TEST=ON
           -DDS_FOUND=ON
@@ -782,8 +766,6 @@ jobs:
           -DEXCEPTIONS_ENABLE=ON
           -fprofile-arcs
           -ftest-coverage
-          -DUSE_THUNDER_R4=ON
-          -DTHUNDER_VERSION=4
           -DTHUNDER_VERSION_MAJOR=4
           -DTHUNDER_VERSION_MINOR=4
           -DDEVICE_TYPE=AVOutputTV
@@ -839,7 +821,6 @@ jobs:
           -DCMAKE_DISABLE_FIND_PACKAGE_RBus=ON
           -DPLUGIN_SYSTEMSERVICES=ON
           -DPLUGIN_POWERMANAGER=ON
-          -DUSE_THUNDER_R4=ON
           -DPLUGIN_L2Tests=ON
           -DRDK_SERVICE_L2_TEST=ON
           -DDS_FOUND=ON
@@ -862,8 +843,6 @@ jobs:
           -DEXCEPTIONS_ENABLE=ON
           -fprofile-arcs
           -ftest-coverage
-          -DUSE_THUNDER_R4=ON
-          -DTHUNDER_VERSION=4
           -DTHUNDER_VERSION_MAJOR=4
           -DTHUNDER_VERSION_MINOR=4
           -DDEVICE_TYPE=AVOutputTV
@@ -916,7 +895,6 @@ jobs:
           -DCMAKE_DISABLE_FIND_PACKAGE_RBus=ON
           -DPLUGIN_SYSTEMSERVICES=ON
           -DPLUGIN_POWERMANAGER=ON
-          -DUSE_THUNDER_R4=ON
           -DPLUGIN_L2Tests=ON
           -DRDK_SERVICE_L2_TEST=ON
           -DDS_FOUND=ON
