@@ -54,7 +54,7 @@ SystemServices exposes a rich JSON-RPC API that enables applications to interact
 
 | Tool | Minimum Version | Notes |
 |---|---|---|
-| CMake | 3.3+ | Build system |
+| CMake | 3.15+ | Build system |
 | GCC or Clang | GCC 11+ / Clang 14+ | C++ compiler |
 | Python 3 | 3.x | Required for JSON schema tools |
 | Docker | Any | Required for native full-build workflow |
