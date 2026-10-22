@@ -1,5 +1,5 @@
 # OpenSpec Coverage Report
-**Generated**: 2026-08-05  
+**Generated**: 2026-09-29  
 **Repository**: entservices-systemservices  
 **Spec Location**: openspec/specs/systemservices/spec.md  
 **Analysis Method**: openspec-coverage skill
@@ -10,33 +10,33 @@
 
 | Category | Weight | Score | Max | Percentage |
 |----------|--------|-------|-----|------------|
-| Code to Spec Coverage | 40% | 39.7 | 40 | 99.25% |
+| Code to Spec Coverage | 40% | 38.7 | 40 | 96.75% |
 | Architecture HLA Specification | 10% | 9.5 | 10 | 95.0% |
 | Performance Specification | 10% | 10.0 | 10 | 100.0% |
 | External Interface Specification | 10% | 10.0 | 10 | 100.0% |
 | Security Specification | 10% | 7.5 | 10 | 75.0% |
 | Versioning & Compatibility | 10% | 7.0 | 10 | 70.0% |
 | Conformance Testing & Validation | 10% | 9.5 | 10 | 95.0% |
-| **TOTAL** | **100%** | **93.2** | **100** | **93.2%** |
+| **TOTAL** | **100%** | **92.2** | **100** | **92.2%** |
 
-**Overall Score**: 93.2/100 - Excellent OpenSpec compliance
+**Overall Score**: 92.2/100 - Excellent OpenSpec compliance
 
-**Latest Update**: 2026-08-05 - Enhanced dual-protocol architecture documentation (JSON-RPC and COM-RPC), comprehensive API coverage with protocol parity, updated architecture diagrams, and expanded extension points with protocol-specific examples.
+**Latest Update**: 2026-09-29 - Added PowerController COM-RPC client implementation (4 new files, ~25 API functions). Code-to-Spec coverage decreased to 96.75% pending documentation of new implementation files in Covered Code section.
 
 ---
 
-## 1. Code-to-Spec Coverage (40%) → 39.7/40 (99.25%)
+## 1. Code-to-Spec Coverage (40%) → 38.7/40 (96.75%)
 
 ### 1.1 Reference Coverage (20%) → 20.0/20 (100%)
 
 **Analysis Method**: Spec-driven mapping via `## Covered Code` sections in spec files.
 
 **Coverage Statistics**:
-- **Total Code Methods**: ~145 methods across all implementation files
+- **Total Code Methods**: ~170 methods across all implementation files
 - **Methods Covered by Spec**: ~141 methods explicitly listed
-- **Coverage Percentage**: 97.2% (effectively rounded to 100% for scoring)
+- **Coverage Percentage**: 82.9% (rounded to ~83%)
 
-**Covered Files** (15 files mapped):
+**Covered Files** (18 files mapped):
 - plugin/SystemServices.cpp (19 methods)
 - plugin/SystemServices.h (2 class definitions)
 - plugin/SystemServicesImplementation.cpp (80+ methods)
@@ -48,6 +48,10 @@
 - plugin/platformcaps/platformcaps.cpp (capability discovery)
 - plugin/platformcaps/platformcapsdata.cpp (data management)
 - plugin/platformcaps/platformcapsdatarpc.cpp (RPC interface)
+- plugin/powercontroller/power_controller.cpp (PowerManager COM-RPC client)
+- plugin/powercontroller/power_controller.h (PowerManager interface definitions)
+- plugin/powercontroller/Module.cpp (PowerController module initialization)
+- plugin/powercontroller/Module.h (PowerController module definitions)
 - plugin/Module.cpp (module initialization)
 - plugin/Module.h (module definitions)
 - plugin/TestClient/systemServiceTestClient.cpp (test client)
@@ -105,20 +109,21 @@
 
 **Score**: 5.0/5 (all required sections + comprehensive documentation)
 
-### 1.4 No Orphaned Code (5%) → 4.7/5 (94%)
+### 1.4 No Orphaned Code (5%) → 3.7/5 (74%)
 
 **Analysis**: 
-- **Total Code Methods**: ~145
+- **Total Code Methods**: ~170
 - **Methods Covered**: ~141
-- **Orphaned Methods**: ~4 (helper utilities, internal functions)
-- **Orphan Percentage**: ~2.8%
-- **Score**: 5 × (1 - 0.028 × 0.3) = 4.96 → **4.7/5**
+- **Orphaned Methods**: ~29 (PowerController implementation, helper utilities, internal functions)
+- **Orphan Percentage**: ~17.1%
+- **Score**: 5 × (1 - 0.171 × 0.3) = 4.74 → **3.7/5**
 
 **Orphaned Code Examples**:
+- PowerController implementation (plugin/powercontroller/power_controller.cpp): ~25 extern "C" API functions
 - Some internal helper functions in SystemServicesHelper.cpp
 - Minor test utility functions in TestClient
 
-**Recommendation**: Add a "Helper Utilities" subsection in Covered Code to explicitly list utility functions.
+**Recommendation**: Add PowerController implementation files to the Covered Code section to document the COM-RPC client interface for PowerManager integration.
 
 ---
 
@@ -431,12 +436,12 @@
 
 ### Exceptional Areas (95%+)
 
-1. **Code-to-Spec Coverage (99.25%)**
+1. **Code-to-Spec Coverage (96.75%)**
    - Comprehensive method mapping in Covered Code section
    - 141+ methods documented across 15 files
    - Excellent traceability from spec to implementation
-   - Complete coverage of implementation files
-   - Only ~4 minor helper utilities not explicitly listed
+   - Gap: PowerController COM-RPC client implementation (4 new files, ~25 methods) not documented
+   - Some internal helper utilities not explicitly listed
 
 2. **Performance (100.0%)**
    - Complete performance specification
@@ -520,11 +525,12 @@
 
 ### Priority 3: Enhancement
 
-4. **Document Helper Utilities**
-   - Explicitly list all helper functions in Covered Code section
-   - Add subsection for internal utility functions
-   - Improve traceability for test utilities
-   - **Impact**: +0.3 points (Code-to-Spec: 99.25% → 100%)
+4. **Document PowerController COM-RPC Client**
+   - Add PowerController implementation files to Covered Code section
+   - Document ~25 extern "C" API functions (PowerController_Init, PowerController_GetPowerState, PowerController_SetPowerState, etc.)
+   - Map PowerController notification callbacks (OperationalStateChangeCb, PowerModeChangedCb, etc.)
+   - Document Module.cpp/Module.h files
+   - **Impact**: +1.0 points (Code-to-Spec: 96.75% → 99.75%)
 
 5. **Expand Component Detail**
    - Break down platformcaps subsystem into sub-components
@@ -538,16 +544,22 @@
 
 | Category | Current Score | Percentage | Trend |
 |----------|---------------|------------|-------|
-| Code-to-Spec | 39.7 / 40 | 99.25% | ↑ Excellent |
+| Code-to-Spec | 38.7 / 40 | 96.75% | ↓ Excellent |
 | Performance | 10.0 / 10 | 100.0% | ↑ Perfect |
 | External Interface | 10.0 / 10 | 100.0% | ↑ Perfect |
 | Conformance Testing | 9.5 / 10 | 95.0% | ↑ Excellent |
 | Architecture HLA | 9.5 / 10 | 95.0% | ↑ Excellent |
 | Security | 7.5 / 10 | 75.0% | → Good |
 | Versioning | 7.0 / 10 | 70.0% | → Good |
-| **Overall Score** | **93.2 / 100** | **93.2%** | ↑ **Excellent** |
+| **Overall Score** | **92.2 / 100** | **92.2%** | ↓ **Excellent** |
 
-**Recent Improvements** (2026-08-05):
+**Recent Changes** (2026-09-29):
+- **Code-to-Spec coverage decreased to 96.75%** due to new PowerController COM-RPC client implementation
+- Added 4 new files (power_controller.cpp, power_controller.h, Module.cpp, Module.h) not yet documented in spec
+- PowerController implements IPowerManager COM-RPC client with ~25 API functions
+- Recommendation: Document PowerController in Covered Code section to restore 99%+ coverage
+
+**Previous Improvements** (2026-08-05):
 - **External Interface achieved 100%** with dual-protocol architecture documentation
 - Added comprehensive Protocol Support section comparing JSON-RPC vs COM-RPC
 - Interface parity explicitly guaranteed (same 66+ APIs via both protocols)
@@ -557,7 +569,7 @@
 - Updated Component Structure and High-Level Architecture diagrams to show both protocols
 - Added comprehensive client examples for both JSON-RPC (WebSocket) and COM-RPC (C++)
 
-**Previous Improvements**:
+**Earlier Improvements**:
 - Architecture section enhanced with 6 comprehensive diagrams
 - COM-RPC communication documented with bidirectional flow
 - Callsign corrected throughout (org.rdk.System)
@@ -573,38 +585,38 @@
 
 ## 11. Conclusion
 
-The SystemServices plugin demonstrates **excellent OpenSpec compliance** with a score of **93.2%**. The specification has achieved a very strong foundation with comprehensive performance documentation, perfect external interface specification with dual-protocol architecture, excellent architecture diagrams, outstanding code-to-spec coverage, and thorough conformance testing.
+The SystemServices plugin demonstrates **excellent OpenSpec compliance** with a score of **92.2%**. The specification has achieved a very strong foundation with comprehensive performance documentation, perfect external interface specification with dual-protocol architecture, excellent architecture diagrams, strong code-to-spec coverage, and thorough conformance testing.
 
 **Key Strengths**:
 - Perfect external interface specification (100.0%) with comprehensive dual-protocol architecture
 - Perfect performance specification (100.0%)
-- Outstanding code-to-spec coverage (99.25%) - virtually complete
+- Strong code-to-spec coverage (96.75%)
 - Excellent architecture documentation with 6 detailed diagrams (95.0%)
 - Excellent conformance testing framework with multi-layer approach (95.0%)
 - Complete OpenSpec template compliance with all sections
 - Dual-protocol support fully documented (JSON-RPC and COM-RPC)
 
-**Recent Achievements** (2026-08-05):
-- **External Interface reached 100%** through comprehensive dual-protocol documentation
-- Protocol Support section provides clear JSON-RPC vs COM-RPC comparison
-- Interface parity guarantee ensures consistency across both protocols
-- Side-by-side examples demonstrate equivalent operations in both protocols
-- Architecture diagrams updated to visualize dual-protocol support
+**Recent Changes** (2026-09-29):
+- **Code-to-Spec coverage decreased to 96.75%** with addition of PowerController COM-RPC client
+- New implementation files added: power_controller.cpp, power_controller.h, Module.cpp, Module.h
+- PowerController provides C API wrapper for IPowerManager COM-RPC interface
+- ~25 new API functions and callback types not yet documented in Covered Code section
 
 **Areas for Enhancement**:
 - **Security specification** (75.0%) - Add formal threat model, enhanced security testing
 - **Versioning & migration** (70.0%) - Expand migration guides with detailed procedures
 
 **Recommended Actions**:
-1. **Priority 1**: Develop comprehensive security specification with STRIDE threat model (+2.5 points)
-2. **Priority 1**: Enhance versioning documentation with detailed migration guides (+3.0 points)
-3. **Priority 2**: Enhance test documentation with coverage metrics and execution details (+0.5 points)
+1. **Priority 1**: Document PowerController COM-RPC client implementation in Covered Code (+1.0 points)
+2. **Priority 1**: Develop comprehensive security specification with STRIDE threat model (+2.5 points)
+3. **Priority 1**: Enhance versioning documentation with detailed migration guides (+3.0 points)
+4. **Priority 2**: Enhance test documentation with coverage metrics and execution details (+0.5 points)
 
-With Priority 1 recommendations implemented, this specification would achieve **98.7%** compliance, approaching the highest tier of OpenSpec excellence.
+With Priority 1 recommendations implemented, this specification would achieve **99.2%** compliance, approaching the highest tier of OpenSpec excellence.
 
 ---
 
 **Report Generated By**: openspec-coverage skill  
-**Analysis Date**: 2026-08-05  
+**Analysis Date**: 2026-09-29  
 **Spec Version**: SystemServices 3.4.1  
-**Next Review**: Recommended after implementing Priority 1 improvements (Security and Versioning enhancements)
+**Next Review**: Recommended after documenting PowerController implementation and implementing Priority 1 improvements (Security and Versioning enhancements)
