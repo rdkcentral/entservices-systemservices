@@ -1,0 +1,13 @@
+name: PR - Validate Backport Target
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate:
+    uses: rdkcentral/entservices-testframework/.github/workflows/pr-validate-release.yml@feature/RDKEMW-26903

@@ -1,0 +1,14 @@
+name: backport PR
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  backport:
+    if: github.event.pull_request.merged == true
+    uses: rdkcentral/entservices-testframework/.github/workflows/backport.yml@feature/RDKEMW-26903
