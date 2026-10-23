@@ -4078,6 +4078,7 @@ namespace WPEFramework
 			    }
 		    } else {
 			    LOGERR("file %s open failed\n", VERSION_FILE_NAME);
+                LOGGER("Unable to read version file for version:\n");
 			    return "unknown";
 		    }
 	    }
