@@ -12,3 +12,5 @@ jobs:
   backport:
     if: github.event.pull_request.merged == true
     uses: rdkcentral/entservices-testframework/.github/workflows/backport.yml@feature/RDKEMW-26903
+    secrets:
+      RDKCM_DEPLOY_KEY: ${{ secrets.RDKCM_DEPLOY_KEY }}
