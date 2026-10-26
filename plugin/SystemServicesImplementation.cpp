@@ -503,6 +503,34 @@ namespace WPEFramework
 
         void SystemServicesImplementation::OnPowerModeChanged(const PowerState currentState, const PowerState newState)
         {
+            LOGWARN("Power mode changed from %d to %d", currentState, newState);
+            if (newState == WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP) {
+                m_operatingModeTimer.stop();
+                m_operatingModeTimer.join();
+                {
+                    std::lock_guard<std::mutex> lock(m_getFirmwareInfoThreadMutex);
+                    m_deepSleepInProgress = true;
+                    LOGWARN("Entering deep sleep, setting m_deepSleepInProgress to true, Power mode changed from %d to %d", currentState, newState);
+                    if (m_getFirmwareInfoThread.get().joinable()) {
+                        m_getFirmwareInfoThread.get().join();
+                    }
+                }
+#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
+                LOGWARN("Deinitializing IARM due to entering deep sleep.");
+                DeinitializeIARM();
+#endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
+            } else if (currentState == WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP) {
+                {
+                    std::lock_guard<std::mutex> lock(m_getFirmwareInfoThreadMutex);
+                    m_deepSleepInProgress = false;
+                    LOGWARN("Exiting deep sleep, setting m_deepSleepInProgress to false, Power mode changed from %d to %d", currentState, newState);
+                }
+#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
+                
+                RegisterIARMEventHandlers();
+#endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
+            }
+
             std::string curPowerState,newPowerState = "";
 
             curPowerState = powerModeEnumToString(currentState);
