@@ -625,6 +625,29 @@ namespace WPEFramework
                     string powerState = params["powerState"].String();
                     string currentPowerState = params["currentPowerState"].String();
 
+                    {
+                        char value[256] = {0};
+                        snprintf(value, sizeof(value), "power state changed from");
+                        t2_event_s((char*)"PwrStateChng_split", value);
+
+                        if (currentPowerState == "ON" && powerState == "LIGHT_SLEEP")
+                        {
+                            t2_event_d((char*)"SYST_INFO_ThunderSleep1", 1);
+                        }
+                        else if (currentPowerState == "LIGHT_SLEEP" && powerState == "DEEP_SLEEP")
+                        {
+                            t2_event_d((char*)"SYST_INFO_ThunderSleep2", 1);
+                        }
+                        else if (currentPowerState == "DEEP_SLEEP" && powerState == "LIGHT_SLEEP")
+                        {
+                            t2_event_d((char*)"SYST_INFO_ThunderWake1", 1);
+                        }
+                        else if (currentPowerState == "LIGHT_SLEEP" && powerState == "ON")
+                        {
+                            t2_event_d((char*)"SYST_INFO_ThunderWake2", 1);
+                        }
+                    }
+
                     while (index != _systemServicesNotification.end()) 
                     {
                         (*index)->OnSystemPowerStateChanged(powerState, currentPowerState);
@@ -2950,27 +2973,6 @@ namespace WPEFramework
             params["powerState"] = powerState;
             params["currentPowerState"] = currentPowerState;
             LOGWARN("power state changed from '%s' to '%s'", currentPowerState.c_str(), powerState.c_str());
-
-            char value[256] = {0};
-            snprintf(value, sizeof(value), "power state changed from");
-            t2_event_s((char*)"PwrStateChng_split", value);
-
-            if (currentPowerState == "ON" && powerState == "LIGHT_SLEEP")
-            {
-                t2_event_d((char*)"SYST_INFO_ThunderSleep1", 1);
-            }
-            else if (currentPowerState == "LIGHT_SLEEP" && powerState == "DEEP_SLEEP")
-            {
-                t2_event_d((char*)"SYST_INFO_ThunderSleep2", 1);
-            }
-            else if (currentPowerState == "DEEP_SLEEP" && powerState == "LIGHT_SLEEP")
-            {
-                t2_event_d((char*)"SYST_INFO_ThunderWake1", 1);
-            }
-            else if (currentPowerState == "LIGHT_SLEEP" && powerState == "ON")
-            {
-                t2_event_d((char*)"SYST_INFO_ThunderWake2", 1);
-            }
             dispatchEvent(SYSTEMSERVICES_EVT_ONSYSTEMPOWERSTATECHANGED, params);
         }
         
