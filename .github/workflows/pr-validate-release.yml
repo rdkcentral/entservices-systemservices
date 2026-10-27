@@ -11,3 +11,5 @@ permissions:
 jobs:
   validate:
     uses: rdkcentral/entservices-testframework/.github/workflows/pr-validate-release.yml@feature/RDKEMW-26905-1
+    secrets:
+      JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
