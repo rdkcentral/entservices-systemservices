@@ -89,20 +89,31 @@ using WakeupSourceConfigIteratorImpl = WPEFramework::Core::Service<WPEFramework:
 
 bool isSafeTimeZoneName(const std::string& timeZone)
 {
-    if (timeZone.empty() || timeZone[0] == '/' || timeZone.find("..") != std::string::npos)
+    LOGINFO("isSafeTimeZoneName called");
+    if (timeZone.empty() || timeZone[0] == '/' || timeZone.find("..") != std::string::npos) {
+        LOGWARN("isSafeTimeZoneName rejected: empty, absolute, or traversal input");
         return false;
+    }
     for (unsigned char character : timeZone) {
         if (!std::isalnum(character) && character != '/' && character != '-' && character != '_' && character != '+' && character != '.')
+        {
+            LOGWARN("isSafeTimeZoneName rejected: contains invalid character");
             return false;
+        }
     }
+    LOGINFO("isSafeTimeZoneName accepted input");
     return true;
 }
 
 bool stageSafeSplashScreen(const std::string& input, std::string& stagedPath)
 {
+    LOGINFO("stageSafeSplashScreen called");
     struct stat inputStat;
     if (input.empty())
+    {
+        LOGWARN("stageSafeSplashScreen rejected: empty path");
         return false;
+    }
 
     const int source = open(input.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
     if (source < 0 || fstat(source, &inputStat) != 0 || !S_ISREG(inputStat.st_mode)) {
@@ -160,6 +171,7 @@ bool stageSafeSplashScreen(const std::string& input, std::string& stagedPath)
         return false;
     }
     stagedPath = stagingTemplate;
+    LOGINFO("stageSafeSplashScreen staged file successfully");
     return true;
 }
 
@@ -3342,6 +3354,7 @@ namespace WPEFramework
         {
             bool ret = true;
 
+            LOGINFO("processTimeZones called");
             /* Security: reject shell metacharacters in the entry before passing to popen.
              * Only allow characters valid in Olson timezone paths: alphanumeric, '/', '-', '_', '+', '.' */
             for (char c : entry) {
