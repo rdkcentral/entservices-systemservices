@@ -3264,11 +3264,13 @@ TEST_F(SystemServicesTest, GetWakeupReason_LAN)
 
 TEST_F(SystemServicesTest, SetBootLoaderSplashScreen_EmptyPath)
 {
-    uint32_t result = handler.Invoke(connection, _T("setBootLoaderSplashScreen"),
-              _T("{\"path\":\"\"}"), response);
-    
-    // Should handle empty path gracefully
-    TEST_LOG("SetBootLoaderSplashScreen empty path test - Result: %u, Response: %s", result, response.c_str());
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBootLoaderSplashScreen"),
+              _T("{\"path\":\"\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response));
+    ASSERT_TRUE(jsonResponse.HasLabel("success"));
+    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "Should reject empty path: " << response;
 }
 
 TEST_F(SystemServicesTest, GetPlatformConfiguration_EmptyQuery)
@@ -4009,11 +4011,13 @@ TEST_F(SystemServicesTest, SetBootLoaderSplashScreen_ValidPath)
 
 TEST_F(SystemServicesTest, SetBootLoaderSplashScreen_InvalidPath)
 {
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBootLoaderSplashScreen"), _T("{\"path\":\"/nonexistent/file.png\"}"), response));
+    // /etc/passwd exists but is outside the allowed /opt, /tmp, /media prefixes
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBootLoaderSplashScreen"), _T("{\"path\":\"/etc/passwd\"}"), response));
     
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response));
-    EXPECT_TRUE(jsonResponse.HasLabel("success"));
+    ASSERT_TRUE(jsonResponse.HasLabel("success"));
+    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "Should reject path outside allowed prefixes: " << response;
 }
 
 TEST_F(SystemServicesTest, GetPowerStateBeforeReboot_ValidState)
@@ -11068,6 +11072,24 @@ TEST_F(SystemServicesTest, GetTimeZones_WithSpecificTimezone_CoversIteratorPath)
         ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
     }
     TEST_LOG("GetTimeZones_Specific - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetTimeZones_RejectsTraversalInput)
+{
+    // "../../etc/passwd" must be skipped by isSafeTimeZoneName() before it
+    // reaches processTimeZones()/popen(), never surfacing passwd contents.
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTimeZones"),
+        _T("{\"timeZones\":[\"../../etc/passwd\"]}"), response));
+
+    if (!response.empty()) {
+        JsonObject jsonResponse;
+        ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
+        if (jsonResponse.HasLabel("zoneinfo")) {
+            EXPECT_EQ(std::string::npos, jsonResponse["zoneinfo"].String().find("root:"))
+                << "Unsafe input leaked /etc/passwd contents: " << response;
+        }
+    }
+    TEST_LOG("GetTimeZones_RejectsTraversalInput - Response: %s", response.c_str());
 }
 
 // ------------------------------------------------------------------
