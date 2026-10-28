@@ -286,8 +286,8 @@ namespace WPEFramework
         public:
 #ifdef ENABLE_SYSTIMEMGR_SUPPORT
             void OnTimeStatusChanged(string timequality,string timesource, string utctime);
-            Core::hresult GetTimeStatus(string& TimeQuality, string& TimeSrc, string& Time, bool& success) override;
 #endif// ENABLE_SYSTIMEMGR_SUPPORT
+            Core::hresult GetTimeStatus(string& TimeQuality, string& TimeSrc, string& Time, bool& success) override;
             IPowerManager* getPwrMgrPluginInstance();
             void OnFirmwareUpdateStateChange(int state);
             void OnTemperatureThresholdChanged(string thresholdType, bool exceed, float temperature);

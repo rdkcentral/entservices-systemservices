@@ -69,7 +69,6 @@ using namespace WPEFramework;
 // without needing /usr/bin/logupload to exist (which requires root in CI).
 // These are defined in the UploadLogs namespace but not exposed via the header.
 namespace WPEFramework { namespace Plugin { namespace UploadLogs {
-    bool checkmTlsLogUploadFlag();
     bool getDCMconfigDetails(std::string& upload_protocol, std::string& httplink, std::string& uploadCheck);
     std::int32_t getUploadLogParameters(std::string& tftp_server, std::string& upload_protocol, std::string& upload_httplink);
 } } }
@@ -8006,17 +8005,6 @@ TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_CriticalToCritic
 
 // ===================== Upload Logs Coverage Tests =====================
 // ------------------------------------------------------------------
-// checkmTlsLogUploadFlag — always returns true, just logs
-// ------------------------------------------------------------------
-TEST_F(SystemServicesTest, UploadLogs_CheckMtlsFlag_AlwaysReturnsTrue)
-{
-    // Covers: uploadlogs.cpp lines 43-46 (the entire function)
-    bool result = WPEFramework::Plugin::UploadLogs::checkmTlsLogUploadFlag();
-    EXPECT_TRUE(result) << "checkmTlsLogUploadFlag must always return true";
-    TEST_LOG("UploadLogs_CheckMtlsFlag_AlwaysReturnsTrue - PASSED");
-}
-
-// ------------------------------------------------------------------
 // getDCMconfigDetails — /tmp/DCMSettings.conf absent
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, UploadLogs_GetDCMconfigDetails_FileAbsent_ReturnsFalse)
@@ -8139,7 +8127,7 @@ TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_DevOptDCMAbsent_EtcFall
 // ------------------------------------------------------------------
 // getUploadLogParameters — full success path, no FORCE_MTLS key
 // ------------------------------------------------------------------
-TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_SuccessPath_RegexReplaceApplied)
+TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_SuccessPath_URLUnchanged)
 {
     createFile("/etc/device.properties", "BUILD_TYPE=prod");
     createFile("/etc/dcm.properties", "LOG_SERVER=logs.example.com");
@@ -8152,18 +8140,17 @@ TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_SuccessPath_RegexReplac
     EXPECT_EQ(0, result) << "Must return E_OK on full success path";
     EXPECT_EQ("logs.example.com", tftp);
     EXPECT_EQ("tftp", protocol);
-    // regex_replace applied: cgi-bin → secure/cgi-bin
-    EXPECT_NE(std::string::npos, httplink.find("secure/cgi-bin")) << "URL should have secure/cgi-bin: " << httplink;
+    EXPECT_EQ("http://example.com/cgi-bin/logs.sh", httplink) << "URL must be passed unchanged: " << httplink;
     std::ofstream("/etc/device.properties").close();
     std::ofstream("/etc/dcm.properties").close();
     removeFile("/tmp/DCMSettings.conf");
-    TEST_LOG("UploadLogs_GetUploadLogParams_SuccessPath_RegexReplace - PASSED");
+    TEST_LOG("UploadLogs_GetUploadLogParams_SuccessPath_URLUnchanged - PASSED");
 }
 
 // ------------------------------------------------------------------
-// getUploadLogParameters — FORCE_MTLS=true → mTlsLogUpload=true, skip regex_replace
+// getUploadLogParameters — FORCE_MTLS=true is ignored, URL unchanged
 // ------------------------------------------------------------------
-TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_ForceMTLS_True_SkipsReplace)
+TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_ForceMTLS_True_URLUnchanged)
 {
     createFile("/etc/device.properties", "BUILD_TYPE=prod\nFORCE_MTLS=true");
     createFile("/etc/dcm.properties", "LOG_SERVER=logs.example.com");
@@ -8174,18 +8161,17 @@ TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_ForceMTLS_True_SkipsRep
     std::string tftp, protocol, httplink;
     std::int32_t result = WPEFramework::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
     EXPECT_EQ(0, result);
-    // force_mtls=="true" → inner if is false → regex_replace NOT called, URL unchanged
-    EXPECT_EQ(std::string::npos, httplink.find("secure/cgi-bin")) << "URL must NOT be replaced when FORCE_MTLS=true: " << httplink;
+    EXPECT_EQ("http://example.com/cgi-bin/logs.sh", httplink) << "URL must be passed unchanged: " << httplink;
     std::ofstream("/etc/device.properties").close();
     std::ofstream("/etc/dcm.properties").close();
     removeFile("/tmp/DCMSettings.conf");
-    TEST_LOG("UploadLogs_GetUploadLogParams_ForceMTLS_True_SkipsReplace - PASSED");
+    TEST_LOG("UploadLogs_GetUploadLogParams_ForceMTLS_True_URLUnchanged - PASSED");
 }
 
 // ------------------------------------------------------------------
-// getUploadLogParameters — FORCE_MTLS=false (present but not "true")
+// getUploadLogParameters — FORCE_MTLS=false is ignored, URL unchanged
 // ------------------------------------------------------------------
-TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_ForceMTLS_False_RegexApplied)
+TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_ForceMTLS_False_URLUnchanged)
 {
     createFile("/etc/device.properties", "BUILD_TYPE=prod\nFORCE_MTLS=false");
     createFile("/etc/dcm.properties", "LOG_SERVER=logs.example.com");
@@ -8196,16 +8182,15 @@ TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_ForceMTLS_False_RegexAp
     std::string tftp, protocol, httplink;
     std::int32_t result = WPEFramework::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
     EXPECT_EQ(0, result);
-    // force_mtls="false" → "true" != "false" is true → regex_replace applied
-    EXPECT_NE(std::string::npos, httplink.find("secure/cgi-bin")) << "URL should have secure/cgi-bin: " << httplink;
+    EXPECT_EQ("http://example.com/cgi-bin/upload.sh", httplink) << "URL must be passed unchanged: " << httplink;
     std::ofstream("/etc/device.properties").close();
     std::ofstream("/etc/dcm.properties").close();
     removeFile("/tmp/DCMSettings.conf");
-    TEST_LOG("UploadLogs_GetUploadLogParams_ForceMTLS_False_RegexApplied - PASSED");
+    TEST_LOG("UploadLogs_GetUploadLogParams_ForceMTLS_False_URLUnchanged - PASSED");
 }
 
 // ------------------------------------------------------------------
-// getUploadLogParameters — URL without "cgi-bin" — regex_replace has no effect
+// getUploadLogParameters — URL without "cgi-bin" — unchanged
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_URLNoCgiBin_ReplaceNoEffect)
 {
