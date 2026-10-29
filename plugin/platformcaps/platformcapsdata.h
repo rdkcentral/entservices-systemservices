@@ -25,6 +25,13 @@
 #include <interfaces/IDeviceInfo.h>
 
 namespace Thunder {
+
+#if defined(THUNDER_VERSION) && (THUNDER_VERSION <= 4)
+using ThunderDispatcher = ::WPEFramework::PluginHost::ILocalDispatcher;
+#else
+using ThunderDispatcher = ::Thunder::PluginHost::IDispatcher;
+#endif
+
 namespace Plugin {
 
 class PlatformCapsData {
@@ -73,7 +80,7 @@ private:
       uint32_t mId{ 0 };
       std::string mCallSign{};
 
-      PluginHost::IDispatcher* dispatcher_{ nullptr };
+      ThunderDispatcher* dispatcher_{ nullptr };
 
       Core::ProxyType<Core::JSONRPC::Message> Message() const
       {
@@ -120,11 +127,7 @@ private:
           : mCallSign(std::move(callsign))
       {
         if (service)
-#if ((THUNDER_VERSION >= 4) && (THUNDER_VERSION_MINOR == 4))
-          dispatcher_ = service->QueryInterfaceByCallsign<PluginHost::ILocalDispatcher>(mCallSign);
-#else
-          dispatcher_ = service->QueryInterfaceByCallsign<PluginHost::IDispatcher>(mCallSign);
-#endif
+          dispatcher_ = service->QueryInterfaceByCallsign<ThunderDispatcher>(mCallSign);
       }
       ~JSONRPCDirectLink()
       {
@@ -159,51 +162,35 @@ private:
         message->Designator = Core::JSON::String(mCallSign + ".1." + method);
         ToMessage(parameters, message);
         const uint32_t channelId = ~0;
-#if ((THUNDER_VERSION >= 4))
-            string output = "";
-            uint32_t result = Core::ERROR_BAD_REQUEST;
-	    if (dispatcher_  != nullptr) {
-                result = dispatcher_->Invoke(channelId, message->Id.Value(), "", message->Designator.Value(), message->Parameters.Value(), output);
-            }
-
-            if (message.IsValid() == true) {
-                if (result == static_cast<uint32_t>(~0)) {
-                    message.Release();
-                }
-                else if (result == Core::ERROR_NONE)
-                {
-                    if (output.empty() == true)
-                        message->Result.Null(true);
-                    else
-                        message->Result = output;
-                }
-                else
-                {
-                    message->Error.SetError(result);
-                    if (output.empty() == false) {
-                        message->Error.Text = output;
-                    }
-                }
-            }
-
-            if (!FromMessage(response, message, isResponseString))
-            {
-                return Core::ERROR_GENERAL;
-            }
-#elif ((THUNDER_VERSION >= 4) && (THUNDER_VERSION_MINOR == 2))
-        Core::JSONRPC::Context context(channelId, message->Id.Value(), "");
-        auto resp = dispatcher_->Invoke(context, *message);
-#else
-        auto resp = dispatcher_->Invoke("", channelId, *message);
+        string output = "";
+        uint32_t result = Core::ERROR_BAD_REQUEST;
+#if defined(THUNDER_VERSION) && (THUNDER_VERSION <= 4)
+        if (dispatcher_->Local() != nullptr)
 #endif
-#if ((THUNDER_VERSION == 2) || (THUNDER_VERSION >= 4) && (THUNDER_VERSION_MINOR == 2))
-        if (resp->Error.IsSet()) {
-          std::cout << "Call failed: " << message->Designator.Value() << " error: " << resp->Error.Text.Value() << "\n";
-          return resp->Error.Code;
+        {
+          result = dispatcher_->Invoke(channelId, message->Id.Value(), "", message->Designator.Value(), message->Parameters.Value(), output);
         }
-        if (!FromMessage(response, resp, isResponseString))
+
+        if (message.IsValid() == true) {
+          if (result == static_cast<uint32_t>(~0)) {
+            message.Release();
+          }
+          else if (result == Core::ERROR_NONE) {
+            if (output.empty() == true)
+              message->Result.Null(true);
+            else
+              message->Result = output;
+          }
+          else {
+            message->Error.SetError(result);
+            if (output.empty() == false) {
+              message->Error.Text = output;
+            }
+          }
+        }
+
+        if (!FromMessage(response, message, isResponseString))
           return Core::ERROR_GENERAL;
-#endif
         return Core::ERROR_NONE;
       }
     };
