@@ -11076,9 +11076,10 @@ TEST_F(SystemServicesTest, GetTimeZones_WithSpecificTimezone_CoversIteratorPath)
 
 TEST_F(SystemServicesTest, GetTimeZones_RejectsTraversalInput)
 {
-    // "../../etc/passwd" must be skipped by isSafeTimeZoneName() before it
-    // reaches processTimeZones()/popen(), never surfacing passwd contents.
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTimeZones"),
+    // "../../etc/passwd" is skipped by isSafeTimeZoneName() before it reaches
+    // processTimeZones()/popen(); with no valid entries processed, success stays
+    // false and the call returns ERROR_GENERAL - never surfacing passwd contents.
+    EXPECT_EQ(Core::ERROR_GENERAL, handler.Invoke(connection, _T("getTimeZones"),
         _T("{\"timeZones\":[\"../../etc/passwd\"]}"), response));
 
     if (!response.empty()) {
