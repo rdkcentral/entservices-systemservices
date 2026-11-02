@@ -35,8 +35,7 @@ cTimer::cTimer()
  */
 cTimer::~cTimer()
 {
-    stop();
-    join();
+    this->clear = true;
 }
 
 /***
@@ -44,19 +43,15 @@ Running this timer function as thread function
 */
 void cTimer::timerFunction() {
     while (true) {
-        void (*callback)() = NULL;
-        {
-            std::unique_lock<std::mutex> lock(timerMutex);
-            if (timerCondition.wait_for(lock, std::chrono::milliseconds(interval), [this]() { return clear; })) {
-                return;
-            }
-            callback = callBack_function;
-        }
-
-        if (callback == NULL) {
+         if (this->clear) {
             return;
-        }
-        callback();
+            }
+        std::this_thread::sleep_for(std::chrono::milliseconds(interval));
+         if (this->clear) {
+            return;
+            }
+
+        this->callBack_function();
     }
 }
 /***
@@ -65,14 +60,10 @@ void cTimer::timerFunction() {
  */
 bool cTimer::start()
 {
-    stop();
-    join();
-
-    std::lock_guard<std::mutex> lock(timerMutex);
-    if (interval <= 0 || callBack_function == NULL) {
+    if (interval <= 0 && callBack_function == NULL) {
         return false;
     }
-    clear = false;
+    this->clear = false;
     timerThread = std::thread(&cTimer::timerFunction, this);
     return true;
 }
@@ -83,11 +74,12 @@ bool cTimer::start()
  */
 void cTimer::stop()
 {
-    {
-        std::lock_guard<std::mutex> lock(timerMutex);
-        clear = true;
-    }
-    timerCondition.notify_all();
+     this->clear = true;
+}
+
+void cTimer::detach()
+{
+        timerThread.detach();
 }
 
 void cTimer::join()
@@ -105,8 +97,7 @@ void cTimer::join()
  */
 void cTimer::setInterval(void (*function)(), int val)
 {
-    std::lock_guard<std::mutex> lock(timerMutex);
-    callBack_function = function;
-    interval = val;
+    this->callBack_function = function;
+    this->interval = val;
 }
 

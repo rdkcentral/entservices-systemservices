@@ -304,7 +304,6 @@ namespace WPEFramework
 
             _registeredEventHandlers = false;
             m_operatingModeTimer.stop();
-            m_operatingModeTimer.join();
 #if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
             DeinitializeIARM();
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
@@ -473,6 +472,7 @@ namespace WPEFramework
 #endif// ENABLE_SYSTIMEMGR_SUPPORT
                 m_iarmEventHandlersRegistered = true;
             }
+	    
         }
 
         void SystemServicesImplementation::DeinitializeIARM()
@@ -510,27 +510,22 @@ namespace WPEFramework
 
         void SystemServicesImplementation::OnPowerModeChanged(const PowerState currentState, const PowerState newState)
         {
-            LOGWARN("Power mode changed from %d to %d", currentState, newState);
+            LOGINFO("Power mode changed from %d to %d", currentState, newState);
             if (newState == WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP) {
-                m_operatingModeTimer.stop();
-                m_operatingModeTimer.join();
                 {
                     std::lock_guard<std::mutex> lock(m_getFirmwareInfoThreadMutex);
-                    m_deepSleepInProgress = true;
-                    LOGWARN("Entering deep sleep, setting m_deepSleepInProgress to true, Power mode changed from %d to %d", currentState, newState);
+                    m_deepSleepInProgress = true;                
                     if (m_getFirmwareInfoThread.get().joinable()) {
                         m_getFirmwareInfoThread.get().join();
                     }
                 }
 #if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
-                LOGWARN("Deinitializing IARM due to entering deep sleep.");
                 DeinitializeIARM();
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
             } else if (currentState == WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP) {
                 {
                     std::lock_guard<std::mutex> lock(m_getFirmwareInfoThreadMutex);
-                    m_deepSleepInProgress = false;
-                    LOGWARN("Exiting deep sleep, setting m_deepSleepInProgress to false, Power mode changed from %d to %d", currentState, newState);
+                    m_deepSleepInProgress = false;                    
                 }
 #if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
                 
@@ -870,10 +865,11 @@ namespace WPEFramework
 
         void SystemServicesImplementation::updateDuration()
         {
-            bool stopTimer = false;
             if (m_remainingDuration > 0) {
                 m_remainingDuration--;
             } else {
+                m_operatingModeTimer.stop();
+                m_operatingModeTimer.detach();
                 ModeInfo modeinfo;
                 uint32_t SysSrv_Status;
                 string errorMessage;
@@ -885,15 +881,10 @@ namespace WPEFramework
                 } else {
                     LOGERR("_instance is NULL.\n");
                 }
-                stopTimer = true;
             }
 
             //set values in temp file so they can be restored in receiver restarts / crashes
             m_temp_settings.setValue("mode_duration", m_remainingDuration);
-
-            if (stopTimer) {
-                m_operatingModeTimer.stop();
-            }
         }
 
         uint32_t GetValueFromPropertiesFile(const char* filename, const char* key, string& response, const char *delimiter = "=")
