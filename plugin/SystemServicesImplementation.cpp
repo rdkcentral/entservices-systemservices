@@ -2418,16 +2418,25 @@ namespace WPEFramework
         static bool stageBootLoaderSplashScreen(const std::string& path, std::string& stagedPath)
         {
             static const std::vector<std::string> allowedPrefixes = {"/opt/", "/tmp/", "/media/"};
+            LOGINFO("stageBootLoaderSplashScreen: path=%s", path.c_str());
             if (path.empty())
+            {
+                LOGERR("stageBootLoaderSplashScreen: empty path");
                 return false;
+            }
 
             const int source = open(path.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
             if (source < 0)
+            {
+                LOGERR("stageBootLoaderSplashScreen: open failed");
                 return false;
+            }
+            LOGINFO("stageBootLoaderSplashScreen: opened source fd=%d", source);
 
             struct stat sourceInfo;
             if (fstat(source, &sourceInfo) != 0 || !S_ISREG(sourceInfo.st_mode))
             {
+                LOGERR("stageBootLoaderSplashScreen: fstat failed or not a regular file");
                 close(source);
                 return false;
             }
@@ -2437,14 +2446,17 @@ namespace WPEFramework
             const ssize_t resolvedLength = readlink(descriptorPath.c_str(), resolved, sizeof(resolved) - 1);
             if (resolvedLength < 0)
             {
+                LOGERR("stageBootLoaderSplashScreen: readlink failed");
                 close(source);
                 return false;
             }
             const std::string canonicalPath(resolved, static_cast<size_t>(resolvedLength));
+            LOGINFO("stageBootLoaderSplashScreen: canonical path=%s", canonicalPath.c_str());
             if (std::none_of(allowedPrefixes.begin(), allowedPrefixes.end(), [&canonicalPath](const std::string& prefix) {
                     return canonicalPath.rfind(prefix, 0) == 0;
                 }))
             {
+                LOGERR("stageBootLoaderSplashScreen: canonical path not in allowed prefixes");
                 close(source);
                 return false;
             }
@@ -2455,9 +2467,11 @@ namespace WPEFramework
             umask(previousMask);
             if (destination < 0)
             {
+                LOGERR("stageBootLoaderSplashScreen: mkstemp failed");
                 close(source);
                 return false;
             }
+            LOGINFO("stageBootLoaderSplashScreen: staging file=%s", stagingTemplate);
 
             bool copied = true;
             std::vector<char> buffer(8192);
@@ -2479,18 +2493,23 @@ namespace WPEFramework
                     break;
             }
             if (bytesRead < 0 || fsync(destination) != 0)
+            {
+                LOGERR("stageBootLoaderSplashScreen: read or fsync failed");
                 copied = false;
+            }
 
             close(source);
             close(destination);
             if (!copied)
             {
+                LOGERR("stageBootLoaderSplashScreen: copy failed, removing staged file");
                 if (unlink(stagingTemplate) != 0)
                     LOGWARN("Failed to remove staged splash file");
                 return false;
             }
 
             stagedPath = stagingTemplate;
+            LOGINFO("stageBootLoaderSplashScreen: staged successfully to %s", stagedPath.c_str());
             return true;
         }
 
