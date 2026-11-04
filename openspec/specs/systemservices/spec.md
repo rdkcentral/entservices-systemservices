@@ -113,7 +113,7 @@ The plugin integrates with multiple RDK subsystems:
 - **NFR-REL-004**: Thread-safe access SHALL be enforced for all shared state
 
 #### Security
-- **NFR-SEC-001**: All external inputs SHALL be validated using regex patterns to prevent injection attacks
+- **NFR-SEC-001**: All external inputs SHALL be validated using checks appropriate to the input type, including regex patterns and file-type and canonical-path checks
 - **NFR-SEC-002**: Sensitive data SHALL be stored in `/opt/secure/persistent` with appropriate permissions
 - **NFR-SEC-003**: WPEFramework security token validation SHALL be supported (configurable)
 - **NFR-SEC-004**: Plugin SHALL run with minimal required system privileges
@@ -743,13 +743,15 @@ The plugin uses the enterprise error code framework (`entservices_errorcodes.h`)
 
 ### Input Validation
 
-All external inputs are validated using regex patterns:
+Regex-based input validation uses the following pattern:
 
 ```cpp
 #define REGEX_UNALLOWABLE_INPUT "[^[:alnum:]_-]{1}"
 ```
 
-This prevents injection attacks by restricting inputs to alphanumeric characters, underscores, and hyphens.
+Where applied, this pattern restricts inputs to alphanumeric characters, underscores, and hyphens.
+
+`setBootLoaderSplashScreen(path)` requires a non-empty path to a readable regular file. The final path component must not be a symbolic link, and the opened file's canonical path must begin with `/opt/`, `/tmp/`, or `/media/`. The file is copied to a private temporary file under `/tmp/systemservices-splash-XXXXXX`, and that staged path is passed to MFR Manager over IARM Bus. Removal of the staged file is attempted after the IARM call returns. Validation or staging failures return `success: false` with error code `-32001` and message `Invalid path`; an IARM update failure returns `success: false` with error code `-32002` and message `Update failed`.
 
 ### Exception Handling
 
