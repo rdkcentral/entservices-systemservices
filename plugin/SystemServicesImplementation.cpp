@@ -33,6 +33,7 @@
 #include <sstream>
 #include <ctime>
 #include <iomanip>
+#include <random>
 #include <bits/stdc++.h>
 #include <algorithm>
 #include <curl/curl.h>
@@ -115,7 +116,7 @@ bool stageSafeSplashScreen(const std::string& input, std::string& stagedPath)
         return false;
     }
 
-    const int source = open(input.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+    const int source = open(input.c_str(), O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC);
     if (source < 0 || fstat(source, &inputStat) != 0 || !S_ISREG(inputStat.st_mode)) {
         if (source >= 0)
             close(source);
@@ -136,8 +137,17 @@ bool stageSafeSplashScreen(const std::string& input, std::string& stagedPath)
         return false;
     }
 
-    char stagingTemplate[] = "/tmp/systemservices-splash-XXXXXX";
-    const int destination = mkstemp(stagingTemplate);
+    std::string stagingPath;
+    int destination = -1;
+    std::random_device randomDevice;
+    for (int attempt = 0; attempt < 16 && destination < 0; ++attempt) {
+        char suffix[9];
+        snprintf(suffix, sizeof(suffix), "%08x", static_cast<unsigned int>(randomDevice()));
+        stagingPath = std::string("/tmp/systemservices-splash-") + suffix;
+        destination = open(stagingPath.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, S_IRUSR | S_IWUSR);
+        if (destination < 0 && errno != EEXIST)
+            break;
+    }
     if (destination < 0) {
         close(source);
         return false;
@@ -164,11 +174,11 @@ bool stageSafeSplashScreen(const std::string& input, std::string& stagedPath)
     close(source);
     close(destination);
     if (!copied) {
-        if (unlink(stagingTemplate) != 0)
+        if (unlink(stagingPath.c_str()) != 0)
             LOGWARN("Failed to remove staged splash file");
         return false;
     }
-    stagedPath = stagingTemplate;
+    stagedPath = stagingPath;
     LOGINFO("stageSafeSplashScreen staged file successfully");
     return true;
 }
