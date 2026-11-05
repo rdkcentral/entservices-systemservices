@@ -137,9 +137,7 @@ bool stageSafeSplashScreen(const std::string& input, std::string& stagedPath)
     }
 
     char stagingTemplate[] = "/tmp/systemservices-splash-XXXXXX";
-    const mode_t previousMask = umask(S_IRWXG | S_IRWXO);
     const int destination = mkstemp(stagingTemplate);
-    umask(previousMask);
     if (destination < 0) {
         close(source);
         return false;
@@ -3381,7 +3379,8 @@ namespace WPEFramework
             char resolvedPath[PATH_MAX] = {0};
             if (realpath(entry.c_str(), resolvedPath) != nullptr) {
                 std::string zoneinfoPrefix(ZONEINFO_DIR);
-                if (std::string(resolvedPath).rfind(zoneinfoPrefix, 0) != 0) {
+                if (std::string(resolvedPath) != zoneinfoPrefix &&
+                    std::string(resolvedPath).rfind(zoneinfoPrefix + "/", 0) != 0) {
                     LOGERR("Timezone path escapes ZONEINFO_DIR: '%s' -> '%s'", entry.c_str(), resolvedPath);
                     return false;
                 }
@@ -3498,6 +3497,8 @@ namespace WPEFramework
 
         Core::hresult SystemServicesImplementation::GetTimeZones(IStringIterator* const& timeZones, string& zoneinfo, bool& success)
         {
+            success = false;
+
             if (timeZones == nullptr || timeZones->Count() == 0)
             {
                 LOGINFO("No timezone list provided, processing all");
