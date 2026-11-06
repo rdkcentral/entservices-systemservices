@@ -178,7 +178,7 @@ bool stageSafeSplashScreen(const std::string& input, std::string& stagedPath)
             LOGWARN("Failed to remove staged splash file");
         return false;
     }
-    stagedPath = stagingPath;
+    stagedPath = std::move(stagingPath);
     LOGINFO("stageSafeSplashScreen staged file successfully");
     return true;
 }
