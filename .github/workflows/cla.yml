@@ -15,6 +15,6 @@ on:
 jobs:
   CLA-Lite:
     name: "Signature"
-    uses: rdkcentral/cmf-actions/.github/workflows/cla.yml@v1
+    uses: rdkcentral/cmf-actions/.github/workflows/cla.yml@b7d7aef49926864ee4a4bf4922c42a3d3630c6bb
     secrets:
       PERSONAL_ACCESS_TOKEN: ${{ secrets.CLA_ASSISTANT }}
