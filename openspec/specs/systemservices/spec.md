@@ -470,7 +470,7 @@ The 66+ API methods are organized into seven major capability groups:
 
 #### API Methods
 - `updateFirmware()`: Initiate firmware update process
-- `getFirmwareUpdateInfo(GUID)`: Get firmware update availability (async)
+- `getFirmwareUpdateInfo(GUID)`: Get firmware update availability (async). During deep sleep, returns `asyncResponse: false` and `success: false` without starting a check. Checks are permitted again after leaving deep sleep.
 - `getFirmwareUpdateState()`: Get current firmware update state
 - `getDownloadedFirmwareInfo()`: Get info about downloaded firmware
 - `getFirmwareDownloadPercent()`: Get download progress percentage
