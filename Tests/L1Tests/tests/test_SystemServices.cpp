@@ -43,8 +43,6 @@
 #include "RfcApiMock.h"
 #include "WrapsMock.h"
 #include "PowerManagerMock.h"
-#include "devicesettings/HostMock.h"
-#include "devicesettings/SleepModeMock.h"
 #include "TelemetryMock.h"
 #include "DeviceInfoMock.h"
 #include <interfaces/IMigration.h>
@@ -541,8 +539,6 @@ protected:
     IarmBusImplMock* p_iarmBusMock = nullptr;
     RfcApiImplMock* p_rfcApiMock = nullptr;
     WrapsImplMock* p_wrapsMock = nullptr;
-    HostImplMock* p_hostMock = nullptr;
-    SleepModeMock* p_sleepModeMock = nullptr;
     TelemetryApiImplMock* p_telemetryApiImplMock = nullptr;
     readprocImplMock* p_readprocImplMock = nullptr;
     // Live ISystemServices* obtained via INTERFACE_AGGREGATE from plugin.
@@ -572,12 +568,6 @@ protected:
         p_wrapsMock = new NiceMock<WrapsImplMock>;
         Wraps::setImpl(p_wrapsMock);
         
-        p_hostMock = new NiceMock<HostImplMock>;
-        device::Host::setImpl(p_hostMock);
-        
-        p_sleepModeMock = new NiceMock<SleepModeMock>;
-        device::SleepMode::setImpl(p_sleepModeMock);
-
         p_telemetryApiImplMock = new NiceMock<TelemetryApiImplMock>;
         TelemetryApi::setImpl(p_telemetryApiImplMock);
 
@@ -770,20 +760,6 @@ protected:
         {
             delete p_wrapsMock;
             p_wrapsMock = nullptr;
-        }
-        
-        device::Host::setImpl(nullptr);
-        if (p_hostMock != nullptr)
-        {
-            delete p_hostMock;
-            p_hostMock = nullptr;
-        }
-        
-        device::SleepMode::setImpl(nullptr);
-        if (p_sleepModeMock != nullptr)
-        {
-            delete p_sleepModeMock;
-            p_sleepModeMock = nullptr;
         }
         
         TelemetryApi::setImpl(nullptr);
@@ -4311,17 +4287,6 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_FileReadError)
 }
 TEST_F(SystemServicesTest, SetPowerState_DEEP_SLEEP_Success)
 {
-    // Covers lines 1518-1531: DEEP_SLEEP branch calls getPreferredSleepMode,
-    // convert("DEEP_SLEEP", sleepMode) is true → setPowerStateConversion(sleepMode),
-    // then writes STANDBY_REASON_FILE.
-    device::SleepMode mode;
-    string sleepModeString(_T("DEEP_SLEEP"));
-
-    ON_CALL(*p_hostMock, getPreferredSleepMode)
-        .WillByDefault(::testing::Return(mode));
-    ON_CALL(*p_sleepModeMock, toString)
-        .WillByDefault(::testing::ReturnRef(sleepModeString));
-
     EXPECT_CALL(PowerManagerMock::Mock(), SetPowerState(::testing::_, ::testing::_, ::testing::_))
         .Times(::testing::AnyNumber())
         .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
@@ -4353,16 +4318,6 @@ TEST_F(SystemServicesTest, SetPowerState_WithStandbyReason)
 }
 TEST_F(SystemServicesTest, SetPowerState_LIGHT_SLEEP_Success)
 {
-    // Covers lines 1518-1531: LIGHT_SLEEP branch hits getPreferredSleepMode,
-    // convert("DEEP_SLEEP", "LIGHT_SLEEP") is false → setPowerStateConversion(powerState).
-    device::SleepMode mode;
-    string sleepModeString(_T("LIGHT_SLEEP"));
-
-    ON_CALL(*p_hostMock, getPreferredSleepMode)
-        .WillByDefault(::testing::Return(mode));
-    ON_CALL(*p_sleepModeMock, toString)
-        .WillByDefault(::testing::ReturnRef(sleepModeString));
-
     EXPECT_CALL(PowerManagerMock::Mock(), SetPowerState(::testing::_, ::testing::_, ::testing::_))
         .Times(::testing::AnyNumber())
         .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
@@ -6545,7 +6500,7 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_FilePresent_BlocklistFalse)
 //   1) empty powerState → populateResponseWithError, success=false
 //   2) ON → setPowerStateConversion("ON") → PM success → success=true
 //   3) STANDBY → PM success → success=true
-//   4) LIGHT_SLEEP / DEEP_SLEEP branch hits getPreferredSleepMode path
+//   4) LIGHT_SLEEP / DEEP_SLEEP map to their corresponding PowerManager states
 //   5) PM failure → success=false (ERROR_NONE returned)
 // ------------------------------------------------------------------
 
@@ -11522,14 +11477,6 @@ TEST_F(SystemServicesTest, SetWakeupSrc_PresenceDetection_CoversConvBranch)
 // =============================================================================
 TEST_F(SystemServicesTest, SetPowerState_DeepSleep_WithStandbyReason)
 {
-    device::SleepMode mode;
-    string sleepModeString(_T("DEEP_SLEEP"));
-
-    ON_CALL(*p_hostMock, getPreferredSleepMode)
-        .WillByDefault(::testing::Return(mode));
-    ON_CALL(*p_sleepModeMock, toString)
-        .WillByDefault(::testing::ReturnRef(sleepModeString));
-
     EXPECT_CALL(PowerManagerMock::Mock(), SetPowerState(::testing::_, ::testing::_, ::testing::_))
         .Times(::testing::AnyNumber())
         .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
@@ -12593,8 +12540,6 @@ protected:
     NiceMock<IarmBusImplMock>       iarmMock;
     NiceMock<WrapsImplMock>         wrapsMock;
     NiceMock<readprocImplMock>      readprocMock;
-    NiceMock<HostImplMock>          hostMock;
-    NiceMock<SleepModeMock>         sleepMock;
     NiceMock<TelemetryApiImplMock>  telemetryMock;
     NiceMock<RfcApiImplMock>        rfcMock;
     Exchange::ISystemServices*      m_sysServices = nullptr;
@@ -12616,8 +12561,6 @@ protected:
         IarmBus::setImpl(&iarmMock);
         Wraps::setImpl(&wrapsMock);
         ProcImpl::setImpl(&readprocMock);
-        device::Host::setImpl(&hostMock);
-        device::SleepMode::setImpl(&sleepMock);
         TelemetryApi::setImpl(&telemetryMock);
         RfcApi::setImpl(&rfcMock);
 
@@ -12711,8 +12654,6 @@ protected:
         IarmBus::setImpl(nullptr);
         Wraps::setImpl(nullptr);
         ProcImpl::setImpl(nullptr);
-        device::Host::setImpl(nullptr);
-        device::SleepMode::setImpl(nullptr);
         TelemetryApi::setImpl(nullptr);
         RfcApi::setImpl(nullptr);
 
