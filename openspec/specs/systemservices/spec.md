@@ -24,7 +24,7 @@ RDK devices require a unified interface for system management operations that ab
 **System Integration:**
 The plugin integrates with multiple RDK subsystems:
 - **IARM Bus**: Inter-process communication for system-wide coordination
-- **Device Settings HAL**: Hardware abstraction for display and audio
+- **DeviceSettings Plugin**: Display and audio capability queries over COM-RPC via `DSHelper`
 - **PowerManager Plugin**: Coordinated power state management
 - **FirmwareUpdate Plugin**: Firmware update orchestration
 - **RFC Service**: Dynamic feature flag configuration
@@ -158,7 +158,7 @@ SystemServices Plugin
 │
 └── Hardware Abstraction Layer (HAL)
     ├── IARM Bus (inter-process communication)
-    ├── Device Settings (DS HAL)
+    ├── DeviceSettings plugin (COM-RPC via DSHelper)
     ├── MFR Manager (manufacturing data)
     ├── RFC Service (feature flags)
     └── Deep Sleep Manager (optional)
@@ -206,7 +206,7 @@ The SystemServices plugin follows a layered architecture pattern, sitting betwee
 ┌───┴─────────────┴──────────────┴───────────────┴─────┐
 │         Hardware Abstraction Layer (HAL)              │
 │  • IARM Bus (Inter Application Resource Manager)      │
-│  • Device Settings (Display/Audio/Video Control)      │
+│  • DeviceSettings plugin (COM-RPC via DSHelper)       │
 │  • RFC Service (Remote Feature Control)               │
 │  • MFR Manager (Manufacturing Data)                   │
 │  • Deep Sleep Manager (Power Control)                 │
@@ -302,7 +302,7 @@ Event Callback Registration
 
 **Required Services:**
 - **IARM Bus**: Inter-process communication backbone
-- **Device Settings HAL**: Hardware control abstraction
+- **DeviceSettings Plugin**: COM-RPC access to display and audio capabilities
 - **RFC Service**: Remote Feature Control for dynamic configuration
 - **SysMgr**: System manager for device state coordination
 
@@ -370,6 +370,16 @@ SystemServices                    PowerManager
 - Graceful handling of connection failures with retry mechanism
 - Coordinates system-wide power management through IARM Bus and COM-RPC
 
+#### Outgoing: DeviceSettings Integration
+
+`SystemServicesImplementation` and `PlatformCapsData` use `DSHelper` from `DeviceSettingsInterface.h` to communicate with the `entservices-devicesettings` plugin over COM-RPC.
+
+**DeviceSettings Integration:**
+- **Connection Lifecycle**: `SystemServicesImplementation::Configure()` opens the link with `DSHelper::Open(service, "SystemServices")`; `PlatformCapsData` opens its link in its constructor. Both close their links during destruction.
+- **Lifecycle Callbacks**: `OnDeviceSettingsActivated()` and `OnDeviceSettingsDeactivated()` log plugin availability changes.
+- **Audio Capability Query**: `CanMixPCMWithSurround()` acquires `Exchange::IDeviceSettingsAudio`, gets HDMI audio port 0, and queries `IsAudioMSDecoded()`. It returns false when the interface is unavailable or either query fails.
+- **Build Linkage**: The implementation links to `${NAMESPACE}Definitions::${NAMESPACE}Definitions` for DeviceSettings interface proxies rather than linking directly to `ds` and `dshalcli`.
+
 ## External Interfaces
 
 The SystemServices plugin exposes its functionality through **dual protocol interfaces**, providing the same 66+ APIs via both JSON-RPC and COM-RPC protocols.
@@ -427,7 +437,7 @@ The 66+ API methods are organized into seven major capability groups:
 
 #### API Methods
 - `getPowerState()`: Get current and previous power states
-- `setPowerState(powerState, standbyReason)`: Set device power state
+- `setPowerState(powerState, standbyReason)`: Set device power state; LIGHT_SLEEP and DEEP_SLEEP requests map directly to their corresponding PowerManager states without a preferred-sleep-mode override
 - `getNetworkStandbyMode()`: Get network standby mode status
 - `setNetworkStandbyMode(nwStandby)`: Enable/disable network during standby
 - `getWakeupReason()`: Get reason for last wakeup (requires ENABLE_DEEP_SLEEP)
@@ -753,7 +763,7 @@ This prevents injection attacks by restricting inputs to alphanumeric characters
 
 ### Exception Handling
 
-Device Settings exceptions are caught and logged with context. HAL failures are gracefully handled with appropriate error responses to clients.
+DeviceSettings COM-RPC link failures are logged. Audio capability queries check interface availability and return codes, returning false when the interface or query is unavailable. HAL failures are gracefully handled with appropriate error responses to clients.
 
 ## State Management
 
@@ -855,7 +865,7 @@ Critical states are persisted to survive reboots:
 **Required:**
 - WPEFramework (Thunder) R4.4+
 - IARM Bus library
-- Device Settings HAL
+- DeviceSettings COM-RPC interface headers and Definitions proxies
 - RFC library
 - libcurl (HTTP/HTTPS)
 - libprocps (process info)
@@ -872,7 +882,7 @@ Critical states are persisted to survive reboots:
 - IARM Bus daemon
 - SysMgr (System Manager)
 - RFC service
-- Device Settings service
+- DeviceSettings plugin (`entservices-devicesettings`)
 
 **Optional Services:**
 - PowerManager plugin
@@ -1033,7 +1043,7 @@ ws.send(JSON.stringify({
 
 - Requires Linux-based RDK platform
 - IARM Bus must be available and initialized
-- Device Settings HAL must be present
+- DeviceSettings plugin must be available for display and audio capability queries
 - RFC service must be running
 
 ### Performance Limits
