@@ -9243,6 +9243,10 @@ TEST_F(SystemServicesTest, OnPowerModeChanged_DEEP_SLEEP_TriggersNotification)
     ASSERT_NE(nullptr, m_sysServices);
     ASSERT_NE(nullptr, m_pmModeNotif) << "IModeChangedNotification not saved during Initialize()";
 
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_RemoveEventHandler(::testing::_, ::testing::_, ::testing::_))
+        .Times(3)
+        .WillRepeatedly(::testing::Return(IARM_RESULT_SUCCESS));
+
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
@@ -9252,9 +9256,142 @@ TEST_F(SystemServicesTest, OnPowerModeChanged_DEEP_SLEEP_TriggersNotification)
         Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP);
 
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onSystemPowerStateChanged));
+    EXPECT_TRUE(::testing::Mock::VerifyAndClearExpectations(p_iarmBusMock));
+
+    string firmwareResponse;
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getFirmwareUpdateInfo"),
+        _T("{\"GUID\":\"deep-sleep\"}"), firmwareResponse));
+    JsonObject firmwareJson;
+    ASSERT_TRUE(firmwareJson.FromString(firmwareResponse)) << firmwareResponse;
+    EXPECT_FALSE(firmwareJson["asyncResponse"].Boolean());
+    EXPECT_FALSE(firmwareJson["success"].Boolean());
+
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_RegisterEventHandler(::testing::_, ::testing::_, ::testing::_))
+        .Times(3)
+        .WillRepeatedly(::testing::Return(IARM_RESULT_SUCCESS));
+    notificationHandler->ResetEvent();
+    m_pmModeNotif->OnPowerModeChanged(
+        Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP,
+        Exchange::IPowerManager::POWER_STATE_STANDBY_LIGHT_SLEEP);
+    EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onSystemPowerStateChanged));
+    EXPECT_TRUE(::testing::Mock::VerifyAndClearExpectations(p_iarmBusMock));
 
     m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
+}
+
+TEST_F(SystemServicesTest, OnPowerModeChanged_DEEP_SLEEP_WaitsForFirmwareCheckAndResumesAfterWake)
+{
+    ASSERT_NE(nullptr, m_sysServices);
+    ASSERT_NE(nullptr, m_pmModeNotif) << "IModeChangedNotification not saved during Initialize()";
+
+    auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
+    ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
+        .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
+    ON_CALL(*deviceInfoMock, AddRef()).WillByDefault(::testing::Return(0u));
+    ON_CALL(*deviceInfoMock, Release()).WillByDefault(::testing::Return(1));
+    ON_CALL(*deviceInfoMock, QueryInterface(::testing::_)).WillByDefault(::testing::Return(nullptr));
+
+    std::mutex firmwareWorkerMutex;
+    std::condition_variable firmwareWorkerCondition;
+    bool firmwareWorkerStarted = false;
+    bool releaseFirmwareWorker = false;
+
+    Exchange::IDeviceInfo::FirmwareversionInfo fwInfo;
+    fwInfo.imagename = "TEST-RDK-2025001.1p1";
+    ON_CALL(*deviceInfoMock, FirmwareVersion(::testing::_))
+        .WillByDefault(::testing::Invoke(
+            [&](Exchange::IDeviceInfo::FirmwareversionInfo& info) {
+                std::unique_lock<std::mutex> lock(firmwareWorkerMutex);
+                firmwareWorkerStarted = true;
+                info = fwInfo;
+                firmwareWorkerCondition.notify_all();
+                firmwareWorkerCondition.wait(lock, [&] { return releaseFirmwareWorker; });
+                return Core::ERROR_NONE;
+            }));
+
+    string firmwareResponse;
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getFirmwareUpdateInfo"),
+        _T("{\"GUID\":\"deep-sleep-in-flight\"}"), firmwareResponse));
+
+    {
+        std::unique_lock<std::mutex> lock(firmwareWorkerMutex);
+        ASSERT_TRUE(firmwareWorkerCondition.wait_for(lock, std::chrono::seconds(2),
+            [&] { return firmwareWorkerStarted; }));
+    }
+
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_RemoveEventHandler(::testing::_, ::testing::_, ::testing::_))
+        .Times(3)
+        .WillRepeatedly(::testing::Return(IARM_RESULT_SUCCESS));
+
+    std::mutex sleepMutex;
+    std::condition_variable sleepCondition;
+    bool sleepEntered = false;
+    bool sleepFinished = false;
+    std::thread sleepThread([&] {
+        {
+            std::lock_guard<std::mutex> lock(sleepMutex);
+            sleepEntered = true;
+        }
+        sleepCondition.notify_all();
+        m_pmModeNotif->OnPowerModeChanged(
+            Exchange::IPowerManager::POWER_STATE_STANDBY,
+            Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP);
+        {
+            std::lock_guard<std::mutex> lock(sleepMutex);
+            sleepFinished = true;
+        }
+        sleepCondition.notify_all();
+    });
+
+    {
+        std::unique_lock<std::mutex> lock(sleepMutex);
+        EXPECT_TRUE(sleepCondition.wait_for(lock, std::chrono::seconds(2),
+            [&] { return sleepEntered; }));
+        EXPECT_FALSE(sleepCondition.wait_for(lock, std::chrono::milliseconds(100),
+            [&] { return sleepFinished; }));
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(firmwareWorkerMutex);
+        releaseFirmwareWorker = true;
+    }
+    firmwareWorkerCondition.notify_all();
+
+    {
+        std::unique_lock<std::mutex> lock(sleepMutex);
+        EXPECT_TRUE(sleepCondition.wait_for(lock, std::chrono::seconds(2),
+            [&] { return sleepFinished; }));
+    }
+    sleepThread.join();
+    EXPECT_TRUE(::testing::Mock::VerifyAndClearExpectations(p_iarmBusMock));
+
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_RegisterEventHandler(::testing::_, ::testing::_, ::testing::_))
+        .Times(3)
+        .WillRepeatedly(::testing::Return(IARM_RESULT_SUCCESS));
+    m_pmModeNotif->OnPowerModeChanged(
+        Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP,
+        Exchange::IPowerManager::POWER_STATE_STANDBY_LIGHT_SLEEP);
+    EXPECT_TRUE(::testing::Mock::VerifyAndClearExpectations(p_iarmBusMock));
+
+    SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
+    m_sysServices->Register(notificationHandler);
+    notificationHandler->ResetEvent();
+
+    firmwareResponse.clear();
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getFirmwareUpdateInfo"),
+        _T("{\"GUID\":\"after-wake\"}"), firmwareResponse));
+    JsonObject firmwareJson;
+    ASSERT_TRUE(firmwareJson.FromString(firmwareResponse));
+    EXPECT_TRUE(firmwareJson["asyncResponse"].Boolean());
+    EXPECT_TRUE(firmwareJson["success"].Boolean());
+    EXPECT_TRUE(notificationHandler->WaitForRequestStatus(3000, SystemServices_onFirmwareUpdateInfoReceived));
+
+    m_sysServices->Unregister(notificationHandler);
+    delete notificationHandler;
+    ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::_))
+        .WillByDefault(::testing::Return(nullptr));
+    delete deviceInfoMock;
 }
 
 TEST_F(SystemServicesTest, OnPowerModeChanged_STANDBY_TriggersNotification)
@@ -12808,13 +12945,11 @@ TEST_F(SystemServicesIarmCbTest, StartModeTimer_UpdateDuration_ViaSetMode_Positi
 
     // Wait for two timer ticks (2×1000ms) plus a generous safety margin.
     // Tick 1 (t≈1000ms): m_remainingDuration 1→0 — covers updateDuration if-branch
-    // Tick 2 (t≈2000ms): m_remainingDuration==0 → else-branch: stop()+detach()+SetMode(NORMAL)
-    // The detached thread then returns from timerFunction. 3500ms gives 1500ms of margin
-    // after the second tick, covering typical CI machine load delays without racing the dtor.
+    // Tick 2 (t≈2000ms): m_remainingDuration==0 → else-branch: stop()+SetMode(NORMAL).
+    // The timer worker remains joinable and returns from timerFunction. 3500ms gives 1500ms
+    // of margin after the second tick, covering typical CI machine load delays.
     std::this_thread::sleep_for(std::chrono::milliseconds(3500));
 
-    // After sleep the timer thread has self-detached; timerThread.joinable()==false.
-    // Fixture destructor is safe: ~cTimer() (called at program exit) sees a non-joinable
-    // thread → no std::terminate.
+    // The implementation destructor joins the finished timer worker before releasing state.
     TEST_LOG("StartModeTimer_UpdateDuration_ViaSetMode PASSED");
 }
