@@ -25,7 +25,7 @@ set(PLUGIN_SYSTEMSERVICE_STARTUPORDER "" CACHE STRING "To configure startup orde
 find_package(${NAMESPACE}Plugins REQUIRED)
 find_package(${NAMESPACE}Definitions REQUIRED)
 find_package(CompileSettingsDebug CONFIG REQUIRED)
-find_package(${NAMESPACE}Helpers REQUIRED)
+find_package(${NAMESPACE}Helpers CONFIG REQUIRED)
 find_library(PROCPS_LIBRARIES NAMES procps)
 
 find_package(Telemetry)
