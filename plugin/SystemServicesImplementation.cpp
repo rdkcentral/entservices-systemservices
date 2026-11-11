@@ -3478,7 +3478,7 @@ namespace WPEFramework
                 }
             }
 
-            int err = pclose(p);
+            int err = v_secure_pclose(p);
 
             if (0 != err)
             {    
