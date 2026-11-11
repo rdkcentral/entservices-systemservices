@@ -35,17 +35,54 @@
 #include "SystemServicesImplementation.h"
 #include "UtilsString.h"
 
-bool isSafeTimeZoneName(const std::string& timeZone);
+bool isValidTimezonePath(const std::string& path, bool allowAbsolute = false);
 
 TEST(SystemServicesSecurityTest, ValidatesTimeZoneNames)
 {
-    EXPECT_TRUE(isSafeTimeZoneName("America/New_York"));
-    EXPECT_TRUE(isSafeTimeZoneName("Etc/GMT+5"));
-    EXPECT_FALSE(isSafeTimeZoneName("../etc/passwd"));
-    EXPECT_FALSE(isSafeTimeZoneName("/etc/passwd"));
-    EXPECT_FALSE(isSafeTimeZoneName("America/New_York;command"));
-    EXPECT_FALSE(isSafeTimeZoneName("America/New_York\nnext"));
-    EXPECT_FALSE(isSafeTimeZoneName(""));
+    EXPECT_TRUE(isValidTimezonePath("America/New_York"));
+    EXPECT_TRUE(isValidTimezonePath("Etc/GMT+5"));
+    EXPECT_FALSE(isValidTimezonePath("../etc/passwd"));
+    EXPECT_FALSE(isValidTimezonePath("/etc/passwd"));
+    EXPECT_FALSE(isValidTimezonePath("America/New_York;command"));
+    EXPECT_FALSE(isValidTimezonePath("America/New_York\nnext"));
+    EXPECT_FALSE(isValidTimezonePath(""));
+}
+
+TEST(SystemServicesSecurityTest, TimezonePath_AcceptsIanaNames)
+{
+    for (const char* name : {"Asia/Kolkata", "America/New_York", "Europe/London", "UTC", "Etc/GMT-14",
+                             "America/Port-au-Prince", "America/Argentina/Buenos_Aires"})
+        EXPECT_TRUE(isValidTimezonePath(name)) << name;
+}
+
+TEST(SystemServicesSecurityTest, TimezonePath_CaseIsPreserved)
+{
+    EXPECT_TRUE(isValidTimezonePath("america/new_york"));
+    EXPECT_TRUE(isValidTimezonePath("AMERICA/NEW_YORK"));
+}
+
+TEST(SystemServicesSecurityTest, TimezonePath_RejectsTraversal)
+{
+    for (const char* name : {"..", "../etc/passwd", "America/../../etc", "a/..", "/etc/passwd"})
+        EXPECT_FALSE(isValidTimezonePath(name)) << name;
+}
+
+TEST(SystemServicesSecurityTest, TimezonePath_RejectsSpecialCharacters)
+{
+    for (const char* name : {"UTC;id", "UTC|id", "UTC&id", "$(id)", "`id`", "UTC id", "UTC\nid",
+                             "UTC\tid", "UTC\\id", "UTC*", "UTC?", "UTC'", "UTC\"", "Z\xC3\xA9"})
+        EXPECT_FALSE(isValidTimezonePath(name)) << name;
+    EXPECT_FALSE(isValidTimezonePath(std::string("UTC\0id", 6)));
+}
+
+TEST(SystemServicesSecurityTest, TimezonePath_AbsoluteOnlyWhenAllowed)
+{
+    EXPECT_FALSE(isValidTimezonePath("/usr/share/zoneinfo/UTC"));
+    EXPECT_TRUE(isValidTimezonePath("/usr/share/zoneinfo/UTC", true));
+    EXPECT_TRUE(isValidTimezonePath("/usr/share/zoneinfo", true));
+    EXPECT_FALSE(isValidTimezonePath("", true));
+    EXPECT_FALSE(isValidTimezonePath("/usr/share/zoneinfo/../../etc/passwd", true));
+    EXPECT_FALSE(isValidTimezonePath("/usr/share/zoneinfo/UTC;id", true));
 }
 
 bool stageSafeSplashScreen(const std::string& input, std::string& resolved);
@@ -11061,7 +11098,7 @@ TEST_F(SystemServicesTest, GetTimeZones_WithSpecificTimezone_CoversIteratorPath)
 
 TEST_F(SystemServicesTest, GetTimeZones_RejectsTraversalInput)
 {
-    // "../../etc/passwd" is skipped by isSafeTimeZoneName() before it reaches
+    // "../../etc/passwd" is skipped by isValidTimezonePath() before it reaches
     // processTimeZones()/popen(); with no valid entries processed, success stays
     // false and the call returns ERROR_GENERAL - never surfacing passwd contents.
     EXPECT_EQ(Core::ERROR_GENERAL, handler.Invoke(connection, _T("getTimeZones"),
