@@ -9243,6 +9243,10 @@ TEST_F(SystemServicesTest, OnPowerModeChanged_DEEP_SLEEP_TriggersNotification)
     ASSERT_NE(nullptr, m_sysServices);
     ASSERT_NE(nullptr, m_pmModeNotif) << "IModeChangedNotification not saved during Initialize()";
 
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_RemoveEventHandler(::testing::_, ::testing::_, ::testing::_))
+        .Times(3)
+        .WillRepeatedly(::testing::Return(IARM_RESULT_SUCCESS));
+
     SystemServicesNotificationHandler* notificationHandler = new SystemServicesNotificationHandler();
     m_sysServices->Register(notificationHandler);
     notificationHandler->ResetEvent();
@@ -9252,6 +9256,25 @@ TEST_F(SystemServicesTest, OnPowerModeChanged_DEEP_SLEEP_TriggersNotification)
         Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP);
 
     EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onSystemPowerStateChanged));
+    EXPECT_TRUE(::testing::Mock::VerifyAndClearExpectations(p_iarmBusMock));
+
+    string firmwareResponse;
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getFirmwareUpdateInfo"),
+        _T("{\"GUID\":\"deep-sleep\"}"), firmwareResponse));
+    JsonObject firmwareJson;
+    ASSERT_TRUE(firmwareJson.FromString(firmwareResponse)) << firmwareResponse;
+    EXPECT_FALSE(firmwareJson["asyncResponse"].Boolean());
+    EXPECT_FALSE(firmwareJson["success"].Boolean());
+
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_RegisterEventHandler(::testing::_, ::testing::_, ::testing::_))
+        .Times(3)
+        .WillRepeatedly(::testing::Return(IARM_RESULT_SUCCESS));
+    notificationHandler->ResetEvent();
+    m_pmModeNotif->OnPowerModeChanged(
+        Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP,
+        Exchange::IPowerManager::POWER_STATE_STANDBY_LIGHT_SLEEP);
+    EXPECT_TRUE(notificationHandler->WaitForRequestStatus(2000, SystemServices_onSystemPowerStateChanged));
+    EXPECT_TRUE(::testing::Mock::VerifyAndClearExpectations(p_iarmBusMock));
 
     m_sysServices->Unregister(notificationHandler);
     delete notificationHandler;
@@ -12808,13 +12831,11 @@ TEST_F(SystemServicesIarmCbTest, StartModeTimer_UpdateDuration_ViaSetMode_Positi
 
     // Wait for two timer ticks (2×1000ms) plus a generous safety margin.
     // Tick 1 (t≈1000ms): m_remainingDuration 1→0 — covers updateDuration if-branch
-    // Tick 2 (t≈2000ms): m_remainingDuration==0 → else-branch: stop()+detach()+SetMode(NORMAL)
-    // The detached thread then returns from timerFunction. 3500ms gives 1500ms of margin
-    // after the second tick, covering typical CI machine load delays without racing the dtor.
+    // Tick 2 (t≈2000ms): m_remainingDuration==0 → else-branch: stop()+SetMode(NORMAL).
+    // The timer worker remains joinable and returns from timerFunction. 3500ms gives 1500ms
+    // of margin after the second tick, covering typical CI machine load delays.
     std::this_thread::sleep_for(std::chrono::milliseconds(3500));
 
-    // After sleep the timer thread has self-detached; timerThread.joinable()==false.
-    // Fixture destructor is safe: ~cTimer() (called at program exit) sees a non-joinable
-    // thread → no std::terminate.
+    // The implementation destructor joins the finished timer worker before releasing state.
     TEST_LOG("StartModeTimer_UpdateDuration_ViaSetMode PASSED");
 }
