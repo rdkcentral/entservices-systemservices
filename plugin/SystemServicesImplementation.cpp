@@ -88,17 +88,22 @@ using WakeupSrcConfig           = WPEFramework::Exchange::IPowerManager::WakeupS
 using IWakeupSourceConfigIterator  = WPEFramework::Exchange::IPowerManager::IWakeupSourceConfigIterator;
 using WakeupSourceConfigIteratorImpl = WPEFramework::Core::Service<WPEFramework::RPC::IteratorType<IWakeupSourceConfigIterator>>;
 
-/* Allowlist [A-Za-z0-9/_+.-]; rejects empty and ".."; a leading '/' only when allowAbsolute. */
-bool isValidTimezonePath(const std::string& path, bool allowAbsolute = false)
+bool isSafeTimeZoneName(const std::string& timeZone)
 {
-    if (path.empty() || path.find("..") != std::string::npos)
+    LOGINFO("isSafeTimeZoneName called");
+    if (timeZone.empty() || timeZone[0] == '/' || timeZone.find("..") != std::string::npos) {
+        LOGWARN("isSafeTimeZoneName rejected: empty, absolute, or traversal input");
         return false;
-    if (!allowAbsolute && path[0] == '/')
-        return false;
-    return std::all_of(path.begin(), path.end(), [](unsigned char c) {
-        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
-            || c == '/' || c == '-' || c == '_' || c == '+' || c == '.';
-    });
+    }
+    for (unsigned char character : timeZone) {
+        if (!std::isalnum(character) && character != '/' && character != '-' && character != '_' && character != '+' && character != '.')
+        {
+            LOGWARN("isSafeTimeZoneName rejected: contains invalid character");
+            return false;
+        }
+    }
+    LOGINFO("isSafeTimeZoneName accepted input");
+    return true;
 }
 
 bool stageSafeSplashScreen(const std::string& input, std::string& stagedPath)
@@ -3371,9 +3376,13 @@ namespace WPEFramework
             bool ret = true;
 
             LOGINFO("processTimeZones called");
-            if (!isValidTimezonePath(entry, true)) {
-                LOGERR("Rejected timezone entry with invalid characters: '%s'", entry.c_str());
-                return false;
+            /* Security: reject shell metacharacters in the entry before passing to popen.
+             * Only allow characters valid in Olson timezone paths: alphanumeric, '/', '-', '_', '+', '.' */
+            for (char c : entry) {
+                if (!std::isalnum(static_cast<unsigned char>(c)) && c != '/' && c != '-' && c != '_' && c != '+' && c != '.') {
+                    LOGERR("Rejected timezone entry with invalid character 0x%02x: '%s'", (unsigned char)c, entry.c_str());
+                    return false;
+                }
             }
 
             /* Canonicalize the path and verify it stays within ZONEINFO_DIR */
@@ -3517,7 +3526,7 @@ namespace WPEFramework
 
                     /* Security: reject traversal sequences and absolute paths to prevent
                      * directory listing / file-existence oracle outside ZONEINFO_DIR */
-                    if (!isValidTimezonePath(tz)) {
+                    if (!isSafeTimeZoneName(tz)) {
                         LOGERR("Rejected timezone with path traversal: %s", tz.c_str());
                         continue;
                     }

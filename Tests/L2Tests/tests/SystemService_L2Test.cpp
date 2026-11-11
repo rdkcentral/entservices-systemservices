@@ -9839,21 +9839,21 @@ TEST_F(SystemService_L2Test, SysImpl_ProcessTimeZones_InvalidPath_COMRPC)
 }
 
 /* ------------------------------------------------------------------- *
- * Function 1c: isValidTimezonePath() — 0 hits in L2 coverage.          *
+ * Function 1c: isSafeTimeZoneName() — 0 hits in L2 coverage.           *
  * Every other getTimeZones test in this file passes an empty/null      *
  * timeZones list, which takes the "process all" else-branch in         *
  * GetTimeZones() and never reaches the `while (timeZones->Next(tz))`   *
- * loop that calls isValidTimezonePath(). This test passes a NON-EMPTY  *
+ * loop that calls isSafeTimeZoneName(). This test passes a NON-EMPTY   *
  * timeZones array (JSON-RPC) containing both a safe entry and a        *
  * traversal attack string, forcing the loop body and the validator     *
  * to execute, and confirms the traversal entry never leaks             *
  * /etc/passwd contents into the response.                              *
- * Covers: isValidTimezonePath() reject-traversal branch and            *
+ * Covers: isSafeTimeZoneName() reject-traversal branch (L93-96) and    *
  * the per-entry loop in GetTimeZones() (previously 0 hits in L2).      *
  * ------------------------------------------------------------------- */
 TEST_F(SystemService_L2Test, SysImpl_GetTimeZones_RejectsTraversalInput_JSONRPC)
 {
-    TEST_LOG("SysImpl_GetTimeZones_RejectsTraversalInput: non-empty timeZones list hits isValidTimezonePath()");
+    TEST_LOG("SysImpl_GetTimeZones_RejectsTraversalInput: non-empty timeZones list hits isSafeTimeZoneName()");
 
     JsonObject params;
     JsonArray tzArr;
