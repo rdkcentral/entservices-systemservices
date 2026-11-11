@@ -3419,7 +3419,7 @@ namespace WPEFramework
                 LOGERR("stat() failed: %s", strerror(errno));
             }
 
-            FILE *p = popen(cmd.c_str(), "r");
+            FILE *p = v_secure_popen("r", "%s",cmd.c_str());
 
             if(!p)
             {
