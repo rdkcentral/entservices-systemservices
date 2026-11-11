@@ -287,13 +287,6 @@ namespace WPEFramework
         {
             regfree (&m_regexUnallowedChars);
 
-            {
-                std::lock_guard<std::mutex> lock(m_getFirmwareInfoThreadMutex);
-                if (m_getFirmwareInfoThread.get().joinable()) {
-                    m_getFirmwareInfoThread.get().join();
-                }
-            }
-
             if (_powerManagerPlugin) {
                 _powerManagerPlugin->Unregister(_pwrMgrNotification.baseInterface<Exchange::IPowerManager::INetworkStandbyModeChangedNotification>());
                 _powerManagerPlugin->Unregister(_pwrMgrNotification.baseInterface<Exchange::IPowerManager::IThermalModeChangedNotification>());
