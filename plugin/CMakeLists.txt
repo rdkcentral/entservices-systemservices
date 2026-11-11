@@ -90,17 +90,6 @@ if(PROCPS_LIBRARIES)
     target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${PROCPS_LIBRARIES})
 endif(PROCPS_LIBRARIES)
 
-find_package(DS)
-if (DS_FOUND)
-	find_package(IARMBus)
-    add_definitions(-DDS_FOUND)
-    target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ${IARMBUS_INCLUDE_DIRS})
-    target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ${DS_INCLUDE_DIRS})
-    target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${NAMESPACE}Plugins::${NAMESPACE}Plugins ${IARMBUS_LIBRARIES} ${DS_LIBRARIES})
-else (DS_FOUND)
-    target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${NAMESPACE}Plugins::${NAMESPACE}Plugins)
-endif(DS_FOUND)
-
 find_package(CURL)
 if (CURL_FOUND)
 	include_directories(${CURL_INCLUDE_DIRS})
@@ -146,7 +135,10 @@ endif()
 
 target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ./)
 target_link_libraries(${MODULE_NAME} PRIVATE ${NAMESPACE}::${NAMESPACE}Helpers)
-target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${NAMESPACE}::${NAMESPACE}Helpers)
+# Definitions supplies the DeviceSettings COM-RPC interface proxies.
+target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE
+    ${NAMESPACE}Definitions::${NAMESPACE}Definitions
+    ${NAMESPACE}::${NAMESPACE}Helpers)
 
 #Add mock headers and SYSTIMEMGR support for L1 and L2 tests only
 if (RDK_SERVICES_L1_TEST OR RDK_SERVICE_L2_TEST)
