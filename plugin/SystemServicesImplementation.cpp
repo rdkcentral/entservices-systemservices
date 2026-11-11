@@ -40,7 +40,7 @@
 #include<interfaces/entservices_errorcodes.h>
 
 #include "SystemServicesImplementation.h"
-#include <telemetry_busmessage_sender.h>
+// #include <telemetry_busmessage_sender.h>
 
 #if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
 #include "libIBusDaemon.h"
@@ -72,6 +72,8 @@
 #include "UtilsfileExists.h"
 #include "UtilsgetFileContent.h"
 #include "UtilsProcess.h"
+
+#include <messaging/TelemetryControl.h>
 
 using namespace std;
 using namespace WPEFramework;
@@ -116,6 +118,24 @@ using WakeupSourceConfigIteratorImpl = WPEFramework::Core::Service<WPEFramework:
 #define BLOCKLIST "blocklist"
 #define MIGRATIONSTATUS "/opt/secure/persistent/MigrationStatus"
 #define TR181_MIGRATIONSTATUS "Device.DeviceInfo.Migration.MigrationStatus"
+
+namespace WPEFramework
+{
+    namespace Plugin
+    {
+        DEFINE_TELEMETRY_CATEGORY(WPE_INFO_MigBoottype_split)
+        DEFINE_TELEMETRY_CATEGORY(FWFail_split)
+        DEFINE_TELEMETRY_CATEGORY(WakeUPRsn_split)
+        DEFINE_TELEMETRY_CATEGORY(SYST_ERR_TerritoryNotSet)
+        DEFINE_TELEMETRY_CATEGORY(SYST_INFO_NWenable)
+        DEFINE_TELEMETRY_CATEGORY(SYST_INFO_NwDisable)
+        DEFINE_TELEMETRY_CATEGORY(PwrStateChng_split)
+        DEFINE_TELEMETRY_CATEGORY(SYST_INFO_ThunderSleep1)
+        DEFINE_TELEMETRY_CATEGORY(SYST_INFO_ThunderSleep2)
+        DEFINE_TELEMETRY_CATEGORY(SYST_INFO_ThunderWake1)
+        DEFINE_TELEMETRY_CATEGORY(SYST_INFO_ThunderWake2)
+    }
+}
 
 /**
  * @struct firmwareUpdate
@@ -719,7 +739,6 @@ namespace WPEFramework
                     break;
                 }
                 
-#ifdef ENABLE_SYSTIMEMGR_SUPPORT
                 case SYSTEMSERVICES_EVT_ONTIMESTATUSCHANGED:
                 {
                     string timeQuality = params["TimeQuality"].String();
@@ -733,7 +752,6 @@ namespace WPEFramework
                     }
                     break;
                 }
-#endif// ENABLE_SYSTIMEMGR_SUPPORT
                 
                 case SYSTEMSERVICES_EVT_ONMACADDRESSRETRIEVED:
                 {
@@ -1431,9 +1449,11 @@ namespace WPEFramework
                         bootInfo.bootType = it->second;
                     }
                     
-                    char value[256] = {0};
-                    snprintf(value, sizeof(value), "\"bootType\":\"%s\"", bootInfo.bootType.c_str());
-                    t2_event_s((char*)"WPE_INFO_MigBoottype_split", value);
+                    // char value[256] = {0};
+                    // snprintf(value, sizeof(value), "\"bootType\":\"%s\"", bootInfo.bootType.c_str());
+                    string value = "\"bootType\":\"" + bootInfo.bootType + "\"";
+                    TELEMETRY(WPE_INFO_MigBoottype_split, value);
+                    // t2_event_s((char*)"WPE_INFO_MigBoottype_split", value);
                 }
                 migrationObject->Release();
             }
@@ -1631,9 +1651,11 @@ namespace WPEFramework
 
             failReason = FwFailReasonToText.at(fwFailReason);
             std::string failReasonStr = FwFailReasonToText.at(fwFailReason);
-            char value[256] = {0};
-            snprintf(value, sizeof(value), "getLastFirmwareFailureReason: response=%s", failReasonStr.c_str());
-            t2_event_s((char*)"FWFail_split", value);
+            // char value[256] = {0};
+            // snprintf(value, sizeof(value), "getLastFirmwareFailureReason: response=%s", failReasonStr.c_str());
+            // t2_event_s((char*)"FWFail_split", value);
+            string value = "getLastFirmwareFailureReason: response=" + failReasonStr;
+            TELEMETRY(FWFail_split, value);
             success = true;
             LOGINFO("response: failReason=%s, success=%s", failReason.c_str(), success ? "true" : "false");
             return Core::ERROR_NONE;
@@ -2003,9 +2025,11 @@ namespace WPEFramework
             }
             LOGWARN("WakeupReason : %s\n", wakeupReason.c_str());
             
-            char value[256] = {0};
-            snprintf(value, sizeof(value), "WakeupReason : %s", wakeupReason.c_str());
-            t2_event_s((char*)"WakeUPRsn_split", value);
+            // char value[256] = {0};
+            // snprintf(value, sizeof(value), "WakeupReason : %s", wakeupReason.c_str());
+            // t2_event_s((char*)"WakeUPRsn_split", value);
+            string value = "WakeupReason : " + wakeupReason;
+            TELEMETRY(WakeUPRsn_split, value);
 
             LOGINFO("response: wakeupReason=%s, success=%s", wakeupReason.c_str(), success ? "true" : "false");
             return Core::ERROR_NONE;
@@ -2118,7 +2142,8 @@ namespace WPEFramework
             
 		        }else{
 		    	    LOGERR("Territory is not set");
-		    	    t2_event_d((char*)"SYST_ERR_TerritoryNotSet", 1);
+		    	    // t2_event_d((char*)"SYST_ERR_TerritoryNotSet", 1);
+                    TELEMETRY(SYST_ERR_TerritoryNotSet, static_cast<uint32_t>(1));
 		        }
             }
             catch(...){
@@ -2329,17 +2354,6 @@ namespace WPEFramework
             LOGINFO("response: TimeQuality=%s, TimeSrc=%s, Time=%s, success=%s", TimeQuality.c_str(), TimeSrc.c_str(), Time.c_str(), success ? "true" : "false");
             return Core::ERROR_NONE;
         }
-#else
-        Core::hresult SystemServicesImplementation::GetTimeStatus(string& TimeQuality, string& TimeSrc, string& Time, bool& success)
-        {
-            // built without systimemgr: the time status comes from another service
-            TimeQuality.clear();
-            TimeSrc.clear();
-            Time.clear();
-            success = false;
-            LOGWARN("getTimeStatus: not supported without systimemgr");
-            return Core::ERROR_UNAVAILABLE;
-        }
 #endif// ENABLE_SYSTIMEMGR_SUPPORT
 
         Core::hresult SystemServicesImplementation::SetDeepSleepTimer(const int seconds, uint32_t& SysSrv_Status, string& errorMessage, bool& success)
@@ -2406,9 +2420,11 @@ namespace WPEFramework
             LOGWARN("setNetworkStandbyMode called, with NwStandbyMode : %s\n", (nwStandby)?("Enabled"):("Disabled"));
 
             if (nwStandby) {
-               t2_event_d((char*)"SYST_INFO_NWenable", 1);
+               // t2_event_d((char*)"SYST_INFO_NWenable", 1);
+               TELEMETRY(SYST_INFO_NWenable, static_cast<uint32_t>(1));
             } else {
-               t2_event_d((char*)"SYST_INFO_NwDisable", 1);
+               // t2_event_d((char*)"SYST_INFO_NwDisable", 1);
+               TELEMETRY(SYST_INFO_NwDisable, static_cast<uint32_t>(1));
             }
 
             ASSERT (_powerManagerPlugin);
@@ -2915,25 +2931,31 @@ namespace WPEFramework
             params["currentPowerState"] = currentPowerState;
             LOGWARN("power state changed from '%s' to '%s'", currentPowerState.c_str(), powerState.c_str());
 
-            char value[256] = {0};
-            snprintf(value, sizeof(value), "power state changed from");
-            t2_event_s((char*)"PwrStateChng_split", value);
+            // char value[256] = {0};
+            // snprintf(value, sizeof(value), "power state changed from");
+            // t2_event_s((char*)"PwrStateChng_split", value);
+            string value = "power state changed from";
+            TELEMETRY(PwrStateChng_split, value);
 
             if (currentPowerState == "ON" && powerState == "LIGHT_SLEEP")
             {
-                t2_event_d((char*)"SYST_INFO_ThunderSleep1", 1);
+                // t2_event_d((char*)"SYST_INFO_ThunderSleep1", 1);
+                TELEMETRY(SYST_INFO_ThunderSleep1, static_cast<uint32_t>(1));
             }
             else if (currentPowerState == "LIGHT_SLEEP" && powerState == "DEEP_SLEEP")
             {
-                t2_event_d((char*)"SYST_INFO_ThunderSleep2", 1);
+                // t2_event_d((char*)"SYST_INFO_ThunderSleep2", 1);
+                TELEMETRY(SYST_INFO_ThunderSleep2, static_cast<uint32_t>(1));
             }
             else if (currentPowerState == "DEEP_SLEEP" && powerState == "LIGHT_SLEEP")
             {
-                t2_event_d((char*)"SYST_INFO_ThunderWake1", 1);
+                // t2_event_d((char*)"SYST_INFO_ThunderWake1", 1);
+                TELEMETRY(SYST_INFO_ThunderWake1, static_cast<uint32_t>(1));
             }
             else if (currentPowerState == "LIGHT_SLEEP" && powerState == "ON")
             {
-                t2_event_d((char*)"SYST_INFO_ThunderWake2", 1);
+                // t2_event_d((char*)"SYST_INFO_ThunderWake2", 1);
+                TELEMETRY(SYST_INFO_ThunderWake2, static_cast<uint32_t>(1));
             }
             dispatchEvent(SYSTEMSERVICES_EVT_ONSYSTEMPOWERSTATECHANGED, params);
         }
