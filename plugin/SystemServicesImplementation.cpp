@@ -24,6 +24,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <dirent.h>
 #include <cstring>
 #include <regex>
 #include <fstream>
@@ -3397,9 +3398,6 @@ namespace WPEFramework
                 entry = resolvedPath;
             }
 
-            std::string cmd = "zdump ";
-            cmd += entry;
-            
             if (0 != access(entry.c_str(), F_OK))
             {
                 LOGERR("Timezone is not in olson format ('%s')", entry.c_str());
@@ -3407,49 +3405,45 @@ namespace WPEFramework
             }
 
             struct stat deStat;
+            bool entryIsDir = false;
             if (0 == stat(entry.c_str(), &deStat))
             {
-                if (S_ISDIR(deStat.st_mode))
-                {
-                    cmd += "/*";
-                }
+                entryIsDir = S_ISDIR(deStat.st_mode);
             }
             else
             {
                 LOGERR("stat() failed: %s", strerror(errno));
             }
 
-            FILE *p = v_secure_popen("r", "%s",cmd.c_str());
-
-            if(!p)
+            /* v_secure_popen does not use a shell: no glob expansion, and each %s is a single argv entry */
+            std::vector<std::string> targets;
+            if (entryIsDir)
             {
-                LOGERR("failed to start %s: %s", cmd.c_str(), strerror(errno));
-                return false;
+                DIR *dp = opendir(entry.c_str());
+                if (!dp)
+                {
+                    LOGERR("opendir(%s) failed: %s", entry.c_str(), strerror(errno));
+                    return false;
+                }
+                struct dirent *de;
+                while ((de = readdir(dp)) != nullptr)
+                {
+                    if (de->d_name[0] == '.')
+                        continue;
+                    targets.push_back(entry + "/" + de->d_name);
+                }
+                closedir(dp);
+            }
+            else
+            {
+                targets.push_back(entry);
             }
 
             std::vector <std::string> dirs;
 
-            char buf[4096];
-            while(fgets(buf, sizeof(buf), p) != NULL)
+            for (const std::string& target : targets)
             {
-                std::string line(buf);
-
-                line.erase(0, line.find_first_not_of(" \n\r\t"));
-                line.erase(line.find_last_not_of(" \n\r\t") + 1);
-
-                size_t fileEnd = line.find_first_of(" \t");
-
-                std::string fullName;
-
-                if (std::string::npos == fileEnd)
-                {
-                    LOGERR("Failed to parse '%s'", line.c_str());
-                    continue;
-                }
-
-                fullName = line.substr(0, fileEnd);
-
-                if (stat(fullName.c_str(), &deStat))
+                if (stat(target.c_str(), &deStat))
                 {
                     LOGERR("stat() failed: %s", strerror(errno));
                     continue;
@@ -3457,33 +3451,61 @@ namespace WPEFramework
 
                 if (S_ISDIR(deStat.st_mode))
                 {
-                    // Coverity Fix: ID 50 - COPY_INSTEAD_OF_MOVE: Use std::move when adding to vector
-                    dirs.push_back(std::move(fullName));
+                    dirs.push_back(target);
+                    continue;
                 }
-                else
+
+                FILE *p = v_secure_popen("r", "zdump %s", target.c_str());
+
+                if(!p)
                 {
-
-                    std::string name = fullName;
-
-                    size_t pathEnd = fullName.find_last_of("/") + 1;
-                    if (std::string::npos != pathEnd)
-                        name = fullName.substr(pathEnd);
-                    else
-                        LOGWARN("No '/' in %s", fullName.c_str());
-
-                    line.erase(0, line.find_first_of(" \t"));
-                    line.erase(0, line.find_first_not_of(" \n\r\t"));
-
-                    out[name.c_str()] = line;
+                    LOGERR("failed to start zdump %s: %s", target.c_str(), strerror(errno));
+                    if (!entryIsDir)
+                        return false;
+                    continue;
                 }
-            }
 
-            int err = v_secure_pclose(p);
+                std::string output;
+                char buf[4096];
+                while(fgets(buf, sizeof(buf), p) != NULL)
+                {
+                    output += buf;
+                }
 
-            if (0 != err)
-            {    
-                LOGERR("%s failed with code %d", cmd.c_str(), err);
-                return false;
+                int err = v_secure_pclose(p);
+
+                if (0 != err)
+                {
+                    LOGERR("zdump %s failed with code %d", target.c_str(), err);
+                    if (!entryIsDir)
+                        return false;
+                    continue;
+                }
+
+                std::string line = output;
+                line.erase(0, line.find_first_not_of(" \n\r\t"));
+                line.erase(line.find_last_not_of(" \n\r\t") + 1);
+
+                size_t fileEnd = line.find_first_of(" \t");
+
+                if (std::string::npos == fileEnd)
+                {
+                    LOGERR("Failed to parse '%s'", line.c_str());
+                    continue;
+                }
+
+                std::string name = target;
+
+                size_t pathEnd = target.find_last_of("/") + 1;
+                if (std::string::npos != pathEnd)
+                    name = target.substr(pathEnd);
+                else
+                    LOGWARN("No '/' in %s", target.c_str());
+
+                line.erase(0, fileEnd);
+                line.erase(0, line.find_first_not_of(" \n\r\t"));
+
+                out[name.c_str()] = line;
             }
 
 	        long unsigned int n=0;
