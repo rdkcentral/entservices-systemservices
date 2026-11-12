@@ -24,6 +24,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <dirent.h>
 #include <cstring>
 #include <regex>
 #include <fstream>
