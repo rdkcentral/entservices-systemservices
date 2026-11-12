@@ -48,7 +48,7 @@
 #include "SystemServicesImplementation.h"
 #include <telemetry_busmessage_sender.h>
 
-#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
+#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)																								
 #include "libIBusDaemon.h"
 #include "UtilsIarm.h"
 #endif /* USE_IARMBUS || USE_IARM_BUS */
@@ -3405,88 +3405,67 @@ namespace WPEFramework
             }
 
             struct stat deStat;
-            bool entryIsDir = false;
+            bool isDir = false;
             if (0 == stat(entry.c_str(), &deStat))
             {
-                entryIsDir = S_ISDIR(deStat.st_mode);
+                isDir = S_ISDIR(deStat.st_mode);
             }
             else
             {
                 LOGERR("stat() failed: %s", strerror(errno));
             }
 
-            /* v_secure_popen does not use a shell: no glob expansion, and each %s is a single argv entry */
-            std::vector<std::string> targets;
-            if (entryIsDir)
+            if (isDir)
             {
-                DIR *dp = opendir(entry.c_str());
-                if (!dp)
+                DIR* directory = opendir(entry.c_str());
+                if (directory == nullptr)
                 {
-                    LOGERR("opendir(%s) failed: %s", entry.c_str(), strerror(errno));
+                    LOGERR("opendir() failed for %s: %s", entry.c_str(), strerror(errno));
                     return false;
                 }
-                struct dirent *de;
-                while ((de = readdir(dp)) != nullptr)
+
+                bool directoryStatus = true;
+                while (dirent* child = readdir(directory))
                 {
-                    if (de->d_name[0] == '.')
+                    const std::string name(child->d_name);
+                    if (name == "." || name == "..")
                         continue;
-                    targets.push_back(entry + "/" + de->d_name);
+
+                    JsonObject childObject;
+                    std::string childPath = entry + "/" + name;
+                    struct stat childStat;
+                    if (lstat(childPath.c_str(), &childStat) != 0 || S_ISLNK(childStat.st_mode))
+                        continue;
+                    if (!processTimeZones(std::move(childPath), childObject))
+                        directoryStatus = false;
+                    if (!childObject.IsNull())
+                        out[name.c_str()] = childObject;
                 }
-                closedir(dp);
+                closedir(directory);
+                return directoryStatus;
             }
-            else
+
+            FILE *p = v_secure_popen("r", "zdump %s", entry.c_str());
+
+            if(!p)
             {
-                targets.push_back(entry);
+                LOGERR("failed to start zdump %s: %s", entry.c_str(), strerror(errno));
+                return false;
             }
 
             std::vector <std::string> dirs;
 
-            for (const std::string& target : targets)
+            char buf[4096];
+            while(fgets(buf, sizeof(buf), p) != NULL)
             {
-                if (stat(target.c_str(), &deStat))
-                {
-                    LOGERR("stat() failed: %s", strerror(errno));
-                    continue;
-                }
+                std::string line(buf);
 
-                if (S_ISDIR(deStat.st_mode))
-                {
-                    dirs.push_back(target);
-                    continue;
-                }
-
-                FILE *p = v_secure_popen("r", "zdump %s", target.c_str());
-
-                if(!p)
-                {
-                    LOGERR("failed to start zdump %s: %s", target.c_str(), strerror(errno));
-                    if (!entryIsDir)
-                        return false;
-                    continue;
-                }
-
-                std::string output;
-                char buf[4096];
-                while(fgets(buf, sizeof(buf), p) != NULL)
-                {
-                    output += buf;
-                }
-
-                int err = v_secure_pclose(p);
-
-                if (0 != err)
-                {
-                    LOGERR("zdump %s failed with code %d", target.c_str(), err);
-                    if (!entryIsDir)
-                        return false;
-                    continue;
-                }
-
-                std::string line = output;
                 line.erase(0, line.find_first_not_of(" \n\r\t"));
                 line.erase(line.find_last_not_of(" \n\r\t") + 1);
 
                 size_t fileEnd = line.find_first_of(" \t");
+
+                std::string fullName;
 
                 if (std::string::npos == fileEnd)
                 {
@@ -3494,21 +3473,46 @@ namespace WPEFramework
                     continue;
                 }
 
-                std::string name = target;
+                fullName = line.substr(0, fileEnd);
 
-                size_t pathEnd = target.find_last_of("/") + 1;
-                if (std::string::npos != pathEnd)
-                    name = target.substr(pathEnd);
+                if (stat(fullName.c_str(), &deStat))
+                {
+                    LOGERR("stat() failed: %s", strerror(errno));
+                    continue;
+                }
+
+                if (S_ISDIR(deStat.st_mode))
+                {
+                    // Coverity Fix: ID 50 - COPY_INSTEAD_OF_MOVE: Use std::move when adding to vector
+                    dirs.push_back(std::move(fullName));
+                }
                 else
-                    LOGWARN("No '/' in %s", target.c_str());
+                {
 
-                line.erase(0, fileEnd);
-                line.erase(0, line.find_first_not_of(" \n\r\t"));
+                    std::string name = fullName;
 
-                out[name.c_str()] = line;
+                    size_t pathEnd = fullName.find_last_of("/") + 1;
+                    if (std::string::npos != pathEnd)
+                        name = fullName.substr(pathEnd);
+                    else
+                        LOGWARN("No '/' in %s", fullName.c_str());
+
+                    line.erase(0, line.find_first_of(" \t"));
+                    line.erase(0, line.find_first_not_of(" \n\r\t"));
+
+                    out[name.c_str()] = line;
+                }
             }
 
-	        long unsigned int n=0;
+            int err = v_secure_pclose(p);
+
+            if (0 != err)
+            {
+                LOGERR("zdump %s failed with code %d", entry.c_str(), err);
+                return false;
+            }
+
+            long unsigned int n=0;
             for (n = 0 ; n < dirs.size(); n++) {
                 std::string name = dirs[n];
 
