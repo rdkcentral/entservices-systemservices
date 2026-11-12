@@ -4080,6 +4080,7 @@ namespace WPEFramework
                 return true;
             } else {
                 LOGERR(" --- Failed to create directory: %d", ret);
+				LOGERR("Error occurred while creating directory: %d", ret);
                 return false;
             }
         }
