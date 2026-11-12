@@ -113,7 +113,7 @@ The plugin integrates with multiple RDK subsystems:
 - **NFR-REL-004**: Thread-safe access SHALL be enforced for all shared state
 
 #### Security
-- **NFR-SEC-001**: All external inputs SHALL be validated using regex patterns to prevent injection attacks
+- **NFR-SEC-001**: All external inputs SHALL be validated using input-appropriate checks, including regex patterns, character allowlists, and resolved-path restrictions, to prevent injection attacks
 - **NFR-SEC-002**: Sensitive data SHALL be stored in `/opt/secure/persistent` with appropriate permissions
 - **NFR-SEC-003**: WPEFramework security token validation SHALL be supported (configurable)
 - **NFR-SEC-004**: Plugin SHALL run with minimal required system privileges
@@ -743,13 +743,16 @@ The plugin uses the enterprise error code framework (`entservices_errorcodes.h`)
 
 ### Input Validation
 
-All external inputs are validated using regex patterns:
+Input validation uses input-specific checks, including regex patterns:
 
 ```cpp
 #define REGEX_UNALLOWABLE_INPUT "[^[:alnum:]_-]{1}"
 ```
 
-This prevents injection attacks by restricting inputs to alphanumeric characters, underscores, and hyphens.
+This pattern prevents injection attacks by restricting inputs to alphanumeric characters, underscores, and hyphens.
+
+- `getTimeZones`: Supplied timezone names must be relative, contain no `..` sequences, and contain only alphanumeric characters, `/`, `-`, `_`, `+`, or `.`. Invalid entries are skipped; if no entries are processed, `success` is false. Resolved timezone paths must remain within `/usr/share/zoneinfo`. Directory traversal skips symbolic-link children, and timezone files are processed using the secure `zdump` wrapper.
+- `setBootLoaderSplashScreen(path)`: The input must open as a regular file whose resolved location is under `/opt/`, `/tmp/`, or `/media/`; empty paths and final-component symbolic links are rejected. The file is copied to a private staging file under `/tmp/` before its staged path is passed to MFR Manager, and the staging file is removed after the IARM call. Validation or staging failure returns `success: false` with error code `-32001` and message `Invalid path`.
 
 ### Exception Handling
 
