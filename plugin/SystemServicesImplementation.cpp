@@ -3397,9 +3397,6 @@ namespace WPEFramework
                 entry = resolvedPath;
             }
 
-            std::string cmd = "zdump ";
-            cmd += entry;
-            
             if (0 != access(entry.c_str(), F_OK))
             {
                 LOGERR("Timezone is not in olson format ('%s')", entry.c_str());
@@ -3407,23 +3404,51 @@ namespace WPEFramework
             }
 
             struct stat deStat;
+            bool isDir = false;
             if (0 == stat(entry.c_str(), &deStat))
             {
-                if (S_ISDIR(deStat.st_mode))
-                {
-                    cmd += "/*";
-                }
+                isDir = S_ISDIR(deStat.st_mode);
             }
             else
             {
                 LOGERR("stat() failed: %s", strerror(errno));
             }
 
-            FILE *p = v_secure_popen("r", "%s",cmd.c_str());
+            if (isDir)
+            {
+                DIR* directory = opendir(entry.c_str());
+                if (directory == nullptr)
+                {
+                    LOGERR("opendir() failed for %s: %s", entry.c_str(), strerror(errno));
+                    return false;
+                }
+
+                bool directoryStatus = true;
+                while (dirent* child = readdir(directory))
+                {
+                    const std::string name(child->d_name);
+                    if (name == "." || name == "..")
+                        continue;
+
+                    JsonObject childObject;
+                    std::string childPath = entry + "/" + name;
+                    struct stat childStat;
+                    if (lstat(childPath.c_str(), &childStat) != 0 || S_ISLNK(childStat.st_mode))
+                        continue;
+                    if (!processTimeZones(std::move(childPath), childObject))
+                        directoryStatus = false;
+                    if (!childObject.IsNull())
+                        out[name.c_str()] = childObject;
+                }
+                closedir(directory);
+                return directoryStatus;
+            }
+
+            FILE *p = v_secure_popen("r", "zdump %s", entry.c_str());
 
             if(!p)
             {
-                LOGERR("failed to start %s: %s", cmd.c_str(), strerror(errno));
+                LOGERR("failed to start zdump %s: %s", entry.c_str(), strerror(errno));
                 return false;
             }
 
@@ -3481,12 +3506,12 @@ namespace WPEFramework
             int err = v_secure_pclose(p);
 
             if (0 != err)
-            {    
-                LOGERR("%s failed with code %d", cmd.c_str(), err);
+            {
+                LOGERR("zdump %s failed with code %d", entry.c_str(), err);
                 return false;
             }
 
-	        long unsigned int n=0;
+            long unsigned int n=0;
             for (n = 0 ; n < dirs.size(); n++) {
                 std::string name = dirs[n];
 
