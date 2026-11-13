@@ -109,7 +109,7 @@ bool isSafeTimeZoneName(const std::string& timeZone)
 
 bool stageSafeSplashScreen(const std::string& input, std::string& stagedPath)
 {
-    LOGINFO("stageSafeSplashScreen called");
+    LOGINFO("stageSafeSplashScreen called: input='%s',  stagedPath='%s'", input.c_str(), stagedPath.c_str());
     struct stat inputStat;
     if (input.empty())
     {
@@ -141,7 +141,8 @@ bool stageSafeSplashScreen(const std::string& input, std::string& stagedPath)
     std::string stagingPath;
     int destination = -1;
     std::random_device randomDevice;
-    for (int attempt = 0; attempt < 16 && destination < 0; ++attempt) {
+    int attempt = 0;
+    for (; attempt < 16 && destination < 0; ++attempt) {
         char suffix[9];
         snprintf(suffix, sizeof(suffix), "%08x", static_cast<unsigned int>(randomDevice()));
         stagingPath = std::string("/tmp/systemservices-splash-") + suffix;
@@ -149,6 +150,7 @@ bool stageSafeSplashScreen(const std::string& input, std::string& stagedPath)
         if (destination < 0 && errno != EEXIST)
             break;
     }
+    LOGINFO("stageSafeSplashScreen after staging loop: attempt=%d, stagingPath='%s', destination=%d", attempt, stagingPath.c_str(), destination);
     if (destination < 0) {
         close(source);
         return false;
@@ -170,6 +172,7 @@ bool stageSafeSplashScreen(const std::string& input, std::string& stagedPath)
         if (!copied)
             break;
     }
+    LOGINFO("stageSafeSplashScreen after copy loop: copied=%d, bytesRead=%zd", copied, bytesRead);
     if (bytesRead < 0 || fsync(destination) != 0)
         copied = false;
     close(source);
@@ -179,6 +182,7 @@ bool stageSafeSplashScreen(const std::string& input, std::string& stagedPath)
             LOGWARN("Failed to remove staged splash file");
         return false;
     }
+    LOGINFO("stageSafeSplashScreen before move: stagingPath='%s'", stagingPath.c_str());
     stagedPath = std::move(stagingPath);
     LOGINFO("stageSafeSplashScreen staged file successfully");
     return true;
@@ -2545,8 +2549,6 @@ namespace WPEFramework
             std::strncpy(mfrparam.path, strBLSplashScreenPath.c_str(), sizeof(mfrparam.path));
             mfrparam.path[sizeof(mfrparam.path) - 1] = '\0';
             IARM_Result_t result = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME, IARM_BUS_MFRLIB_API_SetBlSplashScreen, (void *)&mfrparam, sizeof(mfrparam));
-            if (unlink(strBLSplashScreenPath.c_str()) != 0)
-                LOGWARN("Failed to remove staged splash file");
             if (result != IARM_RESULT_SUCCESS){
                 LOGERR("BootLoaderSplashScreen update failed: IARM result %d", result);
                 error.message = "Update failed";
@@ -2559,6 +2561,8 @@ namespace WPEFramework
                 success =true;
             }
             LOGINFO("response: error.code=%s, error.message=%s, success=%s", error.code.c_str(), error.message.c_str(), success ? "true" : "false");
+            if (unlink(strBLSplashScreenPath.c_str()) != 0)
+                LOGWARN("Failed to remove staged splash file");
             return Core::ERROR_NONE;
         }
         
