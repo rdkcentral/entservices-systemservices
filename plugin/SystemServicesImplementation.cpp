@@ -2530,33 +2530,31 @@ namespace WPEFramework
         
         Core::hresult SystemServicesImplementation::SetBootLoaderSplashScreen(const string& path, ErrorInfo& error, bool& success)
         {
-            LOGINFO("path=%s", path.c_str());
-            string strBLSplashScreenPath = path;
-            bool fileExists = Utils::fileExists(strBLSplashScreenPath.c_str());
-            if((strBLSplashScreenPath != "") && fileExists)
+            LOGINFO("SetBootLoaderSplashScreen called");
+            string strBLSplashScreenPath;
+            if (!stageSafeSplashScreen(path, strBLSplashScreenPath))
             {
-                IARM_Bus_MFRLib_SetBLSplashScreen_Param_t mfrparam;
-                std::strncpy(mfrparam.path, strBLSplashScreenPath.c_str(), sizeof(mfrparam.path));
-                mfrparam.path[sizeof(mfrparam.path) - 1] = '\0';
-                IARM_Result_t result = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME, IARM_BUS_MFRLIB_API_SetBlSplashScreen, (void *)&mfrparam, sizeof(mfrparam));
-                if (result != IARM_RESULT_SUCCESS){
-                    LOGERR("Update failed. path: %s, fileExists %s, IARM result %d ",strBLSplashScreenPath.c_str(),fileExists ? "true" : "false",result);
-                    error.message = "Update failed";
-                    error.code = "-32002";
-                    success = false;
-                }
-                else 
-                {
-                    LOGINFO("BootLoaderSplashScreen updated successfully");
-                    success =true;
-                }
-            }
-            else
-            {
-                LOGERR("Invalid path. path: %s, fileExists %s ",strBLSplashScreenPath.c_str(),fileExists ? "true" : "false");
+                LOGERR("Rejected invalid splash screen input");
                 error.message = "Invalid path";
                 error.code = "-32001";
                 success = false;
+                return Core::ERROR_NONE;
+            }
+
+            IARM_Bus_MFRLib_SetBLSplashScreen_Param_t mfrparam;
+            std::strncpy(mfrparam.path, strBLSplashScreenPath.c_str(), sizeof(mfrparam.path));
+            mfrparam.path[sizeof(mfrparam.path) - 1] = '\0';
+            IARM_Result_t result = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME, IARM_BUS_MFRLIB_API_SetBlSplashScreen, (void *)&mfrparam, sizeof(mfrparam));
+            if (result != IARM_RESULT_SUCCESS){
+                LOGERR("BootLoaderSplashScreen update failed: IARM result %d", result);
+                error.message = "Update failed";
+                error.code = "-32002";
+                success = false;
+            }
+            else
+            {
+                LOGINFO("BootLoaderSplashScreen updated successfully");
+                success =true;
             }
             LOGINFO("response: error.code=%s, error.message=%s, success=%s", error.code.c_str(), error.message.c_str(), success ? "true" : "false");
             return Core::ERROR_NONE;
