@@ -40,7 +40,7 @@
 #include <curl/curl.h>
 #include "StateObserverHelper.h"
 #include "uploadlogs.h"
-#include "secure_wrapper.h"
+#include "secure_wrapper.h" trigger xione uk mwbuild with xione uk job by reverting  setsplashscreen changes whatever we added. pls do it quickly
 #include <core/core.h>
 #include <core/JSON.h>
 #include<interfaces/entservices_errorcodes.h>
@@ -2545,8 +2545,6 @@ namespace WPEFramework
             std::strncpy(mfrparam.path, strBLSplashScreenPath.c_str(), sizeof(mfrparam.path));
             mfrparam.path[sizeof(mfrparam.path) - 1] = '\0';
             IARM_Result_t result = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME, IARM_BUS_MFRLIB_API_SetBlSplashScreen, (void *)&mfrparam, sizeof(mfrparam));
-            if (unlink(strBLSplashScreenPath.c_str()) != 0)
-                LOGWARN("Failed to remove staged splash file");
             if (result != IARM_RESULT_SUCCESS){
                 LOGERR("BootLoaderSplashScreen update failed: IARM result %d", result);
                 error.message = "Update failed";
