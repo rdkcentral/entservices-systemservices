@@ -43,8 +43,6 @@
 #include "RfcApiMock.h"
 #include "WrapsMock.h"
 #include "PowerManagerMock.h"
-#include "devicesettings/HostMock.h"
-#include "devicesettings/SleepModeMock.h"
 #include "TelemetryMock.h"
 #include "DeviceInfoMock.h"
 #include <interfaces/IMigration.h>
@@ -69,7 +67,6 @@ using namespace WPEFramework;
 // without needing /usr/bin/logupload to exist (which requires root in CI).
 // These are defined in the UploadLogs namespace but not exposed via the header.
 namespace WPEFramework { namespace Plugin { namespace UploadLogs {
-    bool checkmTlsLogUploadFlag();
     bool getDCMconfigDetails(std::string& upload_protocol, std::string& httplink, std::string& uploadCheck);
     std::int32_t getUploadLogParameters(std::string& tftp_server, std::string& upload_protocol, std::string& upload_httplink);
 } } }
@@ -542,8 +539,6 @@ protected:
     IarmBusImplMock* p_iarmBusMock = nullptr;
     RfcApiImplMock* p_rfcApiMock = nullptr;
     WrapsImplMock* p_wrapsMock = nullptr;
-    HostImplMock* p_hostMock = nullptr;
-    SleepModeMock* p_sleepModeMock = nullptr;
     TelemetryApiImplMock* p_telemetryApiImplMock = nullptr;
     readprocImplMock* p_readprocImplMock = nullptr;
     // Live ISystemServices* obtained via INTERFACE_AGGREGATE from plugin.
@@ -573,12 +568,6 @@ protected:
         p_wrapsMock = new NiceMock<WrapsImplMock>;
         Wraps::setImpl(p_wrapsMock);
         
-        p_hostMock = new NiceMock<HostImplMock>;
-        device::Host::setImpl(p_hostMock);
-        
-        p_sleepModeMock = new NiceMock<SleepModeMock>;
-        device::SleepMode::setImpl(p_sleepModeMock);
-
         p_telemetryApiImplMock = new NiceMock<TelemetryApiImplMock>;
         TelemetryApi::setImpl(p_telemetryApiImplMock);
 
@@ -771,20 +760,6 @@ protected:
         {
             delete p_wrapsMock;
             p_wrapsMock = nullptr;
-        }
-        
-        device::Host::setImpl(nullptr);
-        if (p_hostMock != nullptr)
-        {
-            delete p_hostMock;
-            p_hostMock = nullptr;
-        }
-        
-        device::SleepMode::setImpl(nullptr);
-        if (p_sleepModeMock != nullptr)
-        {
-            delete p_sleepModeMock;
-            p_sleepModeMock = nullptr;
         }
         
         TelemetryApi::setImpl(nullptr);
@@ -4312,17 +4287,6 @@ TEST_F(SystemServicesTest, GetDownloadedFirmwareInfo_FileReadError)
 }
 TEST_F(SystemServicesTest, SetPowerState_DEEP_SLEEP_Success)
 {
-    // Covers lines 1518-1531: DEEP_SLEEP branch calls getPreferredSleepMode,
-    // convert("DEEP_SLEEP", sleepMode) is true → setPowerStateConversion(sleepMode),
-    // then writes STANDBY_REASON_FILE.
-    device::SleepMode mode;
-    string sleepModeString(_T("DEEP_SLEEP"));
-
-    ON_CALL(*p_hostMock, getPreferredSleepMode)
-        .WillByDefault(::testing::Return(mode));
-    ON_CALL(*p_sleepModeMock, toString)
-        .WillByDefault(::testing::ReturnRef(sleepModeString));
-
     EXPECT_CALL(PowerManagerMock::Mock(), SetPowerState(::testing::_, ::testing::_, ::testing::_))
         .Times(::testing::AnyNumber())
         .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
@@ -4354,16 +4318,6 @@ TEST_F(SystemServicesTest, SetPowerState_WithStandbyReason)
 }
 TEST_F(SystemServicesTest, SetPowerState_LIGHT_SLEEP_Success)
 {
-    // Covers lines 1518-1531: LIGHT_SLEEP branch hits getPreferredSleepMode,
-    // convert("DEEP_SLEEP", "LIGHT_SLEEP") is false → setPowerStateConversion(powerState).
-    device::SleepMode mode;
-    string sleepModeString(_T("LIGHT_SLEEP"));
-
-    ON_CALL(*p_hostMock, getPreferredSleepMode)
-        .WillByDefault(::testing::Return(mode));
-    ON_CALL(*p_sleepModeMock, toString)
-        .WillByDefault(::testing::ReturnRef(sleepModeString));
-
     EXPECT_CALL(PowerManagerMock::Mock(), SetPowerState(::testing::_, ::testing::_, ::testing::_))
         .Times(::testing::AnyNumber())
         .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
@@ -6546,7 +6500,7 @@ TEST_F(SystemServicesTest, GetBlocklistFlag_FilePresent_BlocklistFalse)
 //   1) empty powerState → populateResponseWithError, success=false
 //   2) ON → setPowerStateConversion("ON") → PM success → success=true
 //   3) STANDBY → PM success → success=true
-//   4) LIGHT_SLEEP / DEEP_SLEEP branch hits getPreferredSleepMode path
+//   4) LIGHT_SLEEP / DEEP_SLEEP map to their corresponding PowerManager states
 //   5) PM failure → success=false (ERROR_NONE returned)
 // ------------------------------------------------------------------
 
@@ -8006,17 +7960,6 @@ TEST_F(SystemServicesTest, CThermalMonitor_OnThermalModeChanged_CriticalToCritic
 
 // ===================== Upload Logs Coverage Tests =====================
 // ------------------------------------------------------------------
-// checkmTlsLogUploadFlag — always returns true, just logs
-// ------------------------------------------------------------------
-TEST_F(SystemServicesTest, UploadLogs_CheckMtlsFlag_AlwaysReturnsTrue)
-{
-    // Covers: uploadlogs.cpp lines 43-46 (the entire function)
-    bool result = WPEFramework::Plugin::UploadLogs::checkmTlsLogUploadFlag();
-    EXPECT_TRUE(result) << "checkmTlsLogUploadFlag must always return true";
-    TEST_LOG("UploadLogs_CheckMtlsFlag_AlwaysReturnsTrue - PASSED");
-}
-
-// ------------------------------------------------------------------
 // getDCMconfigDetails — /tmp/DCMSettings.conf absent
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, UploadLogs_GetDCMconfigDetails_FileAbsent_ReturnsFalse)
@@ -8139,7 +8082,7 @@ TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_DevOptDCMAbsent_EtcFall
 // ------------------------------------------------------------------
 // getUploadLogParameters — full success path, no FORCE_MTLS key
 // ------------------------------------------------------------------
-TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_SuccessPath_RegexReplaceApplied)
+TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_SuccessPath_URLUnchanged)
 {
     createFile("/etc/device.properties", "BUILD_TYPE=prod");
     createFile("/etc/dcm.properties", "LOG_SERVER=logs.example.com");
@@ -8152,18 +8095,17 @@ TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_SuccessPath_RegexReplac
     EXPECT_EQ(0, result) << "Must return E_OK on full success path";
     EXPECT_EQ("logs.example.com", tftp);
     EXPECT_EQ("tftp", protocol);
-    // regex_replace applied: cgi-bin → secure/cgi-bin
-    EXPECT_NE(std::string::npos, httplink.find("secure/cgi-bin")) << "URL should have secure/cgi-bin: " << httplink;
+    EXPECT_EQ("http://example.com/cgi-bin/logs.sh", httplink) << "URL must be passed unchanged: " << httplink;
     std::ofstream("/etc/device.properties").close();
     std::ofstream("/etc/dcm.properties").close();
     removeFile("/tmp/DCMSettings.conf");
-    TEST_LOG("UploadLogs_GetUploadLogParams_SuccessPath_RegexReplace - PASSED");
+    TEST_LOG("UploadLogs_GetUploadLogParams_SuccessPath_URLUnchanged - PASSED");
 }
 
 // ------------------------------------------------------------------
-// getUploadLogParameters — FORCE_MTLS=true → mTlsLogUpload=true, skip regex_replace
+// getUploadLogParameters — FORCE_MTLS=true is ignored, URL unchanged
 // ------------------------------------------------------------------
-TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_ForceMTLS_True_SkipsReplace)
+TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_ForceMTLS_True_URLUnchanged)
 {
     createFile("/etc/device.properties", "BUILD_TYPE=prod\nFORCE_MTLS=true");
     createFile("/etc/dcm.properties", "LOG_SERVER=logs.example.com");
@@ -8174,18 +8116,17 @@ TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_ForceMTLS_True_SkipsRep
     std::string tftp, protocol, httplink;
     std::int32_t result = WPEFramework::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
     EXPECT_EQ(0, result);
-    // force_mtls=="true" → inner if is false → regex_replace NOT called, URL unchanged
-    EXPECT_EQ(std::string::npos, httplink.find("secure/cgi-bin")) << "URL must NOT be replaced when FORCE_MTLS=true: " << httplink;
+    EXPECT_EQ("http://example.com/cgi-bin/logs.sh", httplink) << "URL must be passed unchanged: " << httplink;
     std::ofstream("/etc/device.properties").close();
     std::ofstream("/etc/dcm.properties").close();
     removeFile("/tmp/DCMSettings.conf");
-    TEST_LOG("UploadLogs_GetUploadLogParams_ForceMTLS_True_SkipsReplace - PASSED");
+    TEST_LOG("UploadLogs_GetUploadLogParams_ForceMTLS_True_URLUnchanged - PASSED");
 }
 
 // ------------------------------------------------------------------
-// getUploadLogParameters — FORCE_MTLS=false (present but not "true")
+// getUploadLogParameters — FORCE_MTLS=false is ignored, URL unchanged
 // ------------------------------------------------------------------
-TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_ForceMTLS_False_RegexApplied)
+TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_ForceMTLS_False_URLUnchanged)
 {
     createFile("/etc/device.properties", "BUILD_TYPE=prod\nFORCE_MTLS=false");
     createFile("/etc/dcm.properties", "LOG_SERVER=logs.example.com");
@@ -8196,16 +8137,15 @@ TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_ForceMTLS_False_RegexAp
     std::string tftp, protocol, httplink;
     std::int32_t result = WPEFramework::Plugin::UploadLogs::getUploadLogParameters(tftp, protocol, httplink);
     EXPECT_EQ(0, result);
-    // force_mtls="false" → "true" != "false" is true → regex_replace applied
-    EXPECT_NE(std::string::npos, httplink.find("secure/cgi-bin")) << "URL should have secure/cgi-bin: " << httplink;
+    EXPECT_EQ("http://example.com/cgi-bin/upload.sh", httplink) << "URL must be passed unchanged: " << httplink;
     std::ofstream("/etc/device.properties").close();
     std::ofstream("/etc/dcm.properties").close();
     removeFile("/tmp/DCMSettings.conf");
-    TEST_LOG("UploadLogs_GetUploadLogParams_ForceMTLS_False_RegexApplied - PASSED");
+    TEST_LOG("UploadLogs_GetUploadLogParams_ForceMTLS_False_URLUnchanged - PASSED");
 }
 
 // ------------------------------------------------------------------
-// getUploadLogParameters — URL without "cgi-bin" — regex_replace has no effect
+// getUploadLogParameters — URL without "cgi-bin" — unchanged
 // ------------------------------------------------------------------
 TEST_F(SystemServicesTest, UploadLogs_GetUploadLogParams_URLNoCgiBin_ReplaceNoEffect)
 {
@@ -11537,14 +11477,6 @@ TEST_F(SystemServicesTest, SetWakeupSrc_PresenceDetection_CoversConvBranch)
 // =============================================================================
 TEST_F(SystemServicesTest, SetPowerState_DeepSleep_WithStandbyReason)
 {
-    device::SleepMode mode;
-    string sleepModeString(_T("DEEP_SLEEP"));
-
-    ON_CALL(*p_hostMock, getPreferredSleepMode)
-        .WillByDefault(::testing::Return(mode));
-    ON_CALL(*p_sleepModeMock, toString)
-        .WillByDefault(::testing::ReturnRef(sleepModeString));
-
     EXPECT_CALL(PowerManagerMock::Mock(), SetPowerState(::testing::_, ::testing::_, ::testing::_))
         .Times(::testing::AnyNumber())
         .WillRepeatedly(::testing::Return(Core::ERROR_NONE));
@@ -12608,8 +12540,6 @@ protected:
     NiceMock<IarmBusImplMock>       iarmMock;
     NiceMock<WrapsImplMock>         wrapsMock;
     NiceMock<readprocImplMock>      readprocMock;
-    NiceMock<HostImplMock>          hostMock;
-    NiceMock<SleepModeMock>         sleepMock;
     NiceMock<TelemetryApiImplMock>  telemetryMock;
     NiceMock<RfcApiImplMock>        rfcMock;
     Exchange::ISystemServices*      m_sysServices = nullptr;
@@ -12631,8 +12561,6 @@ protected:
         IarmBus::setImpl(&iarmMock);
         Wraps::setImpl(&wrapsMock);
         ProcImpl::setImpl(&readprocMock);
-        device::Host::setImpl(&hostMock);
-        device::SleepMode::setImpl(&sleepMock);
         TelemetryApi::setImpl(&telemetryMock);
         RfcApi::setImpl(&rfcMock);
 
@@ -12726,8 +12654,6 @@ protected:
         IarmBus::setImpl(nullptr);
         Wraps::setImpl(nullptr);
         ProcImpl::setImpl(nullptr);
-        device::Host::setImpl(nullptr);
-        device::SleepMode::setImpl(nullptr);
         TelemetryApi::setImpl(nullptr);
         RfcApi::setImpl(nullptr);
 
