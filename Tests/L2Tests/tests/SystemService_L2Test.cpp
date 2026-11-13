@@ -1143,6 +1143,13 @@ TEST_F(SystemService_L2Test, GetFriendlyName_COMRPC)
                 string friendlyName;
                 bool success = false;
 
+                Exchange::ISystemServices::SystemResult setResult;
+                const string expectedFriendlyName = "TestDevice_L2_COMRPC";
+                uint32_t setResultCode = m_SystemServicesPlugin->SetFriendlyName(expectedFriendlyName, setResult);
+
+                EXPECT_EQ(setResultCode, Core::ERROR_NONE);
+                EXPECT_TRUE(setResult.success);
+
                 uint32_t result = m_SystemServicesPlugin->GetFriendlyName(friendlyName, success);
 
                 EXPECT_EQ(result, Core::ERROR_NONE);
@@ -1153,6 +1160,8 @@ TEST_F(SystemService_L2Test, GetFriendlyName_COMRPC)
                 EXPECT_TRUE(success);
 
                 TEST_LOG("FriendlyName: %s", friendlyName.c_str());
+                EXPECT_FALSE(friendlyName.empty());
+                EXPECT_EQ(friendlyName, expectedFriendlyName);
 
                 m_SystemServicesPlugin->Release();
             } else {
