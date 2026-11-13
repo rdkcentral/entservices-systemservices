@@ -1143,6 +1143,13 @@ TEST_F(SystemService_L2Test, GetFriendlyName_COMRPC)
                 string friendlyName;
                 bool success = false;
 
+                Exchange::ISystemServices::SystemResult setResult;
+                const string expectedFriendlyName = "TestDevice_L2_COMRPC";
+                uint32_t setResultCode = m_SystemServicesPlugin->SetFriendlyName(expectedFriendlyName, setResult);
+
+                EXPECT_EQ(setResultCode, Core::ERROR_NONE);
+                EXPECT_TRUE(setResult.success);
+
                 uint32_t result = m_SystemServicesPlugin->GetFriendlyName(friendlyName, success);
 
                 EXPECT_EQ(result, Core::ERROR_NONE);
@@ -1153,6 +1160,8 @@ TEST_F(SystemService_L2Test, GetFriendlyName_COMRPC)
                 EXPECT_TRUE(success);
 
                 TEST_LOG("FriendlyName: %s", friendlyName.c_str());
+                EXPECT_FALSE(friendlyName.empty());
+                EXPECT_EQ(friendlyName, expectedFriendlyName);
 
                 m_SystemServicesPlugin->Release();
             } else {
@@ -3043,8 +3052,10 @@ TEST_F(SystemService_L2Test, SysImpl_Cov_SetMode_NORMAL_JSONRPC)
     TEST_LOG("SysImpl_Cov: Testing setMode NORMAL via JSON-RPC");
 
     JsonObject params;
-    params["mode"] = "NORMAL";
-    params["duration"] = -1;
+    JsonObject modeInfo;
+    modeInfo["mode"] = "NORMAL";
+    modeInfo["duration"] = -1;
+    params["modeInfo"] = modeInfo;
     JsonObject result;
 
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
@@ -4459,9 +4470,10 @@ TEST_F(SystemService_L2Test, SysImpl_SetDeepSleepTimer_ZeroSeconds_JSONRPC)
     JsonObject result;
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setDeepSleepTimer", params, result);
     TEST_LOG("  status=%u", status);
+    EXPECT_EQ(status, Core::ERROR_GENERAL);
 }
 
-/* setDeepSleepTimer seconds=999999: covers overflow clamping branch (>864000 → clamp to 0) */
+/* setDeepSleepTimer seconds=999999: covers overflow clamping branch (>864000 → clamp to 0 then call PM) */
 TEST_F(SystemService_L2Test, SysImpl_SetDeepSleepTimer_OverflowSeconds_JSONRPC)
 {
     TEST_LOG("SysImpl_SetDeepSleepTimer_OverflowSeconds: seconds=999999 clamped (exceeds 864000)");
@@ -4470,6 +4482,9 @@ TEST_F(SystemService_L2Test, SysImpl_SetDeepSleepTimer_OverflowSeconds_JSONRPC)
     JsonObject result;
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setDeepSleepTimer", params, result);
     TEST_LOG("  status=%u", status);
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    ASSERT_TRUE(result.HasLabel("success"));
+    EXPECT_TRUE(result["success"].Boolean());
 }
 
 /* setBootLoaderSplashScreen empty path → covers invalid path branch */
@@ -4481,6 +4496,9 @@ TEST_F(SystemService_L2Test, SysImpl_SetBootLoaderSplashScreen_EmptyPath_JSONRPC
     JsonObject result;
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setBootLoaderSplashScreen", params, result);
     TEST_LOG("  status=%u", status);
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    ASSERT_TRUE(result.HasLabel("success"));
+    EXPECT_FALSE(result["success"].Boolean());
 }
 
 /* setBootLoaderSplashScreen non-existent path → covers fileExists==false branch */
@@ -4492,6 +4510,9 @@ TEST_F(SystemService_L2Test, SysImpl_SetBootLoaderSplashScreen_NonExistentPath_J
     JsonObject result;
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setBootLoaderSplashScreen", params, result);
     TEST_LOG("  status=%u", status);
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    ASSERT_TRUE(result.HasLabel("success"));
+    EXPECT_FALSE(result["success"].Boolean());
 }
 
 
@@ -4958,6 +4979,7 @@ TEST_F(SystemService_L2Test, SysImpl_SetTerritory_InvalidFormat_JSONRPC)
     JsonObject result;
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setTerritory", params, result);
     TEST_LOG("  status=%u", status);
+    EXPECT_EQ(status, Core::ERROR_GENERAL);
 }
 
 /* setMode with empty mode → covers populateResponseWithError(SysSrv_MissingKeyValues) */
@@ -4965,14 +4987,16 @@ TEST_F(SystemService_L2Test, SysImpl_SetMode_Empty_JSONRPC)
 {
     TEST_LOG("SysImpl_SetMode_EmptyModeString: empty mode string returns MissingKeyValues error");
     JsonObject params;
-    params["mode"] = "";
-    params["duration"] = 0;
+    JsonObject modeInfo;
+    modeInfo["mode"] = "";
+    modeInfo["duration"] = 0;
+    params["modeInfo"] = modeInfo;
     JsonObject result;
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
     TEST_LOG("  status=%u", status);
-    if (result.HasLabel("success")) {
-        TEST_LOG("  success=%s", result["success"].Boolean() ? "true" : "false");
-    }
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    ASSERT_TRUE(result.HasLabel("success"));
+    EXPECT_FALSE(result["success"].Boolean());
 }
 
 /* setMode with completely invalid mode string → covers invalid-mode early return */
@@ -4980,15 +5004,16 @@ TEST_F(SystemService_L2Test, SysImpl_SetMode_InvalidMode_JSONRPC)
 {
     TEST_LOG("SysImpl_SetMode_InvalidMode: invalid mode name is rejected");
     JsonObject params;
-    params["mode"] = "INVALID_XYZ_MODE";
-    params["duration"] = 0;
+    JsonObject modeInfo;
+    modeInfo["mode"] = "INVALID_XYZ_MODE";
+    modeInfo["duration"] = 0;
+    params["modeInfo"] = modeInfo;
     JsonObject result;
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
     TEST_LOG("  status=%u", status);
-    if (result.HasLabel("success")) {
-        bool s = result["success"].Boolean();
-        TEST_LOG("  success=%s (expect false for invalid mode)", s ? "true" : "false");
-    }
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    ASSERT_TRUE(result.HasLabel("success"));
+    EXPECT_FALSE(result["success"].Boolean());
 }
 
 /* setTimeZoneDST with empty string → covers MissingKeyValues branch */
@@ -5001,6 +5026,9 @@ TEST_F(SystemService_L2Test, SysImpl_SetTimeZoneDST_Empty_JSONRPC)
     JsonObject result;
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setTimeZoneDST", params, result);
     TEST_LOG("  status=%u", status);
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    ASSERT_TRUE(result.HasLabel("success"));
+    EXPECT_TRUE(result["success"].Boolean());
 }
 
 /* updateFirmware via JSON-RPC */
@@ -5051,16 +5079,25 @@ TEST_F(SystemService_L2Test, SysImpl_SetMode_WAREHOUSE_NegDuration_JSONRPC)
 {
     TEST_LOG("SysImpl: setMode WAREHOUSE duration=-1 (stopModeTimer, no thread)");
     JsonObject params;
-    params["mode"] = "WAREHOUSE";
-    params["duration"] = -1;
+    JsonObject modeInfo;
+    modeInfo["mode"] = "WAREHOUSE";
+    modeInfo["duration"] = -1;
+    params["modeInfo"] = modeInfo;
     JsonObject result;
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "setMode", params, result);
     TEST_LOG("  status=%u", status);
+    EXPECT_EQ(status, Core::ERROR_NONE);
+    ASSERT_TRUE(result.HasLabel("success"));
+    EXPECT_TRUE(result["success"].Boolean());
+
     /* Cleanup: reset to NORMAL */
     JsonObject params2, result2;
-    params2["mode"] = "NORMAL";
-    params2["duration"] = -1;
-    InvokeServiceMethod("org.rdk.System.1", "setMode", params2, result2);
+    JsonObject modeInfo2;
+    modeInfo2["mode"] = "NORMAL";
+    modeInfo2["duration"] = -1;
+    params2["modeInfo"] = modeInfo2;
+    uint32_t cleanupStatus = InvokeServiceMethod("org.rdk.System.1", "setMode", params2, result2);
+    EXPECT_EQ(cleanupStatus, Core::ERROR_NONE);
 }
 
 /***********************************************************************
@@ -6337,6 +6374,9 @@ TEST_F(SystemService_L2Test, SysImpl_GetPlatformConfiguration_MultiQuery_JSONRPC
         params["query"] = q;
         JsonObject result;
         uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getPlatformConfiguration", params, result);
+        EXPECT_EQ(status, Core::ERROR_NONE) << "query='" << q << "'";
+        ASSERT_TRUE(result.HasLabel("success")) << "query='" << q << "'";
+        EXPECT_TRUE(result["success"].Boolean()) << "query='" << q << "'";
         TEST_LOG("  query='%s' status=%u", q, status);
     }
 }
@@ -7220,6 +7260,11 @@ TEST_F(SystemService_L2Test, SysImpl_GetDeviceInfo_UnallowableChars_JSONRPC)
     uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getDeviceInfo", params, result);
     EXPECT_EQ(status, Core::ERROR_NONE);
     TEST_LOG("  status=%u", status);
+
+    ASSERT_TRUE(result.HasLabel("message"));
+    EXPECT_STREQ(result["message"].String().c_str(), "Input has unallowable characters");
+    ASSERT_TRUE(result.HasLabel("success"));
+    EXPECT_FALSE(result["success"].Boolean());
 }
 
 /* ------------------------------------------------------------------- *
