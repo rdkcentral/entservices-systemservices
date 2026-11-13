@@ -20,6 +20,11 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <cstdio>
+#include <climits>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <dirent.h>
 #include <cstring>
 #include <regex>
 #include <fstream>
@@ -29,6 +34,7 @@
 #include <sstream>
 #include <ctime>
 #include <iomanip>
+#include <random>
 #include <bits/stdc++.h>
 #include <algorithm>
 #include <curl/curl.h>
@@ -42,7 +48,7 @@
 #include "SystemServicesImplementation.h"
 #include <telemetry_busmessage_sender.h>
 
-#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
+#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)																								
 #include "libIBusDaemon.h"
 #include "UtilsIarm.h"
 #endif /* USE_IARMBUS || USE_IARM_BUS */
@@ -82,6 +88,105 @@ using WakeupSrcType             = WPEFramework::Exchange::IPowerManager::WakeupS
 using WakeupSrcConfig           = WPEFramework::Exchange::IPowerManager::WakeupSourceConfig;
 using IWakeupSourceConfigIterator  = WPEFramework::Exchange::IPowerManager::IWakeupSourceConfigIterator;
 using WakeupSourceConfigIteratorImpl = WPEFramework::Core::Service<WPEFramework::RPC::IteratorType<IWakeupSourceConfigIterator>>;
+
+bool isSafeTimeZoneName(const std::string& timeZone)
+{
+    LOGINFO("isSafeTimeZoneName called");
+    if (timeZone.empty() || timeZone[0] == '/' || timeZone.find("..") != std::string::npos) {
+        LOGWARN("isSafeTimeZoneName rejected: empty, absolute, or traversal input");
+        return false;
+    }
+    for (unsigned char character : timeZone) {
+        if (!std::isalnum(character) && character != '/' && character != '-' && character != '_' && character != '+' && character != '.')
+        {
+            LOGWARN("isSafeTimeZoneName rejected: contains invalid character");
+            return false;
+        }
+    }
+    LOGINFO("isSafeTimeZoneName accepted input");
+    return true;
+}
+
+bool stageSafeSplashScreen(const std::string& input, std::string& stagedPath)
+{
+    LOGINFO("stageSafeSplashScreen called: input='%s',  stagedPath='%s'", input.c_str(), stagedPath.c_str());
+    struct stat inputStat;
+    if (input.empty())
+    {
+        LOGWARN("stageSafeSplashScreen rejected: empty path");
+        return false;
+    }
+
+    const int source = open(input.c_str(), O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC);
+    if (source < 0 || fstat(source, &inputStat) != 0 || !S_ISREG(inputStat.st_mode)) {
+        if (source >= 0)
+            close(source);
+        return false;
+    }
+
+    char resolvedBuffer[PATH_MAX] = {0};
+    const std::string descriptorPath = "/proc/self/fd/" + std::to_string(source);
+    const ssize_t resolvedLength = readlink(descriptorPath.c_str(), resolvedBuffer, sizeof(resolvedBuffer) - 1);
+    if (resolvedLength < 0) {
+        close(source);
+        return false;
+    }
+    const std::string resolved(resolvedBuffer, static_cast<size_t>(resolvedLength));
+    static const std::vector<std::string> allowedPrefixes = {"/opt/", "/tmp/", "/media/"};
+    if (std::none_of(allowedPrefixes.begin(), allowedPrefixes.end(), [&resolved](const std::string& prefix) { return resolved.rfind(prefix, 0) == 0; })) {
+        close(source);
+        return false;
+    }
+
+    std::string stagingPath;
+    int destination = -1;
+    std::random_device randomDevice;
+    int attempt = 0;
+    for (; attempt < 16 && destination < 0; ++attempt) {
+        char suffix[9];
+        snprintf(suffix, sizeof(suffix), "%08x", static_cast<unsigned int>(randomDevice()));
+        stagingPath = std::string("/tmp/systemservices-splash-") + suffix;
+        destination = open(stagingPath.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, S_IRUSR | S_IWUSR);
+        if (destination < 0 && errno != EEXIST)
+            break;
+    }
+    LOGINFO("stageSafeSplashScreen after staging loop: attempt=%d, stagingPath='%s', destination=%d", attempt, stagingPath.c_str(), destination);
+    if (destination < 0) {
+        close(source);
+        return false;
+    }
+
+    bool copied = true;
+    std::vector<char> buffer(8192);
+    ssize_t bytesRead;
+    while ((bytesRead = read(source, buffer.data(), buffer.size())) > 0) {
+        ssize_t offset = 0;
+        while (offset < bytesRead) {
+            const ssize_t bytesWritten = write(destination, buffer.data() + offset, static_cast<size_t>(bytesRead - offset));
+            if (bytesWritten <= 0) {
+                copied = false;
+                break;
+            }
+            offset += bytesWritten;
+        }
+        if (!copied)
+            break;
+    }
+    LOGINFO("stageSafeSplashScreen after copy loop: copied=%d, bytesRead=%zd", copied, bytesRead);
+    if (bytesRead < 0 || fsync(destination) != 0)
+        copied = false;
+    close(source);
+    close(destination);
+    if (!copied) {
+        if (unlink(stagingPath.c_str()) != 0)
+            LOGWARN("Failed to remove staged splash file");
+        return false;
+    }
+    LOGINFO("stageSafeSplashScreen before move: stagingPath='%s'", stagingPath.c_str());
+    stagedPath = std::move(stagingPath);
+    LOGINFO("stageSafeSplashScreen staged file successfully");
+    return true;
+}
 
 #define MAX_REBOOT_DELAY 86400 /* 24Hr = 86400 sec */
 #define TR181_FW_DELAY_REBOOT "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AutoReboot.fwDelayReboot"
@@ -2429,35 +2534,37 @@ namespace WPEFramework
         
         Core::hresult SystemServicesImplementation::SetBootLoaderSplashScreen(const string& path, ErrorInfo& error, bool& success)
         {
-            LOGINFO("path=%s", path.c_str());
-            string strBLSplashScreenPath = path;
-            bool fileExists = Utils::fileExists(strBLSplashScreenPath.c_str());
-            if((strBLSplashScreenPath != "") && fileExists)
+            LOGINFO("SetBootLoaderSplashScreen called");
+            string strBLSplashScreenPath;
+            if (!stageSafeSplashScreen(path, strBLSplashScreenPath))
             {
-                IARM_Bus_MFRLib_SetBLSplashScreen_Param_t mfrparam;
-                std::strncpy(mfrparam.path, strBLSplashScreenPath.c_str(), sizeof(mfrparam.path));
-                mfrparam.path[sizeof(mfrparam.path) - 1] = '\0';
-                IARM_Result_t result = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME, IARM_BUS_MFRLIB_API_SetBlSplashScreen, (void *)&mfrparam, sizeof(mfrparam));
-                if (result != IARM_RESULT_SUCCESS){
-                    LOGERR("Update failed. path: %s, fileExists %s, IARM result %d ",strBLSplashScreenPath.c_str(),fileExists ? "true" : "false",result);
-                    error.message = "Update failed";
-                    error.code = "-32002";
-                    success = false;
-                }
-                else 
-                {
-                    LOGINFO("BootLoaderSplashScreen updated successfully");
-                    success =true;
-                }
-            }
-            else
-            {
-                LOGERR("Invalid path. path: %s, fileExists %s ",strBLSplashScreenPath.c_str(),fileExists ? "true" : "false");
+                LOGERR("Rejected invalid splash screen input");
                 error.message = "Invalid path";
                 error.code = "-32001";
                 success = false;
+                return Core::ERROR_NONE;
+            }
+
+            IARM_Bus_MFRLib_SetBLSplashScreen_Param_t mfrparam;
+            std::strncpy(mfrparam.path, strBLSplashScreenPath.c_str(), sizeof(mfrparam.path));
+            mfrparam.path[sizeof(mfrparam.path) - 1] = '\0';
+            IARM_Result_t result = IARM_Bus_Call(IARM_BUS_MFRLIB_NAME, IARM_BUS_MFRLIB_API_SetBlSplashScreen, (void *)&mfrparam, sizeof(mfrparam));
+            if (result != IARM_RESULT_SUCCESS){
+                LOGERR("BootLoaderSplashScreen update failed: IARM result %d", result);
+                error.message = "Update failed";
+                error.code = "-32002";
+                success = false;
+            }
+            else
+            {
+                LOGINFO("BootLoaderSplashScreen updated successfully");
+                success =true;
             }
             LOGINFO("response: error.code=%s, error.message=%s, success=%s", error.code.c_str(), error.message.c_str(), success ? "true" : "false");
+            if (!strBLSplashScreenPath.empty()) {
+                if (unlink(strBLSplashScreenPath.c_str()) != 0)
+                LOGWARN("Failed to remove staged splash file");
+            }
             return Core::ERROR_NONE;
         }
         
@@ -3275,9 +3382,28 @@ namespace WPEFramework
         {
             bool ret = true;
 
-            std::string cmd = "zdump ";
-            cmd += entry;
-            
+            LOGINFO("processTimeZones called");
+            /* Security: reject shell metacharacters in the entry before passing to popen.
+             * Only allow characters valid in Olson timezone paths: alphanumeric, '/', '-', '_', '+', '.' */
+            for (char c : entry) {
+                if (!std::isalnum(static_cast<unsigned char>(c)) && c != '/' && c != '-' && c != '_' && c != '+' && c != '.') {
+                    LOGERR("Rejected timezone entry with invalid character 0x%02x: '%s'", (unsigned char)c, entry.c_str());
+                    return false;
+                }
+            }
+
+            /* Canonicalize the path and verify it stays within ZONEINFO_DIR */
+            char resolvedPath[PATH_MAX] = {0};
+            if (realpath(entry.c_str(), resolvedPath) != nullptr) {
+                std::string zoneinfoPrefix(ZONEINFO_DIR);
+                if (std::string(resolvedPath) != zoneinfoPrefix &&
+                    std::string(resolvedPath).rfind(zoneinfoPrefix + "/", 0) != 0) {
+                    LOGERR("Timezone path escapes ZONEINFO_DIR: '%s' -> '%s'", entry.c_str(), resolvedPath);
+                    return false;
+                }
+                entry = resolvedPath;
+            }
+
             if (0 != access(entry.c_str(), F_OK))
             {
                 LOGERR("Timezone is not in olson format ('%s')", entry.c_str());
@@ -3285,23 +3411,51 @@ namespace WPEFramework
             }
 
             struct stat deStat;
+            bool isDir = false;
             if (0 == stat(entry.c_str(), &deStat))
             {
-                if (S_ISDIR(deStat.st_mode))
-                {
-                    cmd += "/*";
-                }
+                isDir = S_ISDIR(deStat.st_mode);
             }
             else
             {
                 LOGERR("stat() failed: %s", strerror(errno));
             }
 
-            FILE *p = popen(cmd.c_str(), "r");
+            if (isDir)
+            {
+                DIR* directory = opendir(entry.c_str());
+                if (directory == nullptr)
+                {
+                    LOGERR("opendir() failed for %s: %s", entry.c_str(), strerror(errno));
+                    return false;
+                }
+
+                bool directoryStatus = true;
+                while (dirent* child = readdir(directory))
+                {
+                    const std::string name(child->d_name);
+                    if (name == "." || name == "..")
+                        continue;
+
+                    JsonObject childObject;
+                    std::string childPath = entry + "/" + name;
+                    struct stat childStat;
+                    if (lstat(childPath.c_str(), &childStat) != 0 || S_ISLNK(childStat.st_mode))
+                        continue;
+                    if (!processTimeZones(std::move(childPath), childObject))
+                        directoryStatus = false;
+                    if (!childObject.IsNull())
+                        out[name.c_str()] = childObject;
+                }
+                closedir(directory);
+                return directoryStatus;
+            }
+
+            FILE *p = v_secure_popen("r", "zdump %s", entry.c_str());
 
             if(!p)
             {
-                LOGERR("failed to start %s: %s", cmd.c_str(), strerror(errno));
+                LOGERR("failed to start zdump %s: %s", entry.c_str(), strerror(errno));
                 return false;
             }
 
@@ -3356,15 +3510,15 @@ namespace WPEFramework
                 }
             }
 
-            int err = pclose(p);
+            int err = v_secure_pclose(p);
 
             if (0 != err)
-            {    
-                LOGERR("%s failed with code %d", cmd.c_str(), err);
+            {
+                LOGERR("zdump %s failed with code %d", entry.c_str(), err);
                 return false;
             }
 
-	        long unsigned int n=0;
+            long unsigned int n=0;
             for (n = 0 ; n < dirs.size(); n++) {
                 std::string name = dirs[n];
 
@@ -3385,6 +3539,8 @@ namespace WPEFramework
 
         Core::hresult SystemServicesImplementation::GetTimeZones(IStringIterator* const& timeZones, string& zoneinfo, bool& success)
         {
+            success = false;
+
             if (timeZones == nullptr || timeZones->Count() == 0)
             {
                 LOGINFO("No timezone list provided, processing all");
@@ -3399,6 +3555,13 @@ namespace WPEFramework
                 {
                     if (tz.empty())
                         continue;
+
+                    /* Security: reject traversal sequences and absolute paths to prevent
+                     * directory listing / file-existence oracle outside ZONEINFO_DIR */
+                    if (!isSafeTimeZoneName(tz)) {
+                        LOGERR("Rejected timezone with path traversal: %s", tz.c_str());
+                        continue;
+                    }
 
                     std::string path = std::string(ZONEINFO_DIR) + "/" + tz;
                     bool status = processTimeZones(std::move(path), dirObject);
