@@ -2561,8 +2561,10 @@ namespace WPEFramework
                 success =true;
             }
             LOGINFO("response: error.code=%s, error.message=%s, success=%s", error.code.c_str(), error.message.c_str(), success ? "true" : "false");
-            if (unlink(strBLSplashScreenPath.c_str()) != 0)
+            if (!strBLSplashScreenPath.empty()) {
+                if (unlink(strBLSplashScreenPath.c_str()) != 0)
                 LOGWARN("Failed to remove staged splash file");
+            }
             return Core::ERROR_NONE;
         }
         
