@@ -92,7 +92,8 @@ namespace WPEFramework
                 class PowerManagerNotification : public Exchange::IPowerManager::INetworkStandbyModeChangedNotification,
                                                      public Exchange::IPowerManager::IThermalModeChangedNotification,
                                                      public Exchange::IPowerManager::IRebootNotification,
-                                                     public Exchange::IPowerManager::IModeChangedNotification {
+                                                     public Exchange::IPowerManager::IModeChangedNotification 
+                                                     public Exchange::IPowerManager::IModePreChangeNotification {
                 private:
                     PowerManagerNotification(const PowerManagerNotification&) = delete;
                     PowerManagerNotification& operator=(const PowerManagerNotification&) = delete;
@@ -108,6 +109,11 @@ namespace WPEFramework
                     void OnPowerModeChanged(const PowerState currentState, const PowerState newState) override
                     {
                         _parent.OnPowerModeChanged(currentState, newState);
+                    }
+                    void OnPowerModePreChange(const Exchange::IPowerManager::PowerState currentState,const Exchange::IPowerManager::PowerState newState, const int transactionId,
+                        const int stateChangeAfter) override
+                    {
+                        _parent.OnPowerModePreChange(currentState, newState, transactionId, stateChangeAfter);
                     }
                     void OnNetworkStandbyModeChanged(const bool enabled) override
                     {
@@ -134,6 +140,7 @@ namespace WPEFramework
                     INTERFACE_ENTRY(Exchange::IPowerManager::IThermalModeChangedNotification)
                     INTERFACE_ENTRY(Exchange::IPowerManager::IRebootNotification)
                     INTERFACE_ENTRY(Exchange::IPowerManager::IModeChangedNotification)
+                    INTERFACE_ENTRY(Exchange::IPowerManager::IModePreChangeNotification)
                     END_INTERFACE_MAP
 
                     private:
@@ -323,8 +330,12 @@ namespace WPEFramework
             string m_stbVersionString;
             static cSettings m_temp_settings;
             PowerManagerInterfaceRef _powerManagerPlugin;
+            uint32_t _powerModeClientId;
             Core::Sink<PowerManagerNotification> _pwrMgrNotification;
             bool _registeredEventHandlers;
+#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
+            bool m_iarmEventHandlersRegistered;
+#endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
             Utils::ThreadRAII thread_getMacAddresses;
             static const string MODEL_NAME;
             static const string HARDWARE_ID;
@@ -335,6 +346,8 @@ namespace WPEFramework
             static cTimer m_operatingModeTimer;
             static int m_remainingDuration;
             Utils::ThreadRAII m_getFirmwareInfoThread;
+            std::mutex m_getFirmwareInfoThreadMutex;
+            bool m_deepSleepInProgress;
             PluginHost::IShell* m_shellService { nullptr };
             regex_t m_regexUnallowedChars;
             int m_FwUpdateState_LatestEvent;
@@ -375,6 +388,7 @@ namespace WPEFramework
 #if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
             void InitializeIARM();
             void DeinitializeIARM();
+            void RegisterIARMEventHandlers();
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
 
             /* Events : Begin */
