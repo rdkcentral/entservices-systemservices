@@ -44,10 +44,6 @@ namespace Plugin
 {
 namespace UploadLogs
 {
-bool checkmTlsLogUploadFlag(){
-    LOGINFO("MTLS is defaulted");
-    return true;
-}
 
 bool getDCMconfigDetails(string &upload_protocol,string &httplink, string &uploadCheck){
 
@@ -82,11 +78,8 @@ std::int32_t getUploadLogParameters(string &tftp_server, string &upload_protocol
     string build_type;
     string httplink;
     string uploadcheck;
-    string dcmFile, force_mtls;
+    string dcmFile;
     string calledFromPlugin="1";
-    bool mTlsLogUpload = false;
-
-    mTlsLogUpload = checkmTlsLogUploadFlag();
 
     if ( !parseConfigFile(DEVICE_PROPERTIES,"BUILD_TYPE",build_type) ){
         LOGINFO("Failed to get BUILD Type\n");
@@ -105,27 +98,12 @@ std::int32_t getUploadLogParameters(string &tftp_server, string &upload_protocol
         return E_NOK;
     }
 
-    if (parseConfigFile(DEVICE_PROPERTIES,"FORCE_MTLS",force_mtls) ){
-        if ( "true" == force_mtls ){
-            mTlsLogUpload = true;
-        }
-    }
-
     if ( !getDCMconfigDetails(upload_protocol,httplink,uploadcheck)){
         LOGINFO("Failed to get DCM configDetails\n");
         return E_NOK;
     }
 
    upload_httplink = httplink;
-
-   if ( mTlsLogUpload ){
-       //some product's endpoint dont use /secure extension
-       if( "true" != force_mtls ){
-        //append secure with the url
-        upload_httplink=regex_replace(httplink,regex("cgi-bin"),"secure/cgi-bin");
-       }
-   }
-
    return E_OK;
 }
 
