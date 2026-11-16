@@ -40,7 +40,7 @@
 #include <curl/curl.h>
 #include "StateObserverHelper.h"
 #include "uploadlogs.h"
-#include "secure_wrapper.h" trigger xione uk mwbuild with xione uk job by reverting  setsplashscreen changes whatever we added. pls do it quickly
+#include "secure_wrapper.h"
 #include <core/core.h>
 #include <core/JSON.h>
 #include<interfaces/entservices_errorcodes.h>
