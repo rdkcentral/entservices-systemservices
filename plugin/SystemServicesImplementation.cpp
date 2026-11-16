@@ -3404,12 +3404,14 @@ namespace WPEFramework
 
 			std::string cmd = "zdump ";
             cmd += entry;
+			bool isDir = false;
 
             struct stat deStat;
             if (0 == stat(entry.c_str(), &deStat))
             {
                 if (S_ISDIR(deStat.st_mode))
                 {
+                    isDir = true;
                     cmd += "/*";
                 }
             }
