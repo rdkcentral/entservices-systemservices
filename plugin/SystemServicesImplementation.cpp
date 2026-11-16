@@ -3402,52 +3402,28 @@ namespace WPEFramework
                 return false;
             }
 
+			std::string cmd = "zdump ";
+            cmd += entry;
+
             struct stat deStat;
-            bool isDir = false;
             if (0 == stat(entry.c_str(), &deStat))
             {
-                isDir = S_ISDIR(deStat.st_mode);
+                if (S_ISDIR(deStat.st_mode))
+                {
+                    cmd += "/*";
+                }
             }
             else
             {
                 LOGERR("stat() failed: %s", strerror(errno));
             }
 
-            if (isDir)
-            {
-                DIR* directory = opendir(entry.c_str());
-                if (directory == nullptr)
-                {
-                    LOGERR("opendir() failed for %s: %s", entry.c_str(), strerror(errno));
-                    return false;
-                }
-
-                bool directoryStatus = true;
-                while (dirent* child = readdir(directory))
-                {
-                    const std::string name(child->d_name);
-                    if (name == "." || name == "..")
-                        continue;
-
-                    JsonObject childObject;
-                    std::string childPath = entry + "/" + name;
-                    struct stat childStat;
-                    if (lstat(childPath.c_str(), &childStat) != 0 || S_ISLNK(childStat.st_mode))
-                        continue;
-                    if (!processTimeZones(std::move(childPath), childObject))
-                        directoryStatus = false;
-                    if (!childObject.IsNull())
-                        out[name.c_str()] = childObject;
-                }
-                closedir(directory);
-                return directoryStatus;
-            }
-
-            FILE *p = v_secure_popen("r", "zdump %s", entry.c_str());
+            FILE *p = isDir ? v_secure_popen("r", "sh -c %s", cmd.c_str())
+                            : v_secure_popen("r", "zdump %s", entry.c_str());
 
             if(!p)
             {
-                LOGERR("failed to start zdump %s: %s", entry.c_str(), strerror(errno));
+                LOGERR("failed to start %s: %s", cmd.c_str(), strerror(errno));
                 return false;
             }
 
@@ -3506,7 +3482,7 @@ namespace WPEFramework
 
             if (0 != err)
             {
-                LOGERR("zdump %s failed with code %d", entry.c_str(), err);
+                LOGERR("%s failed with code %d", cmd.c_str(), err);
                 return false;
             }
 
