@@ -110,8 +110,7 @@ namespace WPEFramework
                     {
                         _parent.OnPowerModeChanged(currentState, newState);
                     }
-                    void OnPowerModePreChange(const Exchange::IPowerManager::PowerState currentState,const Exchange::IPowerManager::PowerState newState, const int transactionId,
-                        const int stateChangeAfter) override
+                    void OnPowerModePreChange(const PowerState currentState,const PowerState newState, const int transactionId, const int stateChangeAfter) override
                     {
                         _parent.OnPowerModePreChange(currentState, newState, transactionId, stateChangeAfter);
                     }
@@ -369,6 +368,7 @@ namespace WPEFramework
             void InitializePowerManager();
             void registerEventHandlers();
             void OnPowerModeChanged(const PowerState currentState, const PowerState newState);
+            void OnPowerModePreChange(const PowerState currentState,const PowerState newState, const int transactionId, const int stateChangeAfter);
             std::string powerModeEnumToString(PowerState state);
             void OnNetworkStandbyModeChanged(const bool enabled);
             void OnThermalModeChanged(const ThermalTemperature currentThermalLevel, const ThermalTemperature newThermalLevel, const float currentTemperature);
