@@ -113,7 +113,7 @@ The plugin integrates with multiple RDK subsystems:
 - **NFR-REL-004**: Thread-safe access SHALL be enforced for all shared state
 
 #### Security
-- **NFR-SEC-001**: All external inputs SHALL be validated using regex patterns to prevent injection attacks
+- **NFR-SEC-001**: All external inputs SHALL be validated using API-appropriate checks to prevent injection attacks
 - **NFR-SEC-002**: Sensitive data SHALL be stored in `/opt/secure/persistent` with appropriate permissions
 - **NFR-SEC-003**: WPEFramework security token validation SHALL be supported (configurable)
 - **NFR-SEC-004**: Plugin SHALL run with minimal required system privileges
@@ -743,13 +743,16 @@ The plugin uses the enterprise error code framework (`entservices_errorcodes.h`)
 
 ### Input Validation
 
-All external inputs are validated using regex patterns:
+Input validation uses regex patterns and API-specific checks:
 
 ```cpp
 #define REGEX_UNALLOWABLE_INPUT "[^[:alnum:]_-]{1}"
 ```
 
-This prevents injection attacks by restricting inputs to alphanumeric characters, underscores, and hyphens.
+This pattern restricts inputs to alphanumeric characters, underscores, and hyphens. The following APIs use additional validation:
+
+- `getTimeZones`: Entries in the optional `timeZones` list must be relative timezone names containing only alphanumeric characters, `/`, `-`, `_`, `+`, and `.`; empty entries, absolute paths, names containing `..`, and names containing other characters are skipped. Resolved timezone paths outside `/usr/share/zoneinfo` are rejected before invoking `zdump`.
+- `setBootLoaderSplashScreen(path)`: The source must be an existing regular file whose resolved path is under `/opt/`, `/tmp/`, or `/media/`; a symlink as the final path component is rejected. The validated source is copied to a private staging file under `/tmp/` before being passed to MFR Manager. Validation or staging failure returns `success: false` with error code `-32001` and message `Invalid path`.
 
 ### Exception Handling
 
@@ -832,7 +835,7 @@ Critical states are persisted to survive reboots:
 
 ### Input Sanitization
 
-- Regex-based validation prevents injection attacks
+- Regex-based and API-specific validation prevents injection attacks
 - Path traversal prevention
 - Command injection protection
 
