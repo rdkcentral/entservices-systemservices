@@ -832,6 +832,24 @@ protected:
     }
 };
 
+static void mockSecurePopenViaShell(WrapsImplMock* wrapsMock)
+{
+    ON_CALL(*wrapsMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_))
+        .WillByDefault(::testing::Invoke(
+            [](const char* mode, const char* format, va_list args) -> FILE* {
+                char cmd[4096];
+                vsnprintf(cmd, sizeof(cmd), format, args);
+                std::string command(cmd);
+                // The real wrapper passes the %s argument to "sh -c" as a single argument.
+                if (command.rfind("sh -c ", 0) == 0) {
+                    command = "sh -c '" + command.substr(6) + "'";
+                }
+                return popen(command.c_str(), mode);
+            }));
+    ON_CALL(*wrapsMock, v_secure_pclose(::testing::_))
+        .WillByDefault(::testing::Invoke([](FILE* f) -> int { return f ? pclose(f) : 0; }));
+}
+
 TEST_F(SystemServicesTest, RegisteredMethods)
 {
     EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("requestSystemUptime")));
@@ -2017,6 +2035,7 @@ TEST_F(SystemServicesTest, GetPlatformConfiguration_Success)
 
 TEST_F(SystemServicesTest, GetTimeZones_Success)
 {
+    mockSecurePopenViaShell(p_wrapsMock);
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTimeZones"), _T("{}"), response));
     
     JsonObject jsonResponse;
@@ -2629,6 +2648,7 @@ TEST_F(SystemServicesTest, GetTimeZones_AllTimeZones)
     (void)system("touch /usr/share/zoneinfo/America/New_York");
     (void)system("touch /usr/share/zoneinfo/Europe/London");
 
+    mockSecurePopenViaShell(p_wrapsMock);
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTimeZones"), _T("{}"), response));
     
     JsonObject jsonResponse;
@@ -3752,6 +3772,7 @@ TEST_F(SystemServicesTest, AbortLogUpload_NoActiveUpload)
 
 TEST_F(SystemServicesTest, GetTimeZones_EmptyParams)
 {
+    mockSecurePopenViaShell(p_wrapsMock);
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTimeZones"), _T("{}"), response));
     
     JsonObject jsonResponse;
@@ -6308,6 +6329,7 @@ TEST_F(SystemServicesTest, GetPowerState_PMFailure_SuccessFalse)
 
 TEST_F(SystemServicesTest, GetTimeZones_NullIterator_ProcessAll)
 {
+    mockSecurePopenViaShell(p_wrapsMock);
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTimeZones"), _T("{}"), response));
 
     JsonObject jsonResponse;
@@ -7551,6 +7573,7 @@ TEST_F(SystemServicesTest, GetTerritory_FilePresent_ReturnsTerritory)
 
 TEST_F(SystemServicesTest, GetTimeZones_NullParam_ProcessesAllZones)
 {
+    mockSecurePopenViaShell(p_wrapsMock);
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTimeZones"), _T("{}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
@@ -9724,8 +9747,8 @@ TEST_F(SystemServicesTest, Notification_OnTimeZoneDSTChanged_TwoDifferentTimezon
         auto tzInfo = notificationHandler->GetTimeZoneDSTChangedInfo();
         EXPECT_EQ("", tzInfo.oldTimeZone);
         EXPECT_EQ("Europe/London", tzInfo.newTimeZone);
-        // When setTimeZoneDST is called without accuracy parameter, accuracy is empty string
-        EXPECT_EQ("", tzInfo.oldAccuracy);
+        // Without an accuracy parameter, old accuracy is the helper default and new accuracy stays empty
+        EXPECT_EQ("INITIAL", tzInfo.oldAccuracy);
         EXPECT_EQ("", tzInfo.newAccuracy);
     }
 
