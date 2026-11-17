@@ -91,7 +91,7 @@ using WakeupSourceConfigIteratorImpl = WPEFramework::Core::Service<WPEFramework:
 
 bool isSafeTimeZoneName(const std::string& timeZone)
 {
-    LOGINFO("isSafeTimeZoneName called");
+    LOGINFO("");
     if (timeZone.empty() || timeZone[0] == '/' || timeZone.find("..") != std::string::npos) {
         LOGWARN("isSafeTimeZoneName rejected: empty, absolute, or traversal input");
         return false;
@@ -109,7 +109,7 @@ bool isSafeTimeZoneName(const std::string& timeZone)
 
 bool stageSafeSplashScreen(const std::string& input, std::string& stagedPath)
 {
-    LOGINFO("stageSafeSplashScreen called");
+    LOGINFO("");
     struct stat inputStat;
     if (input.empty())
     {
