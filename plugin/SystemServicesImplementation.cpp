@@ -294,7 +294,7 @@ namespace WPEFramework
                 _powerManagerPlugin->Unregister(_pwrMgrNotification.baseInterface<Exchange::IPowerManager::IRebootNotification>());
                 _powerManagerPlugin->Unregister(_pwrMgrNotification.baseInterface<Exchange::IPowerManager::IModeChangedNotification>());		
                 _powerManagerPlugin->RemovePowerModePreChangeClient(_powerModeClientId);
-                _powerManagerPlugin->Unregister(_pwrMgrNotification.baseInterface<Exchange::IPowerManager::IPowerModePreChangeNotification>());
+                _powerManagerPlugin->Unregister(_pwrMgrNotification.baseInterface<Exchange::IPowerManager::IModePreChangeNotification>());
                 _powerModeClientId = 0;
                 _powerManagerPlugin.Reset();
             }
@@ -565,7 +565,7 @@ namespace WPEFramework
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
             }
             LOGINFO("Power mode change completed for client ID: %u", _powerModeClientId);
-            _powerManagerPlugin->PowerModePreChangeCompleted(_powerModeClientId, transactionId);
+            _powerManagerPlugin->PowerModePreChangeComplete(_powerModeClientId, transactionId);
         }
 
         std::string SystemServicesImplementation::powerModeEnumToString(PowerState state)
