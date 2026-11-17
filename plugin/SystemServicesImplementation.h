@@ -92,7 +92,7 @@ namespace WPEFramework
                 class PowerManagerNotification : public Exchange::IPowerManager::INetworkStandbyModeChangedNotification,
                                                      public Exchange::IPowerManager::IThermalModeChangedNotification,
                                                      public Exchange::IPowerManager::IRebootNotification,
-                                                     public Exchange::IPowerManager::IModeChangedNotification 
+                                                     public Exchange::IPowerManager::IModeChangedNotification, 
                                                      public Exchange::IPowerManager::IModePreChangeNotification {
                 private:
                     PowerManagerNotification(const PowerManagerNotification&) = delete;
