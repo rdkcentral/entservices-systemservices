@@ -113,7 +113,7 @@ The plugin integrates with multiple RDK subsystems:
 - **NFR-REL-004**: Thread-safe access SHALL be enforced for all shared state
 
 #### Security
-- **NFR-SEC-001**: All external inputs SHALL be validated using regex patterns to prevent injection attacks
+- **NFR-SEC-001**: All external inputs SHALL be validated to prevent injection attacks, using input-specific character and path checks where appropriate
 - **NFR-SEC-002**: Sensitive data SHALL be stored in `/opt/secure/persistent` with appropriate permissions
 - **NFR-SEC-003**: WPEFramework security token validation SHALL be supported (configurable)
 - **NFR-SEC-004**: Plugin SHALL run with minimal required system privileges
@@ -515,7 +515,7 @@ The 66+ API methods are organized into seven major capability groups:
 #### API Methods
 - `setTimeZoneDST(timeZone, accuracy)`: Set system timezone
 - `getTimeZoneDST()`: Get current timezone configuration
-- `getTimeZones()`: Get list of available timezones
+- `getTimeZones(timeZones)`: Get available timezone information; a null or empty list processes all timezones. Supplied names must be relative, contain no `..`, and use only alphanumeric characters, `/`, `-`, `_`, `+`, and `.`. Invalid entries are skipped; resolved timezone paths must stay within `/usr/share/zoneinfo`.
 - `setTerritory(territory, region)`: Set device territory/region
 - `getTerritory()`: Get current territory configuration
 - `setFriendlyName(friendlyName)`: Set user-friendly device name
@@ -625,6 +625,7 @@ The 66+ API methods are organized into seven major capability groups:
 - `getPreviousRebootInfo()`: Get information about last reboot
 - `getPreviousRebootInfo2()`: Get detailed reboot information
 - `getPreviousRebootReason()`: Get reason for last reboot
+- `setBootLoaderSplashScreen(path)`: Set the bootloader splash screen from an existing regular file whose resolved path is under `/opt/`, `/tmp/`, or `/media/`. Empty paths and final-component symlinks are rejected. The validated file is copied to a private staging file before being passed to MFR Manager. Invalid paths or staging failures return `success: false` with error code `-32001` (`Invalid path`); an MFR update failure returns `-32002` (`Update failed`).
 
 #### Events
 - `onRebootRequest`: Reboot initiated by application or system
@@ -743,13 +744,13 @@ The plugin uses the enterprise error code framework (`entservices_errorcodes.h`)
 
 ### Input Validation
 
-All external inputs are validated using regex patterns:
+Input validation uses input-specific checks. Regex-based validation includes:
 
 ```cpp
 #define REGEX_UNALLOWABLE_INPUT "[^[:alnum:]_-]{1}"
 ```
 
-This prevents injection attacks by restricting inputs to alphanumeric characters, underscores, and hyphens.
+This pattern restricts inputs to alphanumeric characters, underscores, and hyphens. `getTimeZones` additionally validates timezone names and checks resolved paths against the timezone database directory. `setBootLoaderSplashScreen` validates file type and resolved location, rejects final-component symlinks, and stages a copy of the file before use.
 
 ### Exception Handling
 
