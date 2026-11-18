@@ -9839,6 +9839,43 @@ TEST_F(SystemService_L2Test, SysImpl_ProcessTimeZones_InvalidPath_COMRPC)
 }
 
 /* ------------------------------------------------------------------- *
+ * Function 1c: isSafeTimeZoneName() — 0 hits in L2 coverage.           *
+ * Every other getTimeZones test in this file passes an empty/null      *
+ * timeZones list, which takes the "process all" else-branch in         *
+ * GetTimeZones() and never reaches the `while (timeZones->Next(tz))`   *
+ * loop that calls isSafeTimeZoneName(). This test passes a NON-EMPTY   *
+ * timeZones array (JSON-RPC) containing both a safe entry and a        *
+ * traversal attack string, forcing the loop body and the validator     *
+ * to execute, and confirms the traversal entry never leaks             *
+ * /etc/passwd contents into the response.                              *
+ * Covers: isSafeTimeZoneName() reject-traversal branch (L93-96) and    *
+ * the per-entry loop in GetTimeZones() (previously 0 hits in L2).      *
+ * ------------------------------------------------------------------- */
+TEST_F(SystemService_L2Test, SysImpl_GetTimeZones_RejectsTraversalInput_JSONRPC)
+{
+    TEST_LOG("SysImpl_GetTimeZones_RejectsTraversalInput: non-empty timeZones list hits isSafeTimeZoneName()");
+
+    JsonObject params;
+    JsonArray tzArr;
+    tzArr.Add("../../etc/passwd");   /* rejected: contains ".." (empty/absolute/traversal branch) */
+    tzArr.Add("America/New_York");   /* accepted: exercises the per-character validation loop */
+    params["timeZones"] = tzArr;
+    JsonObject result;
+
+    uint32_t status = InvokeServiceMethod("org.rdk.System.1", "getTimeZones", params, result);
+    TEST_LOG("  getTimeZones(traversal) status=%u", status);
+
+    if (result.HasLabel("zoneinfo")) {
+        std::string zoneinfo = result["zoneinfo"].String();
+        EXPECT_EQ(zoneinfo.find("root:"), std::string::npos)
+            << "Unsafe input must not leak /etc/passwd contents: " << zoneinfo;
+    }
+    if (result.HasLabel("success")) {
+        TEST_LOG("  success=%s", result["success"].Boolean() ? "true" : "false");
+    }
+}
+
+/* ------------------------------------------------------------------- *
  * Function 2: OnLogUpload — m_uploadLogsPid != -1 branch              *
  * Strategy: fork a real 'sleep 60' process via UploadLogsAsync,       *
  * then fire the LOG_UPLOAD IARM event → OnLogUpload sees               *
