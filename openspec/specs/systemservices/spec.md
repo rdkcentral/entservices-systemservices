@@ -52,7 +52,7 @@ The plugin integrates with multiple RDK subsystems:
 - **REQ-PWR-001**: The plugin SHALL support power state transitions between ON, STANDBY, LIGHT_SLEEP, and DEEP_SLEEP states
 - **REQ-PWR-002**: The plugin SHALL provide APIs to get and set the current power state with reason tracking
 - **REQ-PWR-003**: The plugin SHALL support network standby mode to keep network interfaces active during standby
-- **REQ-PWR-004**: The plugin SHALL allow configuration of wakeup sources per power state (IR, CEC, Voice, Bluetooth, Timer, Power Key, LAN, WiFi, RF4CE, Presence Detection)
+- **REQ-PWR-004**: The plugin SHALL allow configuration of platform-supported wakeup sources per power state (IR, CEC, Voice, Bluetooth, Timer, Power Key, LAN, WiFi, RF4CE, Presence Detection), subject to PowerManager HAL support
 - **REQ-PWR-005**: The plugin SHALL track and report the reason for the last device wakeup
 - **REQ-PWR-006**: The plugin SHALL support thermal protection with configurable temperature thresholds
 - **REQ-PWR-007**: The plugin SHALL support deep sleep timer for scheduled wakeup
@@ -410,7 +410,7 @@ The 66+ API methods are organized into seven major capability groups:
 #### Features
 - **Power State Control**: Transition between power states with reason tracking
 - **Network Standby Mode**: Keep network interfaces active during standby for remote wake
-- **Wakeup Source Configuration**: Configure multiple wake triggers per power state
+- **Wakeup Source Configuration**: Configure multiple wake triggers per power state, subject to platform-specific PowerManager HAL support
   - IR Remote
   - CEC (HDMI Consumer Electronics Control)
   - Voice Assistant
@@ -432,7 +432,7 @@ The 66+ API methods are organized into seven major capability groups:
 - `setNetworkStandbyMode(nwStandby)`: Enable/disable network during standby
 - `getWakeupReason()`: Get reason for last wakeup (requires ENABLE_DEEP_SLEEP)
 - `getLastWakeupKeyCode()`: Get key code that triggered wakeup
-- `setWakeupSrcConfiguration(powerState, wakeupSources)`: Configure wake sources per state
+- `setWakeupSrcConfiguration(powerState, wakeupSources)`: Configure platform-supported wake sources per state through PowerManager
 - `getAvailableStandbyModes()`: Get supported standby modes
 - `getPreferredStandbyMode()`: Get platform's preferred standby mode
 - `setPreferredStandbyMode(standbyMode)`: Set preferred standby mode
