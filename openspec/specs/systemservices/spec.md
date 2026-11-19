@@ -24,7 +24,7 @@ RDK devices require a unified interface for system management operations that ab
 **System Integration:**
 The plugin integrates with multiple RDK subsystems:
 - **IARM Bus**: Inter-process communication for system-wide coordination
-- **Device Settings HAL**: Hardware abstraction for display and audio
+- **DeviceSettings Plugin**: COM-RPC access to display and audio capabilities through DSHelper
 - **PowerManager Plugin**: Coordinated power state management
 - **FirmwareUpdate Plugin**: Firmware update orchestration
 - **RFC Service**: Dynamic feature flag configuration
@@ -158,7 +158,7 @@ SystemServices Plugin
 │
 └── Hardware Abstraction Layer (HAL)
     ├── IARM Bus (inter-process communication)
-    ├── Device Settings (DS HAL)
+    ├── DeviceSettings Plugin (COM-RPC via DSHelper)
     ├── MFR Manager (manufacturing data)
     ├── RFC Service (feature flags)
     └── Deep Sleep Manager (optional)
@@ -206,7 +206,7 @@ The SystemServices plugin follows a layered architecture pattern, sitting betwee
 ┌───┴─────────────┴──────────────┴───────────────┴─────┐
 │         Hardware Abstraction Layer (HAL)              │
 │  • IARM Bus (Inter Application Resource Manager)      │
-│  • Device Settings (Display/Audio/Video Control)      │
+│  • DeviceSettings Plugin (COM-RPC via DSHelper)       │
 │  • RFC Service (Remote Feature Control)               │
 │  • MFR Manager (Manufacturing Data)                   │
 │  • Deep Sleep Manager (Power Control)                 │
@@ -302,7 +302,7 @@ Event Callback Registration
 
 **Required Services:**
 - **IARM Bus**: Inter-process communication backbone
-- **Device Settings HAL**: Hardware control abstraction
+- **DeviceSettings Plugin**: Platform capability queries over COM-RPC
 - **RFC Service**: Remote Feature Control for dynamic configuration
 - **SysMgr**: System manager for device state coordination
 
@@ -370,6 +370,10 @@ SystemServices                    PowerManager
 - Graceful handling of connection failures with retry mechanism
 - Coordinates system-wide power management through IARM Bus and COM-RPC
 
+#### Outgoing: DeviceSettings Integration
+
+SystemServicesImplementation and PlatformCapsData use `DSHelper` to open COM-RPC links to the DeviceSettings plugin and close them during teardown. PlatformCapsData acquires `Exchange::IDeviceSettingsAudio` to query MS decode support on HDMI audio port 0 for PCM/surround mixing capability. Activation and deactivation callbacks track DeviceSettings lifecycle events.
+
 ## External Interfaces
 
 The SystemServices plugin exposes its functionality through **dual protocol interfaces**, providing the same 66+ APIs via both JSON-RPC and COM-RPC protocols.
@@ -427,7 +431,7 @@ The 66+ API methods are organized into seven major capability groups:
 
 #### API Methods
 - `getPowerState()`: Get current and previous power states
-- `setPowerState(powerState, standbyReason)`: Set device power state
+- `setPowerState(powerState, standbyReason)`: Set device power state; LIGHT_SLEEP and DEEP_SLEEP requests map to their corresponding PowerManager states without overriding the request with the Device Settings preferred sleep mode
 - `getNetworkStandbyMode()`: Get network standby mode status
 - `setNetworkStandbyMode(nwStandby)`: Enable/disable network during standby
 - `getWakeupReason()`: Get reason for last wakeup (requires ENABLE_DEEP_SLEEP)
@@ -642,6 +646,7 @@ The 66+ API methods are organized into seven major capability groups:
 - **Abort Capability**: Cancel in-progress uploads
 - **Process Management**: Thread-safe upload process tracking
 - **RFC-Controlled**: Optional log upload before deep sleep
+- **Upload Endpoint**: Uses the configured DCM HTTP URL unchanged; FORCE_MTLS in `/etc/device.properties` does not control URL rewriting
 
 #### API Methods
 - `uploadLogs()`: Synchronous log upload (deprecated)
@@ -753,7 +758,7 @@ This prevents injection attacks by restricting inputs to alphanumeric characters
 
 ### Exception Handling
 
-Device Settings exceptions are caught and logged with context. HAL failures are gracefully handled with appropriate error responses to clients.
+DeviceSettings capability queries check interface availability and COM-RPC return codes. The PCM/surround mixing capability query returns false if the audio interface is unavailable or the audio-port or MS decode query fails. HAL failures are gracefully handled with appropriate error responses to clients.
 
 ## State Management
 
@@ -855,7 +860,7 @@ Critical states are persisted to survive reboots:
 **Required:**
 - WPEFramework (Thunder) R4.4+
 - IARM Bus library
-- Device Settings HAL
+- DeviceSettings COM-RPC interface proxies (Definitions) and DSHelper (Helpers)
 - RFC library
 - libcurl (HTTP/HTTPS)
 - libprocps (process info)
@@ -872,7 +877,7 @@ Critical states are persisted to survive reboots:
 - IARM Bus daemon
 - SysMgr (System Manager)
 - RFC service
-- Device Settings service
+- DeviceSettings plugin (`entservices-devicesettings`)
 
 **Optional Services:**
 - PowerManager plugin
@@ -888,7 +893,7 @@ Conditional compilation flags control optional features:
 - `ENABLE_THERMAL_PROTECTION`: Enable thermal monitoring
 - `ENABLE_DEEP_SLEEP`: Enable deep sleep functionality
 - `ENABLE_DEVICE_MANUFACTURER_INFO`: Enable MFR data APIs
-- `ENABLE_SYSTIMEMGR_SUPPORT`: Enable system time manager integration
+- `ENABLE_SYSTIMEMGR_SUPPORT`: Enable system time manager integration; without it, `GetTimeStatus` returns `Core::ERROR_UNAVAILABLE`, clears the time quality, source, and time outputs, and sets `success` to false
 - `ENABLE_XCONF_PARAMS`: Enable Xconf parameter retrieval
 - `USE_IARMBUS` / `USE_IARM_BUS`: Enable IARM Bus integration
 - `HAS_API_SYSTEM`: Enable system APIs
@@ -1033,7 +1038,7 @@ ws.send(JSON.stringify({
 
 - Requires Linux-based RDK platform
 - IARM Bus must be available and initialized
-- Device Settings HAL must be present
+- DeviceSettings plugin must be available for DeviceSettings-backed capability queries
 - RFC service must be running
 
 ### Performance Limits
