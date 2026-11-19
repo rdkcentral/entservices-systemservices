@@ -387,8 +387,8 @@ namespace WPEFramework
 
 #if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
             void InitializeIARM();
-            void DeinitializeIARM();
             void RegisterIARMEventHandlers();
+            void UnregisterIARMEventHandlers();
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
 
             /* Events : Begin */

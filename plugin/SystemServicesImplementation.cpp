@@ -302,7 +302,7 @@ namespace WPEFramework
             _registeredEventHandlers = false;
             m_operatingModeTimer.stop();
 #if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
-            DeinitializeIARM();
+            UnregisterIARMEventHandlers();
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
             // Close COM-RPC link
             DSHelper::Close();
@@ -472,7 +472,7 @@ namespace WPEFramework
 	    
         }
 
-        void SystemServicesImplementation::DeinitializeIARM()
+        void SystemServicesImplementation::UnregisterIARMEventHandlers()
         {
             if (m_iarmEventHandlersRegistered && Utils::IARM::isConnected())
             {
@@ -552,7 +552,7 @@ namespace WPEFramework
                     }
                 }
 #if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
-                DeinitializeIARM();
+                UnregisterIARMEventHandlers();
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
             } else {
                 {
