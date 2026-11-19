@@ -436,7 +436,7 @@ The 66+ API methods are organized into seven major capability groups:
 - `getAvailableStandbyModes()`: Get supported standby modes
 - `getPreferredStandbyMode()`: Get platform's preferred standby mode
 - `setPreferredStandbyMode(standbyMode)`: Set preferred standby mode
-- `setDeepSleepTimer(seconds)`: Schedule wake from deep sleep
+- `setDeepSleepTimer(seconds)`: Schedule wake from deep sleep; `seconds` must be in the range 0–172800 (up to 2 days)
 - `getCoreTemperature()`: Get device core temperature (requires ENABLE_THERMAL_PROTECTION)
 - `getTemperatureThresholds()`: Get thermal threshold configuration
 - `setTemperatureThresholds(thresholds)`: Set thermal warning/critical thresholds
