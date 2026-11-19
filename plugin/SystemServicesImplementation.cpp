@@ -506,7 +506,7 @@ namespace WPEFramework
                 _powerManagerPlugin->AddPowerModePreChangeClient("SystemServices", _powerModeClientId);
             }
 
-            LOGINFO("Event handlers registered: %s _powerModeClientId: %u", _registeredEventHandlers ? "true" : "false", _powerModeClientId);
+            LOGDBG("Event handlers registered: %s _powerModeClientId: %u", _registeredEventHandlers ? "true" : "false", _powerModeClientId);
         }
 
         void SystemServicesImplementation::OnPowerModeChanged(const PowerState currentState, const PowerState newState)
