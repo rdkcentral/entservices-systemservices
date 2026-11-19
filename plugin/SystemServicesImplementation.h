@@ -180,7 +180,7 @@ namespace WPEFramework
  
             class EXTERNAL Job : public Core::IDispatch {
             protected:
-                Job(SystemServicesImplementation* systemServicesImplementation, Event event, JsonObject &params)
+                Job(SystemServicesImplementation* systemServicesImplementation, Event event, const JsonObject &params)
                     : _systemServicesImplementation(systemServicesImplementation)
                     , _event(event)
                     , _params(params) {
@@ -200,7 +200,7 @@ namespace WPEFramework
                 }
 
             public:
-                static Core::ProxyType<Core::IDispatch> Create(SystemServicesImplementation* systemServicesImplementation, Event event, JsonObject  params) {
+                static Core::ProxyType<Core::IDispatch> Create(SystemServicesImplementation* systemServicesImplementation, Event event, const JsonObject &params) {
 #ifndef USE_THUNDER_R4
                     return (Core::proxy_cast<Core::IDispatch>(Core::ProxyType<Job>::Create(systemServicesImplementation, event, params)));
 #else

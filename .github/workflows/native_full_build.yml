@@ -1,5 +1,8 @@
 name: Build Component in Native Environment
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [ main, 'sprint/**', 'release/**', develop ]
