@@ -354,6 +354,7 @@ namespace WPEFramework
             , _registeredEventHandlers(false)
         {
             LOGINFO("Create SystemServicesImplementation Instance");
+			LOGINFO("created instance");
 
             SystemServicesImplementation::_instance = this;
 
