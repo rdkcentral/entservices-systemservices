@@ -34,6 +34,58 @@
 #include "SystemServices.h"
 #include "SystemServicesImplementation.h"
 #include "UtilsString.h"
+
+bool isSafeTimeZoneName(const std::string& timeZone);
+
+TEST(SystemServicesSecurityTest, ValidatesTimeZoneNames)
+{
+    EXPECT_TRUE(isSafeTimeZoneName("America/New_York"));
+    EXPECT_TRUE(isSafeTimeZoneName("Etc/GMT+5"));
+    EXPECT_FALSE(isSafeTimeZoneName("../etc/passwd"));
+    EXPECT_FALSE(isSafeTimeZoneName("/etc/passwd"));
+    EXPECT_FALSE(isSafeTimeZoneName("America/New_York;command"));
+    EXPECT_FALSE(isSafeTimeZoneName("America/New_York\nnext"));
+    EXPECT_FALSE(isSafeTimeZoneName(""));
+}
+
+bool stageSafeSplashScreen(const std::string& input, std::string& resolved);
+
+TEST(SystemServicesSecurityTest, ValidatesSplashScreenPaths)
+{
+    std::string resolved;
+
+    // Valid paths within allowed prefixes
+    const char* validPath = "/tmp/systemservices_splash.jpg";
+    const char* symlinkPath = "/tmp/systemservices_splash_link.jpg";
+    std::remove(symlinkPath);
+    std::remove(validPath);
+    {
+        std::ofstream image(validPath);
+        image << "splash";
+    }
+    ASSERT_EQ(0, symlink(validPath, symlinkPath));
+    EXPECT_TRUE(stageSafeSplashScreen(validPath, resolved));
+
+    // Empty path rejected
+    EXPECT_FALSE(stageSafeSplashScreen("", resolved));
+
+    // Paths outside allowed prefixes rejected
+    EXPECT_FALSE(stageSafeSplashScreen("/etc/passwd", resolved));
+    EXPECT_FALSE(stageSafeSplashScreen("/root/.ssh", resolved));
+    EXPECT_FALSE(stageSafeSplashScreen("/home/user/image.png", resolved));
+
+    // Symlinks rejected
+    EXPECT_FALSE(stageSafeSplashScreen(symlinkPath, resolved));
+
+    // Nonexistent files rejected
+    EXPECT_FALSE(stageSafeSplashScreen("/opt/nonexistent.png", resolved));
+
+    // Traversal sequences rejected by lexical check
+    EXPECT_FALSE(stageSafeSplashScreen("/opt/../etc/passwd", resolved));
+    std::remove(resolved.c_str());
+    std::remove(symlinkPath);
+    std::remove(validPath);
+}
 #include "UtilsFile.h"
 #include "UtilsProcess.h"
 #include "thermonitor.h"
@@ -779,6 +831,24 @@ protected:
         PowerManagerMock::Delete();
     }
 };
+
+static void mockSecurePopenViaShell(WrapsImplMock* wrapsMock)
+{
+    ON_CALL(*wrapsMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_))
+        .WillByDefault(::testing::Invoke(
+            [](const char* mode, const char* format, va_list args) -> FILE* {
+                char cmd[4096];
+                vsnprintf(cmd, sizeof(cmd), format, args);
+                std::string command(cmd);
+                // The real wrapper passes the %s argument to "sh -c" as a single argument.
+                if (command.rfind("sh -c ", 0) == 0) {
+                    command = "sh -c '" + command.substr(6) + "'";
+                }
+                return popen(command.c_str(), mode);
+            }));
+    ON_CALL(*wrapsMock, v_secure_pclose(::testing::_))
+        .WillByDefault(::testing::Invoke([](FILE* f) -> int { return f ? pclose(f) : 0; }));
+}
 
 TEST_F(SystemServicesTest, RegisteredMethods)
 {
@@ -1581,6 +1651,37 @@ TEST_F(SystemServicesTest, SetBootLoaderSplashScreen_Success)
     
     (void)std::remove("/tmp/test_splash.png");
 }
+
+TEST_F(SystemServicesTest, SetBootLoaderSplashScreenUsesStableStagedFile)
+{
+    const char* sourcePath = "/tmp/test_splash_stable.png";
+    {
+        std::ofstream file(sourcePath);
+        file << "validated-content";
+    }
+
+    EXPECT_CALL(*p_iarmBusMock, IARM_Bus_Call(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke([sourcePath](const char*, const char*, void* argument, size_t) {
+            {
+                std::ofstream replacement(sourcePath, std::ios::trunc);
+                replacement << "replacement-content";
+            }
+            const auto* parameters = static_cast<IARM_Bus_MFRLib_SetBLSplashScreen_Param_t*>(argument);
+            EXPECT_THAT(std::string(parameters->path), ::testing::StartsWith("/tmp/systemservices-splash-"));
+            std::ifstream staged(parameters->path);
+            std::string content;
+            std::getline(staged, content);
+            EXPECT_EQ("validated-content", content);
+            return IARM_RESULT_SUCCESS;
+        }));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBootLoaderSplashScreen"), _T("{\"path\":\"/tmp/test_splash_stable.png\"}"), response));
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response));
+    EXPECT_TRUE(jsonResponse["success"].Boolean());
+    (void)std::remove(sourcePath);
+}
+
 TEST_F(SystemServicesTest, SetWakeupSrcConfiguration_Success)
 {
     EXPECT_CALL(PowerManagerMock::Mock(), SetWakeupSourceConfig(::testing::_))
@@ -1934,6 +2035,7 @@ TEST_F(SystemServicesTest, GetPlatformConfiguration_Success)
 
 TEST_F(SystemServicesTest, GetTimeZones_Success)
 {
+    mockSecurePopenViaShell(p_wrapsMock);
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTimeZones"), _T("{}"), response));
     
     JsonObject jsonResponse;
@@ -2546,6 +2648,7 @@ TEST_F(SystemServicesTest, GetTimeZones_AllTimeZones)
     (void)system("touch /usr/share/zoneinfo/America/New_York");
     (void)system("touch /usr/share/zoneinfo/Europe/London");
 
+    mockSecurePopenViaShell(p_wrapsMock);
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTimeZones"), _T("{}"), response));
     
     JsonObject jsonResponse;
@@ -3156,11 +3259,13 @@ TEST_F(SystemServicesTest, GetWakeupReason_LAN)
 
 TEST_F(SystemServicesTest, SetBootLoaderSplashScreen_EmptyPath)
 {
-    uint32_t result = handler.Invoke(connection, _T("setBootLoaderSplashScreen"),
-              _T("{\"path\":\"\"}"), response);
-    
-    // Should handle empty path gracefully
-    TEST_LOG("SetBootLoaderSplashScreen empty path test - Result: %u, Response: %s", result, response.c_str());
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBootLoaderSplashScreen"),
+              _T("{\"path\":\"\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response));
+    ASSERT_TRUE(jsonResponse.HasLabel("success"));
+    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "Should reject empty path: " << response;
 }
 
 TEST_F(SystemServicesTest, GetPlatformConfiguration_EmptyQuery)
@@ -3667,6 +3772,7 @@ TEST_F(SystemServicesTest, AbortLogUpload_NoActiveUpload)
 
 TEST_F(SystemServicesTest, GetTimeZones_EmptyParams)
 {
+    mockSecurePopenViaShell(p_wrapsMock);
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTimeZones"), _T("{}"), response));
     
     JsonObject jsonResponse;
@@ -3901,11 +4007,13 @@ TEST_F(SystemServicesTest, SetBootLoaderSplashScreen_ValidPath)
 
 TEST_F(SystemServicesTest, SetBootLoaderSplashScreen_InvalidPath)
 {
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBootLoaderSplashScreen"), _T("{\"path\":\"/nonexistent/file.png\"}"), response));
+    // /etc/passwd exists but is outside the allowed /opt, /tmp, /media prefixes
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setBootLoaderSplashScreen"), _T("{\"path\":\"/etc/passwd\"}"), response));
     
     JsonObject jsonResponse;
     ASSERT_TRUE(jsonResponse.FromString(response));
-    EXPECT_TRUE(jsonResponse.HasLabel("success"));
+    ASSERT_TRUE(jsonResponse.HasLabel("success"));
+    EXPECT_FALSE(jsonResponse["success"].Boolean()) << "Should reject path outside allowed prefixes: " << response;
 }
 
 TEST_F(SystemServicesTest, GetPowerStateBeforeReboot_ValidState)
@@ -6221,6 +6329,7 @@ TEST_F(SystemServicesTest, GetPowerState_PMFailure_SuccessFalse)
 
 TEST_F(SystemServicesTest, GetTimeZones_NullIterator_ProcessAll)
 {
+    mockSecurePopenViaShell(p_wrapsMock);
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTimeZones"), _T("{}"), response));
 
     JsonObject jsonResponse;
@@ -7464,6 +7573,7 @@ TEST_F(SystemServicesTest, GetTerritory_FilePresent_ReturnsTerritory)
 
 TEST_F(SystemServicesTest, GetTimeZones_NullParam_ProcessesAllZones)
 {
+    mockSecurePopenViaShell(p_wrapsMock);
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getTimeZones"), _T("{}"), response));
 
     JsonObject jr; ASSERT_TRUE(jr.FromString(response));
@@ -9637,8 +9747,8 @@ TEST_F(SystemServicesTest, Notification_OnTimeZoneDSTChanged_TwoDifferentTimezon
         auto tzInfo = notificationHandler->GetTimeZoneDSTChangedInfo();
         EXPECT_EQ("", tzInfo.oldTimeZone);
         EXPECT_EQ("Europe/London", tzInfo.newTimeZone);
-        // When setTimeZoneDST is called without accuracy parameter, accuracy is empty string
-        EXPECT_EQ("", tzInfo.oldAccuracy);
+        // Without an accuracy parameter, old accuracy is the helper default and new accuracy stays empty
+        EXPECT_EQ("INITIAL", tzInfo.oldAccuracy);
         EXPECT_EQ("", tzInfo.newAccuracy);
     }
 
@@ -10925,6 +11035,25 @@ TEST_F(SystemServicesTest, GetTimeZones_WithSpecificTimezone_CoversIteratorPath)
         ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
     }
     TEST_LOG("GetTimeZones_Specific - Response: %s", response.c_str());
+}
+
+TEST_F(SystemServicesTest, GetTimeZones_RejectsTraversalInput)
+{
+    // "../../etc/passwd" is skipped by isSafeTimeZoneName() before it reaches
+    // processTimeZones()/popen(); with no valid entries processed, success stays
+    // false and the call returns ERROR_GENERAL - never surfacing passwd contents.
+    EXPECT_EQ(Core::ERROR_GENERAL, handler.Invoke(connection, _T("getTimeZones"),
+        _T("{\"timeZones\":[\"../../etc/passwd\"]}"), response));
+
+    if (!response.empty()) {
+        JsonObject jsonResponse;
+        ASSERT_TRUE(jsonResponse.FromString(response)) << "Response: " << response;
+        if (jsonResponse.HasLabel("zoneinfo")) {
+            EXPECT_EQ(std::string::npos, jsonResponse["zoneinfo"].String().find("root:"))
+                << "Unsafe input leaked /etc/passwd contents: " << response;
+        }
+    }
+    TEST_LOG("GetTimeZones_RejectsTraversalInput - Response: %s", response.c_str());
 }
 
 // ------------------------------------------------------------------
