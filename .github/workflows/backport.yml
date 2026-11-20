@@ -275,6 +275,8 @@ jobs:
       # ── 3. Create or checkout feature branch from support ────────────────────
       - name: Create or checkout feature branch
         id: setup_feature
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           
@@ -612,6 +614,7 @@ jobs:
       - name: Create Pull Request
         if: steps.apply.outputs.applied == 'true'
         env:
+          GH_TOKEN:          ${{ github.token }}
           FEATURE_BRANCH:    ${{ steps.setup_feature.outputs.feature_branch }}
           ORIGINAL_PR:       ${{ env.PR_URL }}
           CONFLICT_RESOLVED: ${{ steps.apply.outputs.conflict_resolved }}
