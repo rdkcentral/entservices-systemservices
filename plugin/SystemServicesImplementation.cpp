@@ -4065,7 +4065,6 @@ namespace WPEFramework
 			    }
 		    } else {
 			    LOGERR("file %s open failed\n", VERSION_FILE_NAME);
-				LOGERR("Error occured while open");
 			    return "unknown";
 		    }
 	    }
@@ -4081,7 +4080,6 @@ namespace WPEFramework
                 return true;
             } else {
                 LOGERR(" --- Failed to create directory: %d", ret);
-				LOGERR("Error occurred while creating directory: %d", ret);
                 return false;
             }
         }
