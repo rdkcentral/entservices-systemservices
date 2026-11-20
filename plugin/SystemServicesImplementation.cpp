@@ -4065,6 +4065,7 @@ namespace WPEFramework
 			    }
 		    } else {
 			    LOGERR("file %s open failed\n", VERSION_FILE_NAME);
+				LOGERR("Error occured while open");
 			    return "unknown";
 		    }
 	    }
