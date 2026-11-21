@@ -295,7 +295,8 @@ Event Callback Registration
     ├─ INetworkStandbyModeChangedNotification
     ├─ IThermalModeChangedNotification
     ├─ IRebootNotification
-    └─ IModeChangedNotification
+    ├─ IModeChangedNotification
+    └─ IModePreChangeNotification
 ```
 
 ### Integration Points
@@ -351,6 +352,7 @@ SystemServices                    PowerManager
       │  (IThermalModeChanged)          │
       │  (IRebootNotification)          │
       │  (IModeChangedNotification)     │
+      │  (IModePreChangeNotification)  │
       │                                 │
       │<──── Power State Events ────────┤
       │<──── Thermal Events ────────────┤
@@ -369,6 +371,9 @@ SystemServices                    PowerManager
 - Provides getter method `getPwrMgrPluginInstance()` for internal access
 - Graceful handling of connection failures with retry mechanism
 - Coordinates system-wide power management through IARM Bus and COM-RPC
+- Registers as the `SystemServices` power-mode pre-change client via `AddPowerModePreChangeClient` and acknowledges each pre-change notification with `PowerModePreChangeComplete` using the client ID and transaction ID
+- Before a transition from STANDBY or LIGHT_SLEEP to DEEP_SLEEP, marks deep sleep in progress, waits for any running firmware-info check to finish, and unregisters IARM event handlers when IARM support is enabled. Other pre-change notifications clear the deep-sleep flag and restore those handlers
+- Removes the pre-change client and unregisters its notification interface during teardown
 
 ## External Interfaces
 
@@ -470,7 +475,7 @@ The 66+ API methods are organized into seven major capability groups:
 
 #### API Methods
 - `updateFirmware()`: Initiate firmware update process
-- `getFirmwareUpdateInfo(GUID)`: Get firmware update availability (async)
+- `getFirmwareUpdateInfo(GUID)`: Get firmware update availability (async). While the deep-sleep-in-progress flag is set by power-mode pre-change handling, skips the check and returns `asyncResponse = false` and `success = false` with `Core::ERROR_NONE`
 - `getFirmwareUpdateState()`: Get current firmware update state
 - `getDownloadedFirmwareInfo()`: Get info about downloaded firmware
 - `getFirmwareDownloadPercent()`: Get download progress percentage
@@ -811,6 +816,7 @@ Critical states are persisted to survive reboots:
 **Mutexes:**
 - `m_uploadLogsMutex`: Protect log upload state
 - `m_territoryMutex`: Protect territory configuration
+- `m_getFirmwareInfoThreadMutex`: Synchronize firmware-info thread access and the deep-sleep-in-progress flag
 - `_adminLock`: Critical section for plugin operations
 
 ## Performance
@@ -1082,7 +1088,8 @@ The following code files and methods/classes are covered by this specification:
 - plugin/SystemServicesImplementation.cpp:
     - SystemServicesImplementation::Configure
     - SystemServicesImplementation::InitializeIARM
-    - SystemServicesImplementation::DeinitializeIARM
+    - SystemServicesImplementation::RegisterIARMEventHandlers
+    - SystemServicesImplementation::UnregisterIARMEventHandlers
     - SystemServicesImplementation::InitializePowerManager
     - SystemServicesImplementation::registerEventHandlers
     - SystemServicesImplementation::Dispatch
@@ -1104,6 +1111,7 @@ The following code files and methods/classes are covered by this specification:
     - SystemServicesImplementation::SetDeepSleepTimer
     - SystemServicesImplementation::GetPowerStateBeforeReboot
     - SystemServicesImplementation::OnPowerModeChanged
+    - SystemServicesImplementation::OnPowerModePreChange
     - SystemServicesImplementation::OnNetworkStandbyModeChanged
     - SystemServicesImplementation::OnThermalModeChanged
     - SystemServicesImplementation::OnTemperatureThresholdChanged
