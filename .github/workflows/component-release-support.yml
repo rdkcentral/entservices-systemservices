@@ -1,0 +1,30 @@
+name: Component Release Support
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Hotfix version to release (e.g. 3.17.0.5)'
+        required: true
+        type: string
+      jira_ticket:
+        description: 'Jira ticket for the changelog commit'
+        required: true
+        type: string
+      support_branch:
+        description: 'Existing support branch (e.g. support/2.16.0)'
+        required: true
+        type: string
+
+jobs:
+  release:
+    uses: rdkcentral/build_tools_workflows/.github/workflows/component-release-support.yml@topic/support_branch_wf
+    with:
+      tag: ${{ inputs.tag }}
+      jira_ticket: ${{ inputs.jira_ticket }}
+      support_branch: ${{ inputs.support_branch }}
+    secrets:
+      RDKCM_DEPLOY_KEY: ${{ secrets.RDKCM_DEPLOY_KEY }}
