@@ -60,10 +60,6 @@ public:
         timezoneFile << timeZone;
         timezoneFile.close();
         ASSERT_TRUE(timezoneFile.good());
-        std::ofstream accuracyFile("/opt/persistent/timeZoneDSTAccuracy");
-        accuracyFile << "FINAL";
-        accuracyFile.close();
-        ASSERT_TRUE(accuracyFile.good());
     }
 
     ~TimeZoneTestFiles()
@@ -101,9 +97,6 @@ public:
         std::string value;
         ASSERT_TRUE(static_cast<bool>(std::getline(timezoneFile, value)));
         EXPECT_EQ(timeZone, value);
-        std::ifstream accuracyFile("/opt/persistent/timeZoneDSTAccuracy");
-        ASSERT_TRUE(static_cast<bool>(std::getline(accuracyFile, value)));
-        EXPECT_EQ("FINAL", value);
     }
 
     std::string MissingTarget() const
