@@ -2711,7 +2711,7 @@ namespace WPEFramework
                                 }
                             }
 #ifdef ENABLE_LINK_LOCALTIME
-                            // RDKEMW-27280: During the migration from RDK-V to RDK-E entOS stack, 
+                            // RDKEMW-29144: During the migration from RDK-V to RDK-E entOS stack, 
                             // ensure the localtime link is correctly set though timeZoneDST file might be available with the correct timezone information
                             // If the localtime link does not exist, create it
                             else {

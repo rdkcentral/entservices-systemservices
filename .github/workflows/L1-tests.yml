@@ -479,6 +479,7 @@ jobs:
           -DUSE_THUNDER_R4=ON
           -DHIDE_NON_EXTERNAL_SYMBOLS=OFF
           -DPLUGIN_SYSTEMSERVICES=ON
+          -DBUILD_ENABLE_LINK_LOCALTIME=ON
           &&
           cmake --build build/entservices-systemservices
           &&
