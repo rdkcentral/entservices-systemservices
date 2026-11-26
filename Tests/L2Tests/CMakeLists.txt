@@ -26,7 +26,7 @@ if(PLUGIN_SYSTEMSERVICES)
     set(SRC_FILES ${SRC_FILES} tests/SystemService_L2Test.cpp)
 endif()
 
-add_library(${MODULE_NAME} SHARED ${SRC_FILES})
+add_library(${MODULE_NAME} SHARED ${SRC_FILES} ../../plugin/Module.cpp)
 
 set_target_properties(${MODULE_NAME} PROPERTIES
         CXX_STANDARD 14
