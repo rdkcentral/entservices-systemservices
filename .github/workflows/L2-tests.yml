@@ -709,7 +709,6 @@ jobs:
           -DCMAKE_MODULE_PATH="$GITHUB_WORKSPACE/install/tools/cmake"
           -DHIDE_NON_EXTERNAL_SYMBOLS=OFF
           -DCMAKE_CXX_FLAGS="
-          -include tracing/tracing.h
           -DEXCEPTIONS_ENABLE=ON
           -fprofile-arcs
           -ftest-coverage
