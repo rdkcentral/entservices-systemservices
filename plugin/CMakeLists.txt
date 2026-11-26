@@ -69,6 +69,10 @@ set_target_properties(${PLUGIN_IMPLEMENTATION} PROPERTIES
 
 target_compile_definitions(${PLUGIN_IMPLEMENTATION} PRIVATE MODULE_NAME=Plugin_${PLUGIN_NAME})
 
+if (BUILD_ENABLE_LINK_LOCALTIME)
+    target_compile_definitions(${PLUGIN_IMPLEMENTATION} PRIVATE ENABLE_LINK_LOCALTIME)
+endif ()
+
 if (NOT RDK_SERVICES_L1_TEST)
     target_compile_options(${PLUGIN_IMPLEMENTATION} PRIVATE -Wno-error)
 endif ()
