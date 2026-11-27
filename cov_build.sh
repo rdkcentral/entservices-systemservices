@@ -55,7 +55,7 @@ cmake -G Ninja -S "$GITHUB_WORKSPACE" -B "$1" \
 -I ${GITHUB_WORKSPACE}/entservices-testframework/Tests/mocks/thunder \
 -I ${GITHUB_WORKSPACE}/entservices-testframework/Tests/mocks/devicesettings \
 -I /usr/include/libdrm \
--include ${GITHUB_WORKSPACE}/entservices-testframework/Tests/mocks/devicesettings.h \
+# -include ${GITHUB_WORKSPACE}/entservices-testframework/Tests/mocks/devicesettings.h \
 -include ${GITHUB_WORKSPACE}/entservices-testframework/Tests/mocks/Iarm.h \
 -include ${GITHUB_WORKSPACE}/entservices-testframework/Tests/mocks/Rfc.h \
 -include ${GITHUB_WORKSPACE}/entservices-testframework/Tests/mocks/RBus.h \
