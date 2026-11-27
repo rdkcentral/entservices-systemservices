@@ -117,6 +117,10 @@ include_directories(${TEST_INC})
 # Add SYSTIMEMGR_SUPPORT for L1 tests
 target_compile_definitions(${MODULE_NAME} PRIVATE ENABLE_SYSTIMEMGR_SUPPORT)
 
+if (BUILD_ENABLE_LINK_LOCALTIME)
+    target_compile_definitions(${MODULE_NAME} PRIVATE ENABLE_LINK_LOCALTIME)
+endif()
+
 target_link_directories(${MODULE_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/lib ${CMAKE_INSTALL_PREFIX}/lib/wpeframework/plugins)
 
 target_link_libraries(${MODULE_NAME} ${TEST_LIB})

@@ -6201,6 +6201,39 @@ TEST_F(SystemService_L2Test, SysImpl_SetTimeZoneDST_SameTZTwice_COMRPC)
     m_controller_SystemServices->Release();
 }
 
+/* Same TZ already persisted + missing localtime link → link is recreated (RDKTV-40794) */
+TEST_F(SystemService_L2Test, SysImpl_SetTimeZoneDST_SameTZ_MissingLocaltimeLink_COMRPC)
+{
+    if (CreateSystemServicesInterfaceObject() != Core::ERROR_NONE) {
+        TEST_LOG("Invalid SystemServices_Client");
+        return;
+    }
+    if (!m_controller_SystemServices || !m_SystemServicesPlugin) return;
+
+    uint32_t sysSrvStatus = 0;
+    string errorMessage;
+    bool success = false;
+
+    m_SystemServicesPlugin->SetTimeZoneDST("America/New_York", "FINAL", sysSrvStatus, errorMessage, success);
+    EXPECT_TRUE(success);
+
+    std::remove("/opt/persistent/localtime");
+
+    sysSrvStatus = 0; errorMessage = ""; success = false;
+    uint32_t result = m_SystemServicesPlugin->SetTimeZoneDST("America/New_York", "FINAL", sysSrvStatus, errorMessage, success);
+    EXPECT_EQ(result, Core::ERROR_NONE);
+
+#ifdef ENABLE_LINK_LOCALTIME
+    char target[256] = {0};
+    ssize_t len = readlink("/opt/persistent/localtime", target, sizeof(target) - 1);
+    ASSERT_GT(len, 0);
+    EXPECT_STREQ(target, "/usr/share/zoneinfo/America/New_York");
+#endif
+
+    m_SystemServicesPlugin->Release();
+    m_controller_SystemServices->Release();
+}
+
 /* ------------------------------------------------------------------- *
  * SetMode NORMAL when already NORMAL with duration=0 → changeMode=false*
  * Covers the else branch: LOGWARN("Current mode not changed")          *
@@ -10339,3 +10372,4 @@ TEST_F(SystemService_L2Test, SysImpl_UploadLogsAsync_AlreadyRunning_COMRPC)
         TEST_LOG("m_controller_SystemServices is NULL");
     }
 }
+

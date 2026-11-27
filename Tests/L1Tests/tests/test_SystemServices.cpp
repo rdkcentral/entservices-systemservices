@@ -102,6 +102,7 @@ TEST(SystemServicesSecurityTest, ValidatesSplashScreenPaths)
 #include "ThunderPortability.h"
 #include "WorkerPoolImplementation.h"
 #include "COMLinkMock.h"
+#include "../../TimeZoneTestSupport.h"
 
 #ifdef ENABLE_SYSTIMEMGR_SUPPORT
 #include "systimerifc/itimermsg.h"
@@ -5293,6 +5294,43 @@ TEST_F(SystemServicesTest, SetTimeZoneDST_InvalidAccuracy_Ignored)
 
     TEST_LOG("SetTimeZoneDST_InvalidAccuracy_Ignored - Response: %s", response.c_str());
 }
+
+#ifdef ENABLE_LINK_LOCALTIME
+TEST_F(SystemServicesTest, SetTimeZoneDST_SameZone_MissingLocaltimeLink_CreatesLink)
+{
+    (void)system("mkdir -p /usr/share/zoneinfo/America");
+    (void)system("touch /usr/share/zoneinfo/America/New_York");
+    TimeZoneTestFiles files;
+    ASSERT_NO_FATAL_FAILURE(files.SetUp());
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTimeZoneDST"),
+              _T("{\"timeZone\":\"America/New_York\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << response;
+    files.ExpectLinkTarget(files.zoneFile);
+    files.ExpectUnchangedSettings();
+}
+
+TEST_F(SystemServicesTest, SetTimeZoneDST_SameZone_ExistingLocaltimeLink_Untouched)
+{
+    (void)system("mkdir -p /usr/share/zoneinfo/America");
+    (void)system("touch /usr/share/zoneinfo/America/New_York");
+    TimeZoneTestFiles files;
+    ASSERT_NO_FATAL_FAILURE(files.SetUp());
+    ASSERT_EQ(0, symlink("/etc/passwd", files.localtime)) << strerror(errno);
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setTimeZoneDST"),
+              _T("{\"timeZone\":\"America/New_York\"}"), response));
+
+    JsonObject jsonResponse;
+    ASSERT_TRUE(jsonResponse.FromString(response)) << "Failed to parse response: " << response;
+    EXPECT_TRUE(jsonResponse["success"].Boolean()) << response;
+    files.ExpectLinkTarget("/etc/passwd");
+    files.ExpectUnchangedSettings();
+}
+#endif
 
 // ======================================
 // getTimeZoneDST — file absent/present branches
@@ -12032,11 +12070,19 @@ TEST_F(SystemServicesTest, GetBootTypeInfo_AllBootTypes_CoversAllMapEntries)
 // =============================================================================
 // getDeviceInfo with DeviceInfoImplementationMock 
 // =============================================================================
+class SystemServicesDeviceInfoMock : public DeviceInfoImplementationMock {
+public:
+    MOCK_METHOD(WPEFramework::Core::hresult, DisplayBrandName,
+                (WPEFramework::Exchange::IDeviceInfo::DeviceDisplayBrandName&), (const, override));
+    MOCK_METHOD(WPEFramework::Core::hresult, DisplayBrandName,
+                (const std::string&), (override));
+};
+
 TEST_F(SystemServicesTest, GetDeviceInfo_ModelNumber_WithDeviceInfoPlugin)
 {
     // Heap-allocate so service (fixture member, outlives test body) does not hold
     // a dangling stack pointer in its ON_CALL default-action table.
-    auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
+    auto* deviceInfoMock = new ::testing::NiceMock<SystemServicesDeviceInfoMock>();
 
     // When DeviceInfo plugin is set up, empty queryParam causes ALL fields to be queried,
     // including bluetooth_mac which calls v_secure_popen. Mock it to return a valid empty
@@ -12081,7 +12127,7 @@ TEST_F(SystemServicesTest, GetDeviceInfo_ModelNumber_WithDeviceInfoPlugin)
 
 TEST_F(SystemServicesTest, GetDeviceInfo_DeviceType_WithDeviceInfoPlugin)
 {
-    auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
+    auto* deviceInfoMock = new ::testing::NiceMock<SystemServicesDeviceInfoMock>();
 
     ON_CALL(*p_wrapsMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_))
         .WillByDefault(::testing::Invoke([](const char*, const char*, va_list) -> FILE* { return fopen("/dev/null", "r"); }));
@@ -12120,7 +12166,7 @@ TEST_F(SystemServicesTest, GetDeviceInfo_DeviceType_WithDeviceInfoPlugin)
 
 TEST_F(SystemServicesTest, GetDeviceInfo_EstbMac_WithDeviceInfoPlugin)
 {
-    auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
+    auto* deviceInfoMock = new ::testing::NiceMock<SystemServicesDeviceInfoMock>();
 
     ON_CALL(*p_wrapsMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_))
         .WillByDefault(::testing::Invoke([](const char*, const char*, va_list) -> FILE* { return fopen("/dev/null", "r"); }));
@@ -12159,7 +12205,7 @@ TEST_F(SystemServicesTest, GetDeviceInfo_EstbMac_WithDeviceInfoPlugin)
 
 TEST_F(SystemServicesTest, GetDeviceInfo_EthMac_WithDeviceInfoPlugin)
 {
-    auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
+    auto* deviceInfoMock = new ::testing::NiceMock<SystemServicesDeviceInfoMock>();
 
     ON_CALL(*p_wrapsMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_))
         .WillByDefault(::testing::Invoke([](const char*, const char*, va_list) -> FILE* { return fopen("/dev/null", "r"); }));
@@ -12198,7 +12244,7 @@ TEST_F(SystemServicesTest, GetDeviceInfo_EthMac_WithDeviceInfoPlugin)
 
 TEST_F(SystemServicesTest, GetDeviceInfo_WifiMac_WithDeviceInfoPlugin)
 {
-    auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
+    auto* deviceInfoMock = new ::testing::NiceMock<SystemServicesDeviceInfoMock>();
 
     ON_CALL(*p_wrapsMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_))
         .WillByDefault(::testing::Invoke([](const char*, const char*, va_list) -> FILE* { return fopen("/dev/null", "r"); }));
@@ -12237,7 +12283,7 @@ TEST_F(SystemServicesTest, GetDeviceInfo_WifiMac_WithDeviceInfoPlugin)
 
 TEST_F(SystemServicesTest, GetDeviceInfo_BoxIP_WithDeviceInfoPlugin)
 {
-    auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
+    auto* deviceInfoMock = new ::testing::NiceMock<SystemServicesDeviceInfoMock>();
 
     ON_CALL(*p_wrapsMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_))
         .WillByDefault(::testing::Invoke([](const char*, const char*, va_list) -> FILE* { return fopen("/dev/null", "r"); }));
@@ -12276,7 +12322,7 @@ TEST_F(SystemServicesTest, GetDeviceInfo_BoxIP_WithDeviceInfoPlugin)
 
 TEST_F(SystemServicesTest, GetDeviceInfo_FirmwareVersion_WithDeviceInfoPlugin)
 {
-    auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
+    auto* deviceInfoMock = new ::testing::NiceMock<SystemServicesDeviceInfoMock>();
 
     ON_CALL(*p_wrapsMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_))
         .WillByDefault(::testing::Invoke([](const char*, const char*, va_list) -> FILE* { return fopen("/dev/null", "r"); }));
@@ -12315,7 +12361,7 @@ TEST_F(SystemServicesTest, GetDeviceInfo_FirmwareVersion_WithDeviceInfoPlugin)
 
 TEST_F(SystemServicesTest, GetDeviceInfo_FriendlyId_WithDeviceInfoPlugin)
 {
-    auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
+    auto* deviceInfoMock = new ::testing::NiceMock<SystemServicesDeviceInfoMock>();
 
     ON_CALL(*p_wrapsMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_))
         .WillByDefault(::testing::Invoke([](const char*, const char*, va_list) -> FILE* { return fopen("/dev/null", "r"); }));
@@ -12355,7 +12401,7 @@ TEST_F(SystemServicesTest, GetDeviceInfo_FriendlyId_WithDeviceInfoPlugin)
 TEST_F(SystemServicesTest, GetDeviceInfo_AllFields_WithDeviceInfoPlugin_CoversAllBranches)
 {
     // Empty params array → queries ALL fields → covers all branches in GetDeviceInfo
-    auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
+    auto* deviceInfoMock = new ::testing::NiceMock<SystemServicesDeviceInfoMock>();
 
     ON_CALL(*p_wrapsMock, v_secure_popen(::testing::_, ::testing::_, ::testing::_))
         .WillByDefault(::testing::Invoke([](const char*, const char*, va_list) -> FILE* { return fopen("/dev/null", "r"); }));
@@ -12479,7 +12525,7 @@ TEST_F(SystemServicesTest, SetMigrationStatus_WithMigrationPlugin_MigrationCompl
 // =============================================================================
 TEST_F(SystemServicesTest, GetSerialNumber_WithDeviceInfoPlugin_SuccessPath)
 {
-    ::testing::NiceMock<DeviceInfoImplementationMock> deviceInfoMock;
+    ::testing::NiceMock<SystemServicesDeviceInfoMock> deviceInfoMock;
 
     EXPECT_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
         .WillOnce(::testing::Return(static_cast<Exchange::IDeviceInfo*>(&deviceInfoMock)));
@@ -12512,7 +12558,7 @@ TEST_F(SystemServicesTest, GetSerialNumber_WithDeviceInfoPlugin_SuccessPath)
 // =============================================================================
 TEST_F(SystemServicesTest, GetStbVersionString_ViaGetSystemVersions_WithDeviceInfoPlugin)
 {
-    auto* deviceInfoMock = new ::testing::NiceMock<DeviceInfoImplementationMock>();
+     auto* deviceInfoMock = new ::testing::NiceMock<SystemServicesDeviceInfoMock>();
 
     ON_CALL(service, QueryInterfaceByCallsign(::testing::_, ::testing::Eq(std::string("DeviceInfo"))))
         .WillByDefault(::testing::Return(static_cast<Exchange::IDeviceInfo*>(deviceInfoMock)));
