@@ -5445,7 +5445,7 @@ namespace WPEFramework {
                 status = true;
             }
             else {
-                LOGINFO("Failed to get RFC parameter for Migration Status \n");
+                LOGINFO("Unable to retrieve RFC parameter for Migration Status.\n");
             }
          return (status ?  static_cast<uint32_t>(WPEFramework::Core::ERROR_NONE) :  static_cast<uint32_t>(ERROR_FILE_IO));
         }//end of getMigrationStatus method
