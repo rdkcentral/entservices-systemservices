@@ -4225,7 +4225,7 @@ namespace WPEFramework
                 // Directory already exists, which is fine
                 return true;
             } else {
-                LOGERR(" --- Failed to create directory: %d", ret);
+                LOGERR("Failed to create the directory. Return code: %d", ret);
                 return false;
             }
         }
