@@ -1,5 +1,8 @@
 name: L2-tests
 
+permissions:
+  contents: read
+
 on:
   workflow_call:
     inputs:

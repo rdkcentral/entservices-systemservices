@@ -23,6 +23,7 @@
 #include <curl/curl.h>
 #include <sstream>
 #include <map>
+#include <utility>
 
 #include "SystemServicesHelper.h"
 
@@ -103,7 +104,7 @@ std::int32_t getUploadLogParameters(string &tftp_server, string &upload_protocol
         return E_NOK;
     }
 
-   upload_httplink = httplink;
+   upload_httplink = std::move(httplink);
    return E_OK;
 }
 
