@@ -132,6 +132,7 @@ The repository uses GitHub Actions for automated testing and quality checks:
 - **update-changelog-and-api-version.yml**: Enforces CHANGELOG.md updates
 - **cla.yml**: Contributor License Agreement verification
 - **fossid_integration_stateless_diffscan_target_repo.yml**: Open-source license scanning
+- **component-release-support.yml**: Manually triggered support-branch hotfix release with required tag, Jira ticket, and existing support branch inputs
 
 ## Contributing
 
