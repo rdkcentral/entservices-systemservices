@@ -120,7 +120,7 @@ Real-time notifications for system state changes including power state transitio
 ### System Requirements
 - **WPEFramework**: Thunder R4.4+ compatible
 - **Operating System**: Linux-based RDK platform
-- **Required Services**: IARM Bus, Device Settings HAL, RFC service
+- **Required Services**: IARM Bus, DeviceSettings plugin (`entservices-devicesettings`) accessed over COM-RPC, RFC service
 - **Optional Dependencies**: Deep Sleep HAL, Thermal Monitor (for advanced features)
 
 ### Configuration
