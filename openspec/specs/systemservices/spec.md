@@ -513,7 +513,7 @@ The 66+ API methods are organized into seven major capability groups:
   - Persistent store mode configuration
 
 #### API Methods
-- `setTimeZoneDST(timeZone, accuracy)`: Set system timezone
+- `setTimeZoneDST(timeZone, accuracy)`: Set system timezone. With `ENABLE_LINK_LOCALTIME` enabled, reapplying the saved timezone also attempts to create `/opt/persistent/localtime` if it is missing, pointing it to the corresponding zoneinfo file.
 - `getTimeZoneDST()`: Get current timezone configuration
 - `getTimeZones()`: Get list of available timezones
 - `setTerritory(territory, region)`: Set device territory/region
