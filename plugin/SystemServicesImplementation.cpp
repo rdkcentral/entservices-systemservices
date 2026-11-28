@@ -352,6 +352,11 @@ namespace WPEFramework
             , _service(nullptr)
             , _pwrMgrNotification(*this)
             , _registeredEventHandlers(false)
+            , _powerModeClientId(0)
+#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
+            , m_iarmEventHandlersRegistered(false)
+#endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
+            , m_deepSleepInProgress(false)
         {
             LOGINFO("Create SystemServicesImplementation Instance");
 
@@ -388,14 +393,17 @@ namespace WPEFramework
                 _powerManagerPlugin->Unregister(_pwrMgrNotification.baseInterface<Exchange::IPowerManager::INetworkStandbyModeChangedNotification>());
                 _powerManagerPlugin->Unregister(_pwrMgrNotification.baseInterface<Exchange::IPowerManager::IThermalModeChangedNotification>());
                 _powerManagerPlugin->Unregister(_pwrMgrNotification.baseInterface<Exchange::IPowerManager::IRebootNotification>());
-                _powerManagerPlugin->Unregister(_pwrMgrNotification.baseInterface<Exchange::IPowerManager::IModeChangedNotification>());		    
+                _powerManagerPlugin->Unregister(_pwrMgrNotification.baseInterface<Exchange::IPowerManager::IModeChangedNotification>());		
+                _powerManagerPlugin->RemovePowerModePreChangeClient(_powerModeClientId);
+                _powerManagerPlugin->Unregister(_pwrMgrNotification.baseInterface<Exchange::IPowerManager::IModePreChangeNotification>());
+                _powerModeClientId = 0;
                 _powerManagerPlugin.Reset();
             }
 
             _registeredEventHandlers = false;
             m_operatingModeTimer.stop();
 #if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
-            DeinitializeIARM();
+            UnregisterIARMEventHandlers();
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
             // Close COM-RPC link
             DSHelper::Close();
@@ -546,23 +554,37 @@ namespace WPEFramework
             {
                 IARM_Result_t res;
                 IARM_CHECK( IARM_Bus_RegisterCall(IARM_BUS_COMMON_API_SysModeChange, _SysModeChange));
+                RegisterIARMEventHandlers();
+            }
+        }
+
+        void SystemServicesImplementation::RegisterIARMEventHandlers()
+        {
+            if (!m_iarmEventHandlersRegistered && Utils::IARM::isConnected())
+            {
+				IARM_Result_t res;
                 IARM_CHECK( IARM_Bus_RegisterEventHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, _systemStateChanged));
                 IARM_CHECK( IARM_Bus_RegisterEventHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_DEVICE_UPDATE_RECEIVED, _deviceMgtUpdateReceived));
 #ifdef ENABLE_SYSTIMEMGR_SUPPORT
                 IARM_CHECK( IARM_Bus_RegisterEventHandler(IARM_BUS_SYSTIME_MGR_NAME, cTIMER_STATUS_UPDATE, _timerStatusEventHandler));
 #endif// ENABLE_SYSTIMEMGR_SUPPORT
+                m_iarmEventHandlersRegistered = true;
             }
 	    
         }
 
-        void SystemServicesImplementation::DeinitializeIARM()
+        void SystemServicesImplementation::UnregisterIARMEventHandlers()
         {
-            if (Utils::IARM::isConnected())
+            if (m_iarmEventHandlersRegistered && Utils::IARM::isConnected())
             {
                 IARM_Result_t res;
                 IARM_CHECK( IARM_Bus_RemoveEventHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_SYSTEMSTATE, _systemStateChanged));
-		        IARM_CHECK( IARM_Bus_RemoveEventHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_DEVICE_UPDATE_RECEIVED, _deviceMgtUpdateReceived));
+                IARM_CHECK( IARM_Bus_RemoveEventHandler(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_EVENT_DEVICE_UPDATE_RECEIVED, _deviceMgtUpdateReceived));
+#ifdef ENABLE_SYSTIMEMGR_SUPPORT
+                IARM_CHECK( IARM_Bus_RemoveEventHandler(IARM_BUS_SYSTIME_MGR_NAME, cTIMER_STATUS_UPDATE, _timerStatusEventHandler));
+#endif// ENABLE_SYSTIMEMGR_SUPPORT
             }
+            m_iarmEventHandlersRegistered = false;
         }
 #endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
 
@@ -581,11 +603,17 @@ namespace WPEFramework
                 _powerManagerPlugin->Register(_pwrMgrNotification.baseInterface<Exchange::IPowerManager::IThermalModeChangedNotification>());
                 _powerManagerPlugin->Register(_pwrMgrNotification.baseInterface<Exchange::IPowerManager::IRebootNotification>());
                 _powerManagerPlugin->Register(_pwrMgrNotification.baseInterface<Exchange::IPowerManager::IModeChangedNotification>());
+                _powerManagerPlugin->Register(_pwrMgrNotification.baseInterface<Exchange::IPowerManager::IModePreChangeNotification>());
+                _powerManagerPlugin->AddPowerModePreChangeClient("SystemServices", _powerModeClientId);
             }
+
+            LOGDBG("Event handlers registered: %s _powerModeClientId: %u", _registeredEventHandlers ? "true" : "false", _powerModeClientId);
         }
 
         void SystemServicesImplementation::OnPowerModeChanged(const PowerState currentState, const PowerState newState)
         {
+            LOGINFO("Power mode changed from %d to %d", currentState, newState);
+            
             std::string curPowerState,newPowerState = "";
 
             curPowerState = powerModeEnumToString(currentState);
@@ -599,6 +627,46 @@ namespace WPEFramework
             } else {
                 LOGERR("SystemServicesImplementation::_instance is NULL.\n");
             }
+        }
+
+        void SystemServicesImplementation::OnPowerModePreChange(const PowerState currentState, const PowerState newState, const int transactionId, const int stateChangeAfter)
+        {
+            LOGINFO("PowerModePreChange: Current State %s, New State %s, Transaction ID %d, State Change After %d\n",
+                    powerModeEnumToString(currentState).c_str(),
+                    powerModeEnumToString(newState).c_str(),
+                    transactionId,
+                    stateChangeAfter);
+
+            const bool enteringDeepSleep =
+                (newState == Exchange::IPowerManager::PowerState::POWER_STATE_STANDBY_DEEP_SLEEP) &&
+                (currentState == Exchange::IPowerManager::PowerState::POWER_STATE_STANDBY ||
+                 currentState == Exchange::IPowerManager::PowerState::POWER_STATE_STANDBY_LIGHT_SLEEP);
+            
+            if (enteringDeepSleep) {
+                LOGINFO("Entering deep sleep mode.\n");
+
+                {
+                    std::lock_guard<std::mutex> lock(m_getFirmwareInfoThreadMutex);
+                    m_deepSleepInProgress = true;                
+                    if (m_getFirmwareInfoThread.get().joinable()) {
+                        m_getFirmwareInfoThread.get().join();
+                    }
+                }
+#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
+                UnregisterIARMEventHandlers();
+#endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
+            } else {
+                {
+                    std::lock_guard<std::mutex> lock(m_getFirmwareInfoThreadMutex);
+                    m_deepSleepInProgress = false;                    
+                }
+#if defined(USE_IARMBUS) || defined(USE_IARM_BUS)
+                
+                RegisterIARMEventHandlers();
+#endif /* defined(USE_IARMBUS) || defined(USE_IARM_BUS) */
+            }
+            LOGINFO("Power mode change completed for client ID: %u", _powerModeClientId);
+            _powerManagerPlugin->PowerModePreChangeComplete(_powerModeClientId, transactionId);
         }
 
         std::string SystemServicesImplementation::powerModeEnumToString(PowerState state)
@@ -707,6 +775,29 @@ namespace WPEFramework
                 {
                     string powerState = params["powerState"].String();
                     string currentPowerState = params["currentPowerState"].String();
+
+                    {
+                        char value[256] = {0};
+                        snprintf(value, sizeof(value), "power state changed from");
+                        t2_event_s((char*)"PwrStateChng_split", value);
+
+                        if (currentPowerState == "ON" && powerState == "LIGHT_SLEEP")
+                        {
+                            t2_event_d((char*)"SYST_INFO_ThunderSleep1", 1);
+                        }
+                        else if (currentPowerState == "LIGHT_SLEEP" && powerState == "DEEP_SLEEP")
+                        {
+                            t2_event_d((char*)"SYST_INFO_ThunderSleep2", 1);
+                        }
+                        else if (currentPowerState == "DEEP_SLEEP" && powerState == "LIGHT_SLEEP")
+                        {
+                            t2_event_d((char*)"SYST_INFO_ThunderWake1", 1);
+                        }
+                        else if (currentPowerState == "LIGHT_SLEEP" && powerState == "ON")
+                        {
+                            t2_event_d((char*)"SYST_INFO_ThunderWake2", 1);
+                        }
+                    }
 
                     while (index != _systemServicesNotification.end()) 
                     {
@@ -1906,6 +1997,13 @@ namespace WPEFramework
             LOGINFO("GUID=%s", GUID.c_str());
             try
             {
+                std::lock_guard<std::mutex> lock(m_getFirmwareInfoThreadMutex);
+                if (m_deepSleepInProgress) {
+                    asyncResponse = false;
+                    success = false;
+                    LOGWARN("Firmware update check skipped during deep sleep");
+                    return Core::ERROR_NONE;
+                }
                 if (m_getFirmwareInfoThread.get().joinable()) {
                     m_getFirmwareInfoThread.get().join();
                 }
@@ -3024,27 +3122,6 @@ namespace WPEFramework
             params["powerState"] = powerState;
             params["currentPowerState"] = currentPowerState;
             LOGWARN("power state changed from '%s' to '%s'", currentPowerState.c_str(), powerState.c_str());
-
-            char value[256] = {0};
-            snprintf(value, sizeof(value), "power state changed from");
-            t2_event_s((char*)"PwrStateChng_split", value);
-
-            if (currentPowerState == "ON" && powerState == "LIGHT_SLEEP")
-            {
-                t2_event_d((char*)"SYST_INFO_ThunderSleep1", 1);
-            }
-            else if (currentPowerState == "LIGHT_SLEEP" && powerState == "DEEP_SLEEP")
-            {
-                t2_event_d((char*)"SYST_INFO_ThunderSleep2", 1);
-            }
-            else if (currentPowerState == "DEEP_SLEEP" && powerState == "LIGHT_SLEEP")
-            {
-                t2_event_d((char*)"SYST_INFO_ThunderWake1", 1);
-            }
-            else if (currentPowerState == "LIGHT_SLEEP" && powerState == "ON")
-            {
-                t2_event_d((char*)"SYST_INFO_ThunderWake2", 1);
-            }
             dispatchEvent(SYSTEMSERVICES_EVT_ONSYSTEMPOWERSTATECHANGED, params);
         }
         
